@@ -31,6 +31,14 @@ http://localhost:5173
 ## Di chuyển vào thư mục backend
 
 
+```
+# Build logic tại Colab:
+https://drive.google.com/drive/folders/16eO0z5zsYyhlQrVUVwNYT5McwJsfvVoZ
+```
+
+# Sản phẩm đã được deloy trên Vercel:
+https://ai-exam-monitoring.vercel.app/
+
 # Yêu cầu hệ thống
 
 - NodeJS >= 18
