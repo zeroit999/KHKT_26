@@ -3,7 +3,7 @@
 ## Di chuyển vào thư mục frontend
 
 ```bash
-cd front-end
+cd frontend
 ```
 
 ## Cài dependencies
