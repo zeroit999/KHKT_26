@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "../components/firebase.js";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 
 const AuthContext = createContext({});
 
+// AuthContext keeps hook and provider together to preserve the existing file structure.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -142,6 +144,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (user && !authToken && !isLoading) {
       console.log("🔧 User exists but no authToken, getting token...");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       getAuthToken(user);
     }
   }, [user, authToken, isLoading]);

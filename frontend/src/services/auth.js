@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-catch */
 import { auth } from '../components/firebase.js';
 import {
   signInWithEmailAndPassword,
