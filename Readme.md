@@ -29,9 +29,16 @@ http://localhost:5173
 # Chạy Backend
 
 ## Di chuyển vào thư mục backend
-
-
+```bash
+cd backend
 ```
+## Cài dependencies
+```bash
+npm install
+```
+## Chạy NodeJS Server
+
+
 # Build logic tại Colab:
 https://drive.google.com/drive/folders/16eO0z5zsYyhlQrVUVwNYT5McwJsfvVoZ
 ```
