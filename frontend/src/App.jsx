@@ -14,6 +14,9 @@ import Leaderboard from './pages/Leaderboard.jsx'
 import LearningPage from './pages/LearningPage.jsx'
 import NotFound from './pages/NotFound.jsx'
 import ResultPage from './pages/ResultPage.jsx'
+import Login from './components/Signpage/login.jsx'
+import Register from './components/Signpage/register.jsx'
+import { AuthProvider } from './contexts/AuthContext.jsx'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -52,6 +55,8 @@ function AnimatedRoutes({ darkMode, onToggleDarkMode }) {
               <Route path="/learn/:id" element={<LearningPage />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/home" element={<Navigate to="/" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </motion.div>
