@@ -1,14 +1,14 @@
 import MaintenanceState from '../components/ui/MaintenanceState.jsx'
 
-function Exams() {
+function Classes() {
   return (
     <MaintenanceState
-      badge="Kho đề thi"
+      badge="Quản lý lớp học"
       title="Đang bảo trì"
-      subtitle="Dữ liệu đề thi đang được cập nhật"
+      subtitle="Dữ liệu đang được cập nhật"
       description="Vui lòng quay lại sau"
     />
   )
 }
 
-export default Exams
+export default Classes

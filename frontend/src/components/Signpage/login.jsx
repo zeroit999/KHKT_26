@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase.js";
-import { useAuth } from "../../contexts/AuthContext";
-import SignWithGoogle from "./signWithGoogle";
-import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase.js';
+import { useAuth } from '../../contexts/AuthContext';
+import SignWithGoogle from './signWithGoogle';
+import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase.js';
 
 function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user, isPro, isLoading } = useAuth();
@@ -18,11 +20,11 @@ function Login() {
   // Updated handleSubmit to use Firebase auth directly
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setError('');
     setLoading(true);
 
     try {
-      console.log("🔄 Logging in with Firebase...");
+      console.log('🔄 Logging in with Firebase...');
 
       // Sign in with Firebase directly
       const userCredential = await signInWithEmailAndPassword(
@@ -30,31 +32,35 @@ function Login() {
         email,
         password
       );
-      console.log("✅ Firebase login successful:", userCredential.user.email);
+      console.log('✅ Firebase login successful:', userCredential.user.email);
 
       // AuthContext will automatically handle the rest
       // Navigate based on user type (will be handled after AuthContext updates)
-      setTimeout(() => {
-        navigate("/");
-      }, 1000);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+
+      if (!userDoc.exists() || !userDoc.data()?.isSetupComplete) {
+        navigate('/setup');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
-      console.error("❌ Login error:", error);
+      console.error('❌ Login error:', error);
 
       // Display user-friendly error messages
-      if (error.code === "auth/user-not-found") {
-        setError("Không tìm thấy tài khoản với email này");
-      } else if (error.code === "auth/wrong-password") {
-        setError("Mật khẩu không chính xác");
-      } else if (error.code === "auth/invalid-email") {
-        setError("Email không hợp lệ");
-      } else if (error.code === "auth/invalid-credential") {
-        setError("Thông tin đăng nhập không chính xác");
+      if (error.code === 'auth/user-not-found') {
+        setError('Không tìm thấy tài khoản với email này');
+      } else if (error.code === 'auth/wrong-password') {
+        setError('Mật khẩu không chính xác');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Email không hợp lệ');
+      } else if (error.code === 'auth/invalid-credential') {
+        setError('Thông tin đăng nhập không chính xác');
       } else {
-        setError("Đăng nhập thất bại. Vui lòng thử lại.");
+        setError('Đăng nhập thất bại. Vui lòng thử lại.');
       }
 
       setTimeout(() => {
-        setError("");
+        setError('');
       }, 5000);
     } finally {
       setLoading(false);
@@ -64,8 +70,8 @@ function Login() {
   // Check if user is already logged in via AuthContext
   useEffect(() => {
     if (!isLoading && user) {
-      console.log("✅ User already logged in, redirecting...");
-      navigate("/");
+      console.log('✅ User already logged in, redirecting...');
+      navigate('/');
     }
   }, [user, isLoading, navigate]);
 
@@ -76,17 +82,17 @@ function Login() {
         <div
           className="absolute inset-0 bg-black/10"
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <img
             src="https://gqefcpylonobj.vcdn.cloud/directus-upload/3842e061-79b5-4f70-9b48-b6219f75883d.png"
             alt="Mô tả hình ảnh"
             style={{
-              width: "70%",
-              height: "auto",
+              width: '70%',
+              height: 'auto',
             }}
           />
         </div>
@@ -98,7 +104,7 @@ function Login() {
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div className="text-center mb-6 justify-center items-center flex flex-col">
               <div className="mb-4">
-                <img src={"./Logo_CC_tron.svg"} alt="Logo" className="h-12" />
+                <img src={'./Logo_CC_tron.svg'} alt="Logo" className="h-12" />
               </div>
               <h2 className="text-xl font-bold text-gray-800 mb-2">
                 Chào mừng bạn trở lại!
@@ -141,7 +147,7 @@ function Login() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500" />
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Nhập mật khẩu của bạn"
@@ -173,11 +179,11 @@ function Login() {
                 disabled={loading}
                 className={`w-full px-6 py-2.5 font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
                   loading
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800"
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
                 }`}
               >
-                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
 
               <div className="relative">
@@ -192,7 +198,7 @@ function Login() {
               <SignWithGoogle />
 
               <p className="text-center text-gray-600">
-                Chưa có tài khoản?{" "}
+                Chưa có tài khoản?{' '}
                 <Link
                   to="/register"
                   className="text-blue-600 hover:text-blue-800 font-medium"
