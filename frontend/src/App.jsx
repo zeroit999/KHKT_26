@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+
 import {
   BrowserRouter,
   Navigate,
@@ -7,7 +8,11 @@ import {
   useLocation,
 } from 'react-router-dom'
 
-import { AnimatePresence, motion } from 'framer-motion'
+import {
+  AnimatePresence,
+  motion,
+} from 'framer-motion'
+
 import { Toaster } from 'react-hot-toast'
 
 import AppLayout from './components/layout/AppLayout.jsx'
@@ -150,11 +155,19 @@ function AnimatedRoutes({
             }}
           >
             <Routes location={location}>
-              <Route path="/" element={<Home />} />
+              <Route
+                path="/"
+                element={<Home />}
+              />
 
               <Route
                 path="/home"
-                element={<Navigate to="/" replace />}
+                element={
+                  <Navigate
+                    to="/"
+                    replace
+                  />
+                }
               />
 
               <Route
@@ -249,18 +262,31 @@ function AnimatedRoutes({
 
 function App() {
   const [darkMode, setDarkMode] =
-    useState(true)
+    useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle(
       'dark',
       darkMode
     )
+
+    const favicon =
+      document.getElementById('favicon')
+
+    if (favicon) {
+      favicon.setAttribute(
+        'href',
+        darkMode
+          ? '/favicon-dark-mode.png'
+          : '/favicon-light-mode.png'
+      )
+    }
   }, [darkMode])
 
   const toastOptions = useMemo(
     () => ({
       duration: 2600,
+
       style: {
         border:
           '1px solid rgba(34, 211, 238, 0.28)',
@@ -283,6 +309,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+
         <AnimatedRoutes
           darkMode={darkMode}
           onToggleDarkMode={() =>
@@ -294,6 +321,7 @@ function App() {
           position="top-right"
           toastOptions={toastOptions}
         />
+
       </BrowserRouter>
     </AuthProvider>
   )

@@ -30,7 +30,8 @@ import { auth } from '../firebase'
 
 import { useAuth } from '../../contexts/AuthContext'
 
-import reactLogo from '../../assets/react.svg'
+import darkLogo from '../../assets/dark-mode.png'
+import lightLogo from '../../assets/light-mode.png'
 
 export default function Navbar({
   darkMode,
@@ -63,10 +64,16 @@ export default function Navbar({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener(
+      'mousedown',
+      handleClickOutside
+    )
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener(
+        'mousedown',
+        handleClickOutside
+      )
     }
   }, [])
 
@@ -79,38 +86,40 @@ export default function Navbar({
     }
   }
 
-  const navItems = useMemo(() => [
-    {
-      label: 'Trang chủ',
-      path: '/',
-    },
-    {
-      label: 'Đề thi',
-      path: '/exams',
-    },
-    {
-      label: 'E-Learning',
-      path: '/courses',
-    },
-    {
-      label: 'Xếp hạng',
-      path: '/leaderboard',
-    },
-    {
-      label: 'Dashboard',
-      path: '/dashboard',
-    },
+  const navItems = useMemo(
+    () => [
+      {
+        label: 'Trang chủ',
+        path: '/',
+      },
+      {
+        label: 'Đề thi',
+        path: '/exams',
+      },
+      {
+        label: 'E-Learning',
+        path: '/courses',
+      },
+      {
+        label: 'Xếp hạng',
+        path: '/leaderboard',
+      },
+      {
+        label: 'Dashboard',
+        path: '/dashboard',
+      },
 
-    // GIÁO VIÊN
-    ...(userDetails?.role === 'TEACHER'
-      ? [
-          {
-            label: 'Quản lý lớp học',
-            path: '/classes',
-          },
-        ]
-      : []),
-  ], [userDetails?.role])
+      ...(userDetails?.role === 'TEACHER'
+        ? [
+            {
+              label: 'Quản lý lớp học',
+              path: '/classes',
+            },
+          ]
+        : []),
+    ],
+    [userDetails?.role]
+  )
 
   return (
     <header
@@ -122,24 +131,33 @@ export default function Navbar({
     >
       <div className="mx-auto flex h-20 max-w-screen-xl items-center px-6">
 
-        {/* LEFT — LOGO (fixed width) */}
+        {/* LEFT — LOGO */}
         <div className="flex shrink-0 items-center">
           <Link
             to="/"
             className="flex items-center gap-3"
           >
-            <div className="rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 p-2 shadow-lg">
+
+            <div className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 p-2 shadow-lg">
+
               <img
-                src={reactLogo}
+                src={
+                  darkMode
+                    ? darkLogo
+                    : lightLogo
+                }
                 alt="logo"
-                className="h-7 w-7"
+                className="h-7 w-7 rounded-xl object-contain"
               />
+
             </div>
 
             <div>
               <h1
                 className={`text-2xl font-bold ${
-                  darkMode ? 'text-white' : 'text-slate-900'
+                  darkMode
+                    ? 'text-white'
+                    : 'text-slate-900'
                 }`}
               >
                 EduSprint
@@ -149,13 +167,15 @@ export default function Navbar({
                 THPT Platform
               </p>
             </div>
+
           </Link>
         </div>
 
-        {/* CENTER — NAV (takes remaining space, centered) */}
+        {/* CENTER — NAV */}
         <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path
+            const isActive =
+              location.pathname === item.path
 
             return (
               <Link
@@ -179,31 +199,44 @@ export default function Navbar({
           })}
         </nav>
 
-        {/* RIGHT — AUTH / ACTIONS (fixed width, right-aligned) */}
+        {/* RIGHT */}
         <div className="flex shrink-0 items-center justify-end gap-1">
 
           {/* SEARCH */}
           <button
             className={`rounded-xl p-2.5 transition-all ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+              darkMode
+                ? 'hover:bg-white/10'
+                : 'hover:bg-slate-100'
             }`}
           >
             <Search
               size={18}
-              className={darkMode ? 'text-white' : 'text-slate-700'}
+              className={
+                darkMode
+                  ? 'text-white'
+                  : 'text-slate-700'
+              }
             />
           </button>
 
           {/* NOTIFICATION */}
           <button
             className={`relative rounded-xl p-2.5 transition-all ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+              darkMode
+                ? 'hover:bg-white/10'
+                : 'hover:bg-slate-100'
             }`}
           >
             <Bell
               size={18}
-              className={darkMode ? 'text-white' : 'text-slate-700'}
+              className={
+                darkMode
+                  ? 'text-white'
+                  : 'text-slate-700'
+              }
             />
+
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-400" />
           </button>
 
@@ -211,29 +244,42 @@ export default function Navbar({
           <button
             onClick={onToggleDarkMode}
             className={`rounded-xl p-2.5 transition-all ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+              darkMode
+                ? 'hover:bg-white/10'
+                : 'hover:bg-slate-100'
             }`}
           >
             {darkMode ? (
-              <Sun size={18} className="text-yellow-400" />
+              <Sun
+                size={18}
+                className="text-yellow-400"
+              />
             ) : (
-              <Moon size={18} className="text-slate-700" />
+              <Moon
+                size={18}
+                className="text-slate-700"
+              />
             )}
           </button>
 
-          {/* LOGGED IN — USER DROPDOWN */}
+          {/* USER */}
           {user ? (
-            <div className="relative ml-1" ref={dropdownRef}>
+            <div
+              className="relative ml-1"
+              ref={dropdownRef}
+            >
 
-              {/* TRIGGER BUTTON */}
               <button
-                onClick={() => setOpenDropdown(!openDropdown)}
+                onClick={() =>
+                  setOpenDropdown(!openDropdown)
+                }
                 className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition-all ${
                   darkMode
                     ? 'border-white/10 bg-white/5 hover:bg-white/10'
                     : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
                 }`}
               >
+
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
@@ -255,7 +301,9 @@ export default function Navbar({
                 <div className="hidden text-left md:block">
                   <p
                     className={`max-w-[100px] truncate text-sm font-semibold ${
-                      darkMode ? 'text-white' : 'text-slate-900'
+                      darkMode
+                        ? 'text-white'
+                        : 'text-slate-900'
                     }`}
                   >
                     {userDetails?.fullName ||
@@ -268,12 +316,17 @@ export default function Navbar({
                 <ChevronDown
                   size={14}
                   className={`transition-transform duration-200 ${
-                    openDropdown ? 'rotate-180' : ''
-                  } ${darkMode ? 'text-white' : 'text-slate-700'}`}
+                    openDropdown
+                      ? 'rotate-180'
+                      : ''
+                  } ${
+                    darkMode
+                      ? 'text-white'
+                      : 'text-slate-700'
+                  }`}
                 />
               </button>
 
-              {/* DROPDOWN MENU */}
               {openDropdown && (
                 <div
                   className={`absolute right-0 top-[calc(100%+10px)] w-56 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl ${
@@ -282,15 +335,19 @@ export default function Navbar({
                       : 'border-slate-200/80 bg-white/80'
                   }`}
                 >
-                  {/* USER INFO */}
+
                   <div
                     className={`border-b px-4 py-3 ${
-                      darkMode ? 'border-white/10' : 'border-slate-100'
+                      darkMode
+                        ? 'border-white/10'
+                        : 'border-slate-100'
                     }`}
                   >
                     <p
                       className={`truncate text-sm font-semibold ${
-                        darkMode ? 'text-white' : 'text-slate-900'
+                        darkMode
+                          ? 'text-white'
+                          : 'text-slate-900'
                       }`}
                     >
                       {userDetails?.fullName ||
@@ -300,18 +357,22 @@ export default function Navbar({
 
                     <p
                       className={`truncate text-xs ${
-                        darkMode ? 'text-white/50' : 'text-slate-400'
+                        darkMode
+                          ? 'text-white/50'
+                          : 'text-slate-400'
                       }`}
                     >
                       {user?.email}
                     </p>
                   </div>
 
-                  {/* MENU ITEMS */}
                   <div className="p-1.5">
+
                     <Link
                       to="/profile"
-                      onClick={() => setOpenDropdown(false)}
+                      onClick={() =>
+                        setOpenDropdown(false)
+                      }
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         darkMode
                           ? 'text-white/80 hover:bg-white/10 hover:text-white'
@@ -324,7 +385,9 @@ export default function Navbar({
 
                     <Link
                       to="/settings"
-                      onClick={() => setOpenDropdown(false)}
+                      onClick={() =>
+                        setOpenDropdown(false)
+                      }
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         darkMode
                           ? 'text-white/80 hover:bg-white/10 hover:text-white'
@@ -334,12 +397,14 @@ export default function Navbar({
                       <Settings size={16} />
                       Cài đặt
                     </Link>
+
                   </div>
 
-                  {/* LOGOUT */}
                   <div
                     className={`border-t p-1.5 ${
-                      darkMode ? 'border-white/10' : 'border-slate-100'
+                      darkMode
+                        ? 'border-white/10'
+                        : 'border-slate-100'
                     }`}
                   >
                     <button
@@ -350,13 +415,13 @@ export default function Navbar({
                       Đăng xuất
                     </button>
                   </div>
+
                 </div>
               )}
             </div>
-
           ) : (
-            /* LOGGED OUT — ĐĂNG NHẬP / ĐĂNG KÝ */
             <div className="ml-1 flex items-center gap-2">
+
               <Link
                 to="/login"
                 className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
@@ -374,28 +439,42 @@ export default function Navbar({
               >
                 Đăng ký
               </Link>
+
             </div>
           )}
 
-          {/* MOBILE MENU BUTTON */}
+          {/* MOBILE */}
           <button
-            onClick={() => setMobileOpen(!mobileOpen)}
+            onClick={() =>
+              setMobileOpen(!mobileOpen)
+            }
             className={`rounded-xl p-2.5 lg:hidden ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+              darkMode
+                ? 'hover:bg-white/10'
+                : 'hover:bg-slate-100'
             }`}
           >
             {mobileOpen ? (
               <X
                 size={20}
-                className={darkMode ? 'text-white' : 'text-slate-700'}
+                className={
+                  darkMode
+                    ? 'text-white'
+                    : 'text-slate-700'
+                }
               />
             ) : (
               <Menu
                 size={20}
-                className={darkMode ? 'text-white' : 'text-slate-700'}
+                className={
+                  darkMode
+                    ? 'text-white'
+                    : 'text-slate-700'
+                }
               />
             )}
           </button>
+
         </div>
       </div>
     </header>
