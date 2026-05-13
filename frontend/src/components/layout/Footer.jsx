@@ -101,12 +101,12 @@ function Footer({ darkMode }) {
 
             <p className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-cyan-500" />
-              hello@edusprint.vn
+              zero169209@gmail.com
             </p>
 
             <p className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-cyan-500" />
-              024 8888 2026
+              0938 213 826
             </p>
 
             <p className="flex items-center gap-2">
