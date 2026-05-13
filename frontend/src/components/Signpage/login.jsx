@@ -61,16 +61,7 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex">
-      {/* Left Side */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-          <img
-            src="https://gqefcpylonobj.vcdn.cloud/directus-upload/3842e061-79b5-4f70-9b48-b6219f75883d.png"
-            alt="Mô tả hình ảnh"
-            style={{ width: '70%', height: 'auto' }}
-          />
-        </div>
-      </div>
+
 
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">

@@ -166,10 +166,7 @@ function Register() {
         </div>
       </div>
 
-      {/* Left Side */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
-      </div>
+
     </div>
   );
 }

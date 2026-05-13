@@ -1,140 +1,224 @@
-import React, { useState } from "react";
-import { auth, db } from "../components/firebase";
-import { doc, setDoc } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import React, {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  auth,
+  db,
+} from "../components/firebase";
+
+import {
+  doc,
+  setDoc,
+} from "firebase/firestore";
+
+import {
+  useNavigate,
+} from "react-router-dom";
+
 import toast from "react-hot-toast";
 
 function Setup() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] =
+    useState(1);
 
-  const [role, setRole] = useState("");
+  const [role, setRole] =
+    useState("");
 
-  const [name, setName] = useState("");
+  // FIXED
+  const [fullName, setFullName] =
+    useState("");
 
-  const [school, setSchool] = useState("");
+  const [school, setSchool] =
+    useState("");
 
-  const [className, setClassName] = useState("");
+  const [className, setClassName] =
+    useState("");
 
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] =
+    useState("");
 
-  const [facebook, setFacebook] = useState("");
+  const [facebook, setFacebook] =
+    useState("");
 
-  const [city, setCity] = useState("");
+  const [city, setCity] =
+    useState("");
 
-  const [address, setAddress] = useState("");
+  const [address, setAddress] =
+    useState("");
 
-  const [subject, setSubject] = useState("");
+  const [subject, setSubject] =
+    useState("");
 
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  // GLOBAL DARKMODE
-  const darkMode =
-    document.documentElement.classList.contains(
-      "dark"
+  // =========================
+  // DARKMODE REALTIME
+  // =========================
+  const [darkMode, setDarkMode] =
+    useState(
+      document.documentElement.classList.contains(
+        "dark"
+      )
     );
 
-  const handleFinish = async () => {
-    try {
-      const user = auth.currentUser;
-
-      if (!user) {
-        toast.error("Bạn chưa đăng nhập");
-        return;
-      }
-
-      if (
-        !name ||
-        !school ||
-        !phone ||
-        !city ||
-        !address
-      ) {
-        toast.error(
-          "Vui lòng nhập đầy đủ thông tin"
+  useEffect(() => {
+    const observer =
+      new MutationObserver(() => {
+        setDarkMode(
+          document.documentElement.classList.contains(
+            "dark"
+          )
         );
-        return;
-      }
+      });
 
-      if (
-        role === "STUDENT" &&
-        !className
-      ) {
-        toast.error("Vui lòng nhập lớp");
-        return;
+    observer.observe(
+      document.documentElement,
+      {
+        attributes: true,
+        attributeFilter: [
+          "class",
+        ],
       }
+    );
 
-      if (
-        role === "TEACHER" &&
-        !subject
-      ) {
-        toast.error(
-          "Vui lòng nhập môn giảng dạy"
+    return () =>
+      observer.disconnect();
+  }, []);
+
+  // =========================
+  // FINISH
+  // =========================
+  const handleFinish =
+    async () => {
+      try {
+        const user =
+          auth.currentUser;
+
+        if (!user) {
+          toast.error(
+            "Bạn chưa đăng nhập"
+          );
+          return;
+        }
+
+        // REQUIRED
+        if (
+          !fullName ||
+          !school ||
+          !phone
+        ) {
+          toast.error(
+            "Vui lòng nhập đầy đủ thông tin"
+          );
+          return;
+        }
+
+        if (
+          role ===
+            "STUDENT" &&
+          !className
+        ) {
+          toast.error(
+            "Vui lòng nhập lớp"
+          );
+          return;
+        }
+
+        if (
+          role ===
+            "TEACHER" &&
+          !subject
+        ) {
+          toast.error(
+            "Vui lòng nhập chuyên môn"
+          );
+          return;
+        }
+
+        await setDoc(
+          doc(
+            db,
+            "users",
+            user.uid
+          ),
+          {
+            uid: user.uid,
+
+            email:
+              user.email ||
+              "",
+
+            photoURL:
+              user.photoURL ||
+              "",
+
+            role,
+
+            // FIXED
+            fullName,
+
+            school,
+
+            className:
+              role ===
+              "STUDENT"
+                ? className
+                : "",
+
+            subject:
+              role ===
+              "TEACHER"
+                ? subject
+                : "",
+
+            phone,
+
+            facebook,
+
+            city,
+
+            address,
+
+            points: 0,
+
+            learningStreak: 0,
+
+            isSetupComplete: true,
+
+            createdAt:
+              new Date().toISOString(),
+          },
+          {
+            merge: true,
+          }
         );
-        return;
+
+        toast.success(
+          "Hoàn tất onboarding"
+        );
+
+        window.location.href =
+          "/profile";
+      } catch (error) {
+        console.error(
+          error
+        );
+
+        toast.error(
+          error.message ||
+            "Có lỗi xảy ra"
+        );
       }
+    };
 
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          uid: user.uid,
-
-          email: user.email || "",
-
-          photoURL:
-            user.photoURL || "",
-
-          role,
-
-          name,
-
-          school,
-
-          className:
-            role === "STUDENT"
-              ? className
-              : "",
-
-          phone,
-
-          facebook,
-
-          city,
-
-          address,
-
-          subject:
-            role === "TEACHER"
-              ? subject
-              : "",
-
-          points: 0,
-
-          learningStreak: 0,
-
-          isSetupComplete: true,
-
-          createdAt:
-            new Date().toISOString(),
-        },
-        { merge: true }
-      );
-
-      toast.success(
-        "Hoàn tất onboarding"
-      );
-
-      // FORCE REFRESH AUTH STATE
-      window.location.href =
-        "/profile";
-    } catch (error) {
-      console.error(error);
-
-      toast.error(
-        error.message ||
-          "Có lỗi xảy ra"
-      );
-    }
-  };
+  const inputClass = `w-full rounded-2xl border px-4 py-3 outline-none transition ${
+    darkMode
+      ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
+      : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
+  }`;
 
   return (
     <div
@@ -153,36 +237,41 @@ function Setup() {
       >
         {/* STEP */}
         <div className="mb-10 flex items-center justify-between">
-          {[1, 2, 3].map((item) => (
-            <div
-              key={item}
-              className="flex flex-1 items-center"
-            >
+          {[1, 2, 3].map(
+            (item) => (
               <div
-                className={`flex h-12 w-12 items-center justify-center rounded-full font-bold ${
-                  step >= item
-                    ? "bg-blue-600 text-white"
-                    : darkMode
-                    ? "bg-slate-800 text-slate-400"
-                    : "bg-slate-200 text-slate-600"
-                }`}
+                key={item}
+                className="flex flex-1 items-center"
               >
-                {item}
-              </div>
-
-              {item !== 3 && (
                 <div
-                  className={`h-1 flex-1 ${
-                    step > item
-                      ? "bg-blue-600"
+                  className={`flex h-12 w-12 items-center justify-center rounded-full font-bold ${
+                    step >=
+                    item
+                      ? "bg-blue-600 text-white"
                       : darkMode
-                      ? "bg-slate-700"
-                      : "bg-slate-300"
+                      ? "bg-slate-800 text-slate-400"
+                      : "bg-slate-200 text-slate-600"
                   }`}
-                />
-              )}
-            </div>
-          ))}
+                >
+                  {item}
+                </div>
+
+                {item !==
+                  3 && (
+                  <div
+                    className={`h-1 flex-1 ${
+                      step >
+                      item
+                        ? "bg-blue-600"
+                        : darkMode
+                        ? "bg-slate-700"
+                        : "bg-slate-300"
+                    }`}
+                  />
+                )}
+              </div>
+            )
+          )}
         </div>
 
         {/* STEP 1 */}
@@ -233,84 +322,45 @@ function Setup() {
               Bạn là ai?
             </h1>
 
-            <p
-              className={`mb-8 ${
-                darkMode
-                  ? "text-slate-300"
-                  : "text-slate-600"
-              }`}
-            >
-              Chọn vai trò để hệ thống
-              phân quyền.
-            </p>
-
             <div className="mb-8 grid grid-cols-2 gap-5">
-              {/* STUDENT */}
               <button
                 onClick={() =>
-                  setRole("STUDENT")
+                  setRole(
+                    "STUDENT"
+                  )
                 }
                 className={`rounded-3xl border-2 p-6 transition ${
-                  role === "STUDENT"
+                  role ===
+                  "STUDENT"
                     ? "border-blue-500 bg-blue-500/10"
                     : darkMode
                     ? "border-white/10 bg-slate-900/50"
                     : "border-slate-200 bg-slate-50"
                 }`}
               >
-                <h2
-                  className={`text-2xl font-bold ${
-                    darkMode
-                      ? "text-white"
-                      : "text-slate-900"
-                  }`}
-                >
+                <h2 className="text-2xl font-bold">
                   Học sinh
                 </h2>
-
-                <p
-                  className={`mt-2 ${
-                    darkMode
-                      ? "text-slate-400"
-                      : "text-slate-500"
-                  }`}
-                >
-                  Quyền User
-                </p>
               </button>
 
-              {/* TEACHER */}
               <button
                 onClick={() =>
-                  setRole("TEACHER")
+                  setRole(
+                    "TEACHER"
+                  )
                 }
                 className={`rounded-3xl border-2 p-6 transition ${
-                  role === "TEACHER"
+                  role ===
+                  "TEACHER"
                     ? "border-blue-500 bg-blue-500/10"
                     : darkMode
                     ? "border-white/10 bg-slate-900/50"
                     : "border-slate-200 bg-slate-50"
                 }`}
               >
-                <h2
-                  className={`text-2xl font-bold ${
-                    darkMode
-                      ? "text-white"
-                      : "text-slate-900"
-                  }`}
-                >
+                <h2 className="text-2xl font-bold">
                   Giáo viên
                 </h2>
-
-                <p
-                  className={`mt-2 ${
-                    darkMode
-                      ? "text-slate-400"
-                      : "text-slate-500"
-                  }`}
-                >
-                  Quyền Giáo viên
-                </p>
               </button>
             </div>
 
@@ -343,15 +393,17 @@ function Setup() {
               <input
                 type="text"
                 placeholder="Họ và tên"
-                value={name}
-                onChange={(e) =>
-                  setName(e.target.value)
+                value={
+                  fullName
                 }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                  darkMode
-                    ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                    : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                }`}
+                onChange={(e) =>
+                  setFullName(
+                    e.target.value
+                  )
+                }
+                className={
+                  inputClass
+                }
               />
 
               <input
@@ -363,46 +415,46 @@ function Setup() {
                     e.target.value
                   )
                 }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                  darkMode
-                    ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                    : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                }`}
+                className={
+                  inputClass
+                }
               />
 
-              {role === "STUDENT" && (
+              {role ===
+                "STUDENT" && (
                 <input
                   type="text"
                   placeholder="Lớp"
-                  value={className}
+                  value={
+                    className
+                  }
                   onChange={(e) =>
                     setClassName(
                       e.target.value
                     )
                   }
-                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                    darkMode
-                      ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                      : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                  }`}
+                  className={
+                    inputClass
+                  }
                 />
               )}
 
-              {role === "TEACHER" && (
+              {role ===
+                "TEACHER" && (
                 <input
                   type="text"
-                  placeholder="Môn giảng dạy"
-                  value={subject}
+                  placeholder="Chuyên môn"
+                  value={
+                    subject
+                  }
                   onChange={(e) =>
                     setSubject(
                       e.target.value
                     )
                   }
-                  className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                    darkMode
-                      ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                      : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                  }`}
+                  className={
+                    inputClass
+                  }
                 />
               )}
 
@@ -415,27 +467,25 @@ function Setup() {
                     e.target.value
                   )
                 }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                  darkMode
-                    ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                    : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                }`}
+                className={
+                  inputClass
+                }
               />
 
               <input
                 type="text"
-                placeholder="Facebook (không bắt buộc)"
-                value={facebook}
+                placeholder="Facebook"
+                value={
+                  facebook
+                }
                 onChange={(e) =>
                   setFacebook(
                     e.target.value
                   )
                 }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                  darkMode
-                    ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                    : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                }`}
+                className={
+                  inputClass
+                }
               />
 
               <input
@@ -447,32 +497,32 @@ function Setup() {
                     e.target.value
                   )
                 }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                  darkMode
-                    ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                    : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                }`}
+                className={
+                  inputClass
+                }
               />
 
               <input
                 type="text"
                 placeholder="Địa chỉ"
-                value={address}
+                value={
+                  address
+                }
                 onChange={(e) =>
                   setAddress(
                     e.target.value
                   )
                 }
-                className={`w-full rounded-2xl border px-4 py-3 outline-none transition ${
-                  darkMode
-                    ? "border-white/10 bg-slate-900/70 text-white focus:border-cyan-400"
-                    : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500"
-                }`}
+                className={
+                  inputClass
+                }
               />
             </div>
 
             <button
-              onClick={handleFinish}
+              onClick={
+                handleFinish
+              }
               className="mt-8 w-full rounded-2xl bg-blue-600 py-4 font-bold text-white transition hover:bg-blue-700"
             >
               Hoàn tất
