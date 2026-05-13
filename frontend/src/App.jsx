@@ -277,8 +277,8 @@ function App() {
       favicon.setAttribute(
         'href',
         darkMode
-          ? '/favicon-dark-mode.png'
-          : '/favicon-light-mode.png'
+          ? '/dark-mode.png'
+          : '/light-mode.png'
       )
     }
   }, [darkMode])
