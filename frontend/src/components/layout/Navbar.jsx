@@ -246,7 +246,7 @@ export default function Navbar({
           </button>
 
           {/* USER */}
-          {user && (
+          {user ? (
             <div
               className="relative"
               ref={dropdownRef}
@@ -429,6 +429,26 @@ export default function Navbar({
                   </div>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link
+                to="/login"
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                  darkMode
+                    ? 'text-white hover:bg-white/10'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                Đăng nhập
+              </Link>
+
+              <Link
+                to="/register"
+                className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
+              >
+                Đăng ký
+              </Link>
             </div>
           )}
 
