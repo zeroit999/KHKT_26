@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase.js';
 import { useAuth } from '../../contexts/AuthContext';
 import SignWithGoogle from './signWithGoogle';
-import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
@@ -17,7 +17,6 @@ function Login() {
   const navigate = useNavigate();
   const { user, isPro, isLoading } = useAuth();
 
-  // Updated handleSubmit to use Firebase auth directly
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -25,19 +24,10 @@ function Login() {
 
     try {
       console.log('🔄 Logging in with Firebase...');
-
-      // Sign in with Firebase directly
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('✅ Firebase login successful:', userCredential.user.email);
 
-      // AuthContext will automatically handle the rest
-      // Navigate based on user type (will be handled after AuthContext updates)
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-
       if (!userDoc.exists() || !userDoc.data()?.isSetupComplete) {
         navigate('/setup');
       } else {
@@ -45,8 +35,6 @@ function Login() {
       }
     } catch (error) {
       console.error('❌ Login error:', error);
-
-      // Display user-friendly error messages
       if (error.code === 'auth/user-not-found') {
         setError('Không tìm thấy tài khoản với email này');
       } else if (error.code === 'auth/wrong-password') {
@@ -58,16 +46,12 @@ function Login() {
       } else {
         setError('Đăng nhập thất bại. Vui lòng thử lại.');
       }
-
-      setTimeout(() => {
-        setError('');
-      }, 5000);
+      setTimeout(() => setError(''), 5000);
     } finally {
       setLoading(false);
     }
   };
 
-  // Check if user is already logged in via AuthContext
   useEffect(() => {
     if (!isLoading && user) {
       console.log('✅ User already logged in, redirecting...');
@@ -76,24 +60,14 @@ function Login() {
   }, [user, isLoading, navigate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex">
-      {/* Left Side - Illustration/Branding */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex">
+      {/* Left Side */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 relative overflow-hidden">
-        <div
-          className="absolute inset-0 bg-black/10"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
           <img
             src="https://gqefcpylonobj.vcdn.cloud/directus-upload/3842e061-79b5-4f70-9b48-b6219f75883d.png"
             alt="Mô tả hình ảnh"
-            style={{
-              width: '70%',
-              height: 'auto',
-            }}
+            style={{ width: '70%', height: 'auto' }}
           />
         </div>
       </div>
@@ -101,85 +75,83 @@ function Login() {
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-            <div className="text-center mb-6 justify-center items-center flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
+            <div className="text-center mb-6 flex flex-col items-center">
               <div className="mb-4">
                 <img src={'./Logo_CC_tron.svg'} alt="Logo" className="h-12" />
               </div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
                 Chào mừng bạn trở lại!
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Rất vui được gặp bạn! Vui lòng đăng nhập để tiếp tục
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-blue-700 mb-2">
+                <label className="block text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">
                   Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500 dark:text-blue-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Nhập địa chỉ email của bạn"
-                    className="w-full pl-10 pr-4 py-2.5 border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gradient-to-r from-blue-50/30 to-blue-50/50 hover:from-blue-50/50 hover:to-blue-50/70"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-blue-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-blue-50/30 dark:bg-gray-700 hover:bg-blue-50/50 dark:hover:bg-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                     required
                   />
                 </div>
               </div>
 
+              {/* Password */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-blue-700">
+                  <label className="text-sm font-medium text-blue-700 dark:text-blue-400">
                     Mật khẩu
                   </label>
                   <Link
                     to="/forgotpass"
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                   >
                     Quên mật khẩu?
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500 dark:text-blue-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Nhập mật khẩu của bạn"
-                    className="w-full pl-10 pr-12 py-2.5 border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gradient-to-r from-blue-50/30 to-blue-50/50 hover:from-blue-50/50 hover:to-blue-50/70"
+                    className="w-full pl-10 pr-12 py-3 border-2 border-blue-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-blue-50/30 dark:bg-gray-700 hover:bg-blue-50/50 dark:hover:bg-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-500 hover:text-blue-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">{error}</p>
+                <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg">
+                  <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
                 </div>
               )}
 
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full px-6 py-2.5 font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
+                className={`w-full px-6 py-3 font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg ${
                   loading
-                    ? 'bg-gray-400 cursor-not-allowed'
+                    ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed text-white'
                     : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
                 }`}
               >
@@ -188,20 +160,22 @@ function Login() {
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
+                  <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">hoặc</span>
+                  <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                    hoặc
+                  </span>
                 </div>
               </div>
 
               <SignWithGoogle />
 
-              <p className="text-center text-gray-600">
+              <p className="text-center text-gray-600 dark:text-gray-400">
                 Chưa có tài khoản?{' '}
                 <Link
                   to="/register"
-                  className="text-blue-600 hover:text-blue-800 font-medium"
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                 >
                   Đăng ký
                 </Link>
