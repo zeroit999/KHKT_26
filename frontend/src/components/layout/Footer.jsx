@@ -9,8 +9,8 @@ import {
  Send,
 } from 'lucide-react'
 
-import darkLogo from '../../assets/dark-mode.png'
-import lightLogo from '../../assets/light-mode.png'
+import darkLogo from '../../assets/favicon-dark-mode.png'
+import lightLogo from '../../assets/favicon-light-mode.png'
 
 const quickLinks = [
   { label: 'Trang chủ', href: '/' },

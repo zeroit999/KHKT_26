@@ -30,8 +30,8 @@ import { auth } from '../firebase'
 
 import { useAuth } from '../../contexts/AuthContext'
 
-import darkLogo from '../../assets/dark-mode.png'
-import lightLogo from '../../assets/light-mode.png'
+import darkLogo from '../../assets/favicon-dark-mode.png'
+import lightLogo from '../../assets/favicon-light-mode.png'
 
 export default function Navbar({
   darkMode,
