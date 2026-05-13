@@ -13,6 +13,7 @@ import {
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -53,43 +54,32 @@ export default function Navbar({
   const dropdownRef = useRef(null)
 
   useEffect(() => {
-    const handleClickOutside = (
-      event
-    ) => {
+    const handleClickOutside = (event) => {
       if (
         dropdownRef.current &&
-        !dropdownRef.current.contains(
-          event.target
-        )
+        !dropdownRef.current.contains(event.target)
       ) {
         setOpenDropdown(false)
       }
     }
 
-    document.addEventListener(
-      'mousedown',
-      handleClickOutside
-    )
+    document.addEventListener('mousedown', handleClickOutside)
 
     return () => {
-      document.removeEventListener(
-        'mousedown',
-        handleClickOutside
-      )
+      document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
 
   const handleLogout = async () => {
     try {
       await signOut(auth)
-
       navigate('/login')
     } catch (error) {
       console.error(error)
     }
   }
 
-  const navItems = [
+  const navItems = useMemo(() => [
     {
       label: 'Trang chủ',
       path: '/',
@@ -110,7 +100,17 @@ export default function Navbar({
       label: 'Dashboard',
       path: '/dashboard',
     },
-  ]
+
+    // GIÁO VIÊN
+    ...(userDetails?.role === 'TEACHER'
+      ? [
+          {
+            label: 'Quản lý lớp học',
+            path: '/classes',
+          },
+        ]
+      : []),
+  ], [userDetails?.role])
 
   return (
     <header
@@ -120,10 +120,10 @@ export default function Navbar({
           : 'border-slate-200 bg-white/90'
       }`}
     >
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4">
-        {/* LEFT */}
-        <div className="flex items-center gap-8">
-          {/* LOGO */}
+      <div className="mx-auto flex h-20 max-w-screen-xl items-center px-6">
+
+        {/* LEFT — LOGO (fixed width) */}
+        <div className="flex shrink-0 items-center">
           <Link
             to="/"
             className="flex items-center gap-3"
@@ -139,9 +139,7 @@ export default function Navbar({
             <div>
               <h1
                 className={`text-2xl font-bold ${
-                  darkMode
-                    ? 'text-white'
-                    : 'text-slate-900'
+                  darkMode ? 'text-white' : 'text-slate-900'
                 }`}
               >
                 EduSprint
@@ -152,74 +150,60 @@ export default function Navbar({
               </p>
             </div>
           </Link>
-
-          {/* NAV */}
-          <nav className="hidden items-center gap-6 lg:flex">
-            {navItems.map((item) => {
-              const isActive =
-                location.pathname ===
-                item.path
-
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`relative text-base font-semibold transition-all duration-200 ${
-                    isActive
-                      ? 'text-cyan-400'
-                      : darkMode
-                      ? 'text-white/80 hover:text-white'
-                      : 'text-slate-700 hover:text-slate-900'
-                  }`}
-                >
-                  {item.label}
-
-                  {isActive && (
-                    <span className="absolute -bottom-2 left-0 h-[2px] w-full rounded-full bg-cyan-400" />
-                  )}
-                </Link>
-              )
-            })}
-          </nav>
         </div>
 
-        {/* RIGHT */}
-        <div className="flex items-center gap-2">
+        {/* CENTER — NAV (takes remaining space, centered) */}
+        <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`relative whitespace-nowrap text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'text-cyan-400'
+                    : darkMode
+                    ? 'text-white/80 hover:text-white'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                {item.label}
+
+                {isActive && (
+                  <span className="absolute -bottom-2 left-0 h-[2px] w-full rounded-full bg-cyan-400" />
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* RIGHT — AUTH / ACTIONS (fixed width, right-aligned) */}
+        <div className="flex shrink-0 items-center justify-end gap-1">
+
           {/* SEARCH */}
           <button
             className={`rounded-xl p-2.5 transition-all ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             <Search
-              size={20}
-              className={
-                darkMode
-                  ? 'text-white'
-                  : 'text-slate-700'
-              }
+              size={18}
+              className={darkMode ? 'text-white' : 'text-slate-700'}
             />
           </button>
 
           {/* NOTIFICATION */}
           <button
             className={`relative rounded-xl p-2.5 transition-all ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             <Bell
-              size={20}
-              className={
-                darkMode
-                  ? 'text-white'
-                  : 'text-slate-700'
-              }
+              size={18}
+              className={darkMode ? 'text-white' : 'text-slate-700'}
             />
-
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-400" />
           </button>
 
@@ -227,43 +211,29 @@ export default function Navbar({
           <button
             onClick={onToggleDarkMode}
             className={`rounded-xl p-2.5 transition-all ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             {darkMode ? (
-              <Sun
-                size={20}
-                className="text-yellow-400"
-              />
+              <Sun size={18} className="text-yellow-400" />
             ) : (
-              <Moon
-                size={20}
-                className="text-slate-700"
-              />
+              <Moon size={18} className="text-slate-700" />
             )}
           </button>
 
-          {/* USER */}
+          {/* LOGGED IN — USER DROPDOWN */}
           {user ? (
-            <div
-              className="relative"
-              ref={dropdownRef}
-            >
+            <div className="relative ml-1" ref={dropdownRef}>
+
+              {/* TRIGGER BUTTON */}
               <button
-                onClick={() =>
-                  setOpenDropdown(
-                    !openDropdown
-                  )
-                }
+                onClick={() => setOpenDropdown(!openDropdown)}
                 className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition-all ${
                   darkMode
                     ? 'border-white/10 bg-white/5 hover:bg-white/10'
                     : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
                 }`}
               >
-                {/* AVATAR */}
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
@@ -282,162 +252,117 @@ export default function Navbar({
                   </div>
                 )}
 
-                {/* NAME */}
                 <div className="hidden text-left md:block">
                   <p
-                    className={`max-w-[110px] truncate text-sm font-semibold ${
-                      darkMode
-                        ? 'text-white'
-                        : 'text-slate-900'
+                    className={`max-w-[100px] truncate text-sm font-semibold ${
+                      darkMode ? 'text-white' : 'text-slate-900'
                     }`}
                   >
                     {userDetails?.fullName ||
                       user?.displayName ||
-                      user?.email?.split(
-                        '@'
-                      )[0] ||
+                      user?.email?.split('@')[0] ||
                       'User'}
                   </p>
                 </div>
 
                 <ChevronDown
-                  size={15}
-                  className={
-                    darkMode
-                      ? 'text-white'
-                      : 'text-slate-700'
-                  }
+                  size={14}
+                  className={`transition-transform duration-200 ${
+                    openDropdown ? 'rotate-180' : ''
+                  } ${darkMode ? 'text-white' : 'text-slate-700'}`}
                 />
               </button>
 
-              {/* DROPDOWN */}
+              {/* DROPDOWN MENU */}
               {openDropdown && (
                 <div
-                  className={`absolute right-0 top-12 z-50 w-64 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl ${
+                  className={`absolute right-0 top-[calc(100%+10px)] w-56 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl ${
                     darkMode
-                      ? 'border-white/10 bg-[#050816]/95'
-                      : 'border-slate-200 bg-white/95'
+                      ? 'border-white/10 bg-[#0f1829]/80'
+                      : 'border-slate-200/80 bg-white/80'
                   }`}
                 >
                   {/* USER INFO */}
                   <div
-                    className={`border-b px-4 py-4 ${
-                      darkMode
-                        ? 'border-white/10'
-                        : 'border-slate-200'
+                    className={`border-b px-4 py-3 ${
+                      darkMode ? 'border-white/10' : 'border-slate-100'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={
-                          user?.photoURL ||
-                          reactLogo
-                        }
-                        alt="avatar"
-                        className="h-9 w-9 rounded-full border border-cyan-400 object-cover"
-                      />
+                    <p
+                      className={`truncate text-sm font-semibold ${
+                        darkMode ? 'text-white' : 'text-slate-900'
+                      }`}
+                    >
+                      {userDetails?.fullName ||
+                        user?.displayName ||
+                        'User'}
+                    </p>
 
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`truncate text-sm font-semibold ${
-                            darkMode
-                              ? 'text-white'
-                              : 'text-slate-900'
-                          }`}
-                        >
-                          {userDetails?.fullName ||
-                            user?.displayName ||
-                            user?.email?.split(
-                              '@'
-                            )[0] ||
-                            'User'}
-                        </p>
-
-                        <p
-                          className={`truncate text-xs ${
-                            darkMode
-                              ? 'text-gray-400'
-                              : 'text-slate-500'
-                          }`}
-                        >
-                          {user?.email}
-                        </p>
-                      </div>
-                    </div>
+                    <p
+                      className={`truncate text-xs ${
+                        darkMode ? 'text-white/50' : 'text-slate-400'
+                      }`}
+                    >
+                      {user?.email}
+                    </p>
                   </div>
 
-                  {/* MENU */}
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        navigate(
-                          '/profile'
-                        )
-
-                        setOpenDropdown(
-                          false
-                        )
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm transition-all duration-200 ${
+                  {/* MENU ITEMS */}
+                  <div className="p-1.5">
+                    <Link
+                      to="/profile"
+                      onClick={() => setOpenDropdown(false)}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         darkMode
-                          ? 'text-white hover:bg-white/10'
-                          : 'text-slate-700 hover:bg-slate-100'
+                          ? 'text-white/80 hover:bg-white/10 hover:text-white'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
                       <User size={16} />
+                      Trang cá nhân
+                    </Link>
 
-                      <span className="font-medium">
-                        Hồ sơ học tập
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        navigate(
-                          '/settings'
-                        )
-
-                        setOpenDropdown(
-                          false
-                        )
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm transition-all duration-200 ${
+                    <Link
+                      to="/settings"
+                      onClick={() => setOpenDropdown(false)}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         darkMode
-                          ? 'text-white hover:bg-white/10'
-                          : 'text-slate-700 hover:bg-slate-100'
+                          ? 'text-white/80 hover:bg-white/10 hover:text-white'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
                       <Settings size={16} />
+                      Cài đặt
+                    </Link>
+                  </div>
 
-                      <span className="font-medium">
-                        Cài đặt
-                      </span>
-                    </button>
-
+                  {/* LOGOUT */}
+                  <div
+                    className={`border-t p-1.5 ${
+                      darkMode ? 'border-white/10' : 'border-slate-100'
+                    }`}
+                  >
                     <button
-                      onClick={
-                        handleLogout
-                      }
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm text-red-500 transition-all duration-200 hover:bg-red-500/10"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-400 transition-all hover:bg-red-500/10"
                     >
                       <LogOut size={16} />
-
-                      <span className="font-medium">
-                        Đăng xuất
-                      </span>
+                      Đăng xuất
                     </button>
                   </div>
                 </div>
               )}
             </div>
+
           ) : (
-            <div className="flex items-center gap-3">
+            /* LOGGED OUT — ĐĂNG NHẬP / ĐĂNG KÝ */
+            <div className="ml-1 flex items-center gap-2">
               <Link
                 to="/login"
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
                   darkMode
-                    ? 'text-white hover:bg-white/10'
-                    : 'text-slate-700 hover:bg-slate-100'
+                    ? 'text-white/80 hover:bg-white/10 hover:text-white'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
                 Đăng nhập
@@ -445,43 +370,29 @@ export default function Navbar({
 
               <Link
                 to="/register"
-                className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
+                className="whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 transition-all hover:opacity-90"
               >
                 Đăng ký
               </Link>
             </div>
           )}
 
-          {/* MOBILE MENU */}
+          {/* MOBILE MENU BUTTON */}
           <button
-            onClick={() =>
-              setMobileOpen(
-                !mobileOpen
-              )
-            }
+            onClick={() => setMobileOpen(!mobileOpen)}
             className={`rounded-xl p-2.5 lg:hidden ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             {mobileOpen ? (
               <X
                 size={20}
-                className={
-                  darkMode
-                    ? 'text-white'
-                    : 'text-slate-700'
-                }
+                className={darkMode ? 'text-white' : 'text-slate-700'}
               />
             ) : (
               <Menu
                 size={20}
-                className={
-                  darkMode
-                    ? 'text-white'
-                    : 'text-slate-700'
-                }
+                className={darkMode ? 'text-white' : 'text-slate-700'}
               />
             )}
           </button>
