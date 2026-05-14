@@ -27,7 +27,6 @@ import {
 import { signOut } from 'firebase/auth'
 
 import { auth } from '../firebase'
-
 import { useAuth } from '../../contexts/AuthContext'
 
 import darkLogo from '../../assets/favicon-dark-mode.png'
@@ -38,20 +37,11 @@ export default function Navbar({
   onToggleDarkMode,
 }) {
   const navigate = useNavigate()
-
   const location = useLocation()
+  const { user, userDetails } = useAuth()
 
-  const {
-    user,
-    userDetails,
-  } = useAuth()
-
-  const [mobileOpen, setMobileOpen] =
-    useState(false)
-
-  const [openDropdown, setOpenDropdown] =
-    useState(false)
-
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [openDropdown, setOpenDropdown] = useState(false)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -64,16 +54,10 @@ export default function Navbar({
       }
     }
 
-    document.addEventListener(
-      'mousedown',
-      handleClickOutside
-    )
+    document.addEventListener('mousedown', handleClickOutside)
 
     return () => {
-      document.removeEventListener(
-        'mousedown',
-        handleClickOutside
-      )
+      document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
 
@@ -88,34 +72,13 @@ export default function Navbar({
 
   const navItems = useMemo(
     () => [
-      {
-        label: 'Trang chủ',
-        path: '/',
-      },
-      {
-        label: 'Đề thi',
-        path: '/exams',
-      },
-      {
-        label: 'E-Learning',
-        path: '/courses',
-      },
-      {
-        label: 'Xếp hạng',
-        path: '/leaderboard',
-      },
-      {
-        label: 'Dashboard',
-        path: '/dashboard',
-      },
-
+      { label: 'Trang chủ', path: '/' },
+      { label: 'Đề thi', path: '/exams' },
+      { label: 'E-Learning', path: '/courses' },
+      { label: 'Xếp hạng', path: '/leaderboard' },
+      { label: 'Dashboard', path: '/dashboard' },
       ...(userDetails?.role === 'TEACHER'
-        ? [
-            {
-              label: 'Quản lý lớp học',
-              path: '/classes',
-            },
-          ]
+        ? [{ label: 'Quản lý lớp học', path: '/classes' }]
         : []),
     ],
     [userDetails?.role]
@@ -130,34 +93,20 @@ export default function Navbar({
       }`}
     >
       <div className="mx-auto flex h-20 max-w-screen-xl items-center px-6">
-
-        {/* LEFT — LOGO */}
         <div className="flex shrink-0 items-center">
-          <Link
-            to="/"
-            className="flex items-center gap-3"
-          >
-
-            <div className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 p-2 shadow-lg">
-
-              <img
-                src={
-                  darkMode
-                    ? darkLogo
-                    : lightLogo
-                }
-                alt="logo"
-                className="h-7 w-7 rounded-xl object-contain"
-              />
-
-            </div>
+          <Link to="/" className="flex items-center gap-3">
+<div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
+  <img
+    src={darkMode ? darkLogo : lightLogo}
+    alt="logo"
+    className="h-9 w-9 rounded-sm object-cover"
+  />
+</div>
 
             <div>
               <h1
                 className={`text-2xl font-bold ${
-                  darkMode
-                    ? 'text-white'
-                    : 'text-slate-900'
+                  darkMode ? 'text-white' : 'text-slate-900'
                 }`}
               >
                 EduSprint
@@ -167,15 +116,12 @@ export default function Navbar({
                 THPT Platform
               </p>
             </div>
-
           </Link>
         </div>
 
-        {/* CENTER — NAV */}
         <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex">
           {navItems.map((item) => {
-            const isActive =
-              location.pathname === item.path
+            const isActive = location.pathname === item.path
 
             return (
               <Link
@@ -199,92 +145,63 @@ export default function Navbar({
           })}
         </nav>
 
-        {/* RIGHT */}
         <div className="flex shrink-0 items-center justify-end gap-1">
-
-          {/* SEARCH */}
           <button
+            type="button"
             className={`rounded-xl p-2.5 transition-all ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             <Search
               size={18}
-              className={
-                darkMode
-                  ? 'text-white'
-                  : 'text-slate-700'
-              }
+              className={darkMode ? 'text-white' : 'text-slate-700'}
             />
           </button>
 
-          {/* NOTIFICATION */}
           <button
+            type="button"
             className={`relative rounded-xl p-2.5 transition-all ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             <Bell
               size={18}
-              className={
-                darkMode
-                  ? 'text-white'
-                  : 'text-slate-700'
-              }
+              className={darkMode ? 'text-white' : 'text-slate-700'}
             />
 
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-400" />
           </button>
 
-          {/* DARKMODE */}
           <button
+            type="button"
             onClick={onToggleDarkMode}
             className={`rounded-xl p-2.5 transition-all ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             {darkMode ? (
-              <Sun
-                size={18}
-                className="text-yellow-400"
-              />
+              <Sun size={18} className="text-yellow-400" />
             ) : (
-              <Moon
-                size={18}
-                className="text-slate-700"
-              />
+              <Moon size={18} className="text-slate-700" />
             )}
           </button>
 
-          {/* USER */}
           {user ? (
-            <div
-              className="relative ml-1"
-              ref={dropdownRef}
-            >
-
+            <div className="relative ml-1" ref={dropdownRef}>
               <button
-                onClick={() =>
-                  setOpenDropdown(!openDropdown)
-                }
+                type="button"
+                onClick={() => setOpenDropdown(!openDropdown)}
                 className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition-all ${
                   darkMode
                     ? 'border-white/10 bg-white/5 hover:bg-white/10'
                     : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
                 }`}
               >
-
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
                     alt="avatar"
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-6 w-7 rounded-full object-cover"
                   />
                 ) : (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-sm font-bold text-white">
@@ -301,9 +218,7 @@ export default function Navbar({
                 <div className="hidden text-left md:block">
                   <p
                     className={`max-w-[100px] truncate text-sm font-semibold ${
-                      darkMode
-                        ? 'text-white'
-                        : 'text-slate-900'
+                      darkMode ? 'text-white' : 'text-slate-900'
                     }`}
                   >
                     {userDetails?.fullName ||
@@ -316,14 +231,8 @@ export default function Navbar({
                 <ChevronDown
                   size={14}
                   className={`transition-transform duration-200 ${
-                    openDropdown
-                      ? 'rotate-180'
-                      : ''
-                  } ${
-                    darkMode
-                      ? 'text-white'
-                      : 'text-slate-700'
-                  }`}
+                    openDropdown ? 'rotate-180' : ''
+                  } ${darkMode ? 'text-white' : 'text-slate-700'}`}
                 />
               </button>
 
@@ -335,31 +244,22 @@ export default function Navbar({
                       : 'border-slate-200/80 bg-white/80'
                   }`}
                 >
-
                   <div
                     className={`border-b px-4 py-3 ${
-                      darkMode
-                        ? 'border-white/10'
-                        : 'border-slate-100'
+                      darkMode ? 'border-white/10' : 'border-slate-100'
                     }`}
                   >
                     <p
                       className={`truncate text-sm font-semibold ${
-                        darkMode
-                          ? 'text-white'
-                          : 'text-slate-900'
+                        darkMode ? 'text-white' : 'text-slate-900'
                       }`}
                     >
-                      {userDetails?.fullName ||
-                        user?.displayName ||
-                        'User'}
+                      {userDetails?.fullName || user?.displayName || 'User'}
                     </p>
 
                     <p
                       className={`truncate text-xs ${
-                        darkMode
-                          ? 'text-white/50'
-                          : 'text-slate-400'
+                        darkMode ? 'text-white/50' : 'text-slate-400'
                       }`}
                     >
                       {user?.email}
@@ -367,12 +267,9 @@ export default function Navbar({
                   </div>
 
                   <div className="p-1.5">
-
                     <Link
                       to="/profile"
-                      onClick={() =>
-                        setOpenDropdown(false)
-                      }
+                      onClick={() => setOpenDropdown(false)}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         darkMode
                           ? 'text-white/80 hover:bg-white/10 hover:text-white'
@@ -385,9 +282,7 @@ export default function Navbar({
 
                     <Link
                       to="/settings"
-                      onClick={() =>
-                        setOpenDropdown(false)
-                      }
+                      onClick={() => setOpenDropdown(false)}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         darkMode
                           ? 'text-white/80 hover:bg-white/10 hover:text-white'
@@ -397,17 +292,15 @@ export default function Navbar({
                       <Settings size={16} />
                       Cài đặt
                     </Link>
-
                   </div>
 
                   <div
                     className={`border-t p-1.5 ${
-                      darkMode
-                        ? 'border-white/10'
-                        : 'border-slate-100'
+                      darkMode ? 'border-white/10' : 'border-slate-100'
                     }`}
                   >
                     <button
+                      type="button"
                       onClick={handleLogout}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-400 transition-all hover:bg-red-500/10"
                     >
@@ -415,13 +308,11 @@ export default function Navbar({
                       Đăng xuất
                     </button>
                   </div>
-
                 </div>
               )}
             </div>
           ) : (
             <div className="ml-1 flex items-center gap-2">
-
               <Link
                 to="/login"
                 className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
@@ -439,42 +330,28 @@ export default function Navbar({
               >
                 Đăng ký
               </Link>
-
             </div>
           )}
 
-          {/* MOBILE */}
           <button
-            onClick={() =>
-              setMobileOpen(!mobileOpen)
-            }
+            type="button"
+            onClick={() => setMobileOpen(!mobileOpen)}
             className={`rounded-xl p-2.5 lg:hidden ${
-              darkMode
-                ? 'hover:bg-white/10'
-                : 'hover:bg-slate-100'
+              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
             }`}
           >
             {mobileOpen ? (
               <X
                 size={20}
-                className={
-                  darkMode
-                    ? 'text-white'
-                    : 'text-slate-700'
-                }
+                className={darkMode ? 'text-white' : 'text-slate-700'}
               />
             ) : (
               <Menu
                 size={20}
-                className={
-                  darkMode
-                    ? 'text-white'
-                    : 'text-slate-700'
-                }
+                className={darkMode ? 'text-white' : 'text-slate-700'}
               />
             )}
           </button>
-
         </div>
       </div>
     </header>
