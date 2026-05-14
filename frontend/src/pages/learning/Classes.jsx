@@ -1,4 +1,4 @@
-import MaintenanceState from '../components/ui/MaintenanceState.jsx'
+import MaintenanceState from '../../components/ui/MaintenanceState.jsx'
 
 function Classes() {
   return (

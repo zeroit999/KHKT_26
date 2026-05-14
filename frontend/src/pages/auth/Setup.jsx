@@ -6,7 +6,7 @@ import React, {
 import {
   auth,
   db,
-} from "../components/firebase";
+} from "../../components/firebase";
 
 import {
   doc,

@@ -27,9 +27,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { exams, progressData, questions, resultBreakdown, skillRadar } from '../data/mockData.js'
-import GlassCard from '../components/ui/GlassCard.jsx'
-import GradientButton from '../components/ui/GradientButton.jsx'
+import { exams, progressData, questions, resultBreakdown, skillRadar } from '../../data/mockData.js'
+import GlassCard from '../../components/ui/GlassCard.jsx'
+import GradientButton from '../../components/ui/GradientButton.jsx'
 
 function Confetti() {
   return (

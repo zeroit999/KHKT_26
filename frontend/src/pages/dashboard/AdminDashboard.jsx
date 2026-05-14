@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { BarChart3, Database, Filter, MoreHorizontal, Plus, Search, UploadCloud, UsersRound } from 'lucide-react'
-import { adminQuestions, progressData } from '../data/mockData.js'
-import UploadModal from '../components/admin/UploadModal.jsx'
-import GlassCard from '../components/ui/GlassCard.jsx'
-import GradientButton from '../components/ui/GradientButton.jsx'
-import SectionHeader from '../components/ui/SectionHeader.jsx'
+import { adminQuestions, progressData } from '../../data/mockData.js'
+import UploadModal from '../../components/admin/UploadModal.jsx'
+import GlassCard from '../../components/ui/GlassCard.jsx'
+import GradientButton from '../../components/ui/GradientButton.jsx'
+import SectionHeader from '../../components/ui/SectionHeader.jsx'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 function AdminDashboard() {
