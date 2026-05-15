@@ -7,6 +7,8 @@ import SignWithGoogle from './signWithGoogle';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
+import lightLogo from '../../assets/favicon-light-mode.png';
+import darkLogo from '../../assets/favicon-dark-mode.png';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -15,7 +17,7 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, isPro, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,8 +70,20 @@ function Login() {
         <div className="w-full max-w-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
             <div className="text-center mb-6 flex flex-col items-center">
-              <div className="mb-4">
-                <img src={'./Logo_CC_tron.svg'} alt="Logo" className="h-12" />
+              <div className="mb-5 flex items-center justify-center gap-3">
+                <div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
+                  <img
+                    src={lightLogo}
+                    alt="EduSprint Logo"
+                    className="h-9 w-9 rounded-sm object-cover dark:hidden"
+                  />
+                  <img
+                    src={darkLogo}
+                    alt="EduSprint Logo"
+                    className="hidden h-9 w-9 rounded-sm object-cover dark:block"
+                  />
+                </div>
+
               </div>
               <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
                 Chào mừng bạn trở lại!

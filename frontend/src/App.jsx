@@ -261,10 +261,13 @@ function AnimatedRoutes({
 }
 
 function App() {
-  const [darkMode, setDarkMode] =
-    useState(false)
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('darkMode') === 'true'
+  })
 
   useEffect(() => {
+    localStorage.setItem('darkMode', String(darkMode))
+
     document.documentElement.classList.toggle(
       'dark',
       darkMode
@@ -309,7 +312,6 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-
         <AnimatedRoutes
           darkMode={darkMode}
           onToggleDarkMode={() =>
@@ -321,7 +323,6 @@ function App() {
           position="top-right"
           toastOptions={toastOptions}
         />
-
       </BrowserRouter>
     </AuthProvider>
   )

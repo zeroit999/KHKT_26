@@ -29,9 +29,12 @@ function SignWithGoogle() {
         console.log("🆕 Creating new user document...");
 
         await setDoc(userRef, {
+          uid: result.user.uid,
           email: result.user.email || "",
           name: result.user.displayName || "",
+          fullName: result.user.displayName || "",
           avatar: result.user.photoURL || "",
+          photoURL: result.user.photoURL || "",
           role: "STUDENT", // ✅ Đồng nhất với register.jsx
           points: 0,
           streak: 0,
