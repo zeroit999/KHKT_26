@@ -96,6 +96,63 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+// =========================
+// TEACHER ROUTE
+// =========================
+function TeacherRoute({ children }) {
+  const {
+    user,
+    userDetails,
+    isLoading,
+  } = useAuth()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  const allowed =
+    userDetails?.role === 'TEACHER' ||
+    userDetails?.role === 'ADMIN_DEV'
+
+  if (!allowed) {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
+// =========================
+// ADMIN DEV ROUTE
+// =========================
+function AdminDevRoute({ children }) {
+  const {
+    user,
+    userDetails,
+    isLoading,
+  } = useAuth()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (
+    userDetails?.role !==
+    'ADMIN_DEV'
+  ) {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
 function SetupRoute() {
   const {
     user,
@@ -157,6 +214,9 @@ function AppContent({
     userDetails,
     isLoading,
   } = useAuth()
+
+  console.log(userDetails)
+  console.log(userDetails?.role)
 
   if (isLoading) {
     return <LoadingScreen />
@@ -228,6 +288,9 @@ function AppContent({
             }}
           >
             <Routes location={location}>
+              {/* ========================= */}
+              {/* PUBLIC ROUTES */}
+              {/* ========================= */}
               <Route
                 path="/"
                 element={<Home />}
@@ -253,6 +316,9 @@ function AppContent({
                 element={<Register />}
               />
 
+              {/* ========================= */}
+              {/* SETUP */}
+              {/* ========================= */}
               <Route
                 path="/setup"
                 element={
@@ -262,6 +328,9 @@ function AppContent({
                 }
               />
 
+              {/* ========================= */}
+              {/* PROFILE */}
+              {/* ========================= */}
               <Route
                 path="/profile"
                 element={
@@ -271,56 +340,120 @@ function AppContent({
                 }
               />
 
+              {/* ========================= */}
+              {/* DASHBOARD */}
+              {/* ========================= */}
               <Route
                 path="/dashboard"
-                element={<Dashboard />}
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* LEADERBOARD */}
+              {/* ========================= */}
               <Route
                 path="/leaderboard"
-                element={<Leaderboard />}
+                element={
+                  <ProtectedRoute>
+                    <Leaderboard />
+                  </ProtectedRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* COURSES */}
+              {/* ========================= */}
               <Route
                 path="/courses"
-                element={<Courses />}
+                element={
+                  <ProtectedRoute>
+                    <Courses />
+                  </ProtectedRoute>
+                }
               />
 
               <Route
                 path="/courses/:id"
-                element={<CourseDetail />}
+                element={
+                  <ProtectedRoute>
+                    <CourseDetail />
+                  </ProtectedRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* LEARNING */}
+              {/* ========================= */}
               <Route
                 path="/learn/:id"
-                element={<LearningPage />}
+                element={
+                  <ProtectedRoute>
+                    <LearningPage />
+                  </ProtectedRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* EXAMS */}
+              {/* ========================= */}
               <Route
                 path="/exams"
-                element={<Exams />}
+                element={
+                  <ProtectedRoute>
+                    <Exams />
+                  </ProtectedRoute>
+                }
               />
 
               <Route
                 path="/exam/:id"
-                element={<ExamRoom />}
+                element={
+                  <ProtectedRoute>
+                    <ExamRoom />
+                  </ProtectedRoute>
+                }
               />
 
               <Route
                 path="/exam/:id/result"
-                element={<ResultPage />}
+                element={
+                  <ProtectedRoute>
+                    <ResultPage />
+                  </ProtectedRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* TEACHER ROUTE */}
+              {/* ========================= */}
               <Route
                 path="/classes"
-                element={<Classes />}
+                element={
+                  <TeacherRoute>
+                    <Classes />
+                  </TeacherRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* ADMIN DEV ROUTE */}
+              {/* ========================= */}
               <Route
                 path="/admin"
-                element={<AdminDashboard />}
+                element={
+                  <AdminDevRoute>
+                    <AdminDashboard />
+                  </AdminDevRoute>
+                }
               />
 
+              {/* ========================= */}
+              {/* 404 */}
+              {/* ========================= */}
               <Route
                 path="*"
                 element={<NotFound />}

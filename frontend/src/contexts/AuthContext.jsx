@@ -189,7 +189,7 @@ export function AuthProvider({
                     '',
 
                   role:
-                    'STUDENT',
+                    '',
 
                   points: 0,
 

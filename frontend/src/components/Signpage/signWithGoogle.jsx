@@ -35,7 +35,7 @@ function SignWithGoogle() {
           fullName: result.user.displayName || "",
           avatar: result.user.photoURL || "",
           photoURL: result.user.photoURL || "",
-          role: "STUDENT", // ✅ Đồng nhất với register.jsx
+          role: "",
           points: 0,
           streak: 0,
           isSetupComplete: false,

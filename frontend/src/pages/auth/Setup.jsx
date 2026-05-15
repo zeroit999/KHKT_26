@@ -3,6 +3,7 @@ import { auth, db } from "../../components/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useAuth } from "../../contexts/AuthContext";
 
 const teacherSubjects = [
   "Toán",
@@ -71,6 +72,8 @@ function Setup() {
   const [subject, setSubject] = useState("");
 
   const navigate = useNavigate();
+
+  const { refreshUserData } = useAuth();
 
   const [darkMode, setDarkMode] = useState(
     document.documentElement.classList.contains("dark")
@@ -144,8 +147,12 @@ function Setup() {
         { merge: true }
       );
 
+      // REFRESH USER DATA
+      await refreshUserData(user);
+
       toast.success("Hoàn tất thiết lập");
-      navigate("/");
+
+      navigate("/", { replace: true });
     } catch (error) {
       console.error(error);
       toast.error(error.message || "Có lỗi xảy ra");

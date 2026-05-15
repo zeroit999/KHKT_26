@@ -3,76 +3,20 @@ import {
   Camera,
   Edit3,
   GraduationCap,
-  Link,
   Mail,
   MapPin,
   Phone,
   School,
-  Share2,
   Shield,
   User,
-  Video,
 } from 'lucide-react'
 
-import { FaFacebook, FaInstagram, FaTwitter } from 'react-icons/fa'
 import { doc, updateDoc } from 'firebase/firestore'
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { db } from '../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import defaultAvatar from '../../assets/favicon-light-mode.png'
-
-const SOCIAL_PLATFORMS = [
-  {
-    key: 'facebook',
-    label: 'Facebook',
-    icon: FaFacebook,
-    color: '#1877F2',
-    placeholder: 'facebook.com/username',
-  },
-  {
-    key: 'zalo',
-    label: 'Zalo',
-    icon: Phone,
-    color: '#0068FF',
-    placeholder: '0123456789',
-  },
-  {
-    key: 'instagram',
-    label: 'Instagram',
-    icon: FaInstagram,
-    color: '#E1306C',
-    placeholder: '@username',
-  },
-  {
-    key: 'thread',
-    label: 'Thread',
-    icon: Share2,
-    color: '#000000',
-    placeholder: '@username',
-  },
-  {
-    key: 'twitter',
-    label: 'Twitter',
-    icon: FaTwitter,
-    color: '#1DA1F2',
-    placeholder: '@username',
-  },
-  {
-    key: 'website',
-    label: 'Link',
-    icon: Link,
-    color: '#10B981',
-    placeholder: 'mywebsite.com',
-  },
-  {
-    key: 'tiktok',
-    label: 'Tiktok',
-    icon: Video,
-    color: '#010101',
-    placeholder: '@username',
-  },
-]
 
 function InfoRow({
   icon: Icon,
@@ -102,7 +46,14 @@ function InfoRow({
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: theme.mutedText, fontWeight: 500, marginBottom: 2 }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: theme.mutedText,
+            fontWeight: 500,
+            marginBottom: 2,
+          }}
+        >
           {label}
         </div>
 
@@ -125,70 +76,18 @@ function InfoRow({
             }}
           />
         ) : (
-          <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, wordBreak: 'break-word' }}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: theme.text,
+              wordBreak: 'break-word',
+            }}
+          >
             {value || '—'}
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function SocialItem({ platform, value, isEditing, onChange, theme }) {
-  const Icon = platform.icon
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 80 }}>
-      <div
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 16,
-          background: platform.color,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: theme.shadowSm,
-        }}
-      >
-        <Icon size={24} color="#fff" />
-      </div>
-
-      <div style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>{platform.label}</div>
-
-      {isEditing ? (
-        <input
-          name={platform.key}
-          value={value || ''}
-          onChange={onChange}
-          placeholder={platform.placeholder}
-          style={{
-            width: 80,
-            fontSize: 10,
-            textAlign: 'center',
-            border: `1px solid ${theme.border}`,
-            borderRadius: 6,
-            padding: '3px 6px',
-            outline: 'none',
-            color: theme.subText,
-            background: theme.inputBg,
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            fontSize: 11,
-            color: theme.subText,
-            textAlign: 'center',
-            maxWidth: 80,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {value || platform.placeholder}
-        </div>
-      )}
     </div>
   )
 }
@@ -211,13 +110,6 @@ export default function Profile() {
     subject: '',
     city: '',
     education: 'THPT',
-    facebook: '',
-    zalo: '',
-    instagram: '',
-    thread: '',
-    twitter: '',
-    website: '',
-    tiktok: '',
     learningStreak: 0,
     points: 0,
     role: 'STUDENT',
@@ -315,17 +207,14 @@ export default function Profile() {
         subject: userDetails.subject || '',
         city: userDetails.city || '',
         education: userDetails.education || 'THPT',
-        facebook: userDetails.facebook || '',
-        zalo: userDetails.zalo || '',
-        instagram: userDetails.instagram || '',
-        thread: userDetails.thread || '',
-        twitter: userDetails.twitter || '',
-        website: userDetails.website || '',
-        tiktok: userDetails.tiktok || '',
         learningStreak: userDetails.learningStreak || 0,
         points: userDetails.points || 0,
         role: userDetails.role || 'STUDENT',
-        avatar: userDetails.avatar || userDetails.photoURL || user?.photoURL || defaultAvatar,
+        avatar:
+          userDetails.avatar ||
+          userDetails.photoURL ||
+          user?.photoURL ||
+          defaultAvatar,
         coverPhoto: userDetails.coverPhoto || '',
       })
     }
@@ -336,7 +225,8 @@ export default function Profile() {
     setCoverPreview(profileData.coverPhoto || '')
   }, [profileData.avatar, profileData.coverPhoto])
 
-  const isTeacher = profileData.role?.trim()?.toUpperCase() === 'TEACHER'
+  const isTeacher =
+    profileData.role?.trim()?.toUpperCase() === 'TEACHER'
 
   const avatarSrc = useMemo(() => {
     if (userDetails?.avatar) return userDetails.avatar
@@ -384,15 +274,19 @@ export default function Profile() {
 
       const dataToSave = {
         ...profileData,
-        education: isTeacher ? profileData.education || '' : profileData.education,
+        education: isTeacher
+          ? profileData.education || ''
+          : profileData.education,
       }
 
       const userRef = doc(db, 'users', user.uid)
+
       await updateDoc(userRef, dataToSave)
 
       if (refreshUserData) await refreshUserData()
 
       toast.success('Đã cập nhật thông tin')
+
       setIsEditing(false)
     } catch (error) {
       console.error(error)
@@ -423,7 +317,9 @@ export default function Profile() {
     borderRadius: 20,
     padding: 24,
     boxShadow: theme.shadow,
-    border: `1px solid ${isDark ? theme.border : 'transparent'}`,
+    border: `1px solid ${
+      isDark ? theme.border : 'transparent'
+    }`,
   }
 
   return (
@@ -435,18 +331,29 @@ export default function Profile() {
             borderRadius: 24,
             overflow: 'hidden',
             boxShadow: theme.shadow,
-            border: `1px solid ${isDark ? theme.border : 'transparent'}`,
+            border: `1px solid ${
+              isDark ? theme.border : 'transparent'
+            }`,
           }}
         >
           <div style={{ position: 'relative', height: 180 }}>
             {coverPreview ? (
-              <img src={coverPreview} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img
+                src={coverPreview}
+                alt="cover"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
             ) : (
               <div
                 style={{
                   width: '100%',
                   height: '100%',
-                  background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 40%, #EC4899 80%, #F43F5E 100%)',
+                  background:
+                    'linear-gradient(135deg, #6366F1 0%, #8B5CF6 40%, #EC4899 80%, #F43F5E 100%)',
                 }}
               />
             )}
@@ -470,20 +377,37 @@ export default function Profile() {
                 }}
               >
                 <Camera size={15} /> Đổi ảnh bìa
-                <input type="file" accept="image/*" hidden onChange={handleCoverChange} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleCoverChange}
+                />
               </label>
             )}
           </div>
 
-          <div style={{ padding: '0 28px 24px', position: 'relative' }}>
-            <div style={{ position: 'relative', display: 'inline-block', marginTop: -48 }}>
+          <div
+            style={{
+              padding: '0 28px 24px',
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                display: 'inline-block',
+                marginTop: -48,
+              }}
+            >
               <div
                 style={{
                   width: 96,
                   height: 96,
                   borderRadius: '50%',
                   border: `4px solid ${theme.cardBg}`,
-                  background: 'linear-gradient(135deg, #6366F1, #EC4899)',
+                  background:
+                    'linear-gradient(135deg, #6366F1, #EC4899)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -495,7 +419,11 @@ export default function Profile() {
                   <img
                     src={avatarPreview || avatarSrc}
                     alt="avatar"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
                   />
                 ) : (
                   <GraduationCap size={40} color="#fff" />
@@ -517,11 +445,17 @@ export default function Profile() {
                     justifyContent: 'center',
                     cursor: 'pointer',
                     border: `2px solid ${theme.cardBg}`,
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                    boxShadow:
+                      '0 2px 6px rgba(0,0,0,0.2)',
                   }}
                 >
                   <Edit3 size={13} color="#fff" />
-                  <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleAvatarChange}
+                  />
                 </label>
               )}
             </div>
@@ -556,12 +490,29 @@ export default function Profile() {
                     }}
                   />
                 ) : (
-                  <div style={{ fontSize: 22, fontWeight: 800, color: theme.text, marginBottom: 6 }}>
-                    {profileData.fullName || user?.displayName || 'Tên người dùng'}
+                  <div
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: theme.text,
+                      marginBottom: 6,
+                    }}
+                  >
+                    {profileData.fullName ||
+                      user?.displayName ||
+                      'Tên người dùng'}
                   </div>
                 )}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginBottom: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <span
                     style={{
                       background: theme.pointsBg,
@@ -588,7 +539,9 @@ export default function Profile() {
                       fontWeight: 700,
                     }}
                   >
-                    {isTeacher ? '👨‍🏫 Giáo viên' : '🎓 Học sinh'}
+                    {isTeacher
+                      ? '👨‍🏫 Giáo viên'
+                      : '🎓 Học sinh'}
                   </span>
                 </div>
 
@@ -614,14 +567,27 @@ export default function Profile() {
                     }}
                   />
                 ) : (
-                  <div style={{ fontSize: 14, color: theme.subText, lineHeight: 1.6, maxWidth: 540 }}>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: theme.subText,
+                      lineHeight: 1.6,
+                      maxWidth: 540,
+                    }}
+                  >
                     {profileData.bio ||
                       'Tôi là một người yêu thích khoa học và học tập, luôn tìm kiếm cơ hội để khám phá những điều mới mẻ và phát triển bản thân.'}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  flexShrink: 0,
+                }}
+              >
                 {!isEditing ? (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -674,7 +640,9 @@ export default function Profile() {
                         opacity: isSaving ? 0.7 : 1,
                       }}
                     >
-                      {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                      {isSaving
+                        ? 'Đang lưu...'
+                        : 'Lưu thay đổi'}
                     </button>
                   </>
                 )}
@@ -683,9 +651,22 @@ export default function Profile() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 20,
+          }}
+        >
           <div style={card}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 20,
+              }}
+            >
               <div
                 style={{
                   width: 32,
@@ -699,19 +680,74 @@ export default function Profile() {
               >
                 <Mail size={16} color="#6366F1" />
               </div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: theme.text }}>Thông tin liên hệ</div>
+
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: 16,
+                  color: theme.text,
+                }}
+              >
+                Thông tin liên hệ
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <InfoRow icon={Mail} label="Email" value={user?.email} isEditing={false} theme={theme} />
-              <InfoRow icon={Phone} label="Số điện thoại" value={profileData.phone} name="phone" isEditing={isEditing} onChange={handleChange} theme={theme} />
-              <InfoRow icon={School} label="Trường" value={profileData.school} name="school" isEditing={isEditing} onChange={handleChange} theme={theme} />
-              <InfoRow icon={MapPin} label="Thành phố" value={profileData.city} name="city" isEditing={isEditing} onChange={handleChange} theme={theme} />
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
+              <InfoRow
+                icon={Mail}
+                label="Email"
+                value={user?.email}
+                isEditing={false}
+                theme={theme}
+              />
+
+              <InfoRow
+                icon={Phone}
+                label="Số điện thoại"
+                value={profileData.phone}
+                name="phone"
+                isEditing={isEditing}
+                onChange={handleChange}
+                theme={theme}
+              />
+
+              <InfoRow
+                icon={School}
+                label="Trường"
+                value={profileData.school}
+                name="school"
+                isEditing={isEditing}
+                onChange={handleChange}
+                theme={theme}
+              />
+
+              <InfoRow
+                icon={MapPin}
+                label="Thành phố"
+                value={profileData.city}
+                name="city"
+                isEditing={isEditing}
+                onChange={handleChange}
+                theme={theme}
+              />
             </div>
           </div>
 
           <div style={card}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 20,
+              }}
+            >
               <div
                 style={{
                   width: 32,
@@ -725,13 +761,42 @@ export default function Profile() {
               >
                 <User size={16} color="#6366F1" />
               </div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: theme.text }}>Thông tin cá nhân</div>
+
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: 16,
+                  color: theme.text,
+                }}
+              >
+                Thông tin cá nhân
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <InfoRow icon={User} label="Họ tên" value={profileData.fullName} name="fullName" isEditing={isEditing} onChange={handleChange} theme={theme} />
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
+              <InfoRow
+                icon={User}
+                label="Họ tên"
+                value={profileData.fullName}
+                name="fullName"
+                isEditing={isEditing}
+                onChange={handleChange}
+                theme={theme}
+              />
 
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'flex-start',
+                }}
+              >
                 <div
                   style={{
                     width: 36,
@@ -748,9 +813,17 @@ export default function Profile() {
                 </div>
 
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: theme.mutedText, fontWeight: 500, marginBottom: 4 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: theme.mutedText,
+                      fontWeight: 500,
+                      marginBottom: 4,
+                    }}
+                  >
                     Vai trò
                   </div>
+
                   <span
                     style={{
                       background: theme.badgeBg,
@@ -761,16 +834,34 @@ export default function Profile() {
                       fontWeight: 700,
                     }}
                   >
-                    {isTeacher ? 'Giáo viên' : 'Học sinh'}
+                    {isTeacher
+                      ? 'Giáo viên'
+                      : 'Học sinh'}
                   </span>
                 </div>
               </div>
 
               <InfoRow
-                icon={isTeacher ? BookOpen : GraduationCap}
-                label={isTeacher ? 'Chuyên môn' : 'Lớp'}
-                value={isTeacher ? profileData.subject : profileData.className}
-                name={isTeacher ? 'subject' : 'className'}
+                icon={
+                  isTeacher
+                    ? BookOpen
+                    : GraduationCap
+                }
+                label={
+                  isTeacher
+                    ? 'Chuyên môn'
+                    : 'Lớp'
+                }
+                value={
+                  isTeacher
+                    ? profileData.subject
+                    : profileData.className
+                }
+                name={
+                  isTeacher
+                    ? 'subject'
+                    : 'className'
+                }
                 isEditing={isEditing}
                 onChange={handleChange}
                 theme={theme}
@@ -788,38 +879,6 @@ export default function Profile() {
                 />
               )}
             </div>
-          </div>
-        </div>
-
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 10,
-                background: theme.badgeBg,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Share2 size={16} color="#6366F1" />
-            </div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: theme.text }}>Social Media</div>
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, justifyContent: 'flex-start' }}>
-            {SOCIAL_PLATFORMS.map((platform) => (
-              <SocialItem
-                key={platform.key}
-                platform={platform}
-                value={profileData[platform.key]}
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-              />
-            ))}
           </div>
         </div>
       </div>
