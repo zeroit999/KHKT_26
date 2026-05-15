@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { db } from '../firebase'
 import { useAuth } from '../../contexts/AuthContext'
+import defaultAvatar from '../../assets/favicon-light-mode.png'
 
 const SOCIAL_PLATFORMS = [
   {
@@ -220,7 +221,7 @@ export default function Profile() {
     learningStreak: 0,
     points: 0,
     role: 'STUDENT',
-    avatar: '',
+    avatar: defaultAvatar,
     coverPhoto: '',
   })
 
@@ -324,7 +325,7 @@ export default function Profile() {
         learningStreak: userDetails.learningStreak || 0,
         points: userDetails.points || 0,
         role: userDetails.role || 'STUDENT',
-        avatar: userDetails.avatar || '',
+        avatar: userDetails.avatar || userDetails.photoURL || user?.photoURL || defaultAvatar,
         coverPhoto: userDetails.coverPhoto || '',
       })
     }
@@ -338,9 +339,10 @@ export default function Profile() {
   const isTeacher = profileData.role?.trim()?.toUpperCase() === 'TEACHER'
 
   const avatarSrc = useMemo(() => {
-    if (user?.photoURL) return user.photoURL
     if (userDetails?.avatar) return userDetails.avatar
-    return null
+    if (userDetails?.photoURL) return userDetails.photoURL
+    if (user?.photoURL) return user.photoURL
+    return defaultAvatar
   }, [user, userDetails])
 
   const handleChange = (e) => {

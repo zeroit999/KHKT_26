@@ -95,13 +95,14 @@ export default function Navbar({
       <div className="mx-auto flex h-20 max-w-screen-xl items-center px-6">
         <div className="flex shrink-0 items-center">
           <Link to="/" className="flex items-center gap-3">
-<div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
-  <img
-    src={darkMode ? darkLogo : lightLogo}
-    alt="logo"
-    className="h-9 w-9 rounded-sm object-cover"
-  />
-</div>
+
+            <div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
+              <img
+                src={darkMode ? darkLogo : lightLogo}
+                alt="logo"
+                className="h-9 w-9 rounded-sm object-cover"
+              />
+            </div>
 
             <div>
               <h1
@@ -109,13 +110,14 @@ export default function Navbar({
                   darkMode ? 'text-white' : 'text-slate-900'
                 }`}
               >
-                EduSprint
+                ZUNY
               </h1>
 
               <p className="text-xs font-medium text-cyan-500">
                 THPT Platform
               </p>
             </div>
+
           </Link>
         </div>
 

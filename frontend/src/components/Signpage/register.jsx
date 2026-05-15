@@ -1,6 +1,7 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  updateProfile,
 } from "firebase/auth";
 import React, { useState } from "react";
 import { auth, db } from "../firebase.js";
@@ -8,6 +9,9 @@ import { setDoc, doc } from "firebase/firestore";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import SignWithGoogle from "./signWithGoogle";
+import defaultAvatar from "../../assets/favicon-light-mode.png";
+import lightLogo from "../../assets/favicon-light-mode.png";
+import darkLogo from "../../assets/favicon-dark-mode.png";
 
 function Register() {
   const [email, setEmail] = useState("");
@@ -22,17 +26,25 @@ function Register() {
     setError("");
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
 
-      const user = auth.currentUser;
+      const user = credential.user;
       console.log(user);
 
       if (user) {
+        await updateProfile(user, {
+          displayName: fname,
+          photoURL: defaultAvatar,
+        });
+
         await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
           email: email,
           name: fname,
+          fullName: fname,
           role: "STUDENT",
-          avatar: "",
+          avatar: defaultAvatar,
+          photoURL: defaultAvatar,
           points: 0,
           streak: 0,
           isSetupComplete: false,
@@ -62,6 +74,30 @@ function Register() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
+            <div className="text-center mb-6 flex flex-col items-center">
+              <div className="mb-5 flex items-center justify-center gap-3">
+                <div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
+                  <img
+                    src={lightLogo}
+                    alt="EduSprint Logo"
+                    className="h-9 w-9 rounded-sm object-cover dark:hidden"
+                  />
+                  <img
+                    src={darkLogo}
+                    alt="EduSprint Logo"
+                    className="hidden h-9 w-9 rounded-sm object-cover dark:block"
+                  />
+                </div>
+
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+                Tạo tài khoản mới
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Đăng ký để bắt đầu sử dụng EduSprint
+              </p>
+            </div>
+
             <form onSubmit={handleRegister} className="space-y-4">
 
               {/* Tên tài khoản */}

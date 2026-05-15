@@ -6,7 +6,7 @@ import {
   MapPin,
   MessageCircle,
   Phone,
- Send,
+  Send,
 } from 'lucide-react'
 
 import darkLogo from '../../assets/favicon-dark-mode.png'
@@ -33,23 +33,28 @@ function Footer({ darkMode }) {
             className="mb-4 flex items-center gap-3"
           >
 
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-300 to-blue-600 p-2">
-
+            {/* Logo giống Navbar */}
+            <div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
               <img
                 src={
                   darkMode
                     ? darkLogo
                     : lightLogo
                 }
-                alt="EduSprint Logo"
-                className="h-full w-full rounded-xl object-contain"
+                alt="logo"
+                className="h-9 w-9 rounded-sm object-cover"
               />
+            </div>
 
-            </span>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                ZUNY
+              </h1>
 
-            <span className="text-xl font-black text-slate-950 dark:text-white">
-              EduSprint
-            </span>
+              <p className="text-xs font-medium text-cyan-500">
+                THPT Platform
+              </p>
+            </div>
 
           </Link>
 
