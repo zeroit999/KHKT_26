@@ -20,6 +20,40 @@
       content="EduSprint - giao diện luyện thi THPT và E-Learning hiện đại."
     />
 
+    <!-- KHÔNG flash light mode khi reload -->
+    <script>
+      (() => {
+        const darkMode =
+          localStorage.getItem('darkMode') === 'true'
+
+        if (darkMode) {
+          document.documentElement.classList.add('dark')
+
+          const favicon =
+            document.getElementById('favicon')
+
+          if (favicon) {
+            favicon.setAttribute(
+              'href',
+              '/dark-mode.png'
+            )
+          }
+        } else {
+          document.documentElement.classList.remove('dark')
+
+          const favicon =
+            document.getElementById('favicon')
+
+          if (favicon) {
+            favicon.setAttribute(
+              'href',
+              '/light-mode.png'
+            )
+          }
+        }
+      })()
+    </script>
+
     <title>
       EduSprint | Luyện thi THPT
     </title>

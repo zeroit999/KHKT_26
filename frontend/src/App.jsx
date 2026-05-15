@@ -53,15 +53,40 @@ function ScrollToTop() {
   return null
 }
 
+function LoadingScreen() {
+  const isDark =
+    document.documentElement.classList.contains('dark')
+
+  return (
+    <div
+      className={`flex min-h-screen items-center justify-center transition-colors duration-300 ${
+        isDark
+          ? 'bg-[#020817] text-white'
+          : 'bg-slate-100 text-slate-900'
+      }`}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div
+          className={`h-10 w-10 animate-spin rounded-full border-4 border-t-transparent ${
+            isDark
+              ? 'border-cyan-400'
+              : 'border-blue-600'
+          }`}
+        />
+
+        <p className="text-lg font-semibold">
+          Đang tải...
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#020817] text-white">
-        Loading...
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!user) {
@@ -79,22 +104,18 @@ function SetupRoute() {
   } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#020817] text-white">
-        Loading...
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!user) {
     return <Navigate to="/login" replace />
   }
 
+  // Đã onboarding xong
   if (
-    userDetails &&
-    userDetails.isSetupComplete
+    userDetails?.isSetupComplete === true
   ) {
-    return <Navigate to="/profile" replace />
+    return <Navigate to="/" replace />
   }
 
   return <Setup />
@@ -108,11 +129,7 @@ function ProfileRoute() {
   } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#020817] text-white">
-        Loading...
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!user) {
@@ -121,7 +138,7 @@ function ProfileRoute() {
 
   if (
     userDetails &&
-    !userDetails.isSetupComplete
+    userDetails.isSetupComplete === false
   ) {
     return <Navigate to="/setup" replace />
   }
@@ -129,12 +146,68 @@ function ProfileRoute() {
   return <Profile />
 }
 
-function AnimatedRoutes({
+function AppContent({
   darkMode,
   onToggleDarkMode,
 }) {
   const location = useLocation()
 
+  const {
+    user,
+    userDetails,
+    isLoading,
+  } = useAuth()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  // Chưa onboarding xong
+  // => ép về setup
+  if (
+    user &&
+    userDetails &&
+    userDetails.isSetupComplete === false &&
+    location.pathname !== '/setup'
+  ) {
+    return <Navigate to="/setup" replace />
+  }
+
+  // Setup page
+  // => KHÔNG hiện Navbar/Footer
+  if (location.pathname === '/setup') {
+    return (
+      <>
+        <ScrollToTop />
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{
+              duration: 0.28,
+              ease: 'easeOut',
+            }}
+          >
+            <Routes location={location}>
+              <Route
+                path="/setup"
+                element={
+                  <ProtectedRoute>
+                    <SetupRoute />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
+      </>
+    )
+  }
+
+  // App bình thường
   return (
     <>
       <ScrollToTop />
@@ -303,7 +376,23 @@ function App() {
           : '#0f172a',
 
         boxShadow:
-          '0 18px 50px rgba(8, 47, 73, 0.24)',
+          '0 12px 32px rgba(15, 23, 42, 0.18)',
+
+        backdropFilter: 'blur(18px)',
+      },
+
+      success: {
+        iconTheme: {
+          primary: '#22d3ee',
+          secondary: '#ecfeff',
+        },
+      },
+
+      error: {
+        iconTheme: {
+          primary: '#f87171',
+          secondary: '#fff1f2',
+        },
       },
     }),
     [darkMode]
@@ -312,10 +401,10 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AnimatedRoutes
+        <AppContent
           darkMode={darkMode}
           onToggleDarkMode={() =>
-            setDarkMode((value) => !value)
+            setDarkMode((prev) => !prev)
           }
         />
 
