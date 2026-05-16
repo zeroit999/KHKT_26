@@ -482,8 +482,8 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl dark:bg-slate-950">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl dark:bg-slate-950" onMouseDown={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-black text-slate-950 dark:text-white">
@@ -595,7 +595,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
                   </div>
                 ) : (
                   <div className="rounded-xl bg-slate-50 p-4 text-center text-sm font-bold text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                    Chưa có lớp học nào trong Quản lý lớp học.
+                    Bạn chưa có lớp học nào. Hãy tạo lớp học trước và thêm học sinh vào lớp để có thể chọn lớp cho bài kiểm tra.
                   </div>
                 )}
               </div>
@@ -1392,10 +1392,6 @@ const user = auth.currentUser
                   <p className="text-sm font-medium text-slate-500">Hệ thống làm bài thi cho học sinh</p>
                 </div>
               </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
-                Chế độ học sinh
-              </div>
             </div>
           </header>
 
@@ -1530,7 +1526,7 @@ const user = auth.currentUser
             ) : (
               <div className="mt-16 flex flex-col items-center justify-center text-slate-400">
                 <BookOpen className="h-16 w-16" />
-                <p className="mt-4 text-sm font-semibold">Chưa có đề thi nào</p>
+                <p className="mt-4 text-sm font-semibold">Chưa có bài thi nào</p>
               </div>
             )}
           </main>
@@ -1606,8 +1602,8 @@ const user = auth.currentUser
               ['Tổng đề thi', totalExams, FileText, 'bg-blue-100 text-blue-600'],
               ['Công khai', publicExams, Globe2, 'bg-emerald-100 text-emerald-600'],
               ['Riêng tư', privateExams, LockKeyhole, 'bg-violet-100 text-violet-600'],
-              ['Đã xuất bản', publishedExams, FileText, 'bg-green-100 text-green-600'],
-              ['Bản nháp', draftExams, FileText, 'bg-amber-100 text-amber-600'],
+              ['Hoạt động', publishedExams, FileText, 'bg-green-100 text-green-600'],
+              ['Chưa mở', draftExams, FileText, 'bg-amber-100 text-amber-600'],
             ].map(([label, value, Icon, iconClass]) => (
               <div
                 key={label}
@@ -1642,7 +1638,7 @@ const user = auth.currentUser
               <select
                 value={privacyFilter}
                 onChange={(event) => setPrivacyFilter(event.target.value)}
-                className="rounded-xl border border-blue-500 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-blue-400 dark:bg-slate-900 dark:text-white"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
               >
                 <option value="all">Tất cả đề thi</option>
                 <option value="public">Công khai</option>
@@ -1655,8 +1651,8 @@ const user = auth.currentUser
                 className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
               >
                 <option value="all">Tất cả trạng thái</option>
-                <option value="published">Đã xuất bản</option>
-                <option value="draft">Bản nháp</option>
+                <option value="published">Hoạt động</option>
+                <option value="draft">Chưa mở</option>
               </select>
             </div>
           </div>
@@ -1687,7 +1683,7 @@ const user = auth.currentUser
                               exam.isPublished ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                             }`}
                           >
-                            {exam.isPublished ? 'Đã xuất bản' : 'Bản nháp'}
+                            {exam.isPublished ? 'Hoạt động' : 'Chưa mở'}
                           </span>
 
                           <span
@@ -1792,7 +1788,7 @@ const user = auth.currentUser
           ) : (
             <div className="mt-16 flex flex-col items-center justify-center text-slate-400">
               <BookOpen className="h-16 w-16" />
-              <p className="mt-4 text-sm font-semibold">Chưa có bài kiểm tra nào</p>
+              <p className="mt-4 text-sm font-semibold">Chưa có đề thi nào</p>
             </div>
           )}
         </main>
