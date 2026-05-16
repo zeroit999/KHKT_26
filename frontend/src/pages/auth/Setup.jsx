@@ -7,18 +7,20 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const teacherSubjects = [
   "Toán",
-  "Ngữ văn",
-  "Tiếng Anh",
   "Vật lý",
   "Hóa học",
   "Sinh học",
+  "Tin học",
+  "Ngữ văn",
   "Lịch sử",
   "Địa lý",
-  "Giáo dục công dân",
-  "Tin học",
+  "Tiếng Anh",
   "Công nghệ",
-  "Thể dục",
   "Quốc phòng - An ninh",
+  "Trải nghiệm hướng nghiệp",
+  "Giáo dục địa phương",
+  "Giáo dục thể chất",
+  "Giáo dục Kinh tế và Pháp luật",
 ];
 
 const provinces = [

@@ -189,7 +189,7 @@ export function AuthProvider({
                     '',
 
                   role:
-                    '',
+                    'user',
 
                   points: 0,
 
@@ -267,6 +267,27 @@ export function AuthProvider({
       }
     }
 
+  const normalizedRole =
+    String(userDetails?.role || '').trim().toLowerCase()
+
+  const isUser =
+    normalizedRole === 'user' ||
+    normalizedRole === 'student'
+
+  const isAdmin =
+    normalizedRole === 'admin' ||
+    normalizedRole === 'teacher'
+
+  const isAdminDev =
+    normalizedRole === 'admin_dev'
+
+  const canManageAll =
+    isAdminDev
+
+  const canManageExams =
+    isAdmin ||
+    isAdminDev
+
   return (
     <AuthContext.Provider
       value={{
@@ -276,6 +297,12 @@ export function AuthProvider({
         refreshUserData,
         logout,
         isLoading,
+        normalizedRole,
+        isUser,
+        isAdmin,
+        isAdminDev,
+        canManageAll,
+        canManageExams,
       }}
     >
       {children}

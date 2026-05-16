@@ -23,8 +23,19 @@ import GradientButton from '../../components/ui/GradientButton.jsx'
 
 const labels = ['A', 'B', 'C', 'D']
 
+const normalizeRole = (value) => String(value || '').trim().toLowerCase()
+const isStudentRole = (value) => normalizeRole(value) === 'user' || normalizeRole(value) === 'student'
+const isAdminRole = (value) =>
+  normalizeRole(value) === 'admin user' ||
+  normalizeRole(value) === 'admin_user' ||
+  normalizeRole(value) === 'admin' ||
+  normalizeRole(value) === 'teacher'
+const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normalizeRole(value) === 'admin_dev'
+const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
+const studentResultRoles = ['user', 'student']
+
 function StartAttemptModal({ role, attemptsLeft, lastScore, onContinue, onBack }) {
-  const isTeacher = role === 'teacher'
+  const isTeacher = canManageExams(role)
   const outOfAttempts = !isTeacher && attemptsLeft <= 0
 
   return (
@@ -150,7 +161,7 @@ const user = auth.currentUser
         const resultSnap = await getDocs(collection(db, 'exams', id, 'results'))
         const studentResults = resultSnap.docs
           .map((item) => ({ id: item.id, ...item.data() }))
-          .filter((item) => item.role === 'student' && item.studentId === user.uid)
+          .filter((item) => studentResultRoles.includes(normalizeRole(item.role)) && item.studentId === user.uid)
 
         setExam({
           id: examSnap.id,
@@ -193,7 +204,7 @@ const user = auth.currentUser
     )
   }
 
-  const isTeacher = role === 'teacher'
+  const isTeacher = canManageExams(role)
   const maxAttempts = exam.attemptMode === 'multiple' ? Number(exam.maxAttempts || 1) : 1
   const attemptsLeft = isTeacher ? Infinity : Math.max(0, maxAttempts - attemptCount)
   const currentQuestion = questions[currentIndex]
@@ -241,7 +252,7 @@ const user = auth.currentUser
 
       await addDoc(collection(db, 'exams', exam.id, 'results'), {
         studentId,
-        role: 'student',
+        role,
         score,
         answers,
         textAnswers,
@@ -260,7 +271,7 @@ const user = auth.currentUser
       )
 
       toast.success('Đã nộp bài')
-      navigate(`/exam/${exam.id}/result`, { state: { role: 'student', studentId } })
+      navigate(`/exam/${exam.id}/result`, { state: { role, studentId } })
     } catch (error) {
       console.error(error)
       toast.error('Nộp bài thất bại')

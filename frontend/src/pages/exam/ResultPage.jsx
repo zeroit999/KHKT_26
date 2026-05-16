@@ -25,12 +25,23 @@ import { auth, db } from '../../components/firebase'
 import GlassCard from '../../components/ui/GlassCard.jsx'
 import GradientButton from '../../components/ui/GradientButton.jsx'
 
+const normalizeRole = (value) => String(value || '').trim().toLowerCase()
+const isStudentRole = (value) => normalizeRole(value) === 'user' || normalizeRole(value) === 'student'
+const isAdminRole = (value) =>
+  normalizeRole(value) === 'admin user' ||
+  normalizeRole(value) === 'admin_user' ||
+  normalizeRole(value) === 'admin' ||
+  normalizeRole(value) === 'teacher'
+const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normalizeRole(value) === 'admin_dev'
+const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
+const studentResultRoles = ['user', 'student']
+
 function ResultPage() {
   const { id } = useParams()
   const location = useLocation()
 const [role, setRole] = useState(null)
 const [studentId, setStudentId] = useState(null)
-  const isTeacher = role === 'teacher'
+  const isTeacher = canManageExams(role)
 
   const [exam, setExam] = useState(null)
   const [questions, setQuestions] = useState([])
@@ -64,7 +75,7 @@ setStudentId(user.uid)
         )
 
         const resultSnap = await getDocs(
-          query(collection(db, 'exams', id, 'results'), where('role', '==', 'student')),
+          query(collection(db, 'exams', id, 'results'), where('role', 'in', studentResultRoles)),
         )
 
         setExam({
@@ -111,7 +122,7 @@ setStudentId(user.uid)
     )
   }
 
-  const studentResults = results.filter((result) => result.role === 'student')
+  const studentResults = results.filter((result) => studentResultRoles.includes(normalizeRole(result.role)))
   const latestResult =
     studentResults.find((result) => result.studentId === studentId) ??
     studentResults[0]

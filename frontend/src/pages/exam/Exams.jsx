@@ -4,6 +4,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
   BookOpen,
+  CalendarDays,
+  Clock3,
+  Copy,
+  FileText,
+  Globe2,
+  LockKeyhole,
   ChevronDown,
   Edit3,
   Image,
@@ -21,34 +27,203 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
+  where,
   serverTimestamp,
+  setDoc,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
+
+const teacherSubjects = [
+  'Toán',
+  'Vật lý',
+  'Hóa học',
+  'Sinh học',
+  'Tin học',
+  'Ngữ văn',
+  'Lịch sử',
+  'Địa lý',
+  'Tiếng Anh',
+  'Công nghệ',
+  'Quốc phòng - An ninh',
+  'Trải nghiệm hướng nghiệp',
+  'Giáo dục địa phương',
+  'Giáo dục thể chất',
+  'Giáo dục Kinh tế và Pháp luật',
+]
 
 const subjectCodes = {
   Toán: 'TO',
-  Văn: 'NV',
-  Anh: 'TA',
-  Lý: 'VL',
-  Hóa: 'HH',
-  Sinh: 'SH',
-  Tin: 'TH',
-  Sử: 'LS',
-  Địa: 'DL',
+  'Vật lý': 'VL',
+  'Hóa học': 'HH',
+  'Sinh học': 'SH',
+  'Tin học': 'TH',
+  'Ngữ văn': 'NV',
+  'Lịch sử': 'LS',
+  'Địa lý': 'DL',
+  'Tiếng Anh': 'TA',
   'Công nghệ': 'CN',
-  GDQP: 'QP',
-  'TN-HN': 'HN',
-  GDDP: 'DP',
-  GDTC: 'TD',
-  'GDKT-PL': 'KT',
+  'Quốc phòng - An ninh': 'QP',
+  'Trải nghiệm hướng nghiệp': 'HN',
+  'Giáo dục địa phương': 'DP',
+  'Giáo dục thể chất': 'TD',
+  'Giáo dục Kinh tế và Pháp luật': 'KT',
 }
 
-const classes = Array.from({ length: 10 }, (_, index) => `Lớp ${index + 1}`)
+const normalizeSubject = (value) => {
+  if (!value) return 'Toán'
+
+  const rawValue = String(value).trim()
+  const lowerValue = rawValue.toLowerCase()
+
+  const subjectAliases = {
+    toán: 'Toán',
+
+    lý: 'Vật lý',
+    'vật lý': 'Vật lý',
+
+    hóa: 'Hóa học',
+    'hóa học': 'Hóa học',
+
+    sinh: 'Sinh học',
+    'sinh học': 'Sinh học',
+
+    tin: 'Tin học',
+    'tin học': 'Tin học',
+
+    văn: 'Ngữ văn',
+    'ngữ văn': 'Ngữ văn',
+
+    sử: 'Lịch sử',
+    'lịch sử': 'Lịch sử',
+
+    địa: 'Địa lý',
+    'địa lý': 'Địa lý',
+
+    anh: 'Tiếng Anh',
+    'tiếng anh': 'Tiếng Anh',
+
+    'công nghệ': 'Công nghệ',
+
+    gdqp: 'Quốc phòng - An ninh',
+    'quốc phòng - an ninh': 'Quốc phòng - An ninh',
+    'quốc phòng': 'Quốc phòng - An ninh',
+
+    'trải nghiệm hướng nghiệp': 'Trải nghiệm hướng nghiệp',
+    'tn-hn': 'Trải nghiệm hướng nghiệp',
+    tnhn: 'Trải nghiệm hướng nghiệp',
+
+    'giáo dục địa phương': 'Giáo dục địa phương',
+    gddp: 'Giáo dục địa phương',
+
+    'giáo dục thể chất': 'Giáo dục thể chất',
+    'thể dục': 'Giáo dục thể chất',
+    gdtc: 'Giáo dục thể chất',
+
+    gdktpl: 'Giáo dục Kinh tế và Pháp luật',
+    'gdkt-pl': 'Giáo dục Kinh tế và Pháp luật',
+    'giáo dục kinh tế và pháp luật': 'Giáo dục Kinh tế và Pháp luật',
+    'kinh tế và pháp luật': 'Giáo dục Kinh tế và Pháp luật',
+  }
+
+  if (subjectAliases[lowerValue]) {
+    return subjectAliases[lowerValue]
+  }
+
+  const matchedSubject = teacherSubjects.find(
+    (subject) =>
+      subject.toLowerCase() === lowerValue ||
+      lowerValue.includes(subject.toLowerCase()),
+  )
+
+  return matchedSubject ?? rawValue
+}
+
+
+const normalizeRole = (value) => String(value || '').trim().toLowerCase()
+const isStudentRole = (value) => normalizeRole(value) === 'user' || normalizeRole(value) === 'student'
+const isAdminRole = (value) =>
+  normalizeRole(value) === 'admin user' ||
+  normalizeRole(value) === 'admin_user' ||
+  normalizeRole(value) === 'admin' ||
+  normalizeRole(value) === 'teacher'
+const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normalizeRole(value) === 'admin_dev'
+const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
+const studentResultRoles = ['user', 'student']
+
+const defaultClasses = Array.from({ length: 10 }, (_, index) => `Lớp ${index + 1}`)
+
+const getClassName = (item) =>
+  item?.name ??
+  item?.className ??
+  item?.title ??
+  item?.label ??
+  item?.grade ??
+  item?.id ??
+  ''
+
+
+const toDateTimeInputValue = (value) => {
+  if (!value) return ''
+
+  const text = String(value).trim()
+  if (!text) return ''
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) return text
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return `${text}T00:00`
+
+  const date = new Date(text)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const getDateTimeValue = (value) => {
+  const inputValue = toDateTimeInputValue(value)
+  if (!inputValue) return 0
+  const date = new Date(inputValue)
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
+}
+
+const addMinutesToDateTime = (value, minutes = 45) => {
+  const inputValue = toDateTimeInputValue(value)
+  if (!inputValue) return ''
+
+  const date = new Date(inputValue)
+  if (Number.isNaN(date.getTime())) return ''
+
+  date.setMinutes(date.getMinutes() + Number(minutes || 45))
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const mins = String(date.getMinutes()).padStart(2, '0')
+
+  return `${year}-${month}-${day}T${hours}:${mins}`
+}
+
+const formatDateTimeText = (value) => {
+  const inputValue = toDateTimeInputValue(value)
+  if (!inputValue) return 'Chưa đặt thời gian'
+
+  const [datePart, timePart = '00:00'] = inputValue.split('T')
+  const [year, month, day] = datePart.split('-')
+
+  return `${timePart} ${day}/${month}/${year}`
+}
 
 const createId = () => Date.now().toString() + Math.random().toString(36).slice(2)
 
@@ -155,11 +330,14 @@ function RichEditor({ label, value, onChange }) {
   )
 }
 
-function CreateExamModal({ open, onClose, onSave, editingExam }) {
+function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, availableClasses }) {
+  const fixedSubject = normalizeSubject(teacherSubject)
+  const classes = Array.isArray(availableClasses) ? availableClasses : defaultClasses
+
   const [form, setForm] = useState(
     editingExam ?? {
       title: '',
-      subject: 'Toán',
+      subject: fixedSubject,
       codeNumber: '0001',
       topic: '',
       status: 'public',
@@ -187,7 +365,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
     } else {
       setForm({
         title: '',
-        subject: 'Toán',
+        subject: fixedSubject,
         codeNumber: '0001',
         topic: '',
         status: 'public',
@@ -202,7 +380,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
         questions: [createDefaultQuestion()],
       })
     }
-  }, [editingExam, open])
+  }, [editingExam, open, fixedSubject])
 
   if (!open) return null
 
@@ -264,6 +442,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
     if (!form.topic.trim()) return 'Vui lòng nhập chủ đề.'
     if (!/^\d{4}$/.test(form.codeNumber)) return 'Mã số phải gồm đúng 4 chữ số.'
     if (!form.selectedClasses.length) return 'Vui lòng chọn ít nhất một lớp.'
+    if (form.openDate && form.closeDate && getDateTimeValue(form.closeDate) <= getDateTimeValue(form.openDate)) return 'Thời gian kết thúc phải lớn hơn thời gian bắt đầu.'
 
     for (const question of form.questions) {
       if (question.type !== 'post' && !question.question.trim()) return 'Mỗi câu hỏi phải có nội dung.'
@@ -298,7 +477,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
 
     onSave({
       ...form,
-      code: `${subjectCodes[form.subject]}${form.codeNumber}`,
+      code: `${subjectCodes[normalizeSubject(form.subject)] ?? normalizeSubject(form.subject).slice(0, 2).toUpperCase()}${form.codeNumber}`,
     })
   }
 
@@ -333,15 +512,10 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
             className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
           />
 
-          <select
-            value={form.subject}
-            onChange={(event) => setForm((prev) => ({ ...prev, subject: event.target.value }))}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-          >
-            {Object.keys(subjectCodes).map((subject) => (
-              <option key={subject}>{subject}</option>
-            ))}
-          </select>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Môn học</p>
+            <p className="mt-1">{form.subject}</p>
+          </div>
 
           <input
             value={form.codeNumber}
@@ -380,7 +554,8 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
                   <button
                     type="button"
                     onClick={() => setForm((prev) => ({ ...prev, selectedClasses: classes }))}
-                    className="flex-1 rounded-xl bg-violet-600 px-3 py-2 text-sm font-bold text-white"
+                    disabled={!classes.length}
+                    className="flex-1 rounded-xl bg-violet-600 px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Chọn hết
                   </button>
@@ -394,29 +569,35 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {classes.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          selectedClasses: prev.selectedClasses.includes(item)
-                            ? prev.selectedClasses.filter((value) => value !== item)
-                            : [...prev.selectedClasses, item],
-                        }))
-                      }
-                      className={`rounded-xl px-3 py-2 text-sm font-bold ${
-                        form.selectedClasses.includes(item)
-                          ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200'
-                          : 'bg-slate-50 text-slate-600 dark:bg-white/10 dark:text-white'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+                {classes.length ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {classes.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            selectedClasses: prev.selectedClasses.includes(item)
+                              ? prev.selectedClasses.filter((value) => value !== item)
+                              : [...prev.selectedClasses, item],
+                          }))
+                        }
+                        className={`rounded-xl px-3 py-2 text-sm font-bold ${
+                          form.selectedClasses.includes(item)
+                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200'
+                            : 'bg-slate-50 text-slate-600 dark:bg-white/10 dark:text-white'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-slate-50 p-4 text-center text-sm font-bold text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                    Chưa có lớp học nào trong Quản lý lớp học.
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -447,25 +628,85 @@ function CreateExamModal({ open, onClose, onSave, editingExam }) {
             />
           )}
 
-          <input
-            type="date"
-            value={form.openDate}
-            onChange={(event) => setForm((prev) => ({ ...prev, openDate: event.target.value }))}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-          />
+          <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+              Thời gian bắt đầu
+            </span>
+            <input
+              type="datetime-local"
+              value={toDateTimeInputValue(form.openDate)}
+              onChange={(event) => {
+                const nextOpenDate = event.target.value
 
-          <input
-            type="date"
-            value={form.closeDate}
-            onChange={(event) => setForm((prev) => ({ ...prev, closeDate: event.target.value }))}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-          />
+                setForm((prev) => {
+                  const nextCloseDate =
+                    !prev.closeDate ||
+                    (nextOpenDate && getDateTimeValue(prev.closeDate) <= getDateTimeValue(nextOpenDate))
+                      ? addMinutesToDateTime(nextOpenDate, prev.duration)
+                      : prev.closeDate
+
+                  return {
+                    ...prev,
+                    openDate: nextOpenDate,
+                    closeDate: nextCloseDate,
+                  }
+                })
+              }}
+              className="w-full border-0 bg-transparent p-0 font-bold outline-none dark:text-white"
+            />
+          </label>
+
+          <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+              Thời gian kết thúc
+            </span>
+            <input
+              type="datetime-local"
+              value={toDateTimeInputValue(form.closeDate)}
+              min={toDateTimeInputValue(form.openDate) || undefined}
+              onChange={(event) => {
+                const nextCloseDate = event.target.value
+
+                setForm((prev) => {
+                  if (
+                    prev.openDate &&
+                    nextCloseDate &&
+                    getDateTimeValue(nextCloseDate) <= getDateTimeValue(prev.openDate)
+                  ) {
+                    toast.error('Thời gian kết thúc phải sau thời gian bắt đầu')
+                    return {
+                      ...prev,
+                      closeDate: addMinutesToDateTime(prev.openDate, prev.duration),
+                    }
+                  }
+
+                  return {
+                    ...prev,
+                    closeDate: nextCloseDate,
+                  }
+                })
+              }}
+              className="w-full border-0 bg-transparent p-0 font-bold outline-none dark:text-white"
+            />
+          </label>
 
           <input
             type="number"
             min="1"
             value={form.duration}
-            onChange={(event) => setForm((prev) => ({ ...prev, duration: Number(event.target.value) }))}
+            onChange={(event) => {
+              const nextDuration = Number(event.target.value)
+
+              setForm((prev) => ({
+                ...prev,
+                duration: nextDuration,
+                closeDate:
+                  prev.openDate &&
+                  (!prev.closeDate || getDateTimeValue(prev.closeDate) <= getDateTimeValue(prev.openDate))
+                    ? addMinutesToDateTime(prev.openDate, nextDuration)
+                    : prev.closeDate,
+              }))
+            }}
             placeholder="Thời gian làm bài, phút"
             className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
           />
@@ -742,10 +983,16 @@ function Exams() {
   const navigate = useNavigate()
 
   const [role, setRole] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState(null)
+  const [teacherSubject, setTeacherSubject] = useState('Toán')
   const [studentClass, setStudentClass] = useState('Lớp 1')
+  const [classes, setClasses] = useState([])
   const [dark, setDark] = useState(false)
   const [search, setSearch] = useState('')
+  const [subjectFilter, setSubjectFilter] = useState('all')
   const [codeSearch, setCodeSearch] = useState('')
+  const [privacyFilter, setPrivacyFilter] = useState('all')
+  const [publishFilter, setPublishFilter] = useState('all')
   const [exams, setExams] = useState([])
   const [loading, setLoading] = useState(true)
   const [roleLoading, setRoleLoading] = useState(true)
@@ -765,6 +1012,8 @@ const user = auth.currentUser
           return
         }
 
+        setCurrentUserId(user.uid)
+
         const userSnap = await getDoc(doc(db, 'users', user.uid))
 
         if (!userSnap.exists()) {
@@ -772,7 +1021,19 @@ const user = auth.currentUser
           return
         }
 
-        setRole(userSnap.data().role)
+        const userData = userSnap.data()
+
+        setRole(userData.role)
+        setTeacherSubject(
+          normalizeSubject(
+            userData.specialty ??
+              userData.specialization ??
+              userData.subject ??
+              userData.major ??
+              userData.chuyenMon ??
+              userData.chuyenmon,
+          ),
+        )
       } catch (error) {
         console.error(error)
         toast.error('Không thể tải vai trò người dùng')
@@ -785,40 +1046,96 @@ const user = auth.currentUser
   }, [])
 
   useEffect(() => {
-    const fetchExams = async () => {
-      try {
-        setLoading(true)
+    const user = auth.currentUser
 
-        const snapshot = await getDocs(query(collection(db, 'exams'), orderBy('createdAt', 'desc')))
-        const examData = await Promise.all(
-          snapshot.docs.map(async (examDoc) => {
-            const questionSnapshot = await getDocs(
-              query(collection(db, 'exams', examDoc.id, 'questions'), orderBy('order', 'asc')),
-            )
-
-            const resultSnapshot = await getDocs(collection(db, 'exams', examDoc.id, 'results'))
-
-            return {
-              id: examDoc.id,
-              ...examDoc.data(),
-              questions: questionSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
-              studentResults: resultSnapshot.docs
-                .map((item) => ({ id: item.id, ...item.data() }))
-                .filter((item) => item.role === 'student'),
-            }
-          }),
-        )
-
-        setExams(examData)
-      } catch (error) {
-        console.error(error)
-        toast.error('Không thể tải danh sách bài kiểm tra')
-      } finally {
-        setLoading(false)
-      }
+    if (!user?.uid) {
+      setClasses([])
+      return undefined
     }
 
-    fetchExams()
+    const classesQuery = query(
+      collection(db, 'classes'),
+      where('teacherId', '==', user.uid),
+    )
+
+    const unsubscribe = onSnapshot(
+      classesQuery,
+      (classSnapshot) => {
+        const classData = classSnapshot.docs
+          .map((classDoc) => {
+            const data = classDoc.data()
+            const className = getClassName({ id: classDoc.id, ...data })
+
+            return className ? String(className).trim() : ''
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }))
+
+        const uniqueClasses = Array.from(new Set(classData))
+
+        setClasses(uniqueClasses)
+
+        if (uniqueClasses.length) {
+          setStudentClass((value) => (uniqueClasses.includes(value) ? value : uniqueClasses[0]))
+        } else {
+          setStudentClass('')
+        }
+      },
+      (error) => {
+        console.error(error)
+        toast.error('Không thể đồng bộ danh sách lớp học')
+        setClasses([])
+        setStudentClass('')
+      },
+    )
+
+    return () => unsubscribe()
+  }, [role])
+
+  useEffect(() => {
+    setLoading(true)
+
+    const examsQuery = query(collection(db, 'exams'), orderBy('createdAt', 'desc'))
+
+    const unsubscribe = onSnapshot(
+      examsQuery,
+      async (snapshot) => {
+        try {
+          const examData = await Promise.all(
+            snapshot.docs.map(async (examDoc) => {
+              const questionSnapshot = await getDocs(
+                query(collection(db, 'exams', examDoc.id, 'questions'), orderBy('order', 'asc')),
+              )
+
+              const resultSnapshot = await getDocs(collection(db, 'exams', examDoc.id, 'results'))
+
+              return {
+                id: examDoc.id,
+                ...examDoc.data(),
+                questions: questionSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
+                studentResults: resultSnapshot.docs
+                  .map((item) => ({ id: item.id, ...item.data() }))
+                  .filter((item) => isStudentRole(item.role)),
+              }
+            }),
+          )
+
+          setExams(examData)
+        } catch (error) {
+          console.error(error)
+          toast.error('Không thể đồng bộ danh sách bài kiểm tra')
+        } finally {
+          setLoading(false)
+        }
+      },
+      (error) => {
+        console.error(error)
+        toast.error('Không thể đồng bộ danh sách bài kiểm tra')
+        setLoading(false)
+      },
+    )
+
+    return () => unsubscribe()
   }, [])
 
   const visibleExams = useMemo(() => {
@@ -826,27 +1143,51 @@ const user = auth.currentUser
 
     return exams
       .map((exam) => {
-        const opened = !exam.openDate || now >= new Date(exam.openDate)
-        const closed = exam.closeDate && now > new Date(exam.closeDate)
+        const opened = !exam.openDate || now.getTime() >= getDateTimeValue(exam.openDate)
+        const closed = exam.closeDate && now.getTime() > getDateTimeValue(exam.closeDate)
         const status = opened && !closed ? exam.status : 'private'
         return { ...exam, status }
       })
       .filter((exam) => {
-        if (role === 'student') {
+        if (roleLoading) {
+    return (
+      <div className={dark ? 'dark' : ''}>
+        <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="h-20 rounded-2xl bg-white shadow-sm dark:bg-white/5" />
+            <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="h-24 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
+              ))}
+            </div>
+            <div className="mt-7 h-20 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  if (isStudentRole(role)) {
           if (exam.status !== 'public') return false
           if (!exam.selectedClasses?.includes(studentClass)) return false
         }
+
+        if (privacyFilter !== 'all' && exam.status !== privacyFilter) return false
+
+        if (publishFilter === 'published' && !exam.isPublished) return false
+        if (publishFilter === 'draft' && exam.isPublished) return false
 
         const keyword = search.trim().toLowerCase()
         if (!keyword) return true
 
         return (
           exam.title?.toLowerCase().includes(keyword) ||
+          exam.subject?.toLowerCase().includes(keyword) ||
           exam.topic?.toLowerCase().includes(keyword) ||
           exam.code?.toLowerCase().includes(keyword)
         )
       })
-  }, [exams, role, studentClass, search])
+  }, [exams, role, studentClass, search, privacyFilter, publishFilter])
 
   const studentResults = exams.flatMap((exam) => exam.studentResults ?? [])
   const averageScore = studentResults.length
@@ -855,11 +1196,14 @@ const user = auth.currentUser
 
   const saveExam = async (exam) => {
     try {
+      const fixedExamSubject = normalizeSubject(exam.subject || teacherSubject)
+      const fixedSubjectCode = subjectCodes[fixedExamSubject] ?? fixedExamSubject.slice(0, 2).toUpperCase()
+
       const examData = {
         title: exam.title,
-        subject: exam.subject,
-        subjectCode: subjectCodes[exam.subject],
-        code: `${subjectCodes[exam.subject]}${exam.codeNumber}`,
+        subject: fixedExamSubject,
+        subjectCode: fixedSubjectCode,
+        code: `${fixedSubjectCode}${exam.codeNumber}`,
         topic: exam.topic,
         status: exam.status,
         selectedClasses: exam.selectedClasses,
@@ -870,6 +1214,7 @@ const user = auth.currentUser
         closeDate: exam.closeDate,
         shuffleQuestions: Boolean(exam.shuffleQuestions),
         shuffleAnswers: Boolean(exam.shuffleAnswers),
+        isPublished: exam.status === 'public',
         updatedAt: serverTimestamp(),
       }
 
@@ -886,9 +1231,14 @@ const user = auth.currentUser
         examId = created.id
       }
 
+      const questionSnapshot = await getDocs(collection(db, 'exams', examId, 'questions'))
+      await Promise.all(questionSnapshot.docs.map((questionDoc) => deleteDoc(questionDoc.ref)))
+
       await Promise.all(
-        exam.questions.map((question, index) =>
-          addDoc(collection(db, 'exams', examId, 'questions'), {
+        exam.questions.map((question, index) => {
+          const questionId = question.id || createId()
+
+          return setDoc(doc(db, 'exams', examId, 'questions', questionId), {
             type: question.type,
             question: question.question,
             code: question.code ?? '',
@@ -896,8 +1246,8 @@ const user = auth.currentUser
             explanation: question.explanation,
             order: index,
             updatedAt: serverTimestamp(),
-          }),
-        ),
+          })
+        }),
       )
 
       const nextExam = {
@@ -923,6 +1273,82 @@ const user = auth.currentUser
     }
   }
 
+  const deleteExam = async (examId) => {
+    try {
+      const confirmed = window.confirm('Bạn có chắc muốn xóa đề thi này khỏi Firebase?')
+      if (!confirmed) return
+
+      const subCollections = ['questions', 'results', 'attempts']
+
+      await Promise.all(
+        subCollections.map(async (subCollection) => {
+          const subSnapshot = await getDocs(collection(db, 'exams', examId, subCollection))
+          const batch = writeBatch(db)
+
+          subSnapshot.docs.forEach((item) => {
+            batch.delete(item.ref)
+          })
+
+          await batch.commit()
+        }),
+      )
+
+      await deleteDoc(doc(db, 'exams', examId))
+
+      toast.success('Đã xóa đề thi khỏi Firebase')
+    } catch (error) {
+      console.error(error)
+      toast.error('Xóa đề thi thất bại')
+    }
+  }
+
+  const duplicateExam = async (exam) => {
+    try {
+      const fixedExamSubject = normalizeSubject(exam.subject || teacherSubject)
+      const fixedSubjectCode = subjectCodes[fixedExamSubject] ?? fixedExamSubject.slice(0, 2).toUpperCase()
+      const newCodeNumber = String(Date.now()).slice(-4)
+
+      const created = await addDoc(collection(db, 'exams'), {
+        title: `${exam.title} - Bản sao`,
+        subject: fixedExamSubject,
+        subjectCode: fixedSubjectCode,
+        code: `${fixedSubjectCode}${newCodeNumber}`,
+        topic: exam.topic ?? '',
+        status: 'private',
+        selectedClasses: exam.selectedClasses ?? [],
+        attemptMode: exam.attemptMode ?? 'once',
+        maxAttempts: Number(exam.maxAttempts || 1),
+        duration: Number(exam.duration || 45),
+        openDate: exam.openDate ?? '',
+        closeDate: exam.closeDate ?? '',
+        shuffleQuestions: Boolean(exam.shuffleQuestions),
+        shuffleAnswers: Boolean(exam.shuffleAnswers),
+        isPublished: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      await Promise.all(
+        (exam.questions ?? []).map((question, index) =>
+          setDoc(doc(db, 'exams', created.id, 'questions', createId()), {
+            type: question.type,
+            question: question.question,
+            code: question.code ?? '',
+            answers: question.answers ?? [],
+            explanation: question.explanation,
+            order: index,
+            updatedAt: serverTimestamp(),
+          }),
+        ),
+      )
+
+      toast.success('Đã sao chép đề thi lên Firebase')
+    } catch (error) {
+      console.error(error)
+      toast.error('Sao chép đề thi thất bại')
+    }
+  }
+
   const openByCode = () => {
     const exam = visibleExams.find((item) => item.code?.toLowerCase() === codeSearch.trim().toLowerCase())
 
@@ -934,190 +1360,434 @@ const user = auth.currentUser
     navigate(`/exam/${exam.id}`, { state: { role } })
   }
 
-  if (roleLoading) {
+  if (isStudentRole(role)) {
+    const examSubjects = visibleExams.map((exam) => normalizeSubject(exam.subject)).filter(Boolean)
+    const availableSubjects = Array.from(new Set([...teacherSubjects, ...examSubjects]))
+    const completedExams = visibleExams.filter((exam) =>
+      exam.studentResults?.some((result) => result.studentId === currentUserId),
+    )
+    const pendingExams = Math.max(0, visibleExams.length - completedExams.length)
+    const studentScores = visibleExams
+      .flatMap((exam) => exam.studentResults ?? [])
+      .filter((result) => result.studentId === currentUserId)
+      .map((result) => Number(result.score || 0))
+    const studentAverageScore = studentScores.length
+      ? Math.round((studentScores.reduce((total, score) => total + score, 0) / studentScores.length) * 10)
+      : 0
+
     return (
-      <section className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
-        Đang tải vai trò người dùng...
-      </section>
+      <div className={dark ? 'dark' : ''}>
+        <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950">
+          <header className="border-b border-slate-200 bg-white/95 shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/25">
+                  <BookOpen className="h-7 w-7" />
+                </div>
+
+                <div>
+                  <h1 className="text-2xl font-black text-slate-950 dark:text-white md:text-3xl">
+                    Đề thi trực tuyến
+                  </h1>
+                  <p className="text-sm font-medium text-slate-500">Hệ thống làm bài thi cho học sinh</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+                Chế độ học sinh
+              </div>
+            </div>
+          </header>
+
+          <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['Đề thi khả dụng', visibleExams.length, FileText, 'bg-blue-100 text-blue-600'],
+                ['Đã hoàn thành', completedExams.length, Globe2, 'bg-emerald-100 text-emerald-600'],
+                ['Chưa làm', pendingExams, Clock3, 'bg-orange-100 text-orange-600'],
+                ['Điểm trung bình', studentAverageScore, FileText, 'bg-violet-100 text-violet-600'],
+              ].map(([label, value, Icon, iconClass]) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+                      <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{value}</p>
+                    </div>
+
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconClass}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+              <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                  <Search className="h-5 w-5 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Tìm kiếm đề thi..."
+                    className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={subjectFilter}
+                  onChange={(event) => setSubjectFilter(event.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="all">Tất cả môn học</option>
+                  {availableSubjects.map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="mt-16 text-center text-sm font-semibold text-slate-500">Đang tải đề thi...</div>
+            ) : visibleExams.length ? (
+              <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {visibleExams.map((exam) => {
+                  const studentResult = exam.studentResults?.find((result) => result.studentId === currentUserId)
+                  const completed = Boolean(studentResult)
+                  const bestScore = studentResult?.score ?? null
+                  const questionCount = exam.questions?.length ?? 0
+                  const examDate = formatDateTimeText(exam.openDate || exam.closeDate)
+
+                  return (
+                    <article
+                      key={exam.id}
+                      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-white/10 dark:bg-white/5 ${
+                        completed ? 'border-t-4 border-t-emerald-500' : 'border-t-4 border-t-blue-500'
+                      }`}
+                    >
+                      <div className="p-5">
+                        <h3 className="text-lg font-black text-slate-950 dark:text-white">{exam.title}</h3>
+
+                        <span className="mt-3 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                          {exam.subject}
+                        </span>
+
+                        <div className="mt-5 grid gap-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+                          <span className="inline-flex items-center gap-2">
+                            <UserRound className="h-4 w-4" />
+                            {exam.selectedClasses?.join(', ') || studentClass}
+                          </span>
+
+                          <span className="inline-flex items-center gap-2">
+                            <Clock3 className="h-4 w-4" />
+                            {exam.duration} phút
+                          </span>
+
+                          <span className="inline-flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {questionCount} câu hỏi
+                          </span>
+
+                          <span className="inline-flex items-center gap-2">
+                            <CalendarDays className="h-4 w-4" />
+                            {examDate}
+                          </span>
+                        </div>
+
+                        <div className={`mt-5 rounded-xl p-4 ${completed ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                          {completed ? (
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-bold">Điểm cao nhất</p>
+                                <p className="mt-1 text-xs font-semibold">Đã làm bài</p>
+                              </div>
+                              <p className="text-2xl font-black">{bestScore}</p>
+                            </div>
+                          ) : (
+                            <div className="text-center">
+                              <p className="text-sm font-bold">Chưa làm bài</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <Link
+                          to={`/exam/${exam.id}`}
+                          state={{ role }}
+                          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-700 hover:to-violet-700"
+                        >
+                          {completed ? 'Làm lại bài thi' : 'Bắt đầu làm bài'}
+                        </Link>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="mt-16 flex flex-col items-center justify-center text-slate-400">
+                <BookOpen className="h-16 w-16" />
+                <p className="mt-4 text-sm font-semibold">Chưa có đề thi nào</p>
+              </div>
+            )}
+          </main>
+        </section>
+      </div>
     )
   }
 
+  if (!roleLoading && !canManageExams(role)) {
+    return (
+      <div className={dark ? 'dark' : ''}>
+        <section className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-950 transition dark:bg-slate-950">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200">
+              <FileText className="h-8 w-8" />
+            </div>
+
+            <h1 className="mt-6 text-3xl font-black text-slate-950 dark:text-white">Không có quyền truy cập</h1>
+
+            <p className="mt-3 text-sm font-medium leading-6 text-slate-500 dark:text-slate-300">
+              Tài khoản của bạn chưa được gán quyền phù hợp để truy cập trang đề thi.
+            </p>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  const totalExams = visibleExams.length
+  const publicExams = visibleExams.filter((exam) => exam.status === 'public').length
+  const privateExams = visibleExams.filter((exam) => exam.status !== 'public').length
+  const publishedExams = visibleExams.filter((exam) => exam.isPublished).length
+  const draftExams = visibleExams.filter((exam) => !exam.isPublished).length
+
   return (
     <div className={dark ? 'dark' : ''}>
-      <section className="min-h-screen bg-[#eef3ff] text-slate-950 transition dark:bg-slate-950">
+      <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950">
         <header className="border-b border-slate-200 bg-white/95 shadow-sm dark:border-white/10 dark:bg-slate-900">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/25">
-                <BookOpen className="h-7 w-7" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/25">
+                <FileText className="h-7 w-7" />
               </div>
 
               <div>
-                <h1 className="text-2xl font-black text-violet-600 md:text-3xl">
-                  Hệ Thống Bài Kiểm Tra Khoa Học
+                <h1 className="text-2xl font-black text-slate-950 dark:text-white md:text-3xl">
+                  Quản lý đề thi
                 </h1>
-                <p className="text-sm font-medium text-slate-500">Nền tảng học tập thông minh</p>
+                <p className="text-sm font-medium text-slate-500">Hệ thống quản lý đề thi cho giáo viên</p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <UserRound className="h-5 w-5 text-slate-600 dark:text-white" />
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold dark:border-white/10 dark:bg-white/10 dark:text-white">
-                {role === 'teacher' ? 'Giáo viên' : 'Học sinh'}
-              </div>
-
-              {role === 'student' && (
-                <select
-                  value={studentClass || 'Lớp 1'}
-                  onChange={(event) => setStudentClass(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-                >
-                  {classes.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              )}
-
-              {role === 'teacher' && (
+              {canManageExams(role) && (
                 <button
                   onClick={() => {
                     setEditingExam(null)
                     setCreateOpen(true)
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/20"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
                 >
                   <Plus className="h-4 w-4" />
-                  Tạo bài tập
+                  Tạo đề thi
                 </button>
               )}
-
-              <button
-                onClick={() => setDark((value) => !value)}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/10"
-              >
-                {dark ? <Sun className="h-5 w-5 text-white" /> : <Moon className="h-5 w-5" />}
-              </button>
             </div>
           </div>
         </header>
 
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <button
-              onClick={() => setStatsOpen(true)}
-              className="rounded-2xl border border-white bg-white p-6 text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/5"
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-slate-950 dark:text-white">Điểm trung bình</p>
-                <BarChart3 className="h-5 w-5 dark:text-white" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              ['Tổng đề thi', totalExams, FileText, 'bg-blue-100 text-blue-600'],
+              ['Công khai', publicExams, Globe2, 'bg-emerald-100 text-emerald-600'],
+              ['Riêng tư', privateExams, LockKeyhole, 'bg-violet-100 text-violet-600'],
+              ['Đã xuất bản', publishedExams, FileText, 'bg-green-100 text-green-600'],
+              ['Bản nháp', draftExams, FileText, 'bg-amber-100 text-amber-600'],
+            ].map(([label, value, Icon, iconClass]) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+                    <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{value}</p>
+                  </div>
+
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconClass}`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                </div>
               </div>
+            ))}
+          </div>
 
-              <p className="mt-7 text-3xl font-black text-slate-950 dark:text-white">{averageScore}</p>
-              <p className="mt-1 text-sm text-slate-500">Từ {studentResults.length} bài đã làm</p>
-
-              <p className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-white">
-                <BarChart3 className="h-4 w-4" />
-                Xem thống kê chi tiết
-              </p>
-            </button>
-
-            <div className="rounded-2xl border border-white bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-              <p className="font-bold text-slate-950 dark:text-white">Nhập mã bài kiểm tra</p>
-
-              <div className="mt-9 flex overflow-hidden rounded-xl bg-slate-100 dark:bg-white/10">
+          <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="grid gap-3 lg:grid-cols-[1fr_170px_170px]">
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                <Search className="h-5 w-5 text-slate-400" />
                 <input
-                  value={codeSearch}
-                  onChange={(event) => setCodeSearch(event.target.value.toUpperCase())}
-                  placeholder="NHẬP MÃ (VD: TO0001)"
-                  className="flex-1 bg-transparent px-4 py-3 text-sm font-semibold outline-none dark:text-white"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Tìm kiếm đề thi theo tên hoặc môn học..."
+                  className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 dark:text-white"
                 />
-
-                <button onClick={openByCode} className="bg-slate-950 px-4 text-white">
-                  <Search className="h-5 w-5" />
-                </button>
               </div>
+
+              <select
+                value={privacyFilter}
+                onChange={(event) => setPrivacyFilter(event.target.value)}
+                className="rounded-xl border border-blue-500 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-blue-400 dark:bg-slate-900 dark:text-white"
+              >
+                <option value="all">Tất cả đề thi</option>
+                <option value="public">Công khai</option>
+                <option value="private">Riêng tư</option>
+              </select>
+
+              <select
+                value={publishFilter}
+                onChange={(event) => setPublishFilter(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="published">Đã xuất bản</option>
+                <option value="draft">Bản nháp</option>
+              </select>
             </div>
           </div>
 
-          <div className="mt-7 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white">
-              <BookOpen className="h-6 w-6" />
-              Danh sách bài kiểm tra
-            </h2>
-
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm kiếm theo tên, mã, chủ đề..."
-              className="w-full rounded-xl border border-white bg-white px-4 py-3 text-sm font-semibold outline-none dark:border-white/10 dark:bg-white/5 dark:text-white md:w-80"
-            />
-          </div>
 
           {loading ? (
             <div className="mt-16 text-center text-sm font-semibold text-slate-500">Đang tải bài kiểm tra...</div>
           ) : visibleExams.length ? (
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {visibleExams.map((exam) => (
-                <div key={exam.id} className="rounded-3xl border border-white bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-black text-slate-950 dark:text-white">{exam.title}</h3>
-                      <p className="mt-1 text-sm text-slate-500">Chủ đề: {exam.topic}</p>
+            <div className="mt-5 space-y-4">
+              {visibleExams.map((exam) => {
+                const questionCount = exam.questions?.length ?? 0
+                const maxScore = 100
+                const pointPerQuestion = questionCount ? (maxScore / questionCount).toFixed(1) : '0.0'
+                const examDate = exam.openDate || exam.closeDate ? `${formatDateTimeText(exam.openDate)} - ${formatDateTimeText(exam.closeDate)}` : 'Chưa đặt thời gian'
+
+                return (
+                  <div
+                    key={exam.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/5"
+                  >
+                    <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-white/10 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-black text-slate-950 dark:text-white">{exam.title}</h3>
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-black ${
+                              exam.isPublished ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {exam.isPublished ? 'Đã xuất bản' : 'Bản nháp'}
+                          </span>
+
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ${
+                              exam.status === 'public'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-violet-100 text-violet-700'
+                            }`}
+                          >
+                            {exam.status === 'public' ? <Globe2 className="h-3 w-3" /> : <LockKeyhole className="h-3 w-3" />}
+                            {exam.status === 'public' ? 'Công khai' : 'Riêng tư'}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+                          <span className="inline-flex items-center gap-1.5">
+                            <FileText className="h-4 w-4" />
+                            {exam.subject}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1.5">
+                            <UserRound className="h-4 w-4" />
+                            {exam.selectedClasses?.join(', ') || 'Chưa chọn lớp'}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1.5">
+                            <CalendarDays className="h-4 w-4" />
+                            {examDate}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1.5">
+                            <Clock3 className="h-4 w-4" />
+                            {exam.duration} phút
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end lg:self-start">
+                        {canManageExams(role) ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => duplicateExam(exam)}
+                              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10"
+                              title="Sao chép đề thi"
+                            >
+                              <Copy className="h-5 w-5" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setEditingExam(exam)
+                                setCreateOpen(true)
+                              }}
+                              className="rounded-xl p-2 text-blue-600 transition hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                              title="Cập nhật đề thi"
+                            >
+                              <Edit3 className="h-5 w-5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="rounded-xl p-2 text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
+                              title="Xóa đề thi"
+                              onClick={() => deleteExam(exam.id)}
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </>
+                        ) : (
+                          <Link
+                            to={`/exam/${exam.id}`}
+                            state={{ role }}
+                            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700"
+                          >
+                            Làm bài
+                          </Link>
+                        )}
+                      </div>
                     </div>
 
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-black ${
-                        exam.status === 'public'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-white'
-                      }`}
-                    >
-                      {exam.status === 'public' ? 'Công khai' : 'Riêng tư'}
-                    </span>
-                  </div>
+                    <div className="grid grid-cols-3 pt-4 text-center">
+                      <div>
+                        <p className="text-2xl font-black text-blue-600">{questionCount}</p>
+                        <p className="text-sm font-medium text-slate-500">Câu hỏi</p>
+                      </div>
 
-                  <div className="grid gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                    <p>Mã bài: {exam.code}</p>
-                    <p>Môn: {exam.subject}</p>
-                    <p>Lớp: {exam.selectedClasses?.join(', ')}</p>
-                    <p>Thời gian: {exam.duration} phút</p>
-                  </div>
+                      <div className="border-x border-slate-200 dark:border-white/10">
+                        <p className="text-2xl font-black text-emerald-600">{maxScore}</p>
+                        <p className="text-sm font-medium text-slate-500">Điểm tối đa</p>
+                      </div>
 
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {role === 'teacher' ? (
-                      <>
-                        <Link
-                          to={`/exam/${exam.id}`}
-                          state={{ role }}
-                          className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 dark:bg-white/10 dark:text-white"
-                        >
-                          Xem
-                        </Link>
-
-                        <button
-                          onClick={() => {
-                            setEditingExam(exam)
-                            setCreateOpen(true)
-                          }}
-                          className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                          Cập nhật
-                        </button>
-                      </>
-                    ) : (
-                      <Link
-                        to={`/exam/${exam.id}`}
-                        state={{ role }}
-                        className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white"
-                      >
-                        Làm bài
-                      </Link>
-                    )}
+                      <div>
+                        <p className="text-2xl font-black text-violet-600">{pointPerQuestion}</p>
+                        <p className="text-sm font-medium text-slate-500">Điểm/câu</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="mt-16 flex flex-col items-center justify-center text-slate-400">
@@ -1135,6 +1805,8 @@ const user = auth.currentUser
           }}
           onSave={saveExam}
           editingExam={editingExam}
+          teacherSubject={teacherSubject}
+          availableClasses={classes}
         />
 
         <StatsModal open={statsOpen} onClose={() => setStatsOpen(false)} exams={exams} />
