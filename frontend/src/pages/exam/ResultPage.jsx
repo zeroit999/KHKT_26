@@ -19,7 +19,6 @@ import {
   getDocs,
   orderBy,
   query,
-  where,
 } from 'firebase/firestore'
 import { auth, db } from '../../components/firebase'
 import GlassCard from '../../components/ui/GlassCard.jsx'
@@ -36,7 +35,59 @@ const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normal
 const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
 const studentResultRoles = ['user', 'student']
 
+const getSyncedDarkMode = () => {
+  if (typeof window === 'undefined') return false
+
+  const root = document.documentElement
+  const body = document.body
+
+  if (root.classList.contains('dark') || body.classList.contains('dark')) return true
+  if (root.classList.contains('light') || body.classList.contains('light')) return false
+
+  const storageKeys = ['theme', 'color-theme', 'vite-ui-theme', 'darkMode', 'dark-mode', 'mode']
+
+  for (const key of storageKeys) {
+    const value = window.localStorage.getItem(key)?.toLowerCase()
+
+    if (['dark', 'true', '1', 'night'].includes(value)) return true
+    if (['light', 'false', '0', 'day'].includes(value)) return false
+  }
+
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+}
+
+function useSyncedDarkMode() {
+  const [isDark, setIsDark] = useState(getSyncedDarkMode)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncDarkMode = () => setIsDark(getSyncedDarkMode())
+    const root = document.documentElement
+    const body = document.body
+    const observer = new MutationObserver(syncDarkMode)
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    if (body) observer.observe(body, { attributes: true, attributeFilter: ['class'] })
+
+    window.addEventListener('storage', syncDarkMode)
+    media?.addEventListener?.('change', syncDarkMode)
+    syncDarkMode()
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('storage', syncDarkMode)
+      media?.removeEventListener?.('change', syncDarkMode)
+    }
+  }, [])
+
+  return isDark
+}
+
+
 function ResultPage() {
+  const dark = useSyncedDarkMode()
   const { id } = useParams()
   const location = useLocation()
 const [role, setRole] = useState(null)
@@ -50,18 +101,23 @@ const [studentId, setStudentId] = useState(null)
 
   useEffect(() => {
     const fetchResult = async () => {
-const user = auth.currentUser
-
-if (!user) return
-
-const userSnap = await getDoc(doc(db, 'users', user.uid))
-
-if (!userSnap.exists()) return
-
-setRole(userSnap.data().role)
-setStudentId(user.uid)
       try {
         setLoading(true)
+
+        const user = auth.currentUser
+
+        if (!user?.uid) {
+          setExam(null)
+          return
+        }
+
+        const userSnap = await getDoc(doc(db, 'users', user.uid))
+
+        if (userSnap.exists()) {
+          setRole(userSnap.data().role)
+        }
+
+        setStudentId(user.uid)
 
         const examSnap = await getDoc(doc(db, 'exams', id))
 
@@ -74,9 +130,7 @@ setStudentId(user.uid)
           query(collection(db, 'exams', id, 'questions'), orderBy('order', 'asc')),
         )
 
-        const resultSnap = await getDocs(
-          query(collection(db, 'exams', id, 'results'), where('role', 'in', studentResultRoles)),
-        )
+        const resultSnap = await getDocs(collection(db, 'exams', id, 'results'))
 
         setExam({
           id: examSnap.id,
@@ -91,10 +145,16 @@ setStudentId(user.uid)
         )
 
         setResults(
-          resultSnap.docs.map((item) => ({
-            id: item.id,
-            ...item.data(),
-          })),
+          resultSnap.docs
+            .map((item) => ({
+              id: item.id,
+              ...item.data(),
+            }))
+            .sort((a, b) => {
+              const bTime = b.createdAt?.toMillis?.() ?? 0
+              const aTime = a.createdAt?.toMillis?.() ?? 0
+              return bTime - aTime
+            }),
         )
       } catch (error) {
         console.error(error)
@@ -108,7 +168,7 @@ setStudentId(user.uid)
 
   if (loading) {
     return (
-      <section className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
+      <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-300`}>
         Đang tải kết quả...
       </section>
     )
@@ -116,13 +176,17 @@ setStudentId(user.uid)
 
   if (!exam) {
     return (
-      <section className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
+      <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-300`}>
         Không tìm thấy kết quả
       </section>
     )
   }
 
-  const studentResults = results.filter((result) => studentResultRoles.includes(normalizeRole(result.role)))
+  const studentResults = results.filter((result) => {
+    const resultRole = normalizeRole(result.role || result.originalRole)
+    return studentResultRoles.includes(resultRole) || result.studentId
+  })
+
   const latestResult =
     studentResults.find((result) => result.studentId === studentId) ??
     studentResults[0]
@@ -131,8 +195,25 @@ setStudentId(user.uid)
   const wrongQuestions = latestResult?.wrongQuestions ?? []
 
   const totalMultipleQuestions = questions.filter((question) => question.type === 'multiple').length
+  const answeredCount =
+    latestResult?.answeredCount ??
+    questions.filter((question) => {
+      const type = question.type ?? 'multiple'
+
+      if (type === 'essay' || type === 'code') {
+        return String(latestResult?.textAnswers?.[question.id] ?? '').trim().length > 0
+      }
+
+      if (type === 'truefalse') {
+        const value = latestResult?.answers?.[question.id]
+        return value && typeof value === 'object' && Object.keys(value).length > 0
+      }
+
+      return latestResult?.answers?.[question.id] !== undefined
+    }).length
+  const totalMultipleAnswered = questions.filter((question) => question.type === 'multiple' && latestResult?.answers?.[question.id] !== undefined).length
   const wrongCount = wrongQuestions.length
-  const correctCount = Math.max(0, totalMultipleQuestions - wrongCount)
+  const correctCount = totalMultipleQuestions ? Math.max(0, totalMultipleAnswered - wrongCount) : 0
 
   const pieData = isTeacher
     ? [{ name: 'Không tính giáo viên', value: 1, color: '#94a3b8' }]
@@ -142,7 +223,7 @@ setStudentId(user.uid)
       ]
 
   return (
-    <section className="relative px-4 py-10 sm:px-6 lg:px-8">
+    <section className={`${dark ? 'dark ' : ''}relative min-h-screen bg-slate-50 px-4 py-10 text-slate-950 sm:px-6 lg:px-8 dark:bg-slate-950 dark:text-white`}>
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 grid gap-5 lg:grid-cols-[1fr_0.8fr] lg:items-stretch">
           <GlassCard className="relative overflow-hidden p-7">
@@ -156,6 +237,13 @@ setStudentId(user.uid)
 
               <h1 className="text-3xl font-black text-slate-950 dark:text-white md:text-5xl">{exam.title}</h1>
 
+              {!latestResult && !isTeacher && (
+                <p className="mt-4 rounded-2xl bg-amber-100 p-4 text-sm font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                  Chưa tìm thấy kết quả bài làm của bạn. Hãy quay lại bài thi và nộp lại.
+                </p>
+              )}
+
+
               {isTeacher && (
                 <p className="mt-4 rounded-2xl bg-violet-100 p-4 text-sm font-bold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">
                   Giáo viên không được làm bài như học sinh. Điểm giáo viên không được tính vào biểu đồ và thống kê.
@@ -167,7 +255,7 @@ setStudentId(user.uid)
                   [isTeacher ? '—' : score.toFixed(1), 'Điểm số'],
                   [isTeacher ? '—' : correctCount, 'Câu đúng'],
                   [isTeacher ? '—' : wrongCount, 'Câu sai'],
-                  [isTeacher ? '—' : Math.max(0, questions.length - Object.keys(latestResult?.answers ?? {}).length), 'Bỏ trống'],
+                  [isTeacher ? '—' : Math.max(0, questions.length - answeredCount), 'Bỏ trống'],
                 ].map(([value, label]) => (
                   <div key={label} className="rounded-lg border border-white/60 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
                     <p className="text-3xl font-black text-slate-950 dark:text-white">{value}</p>

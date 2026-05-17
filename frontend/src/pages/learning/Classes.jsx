@@ -1168,7 +1168,7 @@ function Classes() {
         </label>
 
         <p className="modal-note">
-          Môn học mặc định: <strong>{teacherSubject}</strong>. Năm học tự lưu:{' '}
+          Môn học: <strong>{teacherSubject}</strong>. Năm học:{' '}
           <strong>{schoolYear}</strong>.
         </p>
         {createError ? <p className="form-error">{createError}</p> : null}

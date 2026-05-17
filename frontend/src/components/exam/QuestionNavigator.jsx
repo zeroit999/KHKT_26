@@ -1,19 +1,44 @@
 import { Flag } from 'lucide-react'
 import GlassCard from '../ui/GlassCard.jsx'
 
-function QuestionNavigator({ questions, currentIndex, answers, marked, onSelect }) {
+const hasAnsweredValue = (value) => {
+  if (value === undefined || value === null) return false
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'object') return Object.keys(value).length > 0
+  return true
+}
+
+function QuestionNavigator({ questions, currentIndex, answers, textAnswers = {}, marked, onSelect }) {
   return (
     <GlassCard className="p-4" initial={false} whileInView={false}>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-bold text-slate-950 dark:text-white">Danh sách câu hỏi</h2>
         <span className="text-sm font-semibold text-cyan-700 dark:text-cyan-200">
-          {Object.keys(answers).length}/{questions.length}
+          {questions.filter((question) => {
+            const type = question.type ?? 'multiple'
+
+            if (type === 'essay' || type === 'code') {
+              return hasAnsweredValue(textAnswers[question.id])
+            }
+
+            if (type === 'truefalse') {
+              return hasAnsweredValue(answers[question.id])
+            }
+
+            return answers[question.id] !== undefined
+          }).length}/{questions.length}
         </span>
       </div>
       <div className="grid grid-cols-5 gap-2 lg:grid-cols-4 xl:grid-cols-5">
         {questions.map((question, index) => {
           const isCurrent = index === currentIndex
-          const isAnswered = answers[question.id] !== undefined
+          const type = question.type ?? 'multiple'
+          const isAnswered =
+            type === 'essay' || type === 'code'
+              ? hasAnsweredValue(textAnswers[question.id])
+              : type === 'truefalse'
+                ? hasAnsweredValue(answers[question.id])
+                : answers[question.id] !== undefined
           const isMarked = marked.includes(question.id)
 
           return (

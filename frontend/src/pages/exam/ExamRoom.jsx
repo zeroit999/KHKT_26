@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Bookmark, ChevronLeft, ChevronRight, Flag, Send, X } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { auth, db } from '../../components/firebase'
 import AnswerOption from '../../components/exam/AnswerOption.jsx'
 import QuestionNavigator from '../../components/exam/QuestionNavigator.jsx'
@@ -33,6 +34,81 @@ const isAdminRole = (value) =>
 const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normalizeRole(value) === 'admin_dev'
 const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
 const studentResultRoles = ['user', 'student']
+
+const hasAnsweredValue = (value) => {
+  if (value === undefined || value === null) return false
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'object') return Object.keys(value).length > 0
+  return true
+}
+
+const getAnsweredCount = (questions, answers, textAnswers) =>
+  questions.filter((question) => {
+    const type = question.type ?? 'multiple'
+
+    if (type === 'essay' || type === 'code') {
+      return hasAnsweredValue(textAnswers[question.id])
+    }
+
+    if (type === 'truefalse') {
+      const value = answers[question.id]
+      return value && typeof value === 'object' && Object.keys(value).length > 0
+    }
+
+    return answers[question.id] !== undefined
+  }).length
+
+
+const getSyncedDarkMode = () => {
+  if (typeof window === 'undefined') return false
+
+  const root = document.documentElement
+  const body = document.body
+
+  if (root.classList.contains('dark') || body.classList.contains('dark')) return true
+  if (root.classList.contains('light') || body.classList.contains('light')) return false
+
+  const storageKeys = ['theme', 'color-theme', 'vite-ui-theme', 'darkMode', 'dark-mode', 'mode']
+
+  for (const key of storageKeys) {
+    const value = window.localStorage.getItem(key)?.toLowerCase()
+
+    if (['dark', 'true', '1', 'night'].includes(value)) return true
+    if (['light', 'false', '0', 'day'].includes(value)) return false
+  }
+
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+}
+
+function useSyncedDarkMode() {
+  const [isDark, setIsDark] = useState(getSyncedDarkMode)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncDarkMode = () => setIsDark(getSyncedDarkMode())
+    const root = document.documentElement
+    const body = document.body
+    const observer = new MutationObserver(syncDarkMode)
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    if (body) observer.observe(body, { attributes: true, attributeFilter: ['class'] })
+
+    window.addEventListener('storage', syncDarkMode)
+    media?.addEventListener?.('change', syncDarkMode)
+    syncDarkMode()
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('storage', syncDarkMode)
+      media?.removeEventListener?.('change', syncDarkMode)
+    }
+  }, [])
+
+  return isDark
+}
+
 
 function StartAttemptModal({ role, attemptsLeft, lastScore, onContinue, onBack }) {
   const isTeacher = canManageExams(role)
@@ -102,6 +178,7 @@ function CodeBlock({ value, readOnly = false, onChange }) {
 }
 
 function ExamRoom() {
+  const dark = useSyncedDarkMode()
   const { id } = useParams()
   const navigate = useNavigate()
 
@@ -109,24 +186,30 @@ function ExamRoom() {
   const [studentId, setStudentId] = useState(null)
   const [exam, setExam] = useState(null)
   const [questions, setQuestions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Boolean(id))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState({})
   const [textAnswers, setTextAnswers] = useState({})
   const [marked, setMarked] = useState([])
   const [submitOpen, setSubmitOpen] = useState(false)
-  const [startOpen, setStartOpen] = useState(true)
   const [attemptCount, setAttemptCount] = useState(0)
   const [lastScore, setLastScore] = useState(null)
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  const timerFinishedRef = useRef(false)
 
   useEffect(() => {
-    const fetchExam = async () => {
+    if (!id) {
+      setLoading(false)
+      return undefined
+    }
+
+    let cancelled = false
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         setLoading(true)
 
-const user = auth.currentUser
-
-        if (!user) {
+        if (!user?.uid) {
           toast.error('Bạn chưa đăng nhập')
           navigate('/exams')
           return
@@ -141,6 +224,9 @@ const user = auth.currentUser
         }
 
         const userRole = userSnap.data().role
+
+        if (cancelled) return
+
         setRole(userRole)
         setStudentId(user.uid)
 
@@ -163,10 +249,16 @@ const user = auth.currentUser
           .map((item) => ({ id: item.id, ...item.data() }))
           .filter((item) => studentResultRoles.includes(normalizeRole(item.role)) && item.studentId === user.uid)
 
-        setExam({
+        if (cancelled) return
+
+        const examPayload = {
           id: examSnap.id,
           ...examSnap.data(),
-        })
+        }
+
+        setExam(examPayload)
+        setSecondsLeft(Math.max(0, Number(examPayload.duration || 45) * 60))
+        timerFinishedRef.current = false
 
         setQuestions(
           questionSnap.docs.map((item) => ({
@@ -179,26 +271,78 @@ const user = auth.currentUser
         setLastScore(studentResults[0]?.score ?? null)
       } catch (error) {
         console.error(error)
-        toast.error('Không thể tải bài kiểm tra')
+        if (!cancelled) toast.error('Không thể tải bài kiểm tra')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
-    }
+    })
 
-    fetchExam()
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [id, navigate])
+
+  useEffect(() => {
+    if (!exam?.id || !role) return undefined
+
+    const durationSeconds = Math.max(0, Number(exam.duration || 45) * 60)
+    setSecondsLeft((current) => (current > 0 ? current : durationSeconds))
+    timerFinishedRef.current = false
+
+    return undefined
+  }, [exam?.id, exam?.duration, role])
+
+  useEffect(() => {
+    if (!exam?.id || !role || loading) return undefined
+    if (canManageExams(role)) return undefined
+    if (secondsLeft <= 0) return undefined
+
+    const intervalId = window.setInterval(() => {
+      setSecondsLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(intervalId)
+
+          if (!timerFinishedRef.current) {
+            timerFinishedRef.current = true
+            setSubmitOpen(true)
+            toast.error('Đã hết thời gian làm bài')
+          }
+
+          return 0
+        }
+
+        return current - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [exam?.id, role, loading, secondsLeft])
+
+  if (!id) {
+    return null
+  }
 
   if (loading || !role || !studentId) {
     return (
-      <section className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
-        Đang tải bài làm...
+      <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8 dark:bg-slate-950`}>
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 h-28 animate-pulse rounded-2xl bg-white/75 shadow-sm dark:bg-white/5" />
+          <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+            <div className="space-y-5">
+              <div className="h-40 animate-pulse rounded-2xl bg-white/75 shadow-sm dark:bg-white/5" />
+              <div className="h-72 animate-pulse rounded-2xl bg-white/75 shadow-sm dark:bg-white/5" />
+            </div>
+            <div className="h-[520px] animate-pulse rounded-2xl bg-white/75 shadow-sm dark:bg-white/5" />
+          </div>
+        </div>
       </section>
     )
   }
 
   if (!exam || !questions.length) {
     return (
-      <section className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
+      <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-300`}>
         Bài kiểm tra chưa có câu hỏi
       </section>
     )
@@ -208,7 +352,10 @@ const user = auth.currentUser
   const maxAttempts = exam.attemptMode === 'multiple' ? Number(exam.maxAttempts || 1) : 1
   const attemptsLeft = isTeacher ? Infinity : Math.max(0, maxAttempts - attemptCount)
   const currentQuestion = questions[currentIndex]
-  const progress = Math.round((Object.keys(answers).length / questions.length) * 100)
+  const answeredCount = getAnsweredCount(questions, answers, textAnswers)
+  const answerProgress = Math.round((answeredCount / questions.length) * 100)
+  const totalSeconds = Math.max(1, Number(exam.duration || 45) * 60)
+  const timerProgress = Math.max(0, Math.min(100, Math.round((secondsLeft / totalSeconds) * 100)))
   const displayedQuestions = questions
 
   const selectAnswer = (optionIndex) => {
@@ -227,6 +374,12 @@ const user = auth.currentUser
   const confirmSubmit = async () => {
     if (isTeacher) {
       toast.error('Giáo viên không được nộp bài như học sinh')
+      return
+    }
+
+    if (attemptsLeft <= 0) {
+      toast.error('Bạn đã hết lượt làm bài')
+      navigate('/exams')
       return
     }
 
@@ -252,11 +405,14 @@ const user = auth.currentUser
 
       await addDoc(collection(db, 'exams', exam.id, 'results'), {
         studentId,
-        role,
+        role: normalizeRole(role),
+        originalRole: role,
         score,
         answers,
         textAnswers,
         wrongQuestions,
+        totalQuestions: questions.length,
+        answeredCount,
         createdAt: serverTimestamp(),
       })
 
@@ -271,7 +427,7 @@ const user = auth.currentUser
       )
 
       toast.success('Đã nộp bài')
-      navigate(`/exam/${exam.id}/result`, { state: { role, studentId } })
+      navigate(`/exam/${exam.id}/result`, { state: { role, studentId, submitted: true } })
     } catch (error) {
       console.error(error)
       toast.error('Nộp bài thất bại')
@@ -282,17 +438,7 @@ const user = auth.currentUser
   const options = currentQuestion.answers ?? []
 
   return (
-    <section className="px-4 py-8 sm:px-6 lg:px-8">
-      {startOpen && (
-        <StartAttemptModal
-          role={role}
-          attemptsLeft={attemptsLeft}
-          lastScore={lastScore}
-          onContinue={() => setStartOpen(false)}
-          onBack={() => navigate('/exams')}
-        />
-      )}
-
+    <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 sm:px-6 lg:px-8 dark:bg-slate-950 dark:text-white`}>
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -316,23 +462,24 @@ const user = auth.currentUser
           <div className="min-w-64">
             <div className="mb-2 flex justify-between text-sm font-semibold">
               <span className="text-slate-500 dark:text-slate-400">Tiến độ bài làm</span>
-              <span className="text-cyan-700 dark:text-cyan-200">{progress}%</span>
+              <span className="text-cyan-700 dark:text-cyan-200">{answerProgress}%</span>
             </div>
 
             <div className="h-2 overflow-hidden rounded bg-slate-200 dark:bg-white/10">
-              <span className="block h-full rounded bg-gradient-to-r from-cyan-300 to-blue-600" style={{ width: `${progress}%` }} />
+              <span className="block h-full rounded bg-gradient-to-r from-cyan-300 to-blue-600" style={{ width: `${answerProgress}%` }} />
             </div>
           </div>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
           <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-            <TimerCard minutesLeft={Number(exam.duration || 45)} progress={52} />
+            <TimerCard secondsLeft={secondsLeft} totalSeconds={totalSeconds} progress={timerProgress} />
 
             <QuestionNavigator
               questions={displayedQuestions}
               currentIndex={currentIndex}
               answers={answers}
+              textAnswers={textAnswers}
               marked={marked}
               onSelect={setCurrentIndex}
             />
@@ -368,7 +515,7 @@ const user = auth.currentUser
 
             {questionType === 'code' && (
               <div className="mt-7 space-y-4">
-                <CodeBlock value={currentQuestion.code ?? ''} readOnly />
+                {isTeacher && <CodeBlock value={currentQuestion.code ?? ''} readOnly />}
 
                 <CodeBlock
                   value={textAnswers[currentQuestion.id] ?? ''}
@@ -483,7 +630,7 @@ const user = auth.currentUser
 
       <SubmitModal
         open={submitOpen}
-        answered={Object.keys(answers).length}
+        answered={answeredCount}
         total={questions.length}
         onClose={() => setSubmitOpen(false)}
         onConfirm={confirmSubmit}

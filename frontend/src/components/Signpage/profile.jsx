@@ -27,6 +27,7 @@ function InfoRow({
   onChange,
   iconColor = '#6366F1',
   theme,
+  readOnly = false,
 }) {
   return (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
@@ -57,7 +58,8 @@ function InfoRow({
           {label}
         </div>
 
-        {isEditing && name ? (
+        {isEditing && name && !readOnly ? (
+          (
           <input
             name={name}
             value={value || ''}
@@ -75,6 +77,7 @@ function InfoRow({
               boxSizing: 'border-box',
             }}
           />
+          )
         ) : (
           <div
             style={{
@@ -109,7 +112,6 @@ export default function Profile() {
     className: '',
     subject: '',
     city: '',
-    education: 'THPT',
     learningStreak: 0,
     points: 0,
     role: 'STUDENT',
@@ -206,7 +208,6 @@ export default function Profile() {
         className: userDetails.className || '',
         subject: userDetails.subject || '',
         city: userDetails.city || '',
-        education: userDetails.education || 'THPT',
         learningStreak: userDetails.learningStreak || 0,
         points: userDetails.points || 0,
         role: userDetails.role || 'STUDENT',
@@ -264,19 +265,11 @@ export default function Profile() {
       return
     }
 
-    if (!isTeacher && !profileData.education?.trim()) {
-      toast.error('Học sinh bắt buộc nhập học vấn')
-      return
-    }
-
     try {
       setIsSaving(true)
 
       const dataToSave = {
         ...profileData,
-        education: isTeacher
-          ? profileData.education || ''
-          : profileData.education,
       }
 
       const userRef = doc(db, 'users', user.uid)
@@ -715,17 +708,9 @@ export default function Profile() {
                 isEditing={isEditing}
                 onChange={handleChange}
                 theme={theme}
+                readOnly={true}
               />
 
-              <InfoRow
-                icon={School}
-                label="Trường"
-                value={profileData.school}
-                name="school"
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-              />
 
               <InfoRow
                 icon={MapPin}
@@ -735,6 +720,7 @@ export default function Profile() {
                 isEditing={isEditing}
                 onChange={handleChange}
                 theme={theme}
+                readOnly={true}
               />
             </div>
           </div>
@@ -790,56 +776,16 @@ export default function Profile() {
                 theme={theme}
               />
 
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  alignItems: 'flex-start',
-                }}
-              >
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: theme.iconBg,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Shield size={18} color="#6366F1" />
-                </div>
+              <InfoRow
+                icon={School}
+                label="Trường"
+                value={profileData.school}
+                name="school"
+                isEditing={isEditing}
+                onChange={handleChange}
+                theme={theme}
+              />
 
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: theme.mutedText,
-                      fontWeight: 500,
-                      marginBottom: 4,
-                    }}
-                  >
-                    Vai trò
-                  </div>
-
-                  <span
-                    style={{
-                      background: theme.badgeBg,
-                      color: theme.badgeText,
-                      borderRadius: 20,
-                      padding: '3px 12px',
-                      fontSize: 13,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {isTeacher
-                      ? 'Giáo viên'
-                      : 'Học sinh'}
-                  </span>
-                </div>
-              </div>
 
               <InfoRow
                 icon={
@@ -865,19 +811,9 @@ export default function Profile() {
                 isEditing={isEditing}
                 onChange={handleChange}
                 theme={theme}
+                readOnly={isTeacher}
               />
 
-              {!isTeacher && (
-                <InfoRow
-                  icon={BookOpen}
-                  label="Học vấn"
-                  value={profileData.education}
-                  name="education"
-                  isEditing={isEditing}
-                  onChange={handleChange}
-                  theme={theme}
-                />
-              )}
             </div>
           </div>
         </div>

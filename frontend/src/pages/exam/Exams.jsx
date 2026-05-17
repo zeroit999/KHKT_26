@@ -1,5 +1,5 @@
 import { auth, db } from '../../components/firebase'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
@@ -12,6 +12,7 @@ import {
   LockKeyhole,
   ChevronDown,
   Edit3,
+  Eye,
   Image,
   Moon,
   Plus,
@@ -158,6 +159,57 @@ const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normal
 const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
 const studentResultRoles = ['user', 'student']
 
+const getSyncedDarkMode = () => {
+  if (typeof window === 'undefined') return false
+
+  const root = document.documentElement
+  const body = document.body
+
+  if (root.classList.contains('dark') || body.classList.contains('dark')) return true
+  if (root.classList.contains('light') || body.classList.contains('light')) return false
+
+  const storageKeys = ['theme', 'color-theme', 'vite-ui-theme', 'darkMode', 'dark-mode', 'mode']
+
+  for (const key of storageKeys) {
+    const value = window.localStorage.getItem(key)?.toLowerCase()
+
+    if (['dark', 'true', '1', 'night'].includes(value)) return true
+    if (['light', 'false', '0', 'day'].includes(value)) return false
+  }
+
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+}
+
+function useSyncedDarkMode() {
+  const [isDark, setIsDark] = useState(getSyncedDarkMode)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncDarkMode = () => setIsDark(getSyncedDarkMode())
+    const root = document.documentElement
+    const body = document.body
+    const observer = new MutationObserver(syncDarkMode)
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    if (body) observer.observe(body, { attributes: true, attributeFilter: ['class'] })
+
+    window.addEventListener('storage', syncDarkMode)
+    media?.addEventListener?.('change', syncDarkMode)
+    syncDarkMode()
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('storage', syncDarkMode)
+      media?.removeEventListener?.('change', syncDarkMode)
+    }
+  }, [])
+
+  return isDark
+}
+
+
 const defaultClasses = Array.from({ length: 10 }, (_, index) => `Lớp ${index + 1}`)
 
 const getClassName = (item) =>
@@ -168,6 +220,70 @@ const getClassName = (item) =>
   item?.grade ??
   item?.id ??
   ''
+
+const getUserClassName = (item) =>
+  item?.className ??
+  item?.class ??
+  item?.lop ??
+  item?.grade ??
+  item?.studentClass ??
+  item?.classId ??
+  item?.classNameText ??
+  ''
+
+const normalizeClassName = (value) => String(value || '').trim().toLowerCase()
+
+const getStudentIdentityValues = (user, userData = {}) =>
+  [
+    user?.uid,
+    user?.email,
+    userData?.uid,
+    userData?.id,
+    userData?.email,
+    userData?.studentId,
+    userData?.studentCode,
+    userData?.maHocSinh,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase())
+
+const extractStudentItems = (classData = {}) => [
+  ...(Array.isArray(classData.students) ? classData.students : []),
+  ...(Array.isArray(classData.studentIds) ? classData.studentIds : []),
+  ...(Array.isArray(classData.studentUids) ? classData.studentUids : []),
+  ...(Array.isArray(classData.members) ? classData.members : []),
+  ...(Array.isArray(classData.memberIds) ? classData.memberIds : []),
+  ...(Array.isArray(classData.users) ? classData.users : []),
+]
+
+const classHasStudent = (classData, studentIdentities) => {
+  if (!studentIdentities.length) return false
+
+  return extractStudentItems(classData).some((student) => {
+    if (student === null || student === undefined) return false
+
+    if (typeof student === 'string') {
+      return studentIdentities.includes(student.trim().toLowerCase())
+    }
+
+    if (typeof student === 'object') {
+      return [
+        student.uid,
+        student.id,
+        student.email,
+        student.studentId,
+        student.studentCode,
+        student.maHocSinh,
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).trim().toLowerCase())
+        .some((value) => studentIdentities.includes(value))
+    }
+
+    return false
+  })
+}
+
 
 
 const toDateTimeInputValue = (value) => {
@@ -223,6 +339,47 @@ const formatDateTimeText = (value) => {
   const [year, month, day] = datePart.split('-')
 
   return `${timePart} ${day}/${month}/${year}`
+}
+
+
+const normalizeCodePart = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/_/g, '-')
+
+const getTeacherCodeName = (value) => {
+  const text = String(value || 'GV').trim()
+  if (!text) return 'GV'
+
+  const initials = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('')
+
+  return initials || 'GV'
+}
+
+const getExamCode = (teacherName, subject, codeNumber) => {
+  const fixedSubject = normalizeSubject(subject)
+  const subjectCode = subjectCodes[fixedSubject] ?? fixedSubject.slice(0, 2).toUpperCase()
+  return `${getTeacherCodeName(teacherName)}_${subjectCode}_${normalizeCodePart(codeNumber)}`
+}
+
+const getCodeNumberFromExam = (exam, fallback = '0001') => {
+  const code = String(exam?.code || '').trim()
+  if (!code) return exam?.codeNumber ?? fallback
+  if (code.includes('_')) return code.split('_').pop() || fallback
+  const subject = normalizeSubject(exam?.subject)
+  const subjectCode = subjectCodes[subject] ?? subject.slice(0, 2).toUpperCase()
+  return code.startsWith(subjectCode) ? code.slice(subjectCode.length) || fallback : code
 }
 
 const createId = () => Date.now().toString() + Math.random().toString(36).slice(2)
@@ -330,7 +487,48 @@ function RichEditor({ label, value, onChange }) {
   )
 }
 
-function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, availableClasses }) {
+
+function DarkModeSelect({ value, onChange, options, className = '' }) {
+  const [open, setOpen] = useState(false)
+  const selectedOption = options.find((option) => option.value === value) ?? options[0]
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 outline-none transition hover:border-violet-300 focus:border-violet-400 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:border-violet-400/60"
+      >
+        <span>{selectedOption?.label}</span>
+        <ChevronDown className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-slate-900">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value)
+                setOpen(false)
+              }}
+              className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-bold transition ${
+                value === option.value
+                  ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-100'
+                  : 'text-slate-700 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, teacherName, availableClasses }) {
   const fixedSubject = normalizeSubject(teacherSubject)
   const classes = Array.isArray(availableClasses) ? availableClasses : defaultClasses
 
@@ -349,17 +547,42 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
       duration: 45,
       shuffleQuestions: false,
       shuffleAnswers: false,
+      wordFileName: '',
       questions: [createDefaultQuestion()],
     },
   )
 
   const [classPanelOpen, setClassPanelOpen] = useState(false)
+  const classPanelRef = useRef(null)
+
+  const closeClassPanelIfOutside = (event) => {
+    if (classPanelRef.current && !classPanelRef.current.contains(event.target)) {
+      setClassPanelOpen(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!classPanelOpen) return undefined
+
+    const closeClassPanelWhenClickOutside = (event) => {
+      closeClassPanelIfOutside(event)
+    }
+
+    document.addEventListener('mousedown', closeClassPanelWhenClickOutside, true)
+    document.addEventListener('touchstart', closeClassPanelWhenClickOutside, true)
+
+    return () => {
+      document.removeEventListener('mousedown', closeClassPanelWhenClickOutside, true)
+      document.removeEventListener('touchstart', closeClassPanelWhenClickOutside, true)
+    }
+  }, [classPanelOpen])
 
   useEffect(() => {
     if (editingExam) {
       setForm({
         ...editingExam,
-        codeNumber: editingExam.code?.slice(2) ?? '0001',
+        codeNumber: getCodeNumberFromExam(editingExam),
+        wordFileName: editingExam.wordFileName ?? '',
         questions: editingExam.questions?.length ? editingExam.questions : [createDefaultQuestion()],
       })
     } else {
@@ -437,17 +660,54 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
     }))
   }
 
+  const handleWordUpload = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const isWordFile = /\.(doc|docx)$/i.test(file.name)
+    if (!isWordFile) {
+      toast.error('Vui lòng chọn file Word .doc hoặc .docx')
+      event.target.value = ''
+      return
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      wordFileName: file.name,
+      questions: [
+        {
+          id: createId(),
+          type: 'post',
+          question: `[File Word: ${file.name}]`,
+          code: '',
+          explanation: '',
+          answers: [],
+        },
+      ],
+    }))
+  }
+
+  const clearWordUpload = () => {
+    setForm((prev) => ({
+      ...prev,
+      wordFileName: '',
+      questions: prev.questions?.length && prev.questions.some((question) => question.type !== 'post')
+        ? prev.questions
+        : [createDefaultQuestion()],
+    }))
+  }
+
   const validate = () => {
     if (!form.title.trim()) return 'Vui lòng nhập tên bài kiểm tra.'
     if (!form.topic.trim()) return 'Vui lòng nhập chủ đề.'
-    if (!/^\d{4}$/.test(form.codeNumber)) return 'Mã số phải gồm đúng 4 chữ số.'
-    if (!form.selectedClasses.length) return 'Vui lòng chọn ít nhất một lớp.'
+    if (!normalizeCodePart(form.codeNumber)) return 'Vui lòng nhập mã đề.'
+    if (form.status === 'private' && !form.selectedClasses.length) return 'Vui lòng chọn ít nhất một lớp.'
     if (form.openDate && form.closeDate && getDateTimeValue(form.closeDate) <= getDateTimeValue(form.openDate)) return 'Thời gian kết thúc phải lớn hơn thời gian bắt đầu.'
 
-    for (const question of form.questions) {
-      if (question.type !== 'post' && !question.question.trim()) return 'Mỗi câu hỏi phải có nội dung.'
-      if (!question.explanation.trim()) return 'Mỗi câu hỏi phải có lời giải thích.'
+    if (form.wordFileName) return ''
 
+    for (const question of form.questions) {
+      if (!question.question.trim()) return 'Mỗi câu hỏi phải có nội dung.'
       if (question.type === 'multiple') {
         const filledAnswers = question.answers.filter((answer) => answer.content.trim())
         if (filledAnswers.length < 2) return 'Câu nhiều lựa chọn phải có tối thiểu 2 đáp án.'
@@ -477,19 +737,37 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
 
     onSave({
       ...form,
-      code: `${subjectCodes[normalizeSubject(form.subject)] ?? normalizeSubject(form.subject).slice(0, 2).toUpperCase()}${form.codeNumber}`,
+      code: getExamCode(teacherName, form.subject, form.codeNumber),
+      questions: form.wordFileName
+        ? [
+            {
+              id: createId(),
+              type: 'post',
+              question: `[File Word: ${form.wordFileName}]`,
+              code: '',
+              answers: [],
+              explanation: '',
+            },
+          ]
+        : form.questions,
     })
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl dark:bg-slate-950" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl dark:bg-slate-950"
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseDownCapture={(event) => {
+          if (classPanelOpen) closeClassPanelIfOutside(event)
+        }}
+      >
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-black text-slate-950 dark:text-white">
               {editingExam ? 'Cập nhật bài tập' : 'Tạo bài tập'}
             </h2>
-            <p className="text-sm text-slate-500">Dữ liệu sẽ được lưu vào Firebase.</p>
+            <p className="text-sm text-slate-500">Dữ liệu sẽ được lưu vào hệ thống.</p>
           </div>
 
           <button onClick={onClose} className="rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-white/10">
@@ -517,28 +795,48 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
             <p className="mt-1">{form.subject}</p>
           </div>
 
-          <input
-            value={form.codeNumber}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                codeNumber: event.target.value.replace(/\D/g, '').slice(0, 4),
-              }))
-            }
-            placeholder="4 số mã, ví dụ 0001"
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
+          <div className="grid gap-3 sm:grid-cols-[0.9fr_1.1fr]">
+            <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Giáo viên nhập mã đề
+              </span>
+              <input
+                value={form.codeNumber}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    codeNumber: normalizeCodePart(event.target.value),
+                  }))
+                }
+                placeholder="Ví dụ 0001 hoặc DP01"
+                className="w-full bg-transparent font-semibold text-slate-700 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
+              />
+            </label>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-white">
+              <p className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Mã đề
+              </p>
+              <p className="break-all text-base font-black text-slate-900 dark:text-white">
+                {getExamCode(teacherName, form.subject, form.codeNumber || '0001')}
+              </p>
+            </div>
+          </div>
+
+          <DarkModeSelect
+            value={form.status}
+            onChange={(value) => {
+              setClassPanelOpen(false)
+              setForm((prev) => ({ ...prev, status: value }))
+            }}
+            options={[
+              { value: 'public', label: 'Công khai' },
+              { value: 'private', label: 'Riêng tư' },
+            ]}
           />
 
-          <select
-            value={form.status}
-            onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-          >
-            <option value="public">Công khai</option>
-            <option value="private">Riêng tư</option>
-          </select>
-
-          <div className="relative">
+          {form.status === 'private' && (
+          <div ref={classPanelRef} className="relative">
             <button
               type="button"
               onClick={() => setClassPanelOpen((value) => !value)}
@@ -549,7 +847,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
             </button>
 
             {classPanelOpen && (
-              <div className="absolute left-0 top-14 z-10 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-slate-900">
+              <div className="absolute left-0 top-14 z-50 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-slate-900">
                 <div className="mb-3 flex gap-2">
                   <button
                     type="button"
@@ -601,21 +899,22 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
               </div>
             )}
           </div>
+          )}
 
-          <select
+          <DarkModeSelect
             value={form.attemptMode}
-            onChange={(event) =>
+            onChange={(value) =>
               setForm((prev) => ({
                 ...prev,
-                attemptMode: event.target.value,
-                maxAttempts: event.target.value === 'once' ? 1 : prev.maxAttempts,
+                attemptMode: value,
+                maxAttempts: value === 'once' ? 1 : prev.maxAttempts,
               }))
             }
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-          >
-            <option value="once">Làm 1 lần</option>
-            <option value="multiple">Được làm nhiều lần</option>
-          </select>
+            options={[
+              { value: 'once', label: 'Làm 1 lần' },
+              { value: 'multiple', label: 'Được làm nhiều lần' },
+            ]}
+          />
 
           {form.attemptMode === 'multiple' && (
             <input
@@ -624,7 +923,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
               value={form.maxAttempts}
               onChange={(event) => setForm((prev) => ({ ...prev, maxAttempts: Number(event.target.value) }))}
               placeholder="Số lượt làm"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700 outline-none [color-scheme:light] dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:[color-scheme:dark]"
             />
           )}
 
@@ -690,26 +989,31 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
             />
           </label>
 
-          <input
-            type="number"
-            min="1"
-            value={form.duration}
-            onChange={(event) => {
-              const nextDuration = Number(event.target.value)
+          <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/10">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+              Thời gian làm bài (phút)
+            </span>
+            <input
+              type="number"
+              min="1"
+              value={form.duration}
+              onChange={(event) => {
+                const nextDuration = Number(event.target.value)
 
-              setForm((prev) => ({
-                ...prev,
-                duration: nextDuration,
-                closeDate:
-                  prev.openDate &&
-                  (!prev.closeDate || getDateTimeValue(prev.closeDate) <= getDateTimeValue(prev.openDate))
-                    ? addMinutesToDateTime(prev.openDate, nextDuration)
-                    : prev.closeDate,
-              }))
-            }}
-            placeholder="Thời gian làm bài, phút"
-            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-          />
+                setForm((prev) => ({
+                  ...prev,
+                  duration: nextDuration,
+                  closeDate:
+                    prev.openDate &&
+                    (!prev.closeDate || getDateTimeValue(prev.closeDate) <= getDateTimeValue(prev.openDate))
+                      ? addMinutesToDateTime(prev.openDate, nextDuration)
+                      : prev.closeDate,
+                }))
+              }}
+              placeholder="45"
+              className="w-full bg-transparent font-semibold text-slate-700 outline-none dark:text-white"
+            />
+          </label>
 
           <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/10">
             <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-white">
@@ -732,6 +1036,41 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
           </div>
         </div>
 
+        <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-black text-slate-950 dark:text-white">Đăng bài bằng file Word</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                Upload file Word nếu đề đã có sẵn. Khi có file Word, đề thi sẽ được tạo tự động.
+              </p>
+            </div>
+
+            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700">
+              <Upload className="h-4 w-4" />
+              Upload Word
+              <input type="file" accept=".doc,.docx" onChange={handleWordUpload} className="hidden" />
+            </label>
+          </div>
+
+          {form.wordFileName && (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-500/30 dark:bg-violet-500/10 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-violet-700 dark:text-violet-200">Đã chọn file Word</p>
+                <p className="mt-1 break-all text-sm font-semibold text-slate-600 dark:text-slate-300">{form.wordFileName}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={clearWordUpload}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 dark:bg-slate-900 dark:text-white dark:hover:bg-white/10"
+              >
+                Gỡ file
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!form.wordFileName && (
         <div className="mt-6 space-y-5">
           {form.questions.map((question, questionIndex) => (
             <div key={question.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
@@ -751,34 +1090,15 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
                   <option value="multiple">Câu hỏi nhiều lựa chọn</option>
                   <option value="truefalse">Câu đúng sai</option>
                   <option value="essay">Tự luận</option>
-                  <option value="post">Đăng bài</option>
                   <option value="code">Code</option>
                 </select>
               </div>
 
-              {question.type !== 'post' && (
-                <RichEditor
-                  label="Câu hỏi"
-                  value={question.question}
-                  onChange={(value) => updateQuestion(question.id, { question: value })}
-                />
-              )}
-
-              {question.type === 'post' && (
-                <div className="space-y-3">
-                  <RichEditor
-                    label="Nội dung đăng bài"
-                    value={question.question}
-                    onChange={(value) => updateQuestion(question.id, { question: value })}
-                  />
-
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm dark:bg-slate-900 dark:text-white">
-                    <Upload className="h-4 w-4" />
-                    Upload ảnh hoặc Word
-                    <input type="file" accept="image/*,.doc,.docx" className="hidden" />
-                  </label>
-                </div>
-              )}
+              <RichEditor
+                label="Câu hỏi"
+                value={question.question}
+                onChange={(value) => updateQuestion(question.id, { question: value })}
+              />
 
               {question.type === 'code' && (
                 <div className="mt-4">
@@ -894,6 +1214,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, a
             + Thêm câu hỏi
           </button>
         </div>
+        )}
 
         <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-5 dark:border-white/10">
           <button
@@ -985,9 +1306,12 @@ function Exams() {
   const [role, setRole] = useState(null)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [teacherSubject, setTeacherSubject] = useState('Toán')
-  const [studentClass, setStudentClass] = useState('Lớp 1')
+  const [teacherName, setTeacherName] = useState('GiaoVien')
+  const [studentClass, setStudentClass] = useState('')
+  const [studentClasses, setStudentClasses] = useState([])
   const [classes, setClasses] = useState([])
-  const [dark, setDark] = useState(false)
+  const dark = useSyncedDarkMode()
+
   const [search, setSearch] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('all')
   const [codeSearch, setCodeSearch] = useState('')
@@ -999,6 +1323,7 @@ function Exams() {
   const [createOpen, setCreateOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [editingExam, setEditingExam] = useState(null)
+  const [deleteConfirmExam, setDeleteConfirmExam] = useState(null)
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -1024,6 +1349,23 @@ const user = auth.currentUser
         const userData = userSnap.data()
 
         setRole(userData.role)
+
+        const fixedStudentClass = String(getUserClassName(userData) || '').trim()
+
+        if (fixedStudentClass) {
+          setStudentClass(fixedStudentClass)
+          setStudentClasses([fixedStudentClass])
+        }
+
+        setTeacherName(
+          userData.displayName ??
+            userData.fullName ??
+            userData.name ??
+            userData.teacherName ??
+            user.displayName ??
+            user.email?.split('@')[0] ??
+            'GiaoVien',
+        )
         setTeacherSubject(
           normalizeSubject(
             userData.specialty ??
@@ -1048,9 +1390,53 @@ const user = auth.currentUser
   useEffect(() => {
     const user = auth.currentUser
 
-    if (!user?.uid) {
+    if (!user?.uid || !role) {
       setClasses([])
       return undefined
+    }
+
+    if (isStudentRole(role)) {
+      const classesQuery = query(collection(db, 'classes'))
+
+      const unsubscribe = onSnapshot(
+        classesQuery,
+        async (classSnapshot) => {
+          try {
+            const userSnap = await getDoc(doc(db, 'users', user.uid))
+            const userData = userSnap.exists() ? userSnap.data() : {}
+            const directClass = String(getUserClassName(userData) || '').trim()
+            const identities = getStudentIdentityValues(user, userData)
+
+            const membershipClasses = classSnapshot.docs
+              .map((classDoc) => {
+                const data = classDoc.data()
+                const className = getClassName({ id: classDoc.id, ...data })
+
+                return className && classHasStudent(data, identities) ? String(className).trim() : ''
+              })
+              .filter(Boolean)
+
+            const uniqueStudentClasses = Array.from(
+              new Set([directClass, ...membershipClasses].filter(Boolean)),
+            ).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }))
+
+            setStudentClasses(uniqueStudentClasses)
+            setStudentClass((value) =>
+              uniqueStudentClasses.includes(value) ? value : uniqueStudentClasses[0] ?? '',
+            )
+            setClasses([])
+          } catch (error) {
+            console.error(error)
+            setStudentClasses([])
+          }
+        },
+        (error) => {
+          console.error(error)
+          setStudentClasses([])
+        },
+      )
+
+      return () => unsubscribe()
     }
 
     const classesQuery = query(
@@ -1144,38 +1530,37 @@ const user = auth.currentUser
     return exams
       .map((exam) => {
         const opened = !exam.openDate || now.getTime() >= getDateTimeValue(exam.openDate)
-        const closed = exam.closeDate && now.getTime() > getDateTimeValue(exam.closeDate)
-        const status = opened && !closed ? exam.status : 'private'
-        return { ...exam, status }
+        const closed = Boolean(exam.closeDate && now.getTime() > getDateTimeValue(exam.closeDate))
+        const isUpcoming = Boolean(exam.openDate && now.getTime() < getDateTimeValue(exam.openDate))
+        const isActive = opened && !closed
+        const availabilityStatus = isActive ? 'published' : isUpcoming ? 'draft' : 'ended'
+
+        return {
+          ...exam,
+          status: exam.status || 'public',
+          isActive,
+          isUpcoming,
+          isEnded: closed,
+          availabilityStatus,
+        }
       })
       .filter((exam) => {
-        if (roleLoading) {
-    return (
-      <div className={dark ? 'dark' : ''}>
-        <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="h-20 rounded-2xl bg-white shadow-sm dark:bg-white/5" />
-            <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="h-24 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
-              ))}
-            </div>
-            <div className="mt-7 h-20 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
-          </div>
-        </section>
-      </div>
-    )
-  }
+        if (roleLoading) return false
 
-  if (isStudentRole(role)) {
-          if (exam.status !== 'public') return false
-          if (!exam.selectedClasses?.includes(studentClass)) return false
+        if (isStudentRole(role)) {
+          const isPublicExam = exam.status === 'public'
+          const normalizedStudentClasses = studentClasses.map(normalizeClassName)
+          const isAssignedPrivateExam =
+            exam.status === 'private' &&
+            Array.isArray(exam.selectedClasses) &&
+            exam.selectedClasses.some((item) => normalizedStudentClasses.includes(normalizeClassName(item)))
+
+          if (!isPublicExam && !isAssignedPrivateExam) return false
         }
 
         if (privacyFilter !== 'all' && exam.status !== privacyFilter) return false
 
-        if (publishFilter === 'published' && !exam.isPublished) return false
-        if (publishFilter === 'draft' && exam.isPublished) return false
+        if (publishFilter !== 'all' && exam.availabilityStatus !== publishFilter) return false
 
         const keyword = search.trim().toLowerCase()
         if (!keyword) return true
@@ -1187,7 +1572,7 @@ const user = auth.currentUser
           exam.code?.toLowerCase().includes(keyword)
         )
       })
-  }, [exams, role, studentClass, search, privacyFilter, publishFilter])
+  }, [exams, role, studentClass, studentClasses, search, privacyFilter, publishFilter])
 
   const studentResults = exams.flatMap((exam) => exam.studentResults ?? [])
   const averageScore = studentResults.length
@@ -1203,7 +1588,7 @@ const user = auth.currentUser
         title: exam.title,
         subject: fixedExamSubject,
         subjectCode: fixedSubjectCode,
-        code: `${fixedSubjectCode}${exam.codeNumber}`,
+        code: getExamCode(teacherName, fixedExamSubject, exam.codeNumber),
         topic: exam.topic,
         status: exam.status,
         selectedClasses: exam.selectedClasses,
@@ -1214,7 +1599,13 @@ const user = auth.currentUser
         closeDate: exam.closeDate,
         shuffleQuestions: Boolean(exam.shuffleQuestions),
         shuffleAnswers: Boolean(exam.shuffleAnswers),
-        isPublished: exam.status === 'public',
+        wordFileName: exam.wordFileName ?? '',
+        isPublished: (() => {
+          const now2 = new Date()
+          const opened = !exam.openDate || now2.getTime() >= getDateTimeValue(exam.openDate)
+          const closed = exam.closeDate && now2.getTime() > getDateTimeValue(exam.closeDate)
+          return opened && !closed
+        })(),
         updatedAt: serverTimestamp(),
       }
 
@@ -1275,9 +1666,6 @@ const user = auth.currentUser
 
   const deleteExam = async (examId) => {
     try {
-      const confirmed = window.confirm('Bạn có chắc muốn xóa đề thi này khỏi Firebase?')
-      if (!confirmed) return
-
       const subCollections = ['questions', 'results', 'attempts']
 
       await Promise.all(
@@ -1295,7 +1683,8 @@ const user = auth.currentUser
 
       await deleteDoc(doc(db, 'exams', examId))
 
-      toast.success('Đã xóa đề thi khỏi Firebase')
+      toast.success('Đã xóa đề thi')
+      setDeleteConfirmExam(null)
     } catch (error) {
       console.error(error)
       toast.error('Xóa đề thi thất bại')
@@ -1312,7 +1701,7 @@ const user = auth.currentUser
         title: `${exam.title} - Bản sao`,
         subject: fixedExamSubject,
         subjectCode: fixedSubjectCode,
-        code: `${fixedSubjectCode}${newCodeNumber}`,
+        code: getExamCode(teacherName, fixedExamSubject, newCodeNumber),
         topic: exam.topic ?? '',
         status: 'private',
         selectedClasses: exam.selectedClasses ?? [],
@@ -1323,6 +1712,7 @@ const user = auth.currentUser
         closeDate: exam.closeDate ?? '',
         shuffleQuestions: Boolean(exam.shuffleQuestions),
         shuffleAnswers: Boolean(exam.shuffleAnswers),
+        wordFileName: exam.wordFileName ?? '',
         isPublished: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1349,6 +1739,24 @@ const user = auth.currentUser
     }
   }
 
+  if (roleLoading) {
+    return (
+      <div className={dark ? 'dark' : ''}>
+        <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="h-20 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
+            <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="h-24 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
+              ))}
+            </div>
+            <div className="mt-7 h-20 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-white/5" />
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   const openByCode = () => {
     const exam = visibleExams.find((item) => item.code?.toLowerCase() === codeSearch.trim().toLowerCase())
 
@@ -1358,6 +1766,35 @@ const user = auth.currentUser
     }
 
     navigate(`/exam/${exam.id}`, { state: { role } })
+  }
+
+  const copyExamLink = async (exam) => {
+    try {
+      const examUrl = `${window.location.origin}/exam/${exam.id}`
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(examUrl)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = examUrl
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+
+      toast.success('Đã sao chép link bài thi cho học sinh')
+    } catch (error) {
+      console.error(error)
+      toast.error('Không thể sao chép link bài thi')
+    }
+  }
+
+  const previewExam = (exam) => {
+    navigate(`/exam/${exam.id}`, { state: { role, preview: true } })
   }
 
   if (isStudentRole(role)) {
@@ -1448,9 +1885,7 @@ const user = auth.currentUser
               </div>
             </div>
 
-            {loading ? (
-              <div className="mt-16 text-center text-sm font-semibold text-slate-500">Đang tải đề thi...</div>
-            ) : visibleExams.length ? (
+            {visibleExams.length ? (
               <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {visibleExams.map((exam) => {
                   const studentResult = exam.studentResults?.find((result) => result.studentId === currentUserId)
@@ -1527,6 +1962,11 @@ const user = auth.currentUser
               <div className="mt-16 flex flex-col items-center justify-center text-slate-400">
                 <BookOpen className="h-16 w-16" />
                 <p className="mt-4 text-sm font-semibold">Chưa có bài thi nào</p>
+                {studentClasses.length > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-slate-400">
+                    Lớp hiện tại: {studentClasses.join(', ')}
+                  </p>
+                )}
               </div>
             )}
           </main>
@@ -1558,8 +1998,9 @@ const user = auth.currentUser
   const totalExams = visibleExams.length
   const publicExams = visibleExams.filter((exam) => exam.status === 'public').length
   const privateExams = visibleExams.filter((exam) => exam.status !== 'public').length
-  const publishedExams = visibleExams.filter((exam) => exam.isPublished).length
-  const draftExams = visibleExams.filter((exam) => !exam.isPublished).length
+  const publishedExams = visibleExams.filter((exam) => exam.availabilityStatus === 'published').length
+  const draftExams = visibleExams.filter((exam) => exam.availabilityStatus === 'draft').length
+  const endedExams = visibleExams.filter((exam) => exam.availabilityStatus === 'ended').length
 
   return (
     <div className={dark ? 'dark' : ''}>
@@ -1597,13 +2038,14 @@ const user = auth.currentUser
         </header>
 
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
             {[
               ['Tổng đề thi', totalExams, FileText, 'bg-blue-100 text-blue-600'],
               ['Công khai', publicExams, Globe2, 'bg-emerald-100 text-emerald-600'],
               ['Riêng tư', privateExams, LockKeyhole, 'bg-violet-100 text-violet-600'],
               ['Hoạt động', publishedExams, FileText, 'bg-green-100 text-green-600'],
               ['Chưa mở', draftExams, FileText, 'bg-amber-100 text-amber-600'],
+              ['Đã kết thúc', endedExams, FileText, 'bg-red-100 text-red-600'],
             ].map(([label, value, Icon, iconClass]) => (
               <div
                 key={label}
@@ -1653,20 +2095,21 @@ const user = auth.currentUser
                 <option value="all">Tất cả trạng thái</option>
                 <option value="published">Hoạt động</option>
                 <option value="draft">Chưa mở</option>
+                <option value="ended">Đã kết thúc</option>
               </select>
             </div>
           </div>
 
 
-          {loading ? (
-            <div className="mt-16 text-center text-sm font-semibold text-slate-500">Đang tải bài kiểm tra...</div>
-          ) : visibleExams.length ? (
+          {visibleExams.length ? (
             <div className="mt-5 space-y-4">
               {visibleExams.map((exam) => {
                 const questionCount = exam.questions?.length ?? 0
                 const maxScore = 100
                 const pointPerQuestion = questionCount ? (maxScore / questionCount).toFixed(1) : '0.0'
                 const examDate = exam.openDate || exam.closeDate ? `${formatDateTimeText(exam.openDate)} - ${formatDateTimeText(exam.closeDate)}` : 'Chưa đặt thời gian'
+                const isActive = exam.availabilityStatus === 'published'
+                const isUpcoming = exam.availabilityStatus === 'draft'
 
                 return (
                   <div
@@ -1680,10 +2123,10 @@ const user = auth.currentUser
 
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-black ${
-                              exam.isPublished ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                              isActive ? 'bg-emerald-100 text-emerald-700' : isUpcoming ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                             }`}
                           >
-                            {exam.isPublished ? 'Hoạt động' : 'Chưa mở'}
+                            {isActive ? 'Hoạt động' : isUpcoming ? 'Sắp mở' : 'Đã kết thúc'}
                           </span>
 
                           <span
@@ -1726,11 +2169,20 @@ const user = auth.currentUser
                           <>
                             <button
                               type="button"
-                              onClick={() => duplicateExam(exam)}
+                              onClick={() => copyExamLink(exam)}
                               className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10"
-                              title="Sao chép đề thi"
+                              title="Sao chép link bài thi cho học sinh"
                             >
                               <Copy className="h-5 w-5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => previewExam(exam)}
+                              className="rounded-xl p-2 text-emerald-600 transition hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                              title="Xem trước đề thi"
+                            >
+                              <Eye className="h-5 w-5" />
                             </button>
 
                             <button
@@ -1748,7 +2200,7 @@ const user = auth.currentUser
                               type="button"
                               className="rounded-xl p-2 text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
                               title="Xóa đề thi"
-                              onClick={() => deleteExam(exam.id)}
+                              onClick={() => setDeleteConfirmExam(exam)}
                             >
                               <Trash2 className="h-5 w-5" />
                             </button>
@@ -1793,6 +2245,53 @@ const user = auth.currentUser
           )}
         </main>
 
+
+        {deleteConfirmExam && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={() => setDeleteConfirmExam(null)}>
+            <div
+              className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-950"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">Xác nhận xóa</p>
+                  <h3 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Xóa đề thi?</h3>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">
+                    Bạn có chắc muốn xóa đề "{deleteConfirmExam.title || 'Chưa có tên'}" khỏi Firebase? Hành động này sẽ xóa cả câu hỏi, kết quả và lượt làm.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmExam(null)}
+                  className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+                  aria-label="Đóng"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmExam(null)}
+                  className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => deleteExam(deleteConfirmExam.id)}
+                  className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-500/20 transition hover:bg-red-700"
+                >
+                  Xóa đề thi
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <CreateExamModal
           open={createOpen}
           onClose={() => {
@@ -1802,6 +2301,7 @@ const user = auth.currentUser
           onSave={saveExam}
           editingExam={editingExam}
           teacherSubject={teacherSubject}
+          teacherName={teacherName}
           availableClasses={classes}
         />
 
