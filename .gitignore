@@ -7,21 +7,52 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Node / Vite
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+dist/
+dist-ssr/
+frontend/dist/
+frontend/dist-ssr/
+build/
+
+# Env files
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Firebase Admin secret
+backend/config/firebase-admin-key.json
+firebase-admin-key.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+backend/__pycache__/
+backend/**/__pycache__/
+
+# Local database
+users.db
+backend/users.db
+*.sqlite
+*.sqlite3
+*.db
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-firebase-admin-key.json
-.env

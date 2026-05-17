@@ -20,20 +20,40 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { auth, db } from '../../components/firebase'
+import { getMyExamResultApi } from '../../api/examApi'
 import GlassCard from '../../components/ui/GlassCard.jsx'
 import GradientButton from '../../components/ui/GradientButton.jsx'
 
 const normalizeRole = (value) => String(value || '').trim().toLowerCase()
-const isStudentRole = (value) => normalizeRole(value) === 'user' || normalizeRole(value) === 'student'
-const isAdminRole = (value) =>
-  normalizeRole(value) === 'admin user' ||
-  normalizeRole(value) === 'admin_user' ||
-  normalizeRole(value) === 'admin' ||
-  normalizeRole(value) === 'teacher'
-const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normalizeRole(value) === 'admin_dev'
-const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
-const studentResultRoles = ['user', 'student']
+
+const canManageExams = (value) => {
+  const role = normalizeRole(value)
+
+  return (
+    role === 'teacher' ||
+    role === 'admin user' ||
+    role === 'admin_user' ||
+    role === 'admin' ||
+    role === 'admin dev' ||
+    role === 'admin_dev'
+  )
+}
+
+const waitForFirebaseUser = () => {
+  return new Promise((resolve) => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser)
+      return
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe()
+      resolve(user)
+    })
+  })
+}
 
 const getSyncedDarkMode = () => {
   if (typeof window === 'undefined') return false
@@ -85,44 +105,56 @@ function useSyncedDarkMode() {
   return isDark
 }
 
-
 function ResultPage() {
   const dark = useSyncedDarkMode()
   const { id } = useParams()
   const location = useLocation()
-const [role, setRole] = useState(null)
-const [studentId, setStudentId] = useState(null)
+
+  const [role, setRole] = useState(null)
+  const [studentId, setStudentId] = useState(null)
+  const [exam, setExam] = useState(location.state?.exam ?? null)
+  const [questions, setQuestions] = useState(location.state?.questions ?? [])
+  const [latestResult, setLatestResult] = useState(location.state?.result ?? null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
   const isTeacher = canManageExams(role)
 
-  const [exam, setExam] = useState(null)
-  const [questions, setQuestions] = useState([])
-  const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(true)
-
   useEffect(() => {
+    let cancelled = false
+
     const fetchResult = async () => {
       try {
         setLoading(true)
+        setNotFound(false)
 
-        const user = auth.currentUser
+        const user = await waitForFirebaseUser()
 
         if (!user?.uid) {
-          setExam(null)
+          if (!cancelled) {
+            setNotFound(true)
+            setLoading(false)
+          }
           return
         }
 
-        const userSnap = await getDoc(doc(db, 'users', user.uid))
-
-        if (userSnap.exists()) {
-          setRole(userSnap.data().role)
-        }
+        if (cancelled) return
 
         setStudentId(user.uid)
 
+        const userSnap = await getDoc(doc(db, 'users', user.uid))
+        const userRole = userSnap.exists() ? userSnap.data().role : null
+
+        if (cancelled) return
+
+        setRole(userRole)
+
         const examSnap = await getDoc(doc(db, 'exams', id))
 
+        if (cancelled) return
+
         if (!examSnap.exists()) {
-          setExam(null)
+          setNotFound(true)
           return
         }
 
@@ -130,7 +162,7 @@ const [studentId, setStudentId] = useState(null)
           query(collection(db, 'exams', id, 'questions'), orderBy('order', 'asc')),
         )
 
-        const resultSnap = await getDocs(collection(db, 'exams', id, 'results'))
+        if (cancelled) return
 
         setExam({
           id: examSnap.id,
@@ -144,37 +176,32 @@ const [studentId, setStudentId] = useState(null)
           })),
         )
 
-        setResults(
-          resultSnap.docs
-            .map((item) => ({
-              id: item.id,
-              ...item.data(),
-            }))
-            .sort((a, b) => {
-              const bTime = b.createdAt?.toMillis?.() ?? 0
-              const aTime = a.createdAt?.toMillis?.() ?? 0
-              return bTime - aTime
-            }),
-        )
+        if (!canManageExams(userRole)) {
+          const response = await getMyExamResultApi(id)
+
+          if (cancelled) return
+
+          setLatestResult(response.data?.result ?? location.state?.result ?? null)
+        }
       } catch (error) {
         console.error(error)
+
+        if (!cancelled) {
+          setLatestResult(location.state?.result ?? null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchResult()
-  }, [id])
 
-  if (loading) {
-    return (
-      <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-300`}>
-        Đang tải kết quả...
-      </section>
-    )
-  }
+    return () => {
+      cancelled = true
+    }
+  }, [id, location.state])
 
-  if (!exam) {
+  if (!loading && (notFound || !exam)) {
     return (
       <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-300`}>
         Không tìm thấy kết quả
@@ -182,19 +209,14 @@ const [studentId, setStudentId] = useState(null)
     )
   }
 
-  const studentResults = results.filter((result) => {
-    const resultRole = normalizeRole(result.role || result.originalRole)
-    return studentResultRoles.includes(resultRole) || result.studentId
-  })
-
-  const latestResult =
-    studentResults.find((result) => result.studentId === studentId) ??
-    studentResults[0]
+  const safeExam = exam ?? {
+    id,
+    title: 'Kết quả bài thi',
+  }
 
   const score = Number(latestResult?.score ?? 0)
   const wrongQuestions = latestResult?.wrongQuestions ?? []
 
-  const totalMultipleQuestions = questions.filter((question) => question.type === 'multiple').length
   const answeredCount =
     latestResult?.answeredCount ??
     questions.filter((question) => {
@@ -211,15 +233,20 @@ const [studentId, setStudentId] = useState(null)
 
       return latestResult?.answers?.[question.id] !== undefined
     }).length
-  const totalMultipleAnswered = questions.filter((question) => question.type === 'multiple' && latestResult?.answers?.[question.id] !== undefined).length
+
+  const totalMultipleAnswered = questions.filter(
+    (question) => question.type === 'multiple' && latestResult?.answers?.[question.id] !== undefined,
+  ).length
+
   const wrongCount = wrongQuestions.length
-  const correctCount = totalMultipleQuestions ? Math.max(0, totalMultipleAnswered - wrongCount) : 0
+  const correctCount = Math.max(0, totalMultipleAnswered - wrongCount)
+  const blankCount = Math.max(0, questions.length - answeredCount)
 
   const pieData = isTeacher
     ? [{ name: 'Không tính giáo viên', value: 1, color: '#94a3b8' }]
     : [
-        { name: 'Điểm đạt được', value: score, color: '#8b5cf6' },
-        { name: 'Điểm còn thiếu', value: Math.max(0, 10 - score), color: '#e2e8f0' },
+        { name: 'Điểm đạt được', value: score || 0.01, color: '#8b5cf6' },
+        { name: 'Điểm còn thiếu', value: Math.max(0, 10 - score) || 0.01, color: '#e2e8f0' },
       ]
 
   return (
@@ -235,14 +262,21 @@ const [studentId, setStudentId] = useState(null)
                 {isTeacher ? 'Chế độ xem của giáo viên' : 'Kết quả bài làm'}
               </p>
 
-              <h1 className="text-3xl font-black text-slate-950 dark:text-white md:text-5xl">{exam.title}</h1>
+              <h1 className="text-3xl font-black text-slate-950 dark:text-white md:text-5xl">
+                {safeExam.title}
+              </h1>
 
-              {!latestResult && !isTeacher && (
+              {loading && (
+                <p className="mt-4 rounded-2xl bg-blue-100 p-4 text-sm font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">
+                  Đang đồng bộ kết quả...
+                </p>
+              )}
+
+              {!latestResult && !isTeacher && !loading && (
                 <p className="mt-4 rounded-2xl bg-amber-100 p-4 text-sm font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
                   Chưa tìm thấy kết quả bài làm của bạn. Hãy quay lại bài thi và nộp lại.
                 </p>
               )}
-
 
               {isTeacher && (
                 <p className="mt-4 rounded-2xl bg-violet-100 p-4 text-sm font-bold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">
@@ -255,7 +289,7 @@ const [studentId, setStudentId] = useState(null)
                   [isTeacher ? '—' : score.toFixed(1), 'Điểm số'],
                   [isTeacher ? '—' : correctCount, 'Câu đúng'],
                   [isTeacher ? '—' : wrongCount, 'Câu sai'],
-                  [isTeacher ? '—' : Math.max(0, questions.length - answeredCount), 'Bỏ trống'],
+                  [isTeacher ? '—' : blankCount, 'Bỏ trống'],
                 ].map(([value, label]) => (
                   <div key={label} className="rounded-lg border border-white/60 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
                     <p className="text-3xl font-black text-slate-950 dark:text-white">{value}</p>
@@ -272,10 +306,17 @@ const [studentId, setStudentId] = useState(null)
               <Target className="h-6 w-6 text-violet-500" />
             </div>
 
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-[288px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height={288}>
                 <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={4}>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={58}
+                    outerRadius={92}
+                    paddingAngle={4}
+                  >
                     {pieData.map((item) => (
                       <Cell key={item.name} fill={item.color} />
                     ))}
@@ -366,7 +407,7 @@ const [studentId, setStudentId] = useState(null)
         <GlassCard className="mt-5 p-6">
           <div className="flex flex-col gap-3 sm:flex-row">
             {!isTeacher && (
-              <Link to={`/exam/${exam.id}`}>
+              <Link to={`/exam/${safeExam.id}`}>
                 <GradientButton variant="subtle" icon={RotateCcw}>
                   Làm lại
                 </GradientButton>
@@ -374,7 +415,7 @@ const [studentId, setStudentId] = useState(null)
             )}
 
             <Link to="/exams">
-              <GradientButton icon={ArrowRight}>Về danh sách bài kiểm tra</GradientButton>
+              <GradientButton icon={ArrowRight}>Về danh sách bài thi</GradientButton>
             </Link>
           </div>
         </GlassCard>

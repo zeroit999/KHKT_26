@@ -2,16 +2,16 @@ import jwt
 import datetime
 import logging
 from functools import wraps
-from flask import request, jsonify
+
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials, firestore
+from flask import request, jsonify
 
-# Import config with fallback
 try:
     from config.config import Config
 except ImportError:
-    import sys
     import os
+    import sys
 
     sys.path.insert(
         0,
@@ -24,7 +24,11 @@ except ImportError:
 
     from config.config import Config
 
-# Initialize Firebase Admin
+
+# =========================
+# FIREBASE ADMIN INIT
+# =========================
+
 if not firebase_admin._apps:
     cred = credentials.Certificate(
         Config.FIREBASE_ADMIN_KEY_PATH
@@ -32,114 +36,140 @@ if not firebase_admin._apps:
 
     firebase_admin.initialize_app(cred)
 
-# Get Firestore client
+
 db = firestore.client()
 
 
+# =========================
+# USER HELPERS
+# =========================
+
 def get_user_data_firebase(firebase_uid):
-    """Get complete user data from Firebase Firestore"""
+    """
+    Lấy thông tin user từ Firestore: users/{uid}
+    """
 
     try:
-        logging.info(
-            f"🔍 [DEBUG] Getting user data for: {firebase_uid}"
-        )
-
-        user_ref = db.collection('users').document(firebase_uid)
-
+        user_ref = db.collection("users").document(firebase_uid)
         user_doc = user_ref.get()
 
         if user_doc.exists:
-            user_data = user_doc.to_dict()
+            return user_doc.to_dict()
 
-            logging.info(
-                f"✅ [DEBUG] User data found: "
-                f"{user_data.get('email', 'unknown')}"
-            )
+        return None
 
-            return user_data
-
-        else:
-            logging.info(
-                f"❌ [DEBUG] User data not found in Firestore"
-            )
-
-            return None
-
-    except Exception as e:
+    except Exception as error:
         logging.error(
-            f"💥 [DEBUG] Firebase error getting user data: {e}"
+            f"Firebase error getting user data: {error}"
         )
 
         return None
 
 
+def get_display_name(firebase_user, user_data=None):
+    user_data = user_data or {}
+
+    return (
+        user_data.get("displayName")
+        or user_data.get("fullName")
+        or user_data.get("name")
+        or user_data.get("firstName")
+        or firebase_user.get("name")
+        or ""
+    )
+
+
+def get_user_role(user_data=None):
+    user_data = user_data or {}
+
+    return user_data.get("role", "STUDENT")
+
+
+def build_firebase_user_payload(firebase_user, user_data=None):
+    user_data = user_data or {}
+
+    return {
+        "uid": firebase_user["uid"],
+        "user_id": firebase_user["uid"],
+        "email": firebase_user.get("email", ""),
+        "name": get_display_name(firebase_user, user_data),
+        "role": get_user_role(user_data),
+        "type": "firebase",
+    }
+
+
+# =========================
+# JWT MANAGER
+# =========================
+
 class JWTManager:
 
     @staticmethod
     def create_access_token(user_data):
-        """Tạo JWT access token"""
+        """
+        Tạo JWT access token.
+        """
 
         payload = {
-            'user_id': user_data['uid'],
-            'email': user_data['email'],
+            "uid": user_data["uid"],
+            "user_id": user_data["uid"],
+            "email": user_data["email"],
+            "role": user_data.get("role", "STUDENT"),
 
-            'permissions': user_data.get(
-                'permissions',
-                ['basic']
-            ),
-
-            'exp': (
+            "exp": (
                 datetime.datetime.utcnow()
                 + datetime.timedelta(
                     seconds=Config.JWT_ACCESS_TOKEN_EXPIRES
                 )
             ),
 
-            'iat': datetime.datetime.utcnow(),
-
-            'type': 'access'
+            "iat": datetime.datetime.utcnow(),
+            "type": "access",
         }
 
         return jwt.encode(
             payload,
             Config.JWT_SECRET_KEY,
-            algorithm='HS256'
+            algorithm="HS256",
         )
 
     @staticmethod
     def create_refresh_token(user_id):
-        """Tạo JWT refresh token"""
+        """
+        Tạo JWT refresh token.
+        """
 
         payload = {
-            'user_id': user_id,
+            "user_id": user_id,
 
-            'exp': (
+            "exp": (
                 datetime.datetime.utcnow()
                 + datetime.timedelta(
                     seconds=Config.JWT_REFRESH_TOKEN_EXPIRES
                 )
             ),
 
-            'iat': datetime.datetime.utcnow(),
-
-            'type': 'refresh'
+            "iat": datetime.datetime.utcnow(),
+            "type": "refresh",
         }
 
         return jwt.encode(
             payload,
             Config.JWT_SECRET_KEY,
-            algorithm='HS256'
+            algorithm="HS256",
         )
 
     @staticmethod
     def verify_token(token):
-        """Verify JWT token"""
+        """
+        Verify JWT token.
+        """
 
         try:
             payload = jwt.decode(
                 token,
                 Config.JWT_SECRET_KEY,
-                algorithms=['HS256']
+                algorithms=["HS256"],
             )
 
             return payload
@@ -152,63 +182,64 @@ class JWTManager:
 
     @staticmethod
     def verify_firebase_token(id_token):
-        """Verify Firebase ID token"""
+        """
+        Verify Firebase ID token.
+        clock_skew_seconds giúp tránh lỗi:
+        Token used too early
+        """
 
         try:
             decoded_token = firebase_auth.verify_id_token(
-                id_token
+                id_token,
+                clock_skew_seconds=10,
             )
 
             return decoded_token
 
-        except Exception as e:
+        except Exception as error:
             logging.error(
-                f"Firebase token verification failed: {e}"
+                f"Firebase token verification failed: {error}"
             )
+
+            print("FIREBASE TOKEN VERIFY FAILED:", error)
 
             return None
 
 
+# =========================
+# DECORATORS
+# =========================
+
 def jwt_required(f):
     """
-    Decorator yêu cầu JWT token hợp lệ
-    (backward compatibility)
+    Decorator yêu cầu JWT access token hợp lệ.
     """
 
     @wraps(f)
     def decorated(*args, **kwargs):
-
-        auth_header = request.headers.get(
-            'Authorization'
-        )
+        auth_header = request.headers.get("Authorization")
 
         if (
             not auth_header
-            or not auth_header.startswith('Bearer ')
+            or not auth_header.startswith("Bearer ")
         ):
-
             return jsonify({
-                'error': (
-                    'Missing or invalid '
-                    'Authorization header'
-                )
+                "error": "Missing or invalid Authorization header",
             }), 401
 
-        token = auth_header.split(' ')[1]
-
+        token = auth_header.split(" ")[1]
         payload = JWTManager.verify_token(token)
 
         if not payload:
             return jsonify({
-                'error': 'Invalid or expired token'
+                "error": "Invalid or expired token",
             }), 401
 
-        if payload.get('type') != 'access':
+        if payload.get("type") != "access":
             return jsonify({
-                'error': 'Invalid token type'
+                "error": "Invalid token type",
             }), 401
 
-        # Attach user info to request
         request.current_user = payload
 
         return f(*args, **kwargs)
@@ -218,93 +249,52 @@ def jwt_required(f):
 
 def auth_required(f):
     """
-    Decorator hỗ trợ cả
-    JWT token và Firebase ID token
+    Decorator hỗ trợ cả:
+    - Firebase ID token
+    - JWT access token
     """
 
     @wraps(f)
     def decorated(*args, **kwargs):
-
-        auth_header = request.headers.get(
-            'Authorization'
-        )
+        auth_header = request.headers.get("Authorization")
 
         if (
             not auth_header
-            or not auth_header.startswith('Bearer ')
+            or not auth_header.startswith("Bearer ")
         ):
-
             return jsonify({
-                'error': (
-                    'Missing or invalid '
-                    'Authorization header'
-                )
+                "error": "Missing or invalid Authorization header",
             }), 401
 
-        token = auth_header.split(' ')[1]
-
+        token = auth_header.split(" ")[1]
         user_payload = None
 
-        # Try Firebase token first
-        firebase_user = (
-            JWTManager.verify_firebase_token(token)
-        )
+        firebase_user = JWTManager.verify_firebase_token(token)
 
         if firebase_user:
-
-            # Get user data from Firestore
             user_data = get_user_data_firebase(
-                firebase_user['uid']
+                firebase_user["uid"]
             )
 
-            # Convert Firebase user to our format
-            user_payload = {
-                'user_id': firebase_user['uid'],
+            user_payload = build_firebase_user_payload(
+                firebase_user,
+                user_data,
+            )
 
-                'email': firebase_user.get(
-                    'email',
-                    ''
-                ),
-
-                'name': firebase_user.get(
-                    'name',
-                    ''
-                ),
-
-                'type': 'firebase'
-            }
-
-            # Update with Firestore data
-            if user_data:
-
-                user_payload.update({
-                    'name': user_data.get(
-                        'firstName',
-                        user_payload['name']
-                    )
-                })
-
-        # If not Firebase token, try JWT token
         if not user_payload:
-
-            jwt_payload = (
-                JWTManager.verify_token(token)
-            )
+            jwt_payload = JWTManager.verify_token(token)
 
             if (
                 jwt_payload
-                and jwt_payload.get('type') == 'access'
+                and jwt_payload.get("type") == "access"
             ):
-
                 user_payload = jwt_payload
 
         if not user_payload:
-
             return jsonify({
-                'error': 'Invalid or expired token'
+                "error": "Invalid or expired token",
             }), 401
 
-        # Attach user info to request
         request.current_user = user_payload
 
         return f(*args, **kwargs)
@@ -314,74 +304,40 @@ def auth_required(f):
 
 def firebase_required(f):
     """
-    Decorator chỉ chấp nhận Firebase ID token
+    Decorator chỉ chấp nhận Firebase ID token.
+    Dùng cho API bài thi.
     """
 
     @wraps(f)
     def decorated(*args, **kwargs):
-
-        auth_header = request.headers.get(
-            'Authorization'
-        )
+        auth_header = request.headers.get("Authorization")
 
         if (
             not auth_header
-            or not auth_header.startswith('Bearer ')
+            or not auth_header.startswith("Bearer ")
         ):
-
             return jsonify({
-                'error': (
-                    'Missing or invalid '
-                    'Authorization header'
-                )
+                "error": "Missing or invalid Authorization header",
             }), 401
 
-        token = auth_header.split(' ')[1]
+        token = auth_header.split(" ")[1]
 
-        # Verify Firebase token
-        firebase_user = (
-            JWTManager.verify_firebase_token(token)
-        )
+        firebase_user = JWTManager.verify_firebase_token(token)
 
         if not firebase_user:
-
             return jsonify({
-                'error': 'Invalid Firebase token'
+                "error": "Invalid Firebase token",
             }), 401
 
-        # Get user data from Firestore
         user_data = get_user_data_firebase(
-            firebase_user['uid']
+            firebase_user["uid"]
         )
 
-        # Convert to our user format
-        user_payload = {
-            'user_id': firebase_user['uid'],
+        user_payload = build_firebase_user_payload(
+            firebase_user,
+            user_data,
+        )
 
-            'email': firebase_user.get(
-                'email',
-                ''
-            ),
-
-            'name': firebase_user.get(
-                'name',
-                ''
-            ),
-
-            'type': 'firebase'
-        }
-
-        # Update with Firestore data
-        if user_data:
-
-            user_payload.update({
-                'name': user_data.get(
-                    'firstName',
-                    user_payload['name']
-                )
-            })
-
-        # Attach user info to request
         request.current_user = user_payload
 
         return f(*args, **kwargs)

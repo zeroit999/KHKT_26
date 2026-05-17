@@ -698,7 +698,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, t
   }
 
   const validate = () => {
-    if (!form.title.trim()) return 'Vui lòng nhập tên bài kiểm tra.'
+    if (!form.title.trim()) return 'Vui lòng nhập tên bài thi.'
     if (!form.topic.trim()) return 'Vui lòng nhập chủ đề.'
     if (!normalizeCodePart(form.codeNumber)) return 'Vui lòng nhập mã đề.'
     if (form.status === 'private' && !form.selectedClasses.length) return 'Vui lòng chọn ít nhất một lớp.'
@@ -765,7 +765,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, t
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-black text-slate-950 dark:text-white">
-              {editingExam ? 'Cập nhật bài tập' : 'Tạo bài tập'}
+              {editingExam ? 'Cập nhật bài thi' : 'Tạo bài thi'}
             </h2>
             <p className="text-sm text-slate-500">Dữ liệu sẽ được lưu vào hệ thống.</p>
           </div>
@@ -779,7 +779,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, t
           <input
             value={form.title}
             onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-            placeholder="Tên bài kiểm tra"
+            placeholder="Tên bài thi"
             className="rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
           />
 
@@ -893,7 +893,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, t
                   </div>
                 ) : (
                   <div className="rounded-xl bg-slate-50 p-4 text-center text-sm font-bold text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                    Bạn chưa có lớp học nào. Hãy tạo lớp học trước và thêm học sinh vào lớp để có thể chọn lớp cho bài kiểm tra.
+                    Bạn chưa có lớp học nào. Hãy tạo lớp học trước và thêm học sinh vào lớp để có thể chọn lớp cho bài thi.
                   </div>
                 )}
               </div>
@@ -1225,7 +1225,7 @@ function CreateExamModal({ open, onClose, onSave, editingExam, teacherSubject, t
           </button>
 
           <button onClick={submit} className="rounded-2xl bg-violet-600 px-5 py-3 font-bold text-white">
-            {editingExam ? 'Cập nhật' : 'Tạo bài tập'}
+            {editingExam ? 'Cập nhật' : 'Tạo bài thi'}
           </button>
         </div>
       </div>
@@ -1300,6 +1300,162 @@ function StatsModal({ open, onClose, exams }) {
   )
 }
 
+const getStudentDisplayName = (result = {}) => {
+  const name =
+    result.studentName ||
+    result.studentDisplayName ||
+    result.displayName ||
+    result.fullName ||
+    result.name ||
+    result.studentEmail ||
+    result.email
+
+  return String(name || '').trim() || 'Tên học sinh'
+}
+
+const getAnswerDisplayValue = (question, result = {}) => {
+  const type = question.type ?? 'multiple'
+
+  if (type === 'essay' || type === 'code') {
+    const value = result.textAnswers?.[question.id]
+    return String(value || '').trim() || 'Chưa trả lời'
+  }
+
+  const value = result.answers?.[question.id]
+
+  if (type === 'truefalse') {
+    if (!value || typeof value !== 'object') return 'Chưa trả lời'
+
+    return (question.answers ?? [])
+      .map((answer, index) => `${index + 1}. ${value[index] || 'Chưa chọn'}`)
+      .join('; ')
+  }
+
+  if (value === undefined || value === null) return 'Chưa trả lời'
+
+  if (typeof value === 'number') {
+    return labels[value] ?? String(value + 1)
+  }
+
+  return String(value)
+}
+
+function StudentAnswers({ exam, result }) {
+  return (
+    <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+      <p className="mb-3 text-sm font-black text-blue-700 dark:text-blue-200">
+        Bài học sinh đã làm
+      </p>
+
+      <div className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        {(exam.questions ?? []).map((question, questionIndex) => (
+          <div key={question.id ?? questionIndex} className="rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
+            <span className="font-black text-slate-950 dark:text-white">Câu {questionIndex + 1}: </span>
+            <span>{getAnswerDisplayValue(question, result)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function StudentResultsModal({ exam, open, onClose }) {
+  const [openResultId, setOpenResultId] = useState(null)
+
+  useEffect(() => {
+    if (!open) setOpenResultId(null)
+  }, [open])
+
+  if (!open || !exam) return null
+
+  const results = (exam.studentResults ?? [])
+    .slice()
+    .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
+
+  const formatSubmittedTime = (value) => {
+    const date = value?.toDate?.() ?? null
+    if (!date) return 'Chưa có thời gian'
+
+    return date.toLocaleString('vi-VN')
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-950"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Bài làm học sinh</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{exam.title || 'Đề thi'}</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
+              {results.length ? `Có ${results.length} lượt nộp bài.` : 'Chưa có học sinh nộp bài.'}
+            </p>
+          </div>
+
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {results.length ? (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+            <div className="grid grid-cols-[1.3fr_0.55fr_0.75fr_1fr_0.8fr_0.8fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:bg-white/5 dark:text-slate-300">
+              <span>Học sinh</span>
+              <span>Điểm</span>
+              <span>Đã trả lời</span>
+              <span>Thời gian nộp</span>
+              <span>Lỗi sai</span>
+              <span>Bài làm</span>
+            </div>
+
+            <div className="divide-y divide-slate-200 dark:divide-white/10">
+              {results.map((result, index) => {
+                const resultKey = result.id ?? `${result.studentId || 'student'}-${index}`
+                const isOpen = openResultId === resultKey
+
+                return (
+                  <div key={resultKey}>
+                    <div className="grid grid-cols-[1.3fr_0.55fr_0.75fr_1fr_0.8fr_0.8fr] gap-3 px-4 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                      <span className="break-words text-slate-900 dark:text-white">{getStudentDisplayName(result)}</span>
+                      <span className="text-xl font-black text-blue-600">{Number(result.score ?? 0).toFixed(1)}</span>
+                      <span>{result.answeredCount ?? 0}/{result.totalQuestions ?? exam.questions?.length ?? 0}</span>
+                      <span>{formatSubmittedTime(result.createdAt)}</span>
+                      <span>
+                        {(result.wrongQuestions ?? []).length
+                          ? `${(result.wrongQuestions ?? []).length} câu sai`
+                          : 'Không có câu sai'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setOpenResultId((value) => (value === resultKey ? null : resultKey))}
+                        className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
+                      >
+                        {isOpen ? 'Ẩn bài làm' : 'Xem bài làm'}
+                      </button>
+                    </div>
+
+                    {isOpen && (
+                      <div className="px-4 pb-4">
+                        <StudentAnswers exam={exam} result={result} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-slate-50 p-8 text-center text-sm font-bold text-slate-500 dark:bg-white/5 dark:text-slate-300">
+            Chưa có dữ liệu bài làm và điểm của học sinh.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Exams() {
   const navigate = useNavigate()
 
@@ -1322,6 +1478,7 @@ function Exams() {
   const [roleLoading, setRoleLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [resultsExam, setResultsExam] = useState(null)
   const [editingExam, setEditingExam] = useState(null)
   const [deleteConfirmExam, setDeleteConfirmExam] = useState(null)
 
@@ -1494,14 +1651,52 @@ const user = auth.currentUser
               )
 
               const resultSnapshot = await getDocs(collection(db, 'exams', examDoc.id, 'results'))
+              const attemptSnapshot = await getDocs(collection(db, 'exams', examDoc.id, 'attempts'))
+              const rawStudentResults = resultSnapshot.docs
+                .map((item) => ({ id: item.id, ...item.data() }))
+                .filter((item) => isStudentRole(item.role))
+              const studentIds = Array.from(
+                new Set(rawStudentResults.map((item) => item.studentId).filter(Boolean)),
+              )
+              const studentProfiles = await Promise.all(
+                studentIds.map(async (studentId) => {
+                  try {
+                    const studentSnap = await getDoc(doc(db, 'users', studentId))
+                    return [studentId, studentSnap.exists() ? studentSnap.data() : null]
+                  } catch (error) {
+                    console.error(error)
+                    return [studentId, null]
+                  }
+                }),
+              )
+              const studentProfileMap = Object.fromEntries(studentProfiles)
 
               return {
                 id: examDoc.id,
                 ...examDoc.data(),
                 questions: questionSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
-                studentResults: resultSnapshot.docs
-                  .map((item) => ({ id: item.id, ...item.data() }))
-                  .filter((item) => isStudentRole(item.role)),
+                studentResults: rawStudentResults.map((result) => {
+                  const studentProfile = studentProfileMap[result.studentId] ?? {}
+                  const studentName =
+                    result.studentName ||
+                    result.studentDisplayName ||
+                    studentProfile.displayName ||
+                    studentProfile.fullName ||
+                    studentProfile.name ||
+                    studentProfile.hoTen ||
+                    studentProfile.tenHocSinh ||
+                    studentProfile.email ||
+                    result.studentEmail ||
+                    result.email ||
+                    ''
+
+                  return {
+                    ...result,
+                    studentName,
+                    studentEmail: result.studentEmail || studentProfile.email || result.email || '',
+                  }
+                }),
+                attempts: attemptSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
               }
             }),
           )
@@ -1509,14 +1704,14 @@ const user = auth.currentUser
           setExams(examData)
         } catch (error) {
           console.error(error)
-          toast.error('Không thể đồng bộ danh sách bài kiểm tra')
+          toast.error('Không thể đồng bộ danh sách bài thi')
         } finally {
           setLoading(false)
         }
       },
       (error) => {
         console.error(error)
-        toast.error('Không thể đồng bộ danh sách bài kiểm tra')
+        toast.error('Không thể đồng bộ danh sách bài thi')
         setLoading(false)
       },
     )
@@ -1655,12 +1850,12 @@ const user = auth.currentUser
           : [nextExam, ...prev],
       )
 
-      toast.success(editingExam ? 'Đã cập nhật bài tập' : 'Đã tạo bài tập')
+      toast.success(editingExam ? 'Đã cập nhật bài thi' : 'Đã tạo bài thi')
       setEditingExam(null)
       setCreateOpen(false)
     } catch (error) {
       console.error(error)
-      toast.error('Lưu bài kiểm tra thất bại')
+      toast.error('Lưu bài thi thất bại')
     }
   }
 
@@ -1732,7 +1927,7 @@ const user = auth.currentUser
         ),
       )
 
-      toast.success('Đã sao chép đề thi lên Firebase')
+      toast.success('Đã sao chép đề thi lên hệ thống')
     } catch (error) {
       console.error(error)
       toast.error('Sao chép đề thi thất bại')
@@ -1761,7 +1956,7 @@ const user = auth.currentUser
     const exam = visibleExams.find((item) => item.code?.toLowerCase() === codeSearch.trim().toLowerCase())
 
     if (!exam) {
-      toast.error('Không tìm thấy mã bài kiểm tra')
+      toast.error('Không tìm thấy mã bài thi')
       return
     }
 
@@ -1795,6 +1990,30 @@ const user = auth.currentUser
 
   const previewExam = (exam) => {
     navigate(`/exam/${exam.id}`, { state: { role, preview: true } })
+  }
+
+  const getStudentAttemptCount = (exam) => {
+    if (!currentUserId) return 0
+
+    const attempt = exam.attempts?.find((item) => item.id === currentUserId || item.studentId === currentUserId)
+
+    if (attempt) return Number(attempt.count || 0)
+
+    return exam.studentResults?.filter((result) => result.studentId === currentUserId).length ?? 0
+  }
+
+  const getExamMaxAttempts = (exam) =>
+    exam.attemptMode === 'multiple' ? Math.max(1, Number(exam.maxAttempts || 1)) : 1
+
+  const getExamAudienceText = (exam) =>
+    exam.status === 'public'
+      ? 'Công khai cho tất cả học sinh'
+      : exam.selectedClasses?.length
+        ? exam.selectedClasses.join(', ')
+        : 'Chưa chọn lớp'
+
+  const handleOutOfAttempts = () => {
+    toast.error('Bạn đã hết số lượt làm bài thi này')
   }
 
   if (isStudentRole(role)) {
@@ -1893,6 +2112,11 @@ const user = auth.currentUser
                   const bestScore = studentResult?.score ?? null
                   const questionCount = exam.questions?.length ?? 0
                   const examDate = formatDateTimeText(exam.openDate || exam.closeDate)
+                  const attemptCount = getStudentAttemptCount(exam)
+                  const maxAttempts = getExamMaxAttempts(exam)
+                  const attemptsLeft = Math.max(0, maxAttempts - attemptCount)
+                  const outOfAttempts = attemptsLeft <= 0
+                  const actionLabel = completed ? 'Làm lại bài thi' : 'Làm bài'
 
                   return (
                     <article
@@ -1911,7 +2135,7 @@ const user = auth.currentUser
                         <div className="mt-5 grid gap-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                           <span className="inline-flex items-center gap-2">
                             <UserRound className="h-4 w-4" />
-                            {exam.selectedClasses?.join(', ') || studentClass}
+                            {exam.status === 'public' ? 'Công khai cho tất cả học sinh' : exam.selectedClasses?.join(', ') || studentClass || 'Chưa chọn lớp'}
                           </span>
 
                           <span className="inline-flex items-center gap-2">
@@ -1927,6 +2151,11 @@ const user = auth.currentUser
                           <span className="inline-flex items-center gap-2">
                             <CalendarDays className="h-4 w-4" />
                             {examDate}
+                          </span>
+
+                          <span className="inline-flex items-center gap-2">
+                            <Clock3 className="h-4 w-4" />
+                            Còn {attemptsLeft}/{maxAttempts} lượt làm
                           </span>
                         </div>
 
@@ -1946,13 +2175,36 @@ const user = auth.currentUser
                           )}
                         </div>
 
-                        <Link
-                          to={`/exam/${exam.id}`}
-                          state={{ role }}
-                          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-700 hover:to-violet-700"
-                        >
-                          {completed ? 'Làm lại bài thi' : 'Bắt đầu làm bài'}
-                        </Link>
+                        <div className="mt-4 grid gap-3">
+                          {completed && (
+                            <Link
+                              to={`/exam/${exam.id}/result`}
+                              state={{ role, studentId: currentUserId }}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Xem lại
+                            </Link>
+                          )}
+
+                          {outOfAttempts ? (
+                            <button
+                              type="button"
+                              onClick={handleOutOfAttempts}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-300 px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-400/80 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/15"
+                            >
+                              {actionLabel}
+                            </button>
+                          ) : (
+                            <Link
+                              to={`/exam/${exam.id}`}
+                              state={{ role }}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-700 hover:to-violet-700"
+                            >
+                              {actionLabel}
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     </article>
                   )
@@ -2149,7 +2401,7 @@ const user = auth.currentUser
 
                           <span className="inline-flex items-center gap-1.5">
                             <UserRound className="h-4 w-4" />
-                            {exam.selectedClasses?.join(', ') || 'Chưa chọn lớp'}
+                            {getExamAudienceText(exam)}
                           </span>
 
                           <span className="inline-flex items-center gap-1.5">
@@ -2174,6 +2426,15 @@ const user = auth.currentUser
                               title="Sao chép link bài thi cho học sinh"
                             >
                               <Copy className="h-5 w-5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setResultsExam(exam)}
+                              className="rounded-xl p-2 text-violet-600 transition hover:bg-violet-50 dark:hover:bg-violet-500/10"
+                              title="Xem bài làm và điểm của học sinh"
+                            >
+                              <BarChart3 className="h-5 w-5" />
                             </button>
 
                             <button
@@ -2246,6 +2507,12 @@ const user = auth.currentUser
         </main>
 
 
+        <StudentResultsModal
+          open={Boolean(resultsExam)}
+          exam={resultsExam}
+          onClose={() => setResultsExam(null)}
+        />
+
         {deleteConfirmExam && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={() => setDeleteConfirmExam(null)}>
             <div
@@ -2257,7 +2524,7 @@ const user = auth.currentUser
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">Xác nhận xóa</p>
                   <h3 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Xóa đề thi?</h3>
                   <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">
-                    Bạn có chắc muốn xóa đề "{deleteConfirmExam.title || 'Chưa có tên'}" khỏi Firebase? Hành động này sẽ xóa cả câu hỏi, kết quả và lượt làm.
+                    Bạn có chắc muốn xóa đề "{deleteConfirmExam.title || 'Chưa có tên'}" khỏi hệ thống? Hành động này sẽ xóa cả câu hỏi, kết quả và lượt làm.
                   </p>
                 </div>
 

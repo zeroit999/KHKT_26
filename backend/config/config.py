@@ -1,31 +1,34 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+
 class Config:
-    # API Keys
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    FIREBASE_ADMIN_KEY_PATH = os.path.join(BASE_DIR, 'firebase-admin-key.json')
+    FIREBASE_ADMIN_KEY_PATH = os.getenv(
+        "FIREBASE_ADMIN_KEY_PATH",
+        os.path.join(CONFIG_DIR, "firebase-admin-key.json")
+    )
 
-    # JWT
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
-    JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', 1800))
-    JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv('JWT_REFRESH_TOKEN_EXPIRES', 2592000))
+    if not os.path.isabs(FIREBASE_ADMIN_KEY_PATH):
+        FIREBASE_ADMIN_KEY_PATH = os.path.join(BASE_DIR, FIREBASE_ADMIN_KEY_PATH)
 
-    # Flask
-    SECRET_KEY = os.getenv('FLASK_SECRET_KEY')
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev_jwt_secret_key")
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 1800))
+    JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", 2592000))
 
-    # CORS
-    ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', '').split(',')
+    SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev_flask_secret_key")
 
-    # Rate Limiting
-    REDIS_URL = os.getenv('REDIS_URL')
-    RATE_LIMIT_STORAGE = os.getenv('RATE_LIMIT_STORAGE', 'memory')
+    ALLOWED_ORIGINS = os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
 
-    # Environment
-    ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
     @property
     def is_development(self):
-        return self.ENVIRONMENT == 'development'
+        return self.ENVIRONMENT == "development"

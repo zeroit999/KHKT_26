@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Bookmark, ChevronLeft, ChevronRight, Flag, Send, X } from 'lucide-react'
+import { Bookmark, ChevronLeft, ChevronRight, Flag, Send } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
   orderBy,
   query,
-  serverTimestamp,
-  setDoc,
 } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, db } from '../../components/firebase'
+import { submitExamApi } from '../../api/examApi'
 import AnswerOption from '../../components/exam/AnswerOption.jsx'
 import QuestionNavigator from '../../components/exam/QuestionNavigator.jsx'
 import SubmitModal from '../../components/exam/SubmitModal.jsx'
@@ -25,14 +23,24 @@ import GradientButton from '../../components/ui/GradientButton.jsx'
 const labels = ['A', 'B', 'C', 'D']
 
 const normalizeRole = (value) => String(value || '').trim().toLowerCase()
-const isStudentRole = (value) => normalizeRole(value) === 'user' || normalizeRole(value) === 'student'
-const isAdminRole = (value) =>
-  normalizeRole(value) === 'admin user' ||
-  normalizeRole(value) === 'admin_user' ||
-  normalizeRole(value) === 'admin' ||
-  normalizeRole(value) === 'teacher'
-const isAdminDevRole = (value) => normalizeRole(value) === 'admin dev' || normalizeRole(value) === 'admin_dev'
+
+const isAdminRole = (value) => {
+  const role = normalizeRole(value)
+  return (
+    role === 'teacher' ||
+    role === 'admin user' ||
+    role === 'admin_user' ||
+    role === 'admin'
+  )
+}
+
+const isAdminDevRole = (value) => {
+  const role = normalizeRole(value)
+  return role === 'admin dev' || role === 'admin_dev'
+}
+
 const canManageExams = (value) => isAdminRole(value) || isAdminDevRole(value)
+
 const studentResultRoles = ['user', 'student']
 
 const hasAnsweredValue = (value) => {
@@ -57,7 +65,6 @@ const getAnsweredCount = (questions, answers, textAnswers) =>
 
     return answers[question.id] !== undefined
   }).length
-
 
 const getSyncedDarkMode = () => {
   if (typeof window === 'undefined') return false
@@ -109,61 +116,6 @@ function useSyncedDarkMode() {
   return isDark
 }
 
-
-function StartAttemptModal({ role, attemptsLeft, lastScore, onContinue, onBack }) {
-  const isTeacher = canManageExams(role)
-  const outOfAttempts = !isTeacher && attemptsLeft <= 0
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-950">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-950 dark:text-white">
-            {outOfAttempts ? 'Đã hết lượt làm bài' : isTeacher ? 'Chế độ giáo viên' : 'Thông tin bài làm'}
-          </h2>
-
-          <button onClick={onBack} className="rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-white/10">
-            <X className="h-5 w-5 dark:text-white" />
-          </button>
-        </div>
-
-        {isTeacher ? (
-          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Giáo viên chỉ được xem bài kiểm tra. Giáo viên không được làm bài như học sinh và không được tính vào thống kê.
-          </p>
-        ) : (
-          <>
-            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/5">
-              <p className="text-sm font-semibold text-slate-500">Điểm hiện tại</p>
-              <p className="mt-2 text-4xl font-black text-slate-950 dark:text-white">{lastScore ?? 'Chưa có'}</p>
-            </div>
-
-            <p className="mt-4 text-sm font-semibold text-slate-500">Số lượt còn lại: {attemptsLeft}</p>
-          </>
-        )}
-
-        <div className="mt-6 flex gap-3">
-          {!outOfAttempts && (
-            <button
-              onClick={onContinue}
-              className="flex-1 rounded-2xl bg-violet-600 px-5 py-3 font-bold text-white"
-            >
-              {isTeacher ? 'Xem bài' : 'Làm tiếp'}
-            </button>
-          )}
-
-          <button
-            onClick={onBack}
-            className="flex-1 rounded-2xl bg-slate-100 px-5 py-3 font-bold text-slate-700 dark:bg-white/10 dark:text-white"
-          >
-            Quay lại
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function CodeBlock({ value, readOnly = false, onChange }) {
   return (
     <textarea
@@ -193,8 +145,9 @@ function ExamRoom() {
   const [marked, setMarked] = useState([])
   const [submitOpen, setSubmitOpen] = useState(false)
   const [attemptCount, setAttemptCount] = useState(0)
-  const [lastScore, setLastScore] = useState(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+
   const timerFinishedRef = useRef(false)
 
   useEffect(() => {
@@ -233,7 +186,7 @@ function ExamRoom() {
         const examSnap = await getDoc(doc(db, 'exams', id))
 
         if (!examSnap.exists()) {
-          toast.error('Không tìm thấy bài kiểm tra')
+          toast.error('Không tìm thấy bài thi')
           navigate('/exams')
           return
         }
@@ -245,9 +198,15 @@ function ExamRoom() {
         const attemptSnap = await getDoc(doc(db, 'exams', id, 'attempts', user.uid))
 
         const resultSnap = await getDocs(collection(db, 'exams', id, 'results'))
+
         const studentResults = resultSnap.docs
           .map((item) => ({ id: item.id, ...item.data() }))
           .filter((item) => studentResultRoles.includes(normalizeRole(item.role)) && item.studentId === user.uid)
+          .sort((a, b) => {
+            const bTime = b.createdAt?.toMillis?.() ?? 0
+            const aTime = a.createdAt?.toMillis?.() ?? 0
+            return bTime - aTime
+          })
 
         if (cancelled) return
 
@@ -268,10 +227,9 @@ function ExamRoom() {
         )
 
         setAttemptCount(attemptSnap.exists() ? Number(attemptSnap.data().count || 0) : 0)
-        setLastScore(studentResults[0]?.score ?? null)
       } catch (error) {
         console.error(error)
-        if (!cancelled) toast.error('Không thể tải bài kiểm tra')
+        if (!cancelled) toast.error('Không thể tải bài thi')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -319,9 +277,7 @@ function ExamRoom() {
     return () => window.clearInterval(intervalId)
   }, [exam?.id, role, loading, secondsLeft])
 
-  if (!id) {
-    return null
-  }
+  if (!id) return null
 
   if (loading || !role || !studentId) {
     return (
@@ -343,7 +299,7 @@ function ExamRoom() {
   if (!exam || !questions.length) {
     return (
       <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-300`}>
-        Bài kiểm tra chưa có câu hỏi
+        Bài thi chưa có câu hỏi
       </section>
     )
   }
@@ -351,16 +307,29 @@ function ExamRoom() {
   const isTeacher = canManageExams(role)
   const maxAttempts = exam.attemptMode === 'multiple' ? Number(exam.maxAttempts || 1) : 1
   const attemptsLeft = isTeacher ? Infinity : Math.max(0, maxAttempts - attemptCount)
+  const isOutOfAttempts = !isTeacher && attemptsLeft <= 0
+
   const currentQuestion = questions[currentIndex]
+  const questionType = currentQuestion.type ?? 'multiple'
+  const options = currentQuestion.answers ?? []
+
   const answeredCount = getAnsweredCount(questions, answers, textAnswers)
   const answerProgress = Math.round((answeredCount / questions.length) * 100)
   const totalSeconds = Math.max(1, Number(exam.duration || 45) * 60)
   const timerProgress = Math.max(0, Math.min(100, Math.round((secondsLeft / totalSeconds) * 100)))
-  const displayedQuestions = questions
 
   const selectAnswer = (optionIndex) => {
     if (isTeacher) return
-    setAnswers((value) => ({ ...value, [currentQuestion.id]: optionIndex }))
+
+    if (isOutOfAttempts) {
+      toast.error('Bạn đã hết số lượt làm bài thi này')
+      return
+    }
+
+    setAnswers((value) => ({
+      ...value,
+      [currentQuestion.id]: optionIndex,
+    }))
   }
 
   const toggleMarked = () => {
@@ -372,70 +341,50 @@ function ExamRoom() {
   }
 
   const confirmSubmit = async () => {
+    if (submitting) return
+
     if (isTeacher) {
       toast.error('Giáo viên không được nộp bài như học sinh')
       return
     }
 
-    if (attemptsLeft <= 0) {
-      toast.error('Bạn đã hết lượt làm bài')
+    if (isOutOfAttempts) {
+      toast.error('Bạn đã hết số lượt làm bài thi này')
       navigate('/exams')
       return
     }
 
     try {
-      const wrongQuestions = questions
-        .filter((question) => {
-          if (question.type !== 'multiple') return false
+      setSubmitting(true)
 
-          const selectedIndex = answers[question.id]
-          const correctIndex = question.answers?.findIndex((answer) => answer.isCorrect)
-
-          return selectedIndex !== correctIndex
-        })
-        .map((question) => ({
-          question: question.question,
-          correctAnswer: question.answers?.find((answer) => answer.isCorrect)?.content ?? 'Đang cập nhật',
-          teacherNote: question.explanation ?? '',
-        }))
-
-      const multipleQuestions = questions.filter((question) => question.type === 'multiple')
-      const correctCount = multipleQuestions.length - wrongQuestions.length
-      const score = multipleQuestions.length ? Number(((correctCount / multipleQuestions.length) * 10).toFixed(1)) : 0
-
-      await addDoc(collection(db, 'exams', exam.id, 'results'), {
-        studentId,
-        role: normalizeRole(role),
-        originalRole: role,
-        score,
+      const response = await submitExamApi(exam.id, {
         answers,
         textAnswers,
-        wrongQuestions,
-        totalQuestions: questions.length,
-        answeredCount,
-        createdAt: serverTimestamp(),
       })
 
-      await setDoc(
-        doc(db, 'exams', exam.id, 'attempts', studentId),
-        {
-          studentId,
-          count: attemptCount + 1,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
+      toast.success('Đã nộp bài thi')
 
-      toast.success('Đã nộp bài')
-      navigate(`/exam/${exam.id}/result`, { state: { role, studentId, submitted: true } })
+      navigate(`/exam/${exam.id}/result`, {
+        state: {
+          role,
+          studentId,
+          submitted: true,
+          result: response.data,
+        },
+      })
     } catch (error) {
       console.error(error)
-      toast.error('Nộp bài thất bại')
+
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          'Nộp bài thi thất bại',
+      )
+    } finally {
+      setSubmitting(false)
     }
   }
-
-  const questionType = currentQuestion.type ?? 'multiple'
-  const options = currentQuestion.answers ?? []
 
   return (
     <section className={`${dark ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 sm:px-6 lg:px-8 dark:bg-slate-950 dark:text-white`}>
@@ -443,7 +392,7 @@ function ExamRoom() {
         <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Link to="/exams" className="text-sm font-bold text-cyan-700 hover:text-cyan-500 dark:text-cyan-200">
-              ← Quay lại danh sách bài kiểm tra
+              ← Quay lại danh sách bài thi
             </Link>
 
             <h1 className="mt-2 text-2xl font-black text-slate-950 dark:text-white md:text-3xl">{exam.title}</h1>
@@ -451,6 +400,18 @@ function ExamRoom() {
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {exam.subject} • {questions.length} câu • {exam.duration} phút
             </p>
+
+            {!isTeacher && (
+              <p
+                className={`mt-2 rounded-xl px-3 py-2 text-sm font-bold ${
+                  isOutOfAttempts
+                    ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200'
+                    : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-200'
+                }`}
+              >
+                {isOutOfAttempts ? 'Bạn đã hết số lượt làm bài thi này.' : `Số lượt còn lại: ${attemptsLeft}`}
+              </p>
+            )}
 
             {isTeacher && (
               <p className="mt-2 rounded-xl bg-violet-100 px-3 py-2 text-sm font-bold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">
@@ -476,7 +437,7 @@ function ExamRoom() {
             <TimerCard secondsLeft={secondsLeft} totalSeconds={totalSeconds} progress={timerProgress} />
 
             <QuestionNavigator
-              questions={displayedQuestions}
+              questions={questions}
               currentIndex={currentIndex}
               answers={answers}
               textAnswers={textAnswers}
@@ -519,12 +480,26 @@ function ExamRoom() {
 
                 <CodeBlock
                   value={textAnswers[currentQuestion.id] ?? ''}
-                  onChange={(value) => !isTeacher && setTextAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))}
+                  readOnly={isTeacher || isOutOfAttempts}
+                  onChange={(value) => {
+                    if (isTeacher) return
+
+                    if (isOutOfAttempts) {
+                      toast.error('Bạn đã hết số lượt làm bài thi này')
+                      return
+                    }
+
+                    setTextAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }))
+                  }}
                 />
 
-                <label className="inline-flex cursor-pointer rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-bold text-slate-600 dark:border-white/10 dark:text-white">
+                <label
+                  className={`inline-flex rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-bold text-slate-600 dark:border-white/10 dark:text-white ${
+                    isTeacher || isOutOfAttempts ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                  }`}
+                >
                   Tải file lên
-                  <input type="file" disabled={isTeacher} className="hidden" />
+                  <input type="file" disabled={isTeacher || isOutOfAttempts} className="hidden" />
                 </label>
               </div>
             )}
@@ -532,10 +507,10 @@ function ExamRoom() {
             {questionType === 'essay' && (
               <textarea
                 value={textAnswers[currentQuestion.id] ?? ''}
-                disabled={isTeacher}
+                disabled={isTeacher || isOutOfAttempts}
                 onChange={(event) => setTextAnswers((prev) => ({ ...prev, [currentQuestion.id]: event.target.value }))}
                 rows={8}
-                className="mt-7 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 outline-none dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="mt-7 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-white"
                 placeholder="Nhập câu trả lời tự luận..."
               />
             )}
@@ -551,8 +526,13 @@ function ExamRoom() {
                         <button
                           key={item}
                           type="button"
-                          disabled={isTeacher}
-                          onClick={() =>
+                          disabled={isTeacher || isOutOfAttempts}
+                          onClick={() => {
+                            if (isOutOfAttempts) {
+                              toast.error('Bạn đã hết số lượt làm bài thi này')
+                              return
+                            }
+
                             setAnswers((prev) => ({
                               ...prev,
                               [currentQuestion.id]: {
@@ -560,8 +540,8 @@ function ExamRoom() {
                                 [index]: item,
                               },
                             }))
-                          }
-                          className={`rounded-xl px-4 py-2 text-sm font-bold ${
+                          }}
+                          className={`rounded-xl px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
                             answers[currentQuestion.id]?.[index] === item
                               ? 'bg-violet-600 text-white'
                               : 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-white'
@@ -619,8 +599,20 @@ function ExamRoom() {
               </GradientButton>
 
               {!isTeacher && (
-                <GradientButton icon={Send} onClick={() => setSubmitOpen(true)}>
-                  Nộp bài
+                <GradientButton
+                  icon={Send}
+                  disabled={isOutOfAttempts || submitting}
+                  onClick={() => {
+                    if (isOutOfAttempts) {
+                      toast.error('Bạn đã hết số lượt làm bài thi này')
+                      return
+                    }
+
+                    setSubmitOpen(true)
+                  }}
+                  className={isOutOfAttempts || submitting ? 'opacity-50' : ''}
+                >
+                  {submitting ? 'Đang nộp...' : 'Nộp bài'}
                 </GradientButton>
               )}
             </div>
@@ -632,7 +624,9 @@ function ExamRoom() {
         open={submitOpen}
         answered={answeredCount}
         total={questions.length}
-        onClose={() => setSubmitOpen(false)}
+        onClose={() => {
+          if (!submitting) setSubmitOpen(false)
+        }}
         onConfirm={confirmSubmit}
       />
     </section>
