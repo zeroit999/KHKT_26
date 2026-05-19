@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowRight,
   BrainCircuit,
@@ -53,6 +53,14 @@ const waitForFirebaseUser = () => {
       resolve(user)
     })
   })
+}
+
+const requestFullscreen = async () => {
+  if (document.fullscreenElement) return
+
+  if (document.documentElement.requestFullscreen) {
+    await document.documentElement.requestFullscreen()
+  }
 }
 
 const getSyncedDarkMode = () => {
@@ -109,6 +117,7 @@ function ResultPage() {
   const dark = useSyncedDarkMode()
   const { id } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
 
   const [role, setRole] = useState(null)
   const [studentId, setStudentId] = useState(null)
@@ -200,6 +209,22 @@ function ResultPage() {
       cancelled = true
     }
   }, [id, location.state])
+
+  const handleRetakeExam = async () => {
+    try {
+      await requestFullscreen()
+    } catch (error) {
+      console.warn('Không thể bật toàn màn hình:', error)
+    }
+
+    navigate(`/exam/${safeExam.id}`, {
+      state: {
+        role,
+        studentId,
+        forceFullscreen: true,
+      },
+    })
+  }
 
   if (!loading && (notFound || !exam)) {
     return (
@@ -407,11 +432,11 @@ function ResultPage() {
         <GlassCard className="mt-5 p-6">
           <div className="flex flex-col gap-3 sm:flex-row">
             {!isTeacher && (
-              <Link to={`/exam/${safeExam.id}`}>
+              <button type="button" onClick={handleRetakeExam} className="inline-flex">
                 <GradientButton variant="subtle" icon={RotateCcw}>
                   Làm lại
                 </GradientButton>
-              </Link>
+              </button>
             )}
 
             <Link to="/exams">
