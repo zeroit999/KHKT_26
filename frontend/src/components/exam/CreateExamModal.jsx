@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { FileText, Plus, Trash2, Upload, X } from 'lucide-react'
 
 import RichEditor from './RichEditor.jsx'
 import DarkModeSelect from './DarkModeSelect.jsx'
@@ -10,7 +10,6 @@ import {
   createDefaultQuestion,
   getCodeNumberFromExam,
   normalizeSubject,
-  teacherSubjects,
 } from '../../utils/examHelpers'
 
 const questionTypes = [
@@ -28,9 +27,11 @@ function CreateExamModal({
   teacherName = 'GiaoVien',
   availableClasses = [],
 }) {
+  const fixedTeacherSubject = normalizeSubject(teacherSubject)
+
   const [form, setForm] = useState({
     title: '',
-    subject: normalizeSubject(teacherSubject),
+    subject: fixedTeacherSubject,
     codeNumber: '0001',
     topic: '',
     status: 'public',
@@ -42,10 +43,14 @@ function CreateExamModal({
     closeDate: '',
     shuffleQuestions: false,
     shuffleAnswers: false,
+    totalScore: '',
+    scorePerQuestion: '',
     wordFileName: '',
     maxFullscreenViolations: 2,
     questions: [createDefaultQuestion()],
   })
+
+  const questionCount = form.questions?.length || 0
 
   useEffect(() => {
     if (!open) return
@@ -54,7 +59,7 @@ function CreateExamModal({
       setForm({
         id: editingExam.id,
         title: editingExam.title ?? '',
-        subject: normalizeSubject(editingExam.subject || teacherSubject),
+        subject: fixedTeacherSubject,
         codeNumber: getCodeNumberFromExam(editingExam, '0001'),
         topic: editingExam.topic ?? '',
         status: editingExam.status ?? 'public',
@@ -68,6 +73,8 @@ function CreateExamModal({
           addMinutesToDateTime(editingExam.openDate, editingExam.duration || 45),
         shuffleQuestions: Boolean(editingExam.shuffleQuestions),
         shuffleAnswers: Boolean(editingExam.shuffleAnswers),
+        totalScore: editingExam.totalScore ?? '',
+        scorePerQuestion: editingExam.scorePerQuestion ?? '',
         wordFileName: editingExam.wordFileName ?? '',
         maxFullscreenViolations: Number(editingExam.maxFullscreenViolations ?? 2),
         questions:
@@ -78,7 +85,7 @@ function CreateExamModal({
     } else {
       setForm({
         title: '',
-        subject: normalizeSubject(teacherSubject),
+        subject: fixedTeacherSubject,
         codeNumber: String(Date.now()).slice(-4),
         topic: '',
         status: 'public',
@@ -90,32 +97,26 @@ function CreateExamModal({
         closeDate: '',
         shuffleQuestions: false,
         shuffleAnswers: false,
+        totalScore: '',
+        scorePerQuestion: '',
         wordFileName: '',
         maxFullscreenViolations: 2,
         questions: [createDefaultQuestion()],
       })
     }
-  }, [open, editingExam, teacherSubject])
+  }, [open, editingExam, fixedTeacherSubject])
 
   if (!open) return null
 
   const updateForm = (key, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
   const updateQuestion = (questionIndex, key, value) => {
     setForm((prev) => ({
       ...prev,
       questions: prev.questions.map((question, index) =>
-        index === questionIndex
-          ? {
-              ...question,
-              [key]: value,
-            }
-          : question,
+        index === questionIndex ? { ...question, [key]: value } : question,
       ),
     }))
   }
@@ -125,15 +126,11 @@ function CreateExamModal({
       ...prev,
       questions: prev.questions.map((question, index) => {
         if (index !== questionIndex) return question
-
         return {
           ...question,
           answers: question.answers.map((answer, currentAnswerIndex) =>
             currentAnswerIndex === answerIndex
-              ? {
-                  ...answer,
-                  [key]: value,
-                }
+              ? { ...answer, [key]: value }
               : answer,
           ),
         }
@@ -146,7 +143,6 @@ function CreateExamModal({
       ...prev,
       questions: prev.questions.map((question, index) => {
         if (index !== questionIndex) return question
-
         return {
           ...question,
           answers: question.answers.map((answer, currentAnswerIndex) => ({
@@ -202,7 +198,6 @@ function CreateExamModal({
       ...prev,
       questions: prev.questions.map((question, index) => {
         if (index !== questionIndex) return question
-
         return {
           ...question,
           answers:
@@ -217,7 +212,6 @@ function CreateExamModal({
   const toggleClass = (className) => {
     setForm((prev) => {
       const selected = prev.selectedClasses ?? []
-
       return {
         ...prev,
         selectedClasses: selected.includes(className)
@@ -225,6 +219,12 @@ function CreateExamModal({
           : [...selected, className],
       }
     })
+  }
+
+  const handleWordFileChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    updateForm('wordFileName', file.name)
   }
 
   const handleSubmit = () => {
@@ -238,11 +238,23 @@ function CreateExamModal({
       return
     }
 
+    if (Number(form.totalScore || 0) <= 0) {
+      alert('Vui lòng nhập tổng điểm lớn hơn 0')
+      return
+    }
+
+    if (Number(form.scorePerQuestion || 0) <= 0) {
+      alert('Vui lòng nhập điểm mỗi câu lớn hơn 0')
+      return
+    }
+
     onSave({
       ...form,
-      subject: normalizeSubject(form.subject),
+      subject: fixedTeacherSubject,
       maxAttempts: Number(form.maxAttempts || 1),
       duration: Number(form.duration || 45),
+      totalScore: Number(form.totalScore || 0),
+      scorePerQuestion: Number(form.scorePerQuestion || 0),
       maxFullscreenViolations: Number(form.maxFullscreenViolations ?? 2),
     })
   }
@@ -261,16 +273,13 @@ function CreateExamModal({
             <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
               {editingExam ? 'Cập nhật bài thi' : 'Tạo bài thi'}
             </p>
-
             <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
               {editingExam ? 'Sửa bài thi' : 'Tạo bài thi mới'}
             </h2>
-
             <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
               Giáo viên: {teacherName}
             </p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -295,19 +304,16 @@ function CreateExamModal({
 
           <div>
             <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-              Môn học
+              Môn thi theo chuyên môn giáo viên
             </label>
-            <select
-              value={form.subject}
-              onChange={(event) => updateForm('subject', event.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-            >
-              {teacherSubjects.map((subject) => (
-                <option key={subject} value={subject}>
-                  {subject}
-                </option>
-              ))}
-            </select>
+            <input
+              value={fixedTeacherSubject}
+              disabled
+              className="w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
+            />
+            <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Môn thi được khóa theo chuyên môn đã thiết lập ban đầu.
+            </p>
           </div>
 
           <div>
@@ -336,6 +342,65 @@ function CreateExamModal({
 
           <div>
             <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+              Tổng điểm
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.totalScore}
+              onChange={(event) => updateForm('totalScore', event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              placeholder="Ví dụ: 10"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+              Điểm mỗi câu
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.scorePerQuestion}
+              onChange={(event) => updateForm('scorePerQuestion', event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              placeholder="Ví dụ: 0.25"
+            />
+            <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Giáo viên tự nhập điểm mỗi câu.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+              File Word đề thi
+            </label>
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <Upload className="h-5 w-5 shrink-0" />
+                <span className="truncate">
+                  {form.wordFileName || 'Chọn file .doc / .docx'}
+                </span>
+              </span>
+              <input
+                type="file"
+                accept=".doc,.docx"
+                onChange={handleWordFileChange}
+                className="hidden"
+              />
+            </label>
+            {form.wordFileName && (
+              <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <FileText className="h-4 w-4" />
+                {form.wordFileName}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
               Thời lượng phút
             </label>
             <input
@@ -345,7 +410,6 @@ function CreateExamModal({
               onChange={(event) => {
                 const duration = Number(event.target.value || 45)
                 updateForm('duration', duration)
-
                 if (form.openDate) {
                   updateForm('closeDate', addMinutesToDateTime(form.openDate, duration))
                 }
@@ -362,14 +426,9 @@ function CreateExamModal({
               type="number"
               min={0}
               value={form.maxFullscreenViolations ?? 2}
-              onChange={(event) =>
-                updateForm('maxFullscreenViolations', Number(event.target.value || 0))
-              }
+              onChange={(event) => updateForm('maxFullscreenViolations', Number(event.target.value || 0))}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
             />
-            <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Nếu học sinh thoát toàn màn hình quá số lần này, hệ thống sẽ tự động nộp bài.
-            </p>
           </div>
 
           <div>
@@ -428,7 +487,6 @@ function CreateExamModal({
                 { value: 'multiple', label: 'Nhiều lần' },
               ]}
             />
-
             {form.attemptMode === 'multiple' && (
               <input
                 type="number"
@@ -446,7 +504,6 @@ function CreateExamModal({
             <p className="mb-3 text-sm font-black text-slate-700 dark:text-slate-200">
               Chọn lớp được làm bài
             </p>
-
             {availableClasses.length ? (
               <div className="flex flex-wrap gap-2">
                 {availableClasses.map((className) => (
@@ -474,10 +531,14 @@ function CreateExamModal({
 
         <div className="mt-6 space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-xl font-black text-slate-950 dark:text-white">
-              Câu hỏi
-            </h3>
-
+            <div>
+              <h3 className="text-xl font-black text-slate-950 dark:text-white">
+                Câu hỏi
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                {questionCount} câu • {form.totalScore || 0} điểm • {form.scorePerQuestion || 0} điểm/câu
+              </p>
+            </div>
             <button
               type="button"
               onClick={addQuestion}
@@ -499,10 +560,9 @@ function CreateExamModal({
                     Câu {questionIndex + 1}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
-                    Chọn loại câu hỏi và nhập nội dung.
+                    {form.scorePerQuestion || 0} điểm
                   </p>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => removeQuestion(questionIndex)}
@@ -518,9 +578,7 @@ function CreateExamModal({
                 </label>
                 <DarkModeSelect
                   value={question.type ?? 'multiple'}
-                  onChange={(value) =>
-                    updateQuestion(questionIndex, 'type', value)
-                  }
+                  onChange={(value) => updateQuestion(questionIndex, 'type', value)}
                   options={questionTypes}
                 />
               </div>
@@ -536,9 +594,7 @@ function CreateExamModal({
                   <RichEditor
                     label="Gợi ý/chấm điểm"
                     value={question.explanation ?? ''}
-                    onChange={(value) =>
-                      updateQuestion(questionIndex, 'explanation', value)
-                    }
+                    onChange={(value) => updateQuestion(questionIndex, 'explanation', value)}
                   />
                 </div>
               )}
@@ -565,12 +621,7 @@ function CreateExamModal({
                       <input
                         value={answer.content ?? ''}
                         onChange={(event) =>
-                          updateAnswer(
-                            questionIndex,
-                            answerIndex,
-                            'content',
-                            event.target.value,
-                          )
+                          updateAnswer(questionIndex, answerIndex, 'content', event.target.value)
                         }
                         className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                         placeholder={`Đáp án ${String.fromCharCode(65 + answerIndex)}`}
@@ -601,9 +652,7 @@ function CreateExamModal({
                   <RichEditor
                     label="Giải thích đáp án"
                     value={question.explanation ?? ''}
-                    onChange={(value) =>
-                      updateQuestion(questionIndex, 'explanation', value)
-                    }
+                    onChange={(value) => updateQuestion(questionIndex, 'explanation', value)}
                   />
                 </div>
               )}
@@ -619,7 +668,6 @@ function CreateExamModal({
           >
             Hủy
           </button>
-
           <button
             type="button"
             onClick={handleSubmit}

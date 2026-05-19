@@ -14,7 +14,6 @@ import {
 
 import {
   getDateTimeValue,
-  getUserClassName,
   isStudentRole,
   normalizeClassName,
   normalizeSubject,
@@ -27,8 +26,10 @@ export default function useExams() {
 
   const [role, setRole] = useState(null)
   const [currentUserId, setCurrentUserId] = useState(null)
+
   const [teacherSubject, setTeacherSubject] = useState('Toán')
   const [teacherName, setTeacherName] = useState('GiaoVien')
+
   const [studentClass, setStudentClass] = useState('')
   const [studentClasses, setStudentClasses] = useState([])
   const [classes, setClasses] = useState([])
@@ -40,6 +41,7 @@ export default function useExams() {
   const [publishFilter, setPublishFilter] = useState('all')
 
   const [exams, setExams] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [roleLoading, setRoleLoading] = useState(true)
 
@@ -52,19 +54,15 @@ export default function useExams() {
   const loadExams = async () => {
     try {
       setLoading(true)
-
       const response = await getExamsApi()
-
       setExams(response.data?.exams ?? [])
     } catch (error) {
       console.error(error)
-
       toast.error(
         error?.response?.data?.message ||
           error.message ||
           'Không thể tải danh sách bài thi',
       )
-
       setExams([])
     } finally {
       setLoading(false)
@@ -75,7 +73,6 @@ export default function useExams() {
     const loadUser = async () => {
       try {
         setRoleLoading(true)
-
         const user = auth.currentUser
 
         if (!user) {
@@ -84,16 +81,10 @@ export default function useExams() {
         }
 
         setCurrentUserId(user.uid)
-
         const userSnap = await getDoc(doc(db, 'users', user.uid))
         const userData = userSnap.exists() ? userSnap.data() : {}
 
-        const firestoreRole =
-          userData.role ||
-          userData.userRole ||
-          userData.type ||
-          'STUDENT'
-
+        const firestoreRole = userData.role || userData.userRole || userData.type || 'STUDENT'
         setRole(firestoreRole)
 
         const displayName =
@@ -104,8 +95,17 @@ export default function useExams() {
           user.displayName ||
           user.email?.split('@')[0] ||
           'GiaoVien'
-
         setTeacherName(displayName)
+
+        const fixedTeacherSubject =
+          userData.subject ||
+          userData.teacherSubject ||
+          userData.major ||
+          userData.specialization ||
+          userData.chuyenMon ||
+          userData.chuyênMôn ||
+          'Toán'
+        setTeacherSubject(normalizeSubject(fixedTeacherSubject))
 
         const userClass = String(
           userData.className ||
@@ -121,7 +121,10 @@ export default function useExams() {
           setStudentClasses([userClass])
         }
 
-        setTeacherSubject(userData.subject || userData.teacherSubject || 'Toán')
+        const userClasses = userData.classes || userData.classList || userData.managedClasses || []
+        if (Array.isArray(userClasses)) {
+          setClasses(userClasses.filter(Boolean))
+        }
       } catch (error) {
         console.error(error)
         toast.error('Không thể tải dữ liệu người dùng')
@@ -144,24 +147,14 @@ export default function useExams() {
 
     return exams
       .map((exam) => {
-        const opened =
-          !exam.openDate || now.getTime() >= getDateTimeValue(exam.openDate)
-
-        const closed = Boolean(
-          exam.closeDate && now.getTime() > getDateTimeValue(exam.closeDate),
-        )
-
-        const isUpcoming = Boolean(
-          exam.openDate && now.getTime() < getDateTimeValue(exam.openDate),
-        )
-
+        const opened = !exam.openDate || now.getTime() >= getDateTimeValue(exam.openDate)
+        const closed = Boolean(exam.closeDate && now.getTime() > getDateTimeValue(exam.closeDate))
+        const isUpcoming = Boolean(exam.openDate && now.getTime() < getDateTimeValue(exam.openDate))
         const isActive = opened && !closed
-
-        const availabilityStatus = isActive
-          ? 'published'
-          : isUpcoming
-            ? 'draft'
-            : 'ended'
+        const availabilityStatus = isActive ? 'published' : isUpcoming ? 'draft' : 'ended'
+        const questionCount = Number(exam.questionCount || exam.questions?.length || 0)
+        const totalScore = Number(exam.totalScore || 0)
+        const scorePerQuestion = Number(exam.scorePerQuestion || 0)
 
         return {
           ...exam,
@@ -169,6 +162,9 @@ export default function useExams() {
           questions: exam.questions ?? [],
           studentResults: exam.studentResults ?? [],
           attempts: exam.attempts ?? [],
+          questionCount,
+          totalScore,
+          scorePerQuestion,
           isActive,
           isUpcoming,
           isEnded: closed,
@@ -181,7 +177,6 @@ export default function useExams() {
         if (isStudentRole(role)) {
           const isPublicExam = exam.status === 'public'
           const normalizedStudentClasses = studentClasses.map(normalizeClassName)
-
           const isAssignedPrivateExam =
             exam.status === 'private' &&
             Array.isArray(exam.selectedClasses) &&
@@ -193,23 +188,10 @@ export default function useExams() {
         }
 
         if (privacyFilter !== 'all' && exam.status !== privacyFilter) return false
-
-        if (
-          publishFilter !== 'all' &&
-          exam.availabilityStatus !== publishFilter
-        ) {
-          return false
-        }
-
-        if (
-          subjectFilter !== 'all' &&
-          normalizeSubject(exam.subject) !== subjectFilter
-        ) {
-          return false
-        }
+        if (publishFilter !== 'all' && exam.availabilityStatus !== publishFilter) return false
+        if (subjectFilter !== 'all' && normalizeSubject(exam.subject) !== subjectFilter) return false
 
         const keyword = search.trim().toLowerCase()
-
         if (!keyword) return true
 
         return (
@@ -234,19 +216,18 @@ export default function useExams() {
 
   const averageScore = studentResults.length
     ? (
-        studentResults.reduce(
-          (total, item) => total + Number(item.score || 0),
-          0,
-        ) / studentResults.length
+        studentResults.reduce((total, item) => total + Number(item.score || 0), 0) /
+        studentResults.length
       ).toFixed(1)
     : '0.0'
 
   const normalizeExamPayload = (exam) => {
-    const fixedExamSubject = normalizeSubject(exam.subject || teacherSubject)
-
+    const fixedExamSubject = normalizeSubject(teacherSubject)
     const fixedSubjectCode =
-      subjectCodes[fixedExamSubject] ??
-      fixedExamSubject.slice(0, 2).toUpperCase()
+      subjectCodes[fixedExamSubject] ?? fixedExamSubject.slice(0, 2).toUpperCase()
+    const questions = exam.questions ?? []
+    const totalScore = Number(exam.totalScore || 0)
+    const scorePerQuestion = Number(exam.scorePerQuestion || 0)
 
     return {
       title: exam.title,
@@ -263,9 +244,11 @@ export default function useExams() {
       closeDate: exam.closeDate,
       shuffleQuestions: Boolean(exam.shuffleQuestions),
       shuffleAnswers: Boolean(exam.shuffleAnswers),
+      totalScore,
+      scorePerQuestion,
       wordFileName: exam.wordFileName ?? '',
       maxFullscreenViolations: Number(exam.maxFullscreenViolations ?? 2),
-      questions: exam.questions ?? [],
+      questions,
     }
   }
 
@@ -283,11 +266,9 @@ export default function useExams() {
 
       setEditingExam(null)
       setCreateOpen(false)
-
       await loadExams()
     } catch (error) {
       console.error(error)
-
       toast.error(
         error?.response?.data?.message ||
           error.message ||
@@ -299,15 +280,11 @@ export default function useExams() {
   const deleteExam = async (examId) => {
     try {
       await deleteExamApi(examId)
-
       toast.success('Đã xóa đề thi')
-
       setDeleteConfirmExam(null)
-
       await loadExams()
     } catch (error) {
       console.error(error)
-
       toast.error(
         error?.response?.data?.message ||
           error.message ||
@@ -319,7 +296,6 @@ export default function useExams() {
   const duplicateExam = async (exam) => {
     try {
       const newCodeNumber = String(Date.now()).slice(-4)
-
       const payload = normalizeExamPayload({
         ...exam,
         id: undefined,
@@ -329,13 +305,10 @@ export default function useExams() {
       })
 
       await createExamApi(payload)
-
       toast.success('Đã sao chép đề thi')
-
       await loadExams()
     } catch (error) {
       console.error(error)
-
       toast.error(
         error?.response?.data?.message ||
           error.message ||
