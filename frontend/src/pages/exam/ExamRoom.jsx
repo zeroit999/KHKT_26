@@ -1,261 +1,305 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-  MonitorSmartphone,
-} from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Maximize2 } from 'lucide-react'
 
 import useExamRoom from '../../hooks/useExamRoom'
-import { formatDuration } from '../../utils/examHelpers'
 
 function ExamRoom() {
   const {
-    dark,
-    preview,
-    loading,
     exam,
+    loading,
+    submitting,
+    preview,
+    isTeacher,
+    hasStarted,
+
     answers,
     textAnswers,
-    submitting,
+
     timeLeft,
-    fullscreenWarning,
-    fullscreenViolations,
-    leaveWarningOpen,
-    setLeaveWarningOpen,
-    isTeacher,
-    maxFullscreenViolations,
-    questionCount,
+    violations,
     answeredCount,
+
+    formatTime,
+
+    startExam,
     handleAnswer,
+    handleTrueFalseAnswer,
     handleTextAnswer,
     handleSubmit,
-    retryFullscreen,
   } = useExamRoom()
 
   if (loading) {
     return (
-      <div className={dark ? 'dark min-h-screen bg-slate-950' : 'min-h-screen bg-slate-50'}>
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-
-            <p className="mt-4 text-sm font-bold text-slate-500 dark:text-slate-300">
-              Đang tải bài thi...
-            </p>
-          </div>
+      <section className="flex min-h-screen items-center justify-center bg-slate-100">
+        <div className="rounded-3xl bg-white px-8 py-6 text-lg font-black text-slate-700 shadow-sm">
+          Đang tải đề thi...
         </div>
-      </div>
+      </section>
     )
   }
 
-  if (!exam) return null
+  if (!exam) {
+    return (
+      <section className="flex min-h-screen items-center justify-center bg-slate-100">
+        <div className="rounded-3xl bg-white px-8 py-6 text-lg font-black text-red-600 shadow-sm">
+          Không tìm thấy đề thi
+        </div>
+      </section>
+    )
+  }
+
+  if (!preview && !isTeacher && !hasStarted) {
+    return (
+      <section className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+        <div className="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-600 text-white shadow-lg shadow-blue-500/25">
+            <Maximize2 className="h-10 w-10" />
+          </div>
+
+          <h1 className="mt-6 text-3xl font-black text-slate-950">
+            Vào phòng thi
+          </h1>
+
+          <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
+            Bài thi yêu cầu chế độ toàn màn hình. Khi bắt đầu, hệ thống sẽ ghi nhận số lần thoát toàn màn hình.
+          </p>
+
+          <div className="mt-6 rounded-2xl bg-orange-50 p-4 text-left text-sm font-bold text-orange-700">
+            <p>• Không thoát khỏi chế độ toàn màn hình</p>
+            <p>• Quá số lần thoát cho phép sẽ tự động nộp bài</p>
+            <p>• Hệ thống tự động nộp khi hết giờ</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={startExam}
+            className="mt-7 w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700"
+          >
+            Bắt đầu làm bài
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   return (
-    <div className={dark ? 'dark' : ''}>
-      <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950">
-        {fullscreenWarning && !isTeacher && !preview && !submitting && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-slate-900">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-200">
-                <MonitorSmartphone className="h-8 w-8" />
+    <section className="min-h-screen bg-slate-100">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
+          <div>
+            <h1 className="text-3xl font-black text-slate-950">
+              {exam.title}
+            </h1>
+
+            <p className="mt-1 text-base font-semibold text-slate-500">
+              {exam.subject} • {exam.questions?.length || 0} câu hỏi
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="rounded-2xl bg-orange-100 px-5 py-3 font-black text-orange-600">
+              <div className="flex items-center gap-2">
+                <Clock3 className="h-5 w-5" />
+                {formatTime(timeLeft)}
               </div>
+            </div>
 
-              <h2 className="mt-5 text-2xl font-black text-slate-950 dark:text-white">
-                Cần bật toàn màn hình
-              </h2>
+            <div className="rounded-2xl bg-blue-100 px-5 py-3 font-black text-blue-600">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                {answeredCount}/{exam.questions?.length || 0}
+              </div>
+            </div>
 
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">
-                Học sinh bắt buộc phải ở chế độ toàn màn hình để tiếp tục làm bài thi.
-              </p>
+            <div className="rounded-2xl bg-red-100 px-5 py-3 font-black text-red-600">
+              Vi phạm: {violations}/{exam.maxFullscreenViolations ?? 2}
+            </div>
 
-              <p className="mt-3 text-sm font-black text-red-600 dark:text-red-300">
-                Vi phạm: {fullscreenViolations}/{maxFullscreenViolations}
-              </p>
-
+            {!preview && !isTeacher && (
               <button
                 type="button"
-                onClick={retryFullscreen}
-                className="mt-6 w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
+                disabled={submitting}
+                onClick={() => handleSubmit(false)}
+                className="rounded-2xl bg-emerald-600 px-7 py-3 text-base font-black text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Bật toàn màn hình
+                {submitting ? 'Đang nộp...' : 'Nộp bài'}
               </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
+      </header>
 
-        {leaveWarningOpen && !isTeacher && !preview && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-slate-900">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-200">
-                <AlertTriangle className="h-8 w-8" />
-              </div>
-
-              <h2 className="mt-5 text-2xl font-black text-slate-950 dark:text-white">
-                Không nên rời phòng thi
-              </h2>
-
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">
-                Bạn đang làm bài. Nếu rời trang, bài làm có thể bị mất hoặc bị tính là vi phạm.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setLeaveWarningOpen(false)}
-                  className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-                >
-                  Tiếp tục làm bài
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {submitting ? 'Đang nộp...' : 'Nộp bài'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/95">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <div>
-              <h1 className="text-3xl font-black text-slate-950 dark:text-white">
-                {exam.title}
-              </h1>
-
-              <p className="mt-1 text-base font-semibold text-slate-500 dark:text-slate-300">
-                {exam.subject} • {questionCount} câu hỏi
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex items-center gap-2 rounded-2xl bg-orange-100 px-5 py-3 text-base font-black text-orange-700 dark:bg-orange-500/20 dark:text-orange-100">
-                <Clock3 className="h-5 w-5" />
-                {formatDuration(timeLeft)}
-              </div>
-
-              <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-100 px-5 py-3 text-base font-black text-blue-700 dark:bg-blue-500/20 dark:text-blue-100">
-                <CheckCircle2 className="h-5 w-5" />
-                {answeredCount}/{questionCount}
-              </div>
-
-              {!isTeacher && !preview && (
-                <div className="inline-flex items-center gap-2 rounded-2xl bg-red-100 px-5 py-3 text-base font-black text-red-700 dark:bg-red-500/20 dark:text-red-100">
-                  Vi phạm: {fullscreenViolations}/{maxFullscreenViolations}
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <div className="space-y-8">
+          {exam.questions?.map((question, index) => (
+            <div
+              key={question.id}
+              className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-sm"
+            >
+              <div className="flex items-start gap-5">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-black text-white">
+                  {index + 1}
                 </div>
-              )}
 
-              {!preview && !isTeacher && (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={handleSubmit}
-                  className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {submitting ? 'Đang nộp bài...' : 'Nộp bài'}
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-3xl font-black leading-tight text-slate-950">
+                    {question.question}
+                  </h2>
 
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="space-y-7">
-            {exam.questions?.map((question, index) => (
-              <div
-                key={question.id}
-                className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-white/5"
-              >
-                <div className="flex items-start gap-6">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-lg font-black text-white">
-                    {index + 1}
-                  </div>
+                  {question.type === 'truefalse' ? (
+                    <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200">
+                      <div className="grid grid-cols-[1fr_130px_130px] bg-slate-100 text-base font-black text-slate-700">
+                        <div className="px-6 py-4">Ý</div>
+                        <div className="px-6 py-4 text-center">Đúng</div>
+                        <div className="px-6 py-4 text-center">Sai</div>
+                      </div>
 
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-2xl font-black leading-9 text-slate-950 dark:text-white">
-                      {question.question}
-                    </h2>
+                      {(question.answers || []).slice(0, 4).map((answer, answerIndex) => {
+                        const selected = answers[question.id]?.[answerIndex]
 
-                    {question.type === 'essay' || question.type === 'code' ? (
+                        return (
+                          <div
+                            key={answer.id ?? answerIndex}
+                            className="grid grid-cols-[1fr_130px_130px] border-t border-slate-200"
+                          >
+                            <div className="px-6 py-5 text-base font-bold text-slate-800">
+                              <span className="mr-2 font-black">
+                                {String.fromCharCode(97 + answerIndex)})
+                              </span>
+                              {answer.content}
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={preview || isTeacher}
+                              onClick={() =>
+                                handleTrueFalseAnswer(question.id, answerIndex, true)
+                              }
+                              className={`m-3 rounded-2xl px-4 py-3 text-base font-black transition ${
+                                selected === true
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-emerald-50'
+                              }`}
+                            >
+                              Đúng
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={preview || isTeacher}
+                              onClick={() =>
+                                handleTrueFalseAnswer(question.id, answerIndex, false)
+                              }
+                              className={`m-3 rounded-2xl px-4 py-3 text-base font-black transition ${
+                                selected === false
+                                  ? 'bg-red-600 text-white'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-red-50'
+                              }`}
+                            >
+                              Sai
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : question.type === 'short-answer' ? (
+                    <div className="mt-8 grid gap-4 sm:grid-cols-4">
+                      {[0, 1, 2, 3].map((item) => {
+                        const currentValue = Array.isArray(textAnswers[question.id])
+                          ? textAnswers[question.id]
+                          : ['', '', '', '']
+
+                        return (
+                          <input
+                            key={item}
+                            value={currentValue[item] || ''}
+                            disabled={preview || isTeacher}
+                            onChange={(event) => {
+                              const nextValue = [...currentValue]
+                              nextValue[item] = event.target.value
+                              handleTextAnswer(question.id, nextValue)
+                            }}
+                            placeholder={`Ô ${item + 1}`}
+                            className="rounded-2xl border border-slate-200 bg-white px-5 py-5 text-xl font-bold text-slate-800 outline-none transition focus:border-blue-500"
+                          />
+                        )
+                      })}
+                    </div>
+                  ) : question.type === 'essay' || question.type === 'code' ? (
+                    <div className="mt-8">
                       <textarea
+                        disabled={preview || isTeacher}
                         value={textAnswers[question.id] || ''}
                         onChange={(event) =>
                           handleTextAnswer(question.id, event.target.value)
                         }
-                        disabled={preview || isTeacher}
-                        placeholder="Nhập câu trả lời..."
-                        className="mt-6 min-h-[220px] w-full rounded-2xl border border-slate-200 bg-white px-5 py-5 text-lg font-medium text-slate-700 outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                        placeholder="Nhập bài làm tự luận..."
+                        rows={8}
+                        className="w-full rounded-3xl border border-slate-200 bg-white px-6 py-5 text-lg font-semibold text-slate-800 outline-none transition focus:border-blue-500"
                       />
-                    ) : (
-                      <div className="mt-6 grid gap-4">
-                        {question.answers?.map((answer, answerIndex) => {
-                          const selected = answers[question.id] === answerIndex
+                    </div>
+                  ) : (
+                    <div className="mt-8 space-y-4">
+                      {question.answers?.map((answer, answerIndex) => {
+                        const selected = answers[question.id] === answerIndex
 
-                          return (
-                            <button
-                              key={answer.id ?? answerIndex}
-                              type="button"
-                              disabled={preview || isTeacher}
-                              onClick={() => handleAnswer(question.id, answerIndex)}
-                              className={`flex items-center gap-5 rounded-2xl border px-6 py-6 text-left transition ${
+                        return (
+                          <button
+                            key={answer.id ?? answerIndex}
+                            type="button"
+                            disabled={preview || isTeacher}
+                            onClick={() => handleAnswer(question.id, answerIndex)}
+                            className={`flex w-full items-center gap-5 rounded-3xl border px-6 py-5 text-left transition ${
+                              selected
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-slate-200 bg-white hover:border-blue-300'
+                            }`}
+                          >
+                            <div
+                              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl font-black ${
                                 selected
-                                  ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-500/10'
-                                  : 'border-slate-200 bg-white hover:border-blue-300 dark:border-white/10 dark:bg-slate-900'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-100 text-slate-700'
                               }`}
                             >
-                              <div
-                                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-black ${
-                                  selected
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white'
-                                }`}
-                              >
-                                {String.fromCharCode(65 + answerIndex)}
-                              </div>
+                              {String.fromCharCode(65 + answerIndex)}
+                            </div>
 
-                              <span className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                                {answer.content || answer.text || ''}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {!preview && !isTeacher && (
-            <div className="mt-8 rounded-3xl border border-orange-200 bg-orange-50 p-7 dark:border-orange-500/20 dark:bg-orange-500/10">
-              <div className="flex items-start gap-4">
-                <AlertTriangle className="mt-0.5 h-6 w-6 text-orange-600 dark:text-orange-300" />
-
-                <div>
-                  <h3 className="text-base font-black text-orange-700 dark:text-orange-100">
-                    Lưu ý khi làm bài
-                  </h3>
-
-                  <ul className="mt-3 space-y-1.5 text-base font-semibold text-orange-700 dark:text-orange-100">
-                    <li>• Không thoát khỏi chế độ toàn màn hình</li>
-                    <li>• Quá số lần thoát cho phép sẽ tự động nộp bài</li>
-                    <li>• Không reload hoặc quay lại khi đang làm bài</li>
-                    <li>• Hệ thống sẽ tự động nộp khi hết giờ</li>
-                    <li>• Hệ thống tự lưu bài làm mỗi 10 giây</li>
-                    <li>• Kiểm tra kỹ trước khi nộp bài</li>
-                  </ul>
+                            <span className="text-xl font-bold text-slate-800">
+                              {answer.content}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-        </main>
-      </section>
-    </div>
+          ))}
+        </div>
+
+        {!preview && !isTeacher && (
+          <div className="mt-10 rounded-[30px] border border-orange-200 bg-orange-50 p-8">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="mt-1 h-7 w-7 text-orange-500" />
+
+              <div>
+                <h3 className="text-2xl font-black text-orange-700">
+                  Lưu ý khi làm bài
+                </h3>
+
+                <ul className="mt-4 space-y-2 text-lg font-semibold text-orange-600">
+                  <li>• Không thoát khỏi chế độ toàn màn hình</li>
+                  <li>• Quá số lần thoát cho phép sẽ tự động nộp bài</li>
+                  <li>• Hệ thống sẽ tự động nộp khi hết giờ</li>
+                  <li>• Kiểm tra kỹ trước khi nộp bài</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </section>
   )
 }
 

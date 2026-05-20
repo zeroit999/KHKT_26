@@ -1,5 +1,7 @@
 from firebase_admin import firestore
 
+from exams.exam_scoring import calculate_exam_score
+
 db = firestore.client()
 
 
@@ -96,23 +98,6 @@ def get_exam_results_data(exam_id):
     ]
 
 
-def get_exam_attempts(exam_id):
-    attempt_docs = (
-        db.collection("exams")
-        .document(exam_id)
-        .collection("attempts")
-        .stream()
-    )
-
-    return [
-        {
-            "id": attempt_doc.id,
-            **serialize_doc_data(attempt_doc.to_dict() or {}),
-        }
-        for attempt_doc in attempt_docs
-    ]
-
-
 def get_exam_attempt_for_user(exam_id, user_id):
     if not user_id:
         return None
@@ -173,6 +158,19 @@ def can_student_view_exam(current_user, exam_data):
     return is_public or is_assigned
 
 
+def get_default_scoring():
+    return {
+        "part1": {"perQuestion": 0},
+        "part2": {
+            "oneCorrect": 0,
+            "twoCorrect": 0,
+            "threeCorrect": 0,
+            "fourCorrect": 0,
+        },
+        "part3": {"perQuestion": 0},
+    }
+
+
 def build_exam_summary(current_user, exam_id, exam_data):
     role = current_user.get("role")
     user_id = current_user.get("uid")
@@ -184,6 +182,8 @@ def build_exam_summary(current_user, exam_id, exam_data):
             int(exam_data.get("questionCount", 0) or 0)
             or get_question_count(exam_id)
         ),
+        "totalScore": exam_data.get("totalScore", 0),
+        "scoring": exam_data.get("scoring", get_default_scoring()),
         "studentResultCount": exam_data.get("studentResultCount", 0),
         "questions": [],
         "studentResults": [],
@@ -205,7 +205,6 @@ def build_exam_summary(current_user, exam_id, exam_data):
 
 def get_exams(current_user):
     role = current_user.get("role")
-
     exam_docs = db.collection("exams").stream()
     exams = []
 
@@ -250,6 +249,7 @@ def get_exam_detail(current_user, exam_id):
             **exam_data,
             "questionCount": len(questions),
             "questions": questions,
+            "scoring": exam_data.get("scoring", get_default_scoring()),
         },
     }
 
@@ -259,9 +259,11 @@ def create_exam(current_user, payload):
         raise Exception("Bạn không có quyền tạo bài thi")
 
     questions = payload.pop("questions", [])
+    scoring = payload.get("scoring", get_default_scoring())
 
     exam_data = {
         **payload,
+        "scoring": scoring,
         "questionCount": len(questions),
         "studentResultCount": 0,
         "teacherId": current_user.get("uid"),
@@ -395,6 +397,7 @@ def submit_exam(current_user, exam_id, payload):
     fullscreen_violations = int(payload.get("fullscreenViolations", 0) or 0)
 
     questions = get_exam_questions(exam_id)
+    scoring = exam_data.get("scoring", get_default_scoring())
 
     attempt_ref = exam_ref.collection("attempts").document(current_user.get("uid"))
     attempt_doc = attempt_ref.get()
@@ -412,61 +415,12 @@ def submit_exam(current_user, exam_id, payload):
     if attempt_count >= max_attempts:
         raise Exception("Bạn đã hết số lượt làm bài thi này")
 
-    correct_count = 0
-    auto_grade_questions = []
-    wrong_questions = []
-
-    for question in questions:
-        question_type = question.get("type", "multiple")
-
-        if question_type != "multiple":
-            continue
-
-        auto_grade_questions.append(question)
-
-        correct_indexes = [
-            index
-            for index, answer in enumerate(question.get("answers", []))
-            if answer.get("isCorrect")
-        ]
-
-        selected = answers.get(question.get("id"))
-        is_correct = selected in correct_indexes
-
-        if is_correct:
-            correct_count += 1
-        else:
-            correct_answer = ", ".join(
-                chr(65 + index)
-                for index in correct_indexes
-            )
-
-            wrong_questions.append({
-                "question": question.get("question", ""),
-                "correctAnswer": correct_answer,
-                "teacherNote": question.get("explanation", ""),
-            })
-
-    total_auto_grade = len(auto_grade_questions)
-
-    score = (
-        round((correct_count / total_auto_grade) * 10, 1)
-        if total_auto_grade
-        else 0
+    score_data = calculate_exam_score(
+        questions=questions,
+        answers=answers,
+        text_answers=text_answers,
+        scoring=scoring,
     )
-
-    answered_count = 0
-
-    for question in questions:
-        question_id = question.get("id")
-        question_type = question.get("type", "multiple")
-
-        if question_type in ["essay", "code"]:
-            if str(text_answers.get(question_id, "")).strip():
-                answered_count += 1
-        else:
-            if question_id in answers:
-                answered_count += 1
 
     result_ref = exam_ref.collection("results").document()
 
@@ -478,10 +432,8 @@ def submit_exam(current_user, exam_id, payload):
         "answers": answers,
         "textAnswers": text_answers,
         "fullscreenViolations": fullscreen_violations,
-        "score": score,
-        "answeredCount": answered_count,
-        "totalQuestions": len(questions),
-        "wrongQuestions": wrong_questions,
+        "scoring": scoring,
+        **score_data,
         "createdAt": firestore.SERVER_TIMESTAMP,
     }
 

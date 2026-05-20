@@ -1,206 +1,252 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
-import { auth } from '../components/firebase'
-import useSyncedDarkMode from './useSyncedDarkMode'
 import { getExamDetailApi, submitExamApi } from '../api/examApi'
-import { canManageExams } from '../utils/examHelpers'
-
-const requestFullscreen = async () => {
-  const element = document.documentElement
-
-  if (document.fullscreenElement) return
-
-  if (element.requestFullscreen) {
-    await element.requestFullscreen()
-  }
-}
-
-const exitFullscreen = async () => {
-  if (document.fullscreenElement && document.exitFullscreen) {
-    await document.exitFullscreen()
-  }
-}
 
 export default function useExamRoom() {
-  const dark = useSyncedDarkMode()
   const navigate = useNavigate()
   const location = useLocation()
-  const { id } = useParams()
+  const params = useParams()
 
-  const role = location.state?.role
+  const examId = params.examId || params.id
+
   const preview = Boolean(location.state?.preview)
+  const role = String(location.state?.role || 'STUDENT').toUpperCase()
 
-  const [loading, setLoading] = useState(true)
+  const isTeacher =
+    role === 'TEACHER' ||
+    role === 'ADMIN_DEV' ||
+    role === 'ADMIN'
+
   const [exam, setExam] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  const [hasStarted, setHasStarted] = useState(false)
+
   const [answers, setAnswers] = useState({})
   const [textAnswers, setTextAnswers] = useState({})
-  const [submitting, setSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
-  const [fullscreenWarning, setFullscreenWarning] = useState(false)
-  const [fullscreenViolations, setFullscreenViolations] = useState(0)
-  const [leaveWarningOpen, setLeaveWarningOpen] = useState(false)
+  const [violations, setViolations] = useState(0)
 
-  const submitRef = useRef(false)
-
-  const isTeacher = canManageExams(role)
-  const maxFullscreenViolations = Number(exam?.maxFullscreenViolations ?? 2)
-
-  const draftKey = `exam_draft_${id}_${auth.currentUser?.uid || 'guest'}`
-
-  const saveDraftNow = (
-    nextAnswers = answers,
-    nextTextAnswers = textAnswers,
-    nextTimeLeft = timeLeft,
-    nextFullscreenViolations = fullscreenViolations,
-  ) => {
-    if (!exam?.id || isTeacher || preview || submitting) return
-
-    localStorage.setItem(
-      draftKey,
-      JSON.stringify({
-        examId: exam.id,
-        answers: nextAnswers,
-        textAnswers: nextTextAnswers,
-        timeLeft: nextTimeLeft,
-        fullscreenViolations: nextFullscreenViolations,
-        updatedAt: new Date().toISOString(),
-      }),
-    )
-  }
-
-  const handleSubmit = async () => {
-    if (submitting || submitRef.current || !exam?.id) return
-
-    try {
-      submitRef.current = true
-      setSubmitting(true)
-
-      const response = await submitExamApi(exam.id, {
-        answers,
-        textAnswers,
-        fullscreenViolations,
-      })
-
-      localStorage.removeItem(draftKey)
-
-      toast.success('Đã nộp bài thi')
-
-      await exitFullscreen()
-
-      navigate(`/exam/${exam.id}/result`, {
-        state: {
-          role,
-          submitted: true,
-          result: response.data?.result || response.data,
-        },
-      })
-    } catch (error) {
-      console.error(error)
-
-      toast.error(
-        error?.response?.data?.message ||
-          error.message ||
-          'Không thể nộp bài thi',
-      )
-
-      submitRef.current = false
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const submittedRef = useRef(false)
 
   useEffect(() => {
     const loadExam = async () => {
+      if (!examId) {
+        setLoading(false)
+        toast.error('Không tìm thấy mã đề thi trên URL')
+        return
+      }
+
       try {
         setLoading(true)
 
-        const response = await getExamDetailApi(id)
-        const examData = response.data?.exam ?? null
+        const response = await getExamDetailApi(examId)
+        const loadedExam = response.data?.exam
 
-        setExam(examData)
-
-        const defaultTimeLeft = Number(examData?.duration || 45) * 60
-        setTimeLeft(defaultTimeLeft)
-
-        const savedDraft = localStorage.getItem(draftKey)
-
-        if (savedDraft) {
-          const parsed = JSON.parse(savedDraft)
-
-          if (parsed?.examId === examData?.id) {
-            setAnswers(parsed.answers || {})
-            setTextAnswers(parsed.textAnswers || {})
-
-            if (Number(parsed.timeLeft) > 0) {
-              setTimeLeft(Number(parsed.timeLeft))
-            }
-
-            setFullscreenViolations(Number(parsed.fullscreenViolations || 0))
-
-            toast.success('Đã khôi phục bài làm đang lưu')
-          }
+        if (!loadedExam) {
+          toast.error('Không tìm thấy đề thi')
+          return
         }
+
+        setExam(loadedExam)
+        setTimeLeft(Number(loadedExam.duration || 45) * 60)
       } catch (error) {
         console.error(error)
-
         toast.error(
           error?.response?.data?.message ||
             error.message ||
-            'Không thể tải bài thi',
+            'Không thể tải đề thi',
         )
-
-        navigate('/exams')
       } finally {
         setLoading(false)
       }
     }
 
     loadExam()
-  }, [id, navigate, draftKey])
+  }, [examId])
+
+  const startExam = async () => {
+    try {
+      if (!preview && !isTeacher && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen()
+      }
+
+      setHasStarted(true)
+    } catch (error) {
+      console.error(error)
+      toast.error('Bạn cần cho phép toàn màn hình để bắt đầu làm bài')
+    }
+  }
+
+  const handleAnswer = (questionId, answerIndex) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: answerIndex,
+    }))
+  }
+
+  const handleTrueFalseAnswer = (questionId, answerIndex, value) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...(prev[questionId] || {}),
+        [answerIndex]: value,
+      },
+    }))
+  }
+
+  const handleTextAnswer = (questionId, value) => {
+    setTextAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }))
+  }
+
+  const normalizedTextAnswers = useMemo(() => {
+    const result = {}
+
+    Object.entries(textAnswers).forEach(([questionId, value]) => {
+      if (Array.isArray(value)) {
+        result[questionId] = value.filter(Boolean).join(' ').trim()
+      } else {
+        result[questionId] = String(value || '').trim()
+      }
+    })
+
+    return result
+  }, [textAnswers])
+
+  const answeredCount = useMemo(() => {
+    let count = 0
+
+    exam?.questions?.forEach((question) => {
+      if (question.type === 'short-answer') {
+        const value = textAnswers[question.id]
+
+        if (Array.isArray(value)) {
+          if (value.some((item) => String(item || '').trim())) count += 1
+        } else if (String(value || '').trim()) {
+          count += 1
+        }
+
+        return
+      }
+
+      if (question.type === 'truefalse') {
+        const value = answers[question.id]
+
+        if (value && Object.keys(value).length > 0) count += 1
+        return
+      }
+
+      if (answers[question.id] !== undefined && answers[question.id] !== null) {
+        count += 1
+      }
+    })
+
+    return count
+  }, [answers, textAnswers, exam])
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(Number(seconds || 0) / 60)
+    const secs = Number(seconds || 0) % 60
+
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
+
+  const handleSubmit = useCallback(
+    async (autoSubmit = false) => {
+      if (submittedRef.current || !exam) return
+
+      submittedRef.current = true
+
+      try {
+        setSubmitting(true)
+
+        if (!preview && !isTeacher) {
+          await submitExamApi(exam.id, {
+            answers,
+            textAnswers: normalizedTextAnswers,
+            fullscreenViolations: violations,
+          })
+        }
+
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {})
+        }
+
+        navigate(`/exam/${exam.id}/result`, {
+          state: {
+            exam,
+            answers,
+            textAnswers: normalizedTextAnswers,
+            autoSubmit,
+            violations,
+          },
+        })
+      } catch (error) {
+        submittedRef.current = false
+        console.error(error)
+
+        toast.error(
+          error?.response?.data?.message ||
+            error.message ||
+            'Không thể nộp bài',
+        )
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [
+      exam,
+      preview,
+      isTeacher,
+      answers,
+      normalizedTextAnswers,
+      violations,
+      navigate,
+    ],
+  )
 
   useEffect(() => {
-    if (!exam?.id || !role || loading) return undefined
-    if (isTeacher || preview) return undefined
+    if (!exam || preview || isTeacher || !hasStarted) return
 
-    const enterFullscreen = async () => {
-      try {
-        await requestFullscreen()
-      } catch (error) {
-        console.warn('Không thể bật toàn màn hình:', error)
-        setFullscreenWarning(true)
-      }
-    }
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          handleSubmit(true)
+          return 0
+        }
 
-    enterFullscreen()
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [exam, preview, isTeacher, hasStarted, handleSubmit])
+
+  useEffect(() => {
+    if (!exam || preview || isTeacher || !hasStarted) return
 
     const handleFullscreenChange = () => {
-      const isFullscreen = Boolean(document.fullscreenElement)
+      if (document.fullscreenElement) return
 
-      setFullscreenWarning(!isFullscreen)
+      setViolations((prev) => {
+        const next = prev + 1
+        const max = Number(exam.maxFullscreenViolations ?? 2)
 
-      if (!isFullscreen) {
-        setFullscreenViolations((prev) => {
-          const next = prev + 1
+        toast.error(`Bạn đã thoát toàn màn hình (${next}/${max})`)
 
-          saveDraftNow(answers, textAnswers, timeLeft, next)
+        if (next >= max) {
+          handleSubmit(true)
+        }
 
-          toast.error(
-            `Bạn đã thoát toàn màn hình (${next}/${maxFullscreenViolations})`,
-          )
-
-          if (next >= maxFullscreenViolations) {
-            toast.error('Đã vượt quá số lần cho phép. Hệ thống sẽ tự động nộp bài.')
-
-            setTimeout(() => {
-              handleSubmit()
-            }, 1200)
-          }
-
-          return next
-        })
-      }
+        return next
+      })
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
@@ -208,151 +254,29 @@ export default function useExamRoom() {
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [
-    exam?.id,
-    role,
-    loading,
-    isTeacher,
-    preview,
-    maxFullscreenViolations,
-    answers,
-    textAnswers,
-    timeLeft,
-  ])
-
-  useEffect(() => {
-    if (loading || !exam || submitting || isTeacher || preview) return undefined
-
-    const handleBeforeUnload = (event) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-
-    const handlePopState = () => {
-      window.history.pushState(null, '', window.location.href)
-      setLeaveWarningOpen(true)
-    }
-
-    window.history.pushState(null, '', window.location.href)
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('popstate', handlePopState)
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('popstate', handlePopState)
-    }
-  }, [loading, exam, submitting, isTeacher, preview])
-
-  useEffect(() => {
-    if (loading || !exam || submitting || isTeacher || preview) return undefined
-
-    if (timeLeft <= 0) {
-      handleSubmit()
-      return undefined
-    }
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev - 1
-        return next
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [timeLeft, loading, exam, submitting, isTeacher, preview])
-
-  useEffect(() => {
-    if (loading || !exam || submitting || isTeacher || preview) return undefined
-
-    const interval = setInterval(() => {
-      saveDraftNow()
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [
-    draftKey,
-    loading,
-    exam,
-    answers,
-    textAnswers,
-    timeLeft,
-    fullscreenViolations,
-    submitting,
-    isTeacher,
-    preview,
-  ])
-
-  const questionCount = useMemo(() => exam?.questions?.length ?? 0, [exam])
-
-  const answeredCount = useMemo(() => {
-    if (!exam?.questions?.length) return 0
-
-    return exam.questions.filter((question) => {
-      if (question.type === 'essay' || question.type === 'code') {
-        return Boolean(textAnswers[question.id]?.trim())
-      }
-
-      return answers[question.id] !== undefined
-    }).length
-  }, [exam, answers, textAnswers])
-
-  const handleAnswer = (questionId, answerIndex) => {
-    setAnswers((prev) => {
-      const next = {
-        ...prev,
-        [questionId]: answerIndex,
-      }
-
-      saveDraftNow(next, textAnswers)
-
-      return next
-    })
-  }
-
-  const handleTextAnswer = (questionId, value) => {
-    setTextAnswers((prev) => {
-      const next = {
-        ...prev,
-        [questionId]: value,
-      }
-
-      saveDraftNow(answers, next)
-
-      return next
-    })
-  }
-
-  const retryFullscreen = async () => {
-    try {
-      await requestFullscreen()
-      setFullscreenWarning(false)
-    } catch (error) {
-      console.error(error)
-    }
-  }
+  }, [exam, preview, isTeacher, hasStarted, handleSubmit])
 
   return {
-    dark,
-    role,
-    preview,
-    loading,
     exam,
+    loading,
+    submitting,
+    preview,
+    isTeacher,
+    hasStarted,
+
     answers,
     textAnswers,
-    submitting,
+
     timeLeft,
-    fullscreenWarning,
-    fullscreenViolations,
-    leaveWarningOpen,
-    setLeaveWarningOpen,
-    isTeacher,
-    maxFullscreenViolations,
-    questionCount,
+    violations,
     answeredCount,
+
+    formatTime,
+
+    startExam,
     handleAnswer,
+    handleTrueFalseAnswer,
     handleTextAnswer,
     handleSubmit,
-    retryFullscreen,
   }
 }

@@ -24,24 +24,26 @@ function TeacherExamRow({
   onDelete,
 }) {
   const questionCount = Number(exam.questionCount || exam.questions?.length || 0)
+  const totalScore = Number(exam.totalScore || 0)
 
-  const scorePerQuestion = questionCount > 0 ? (10 / questionCount).toFixed(1) : '0.0'
+  const statusText =
+    exam.availabilityStatus === 'published'
+      ? 'Hoạt động'
+      : exam.availabilityStatus === 'draft'
+        ? 'Chưa mở'
+        : 'Đã kết thúc'
 
-  const statusText = exam.availabilityStatus === 'published'
-    ? 'Hoạt động'
-    : exam.availabilityStatus === 'draft'
-      ? 'Chưa mở'
-      : 'Đã kết thúc'
+  const statusClass =
+    exam.availabilityStatus === 'published'
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+      : exam.availabilityStatus === 'draft'
+        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
+        : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200'
 
-  const statusClass = exam.availabilityStatus === 'published'
-    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
-    : exam.availabilityStatus === 'draft'
-      ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
-      : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200'
-
-  const privacyClass = exam.status === 'public'
-    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
-    : 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200'
+  const privacyClass =
+    exam.status === 'public'
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+      : 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200'
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/5">
@@ -105,7 +107,7 @@ function TeacherExamRow({
             type="button"
             onClick={() => onResults(exam)}
             className="rounded-xl p-2 text-violet-600 transition hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-500/10"
-            title="Thống kê"
+            title="Bài làm học sinh"
           >
             <BarChart3 className="h-5 w-5" />
           </button>
@@ -152,7 +154,7 @@ function TeacherExamRow({
 
           <div>
             <p className="text-3xl font-black text-emerald-600">
-              100
+              {totalScore.toFixed(1)}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
               Điểm tối đa
@@ -161,10 +163,10 @@ function TeacherExamRow({
 
           <div>
             <p className="text-3xl font-black text-violet-600">
-              {scorePerQuestion}
+              {totalScore.toFixed(1)}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Điểm/câu
+              Tổng cấu hình điểm
             </p>
           </div>
         </div>

@@ -13,7 +13,46 @@ from exams.exam_service import (
     get_exam_results,
 )
 
+from exams.word_parser import parse_docx_exam
+
 exam_bp = Blueprint("exam_bp", __name__, url_prefix="/api/exams")
+
+
+@exam_bp.post("/parse-word")
+@firebase_required
+def parse_word_exam_route():
+    try:
+        file = request.files.get("file")
+
+        if not file:
+            return jsonify({
+                "success": False,
+                "message": "Chưa có file Word",
+            }), 400
+
+        filename = file.filename or ""
+
+        if not filename.lower().endswith(".docx"):
+            return jsonify({
+                "success": False,
+                "message": "Chỉ hỗ trợ file .docx",
+            }), 400
+
+        data = parse_docx_exam(file.stream)
+
+        return jsonify({
+            "success": True,
+            "fileName": filename,
+            **data,
+        }), 200
+
+    except Exception as error:
+        print("PARSE WORD ERROR:", error)
+
+        return jsonify({
+            "success": False,
+            "message": str(error),
+        }), 400
 
 
 @exam_bp.get("")
