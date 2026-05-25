@@ -5,13 +5,22 @@ from exams.exam_scoring import calculate_exam_score
 db = firestore.client()
 
 
+def normalize_role(user):
+    return str(user.get("role", "")).strip().upper()
+
+
 def is_teacher_or_admin(user):
-    role = str(user.get("role", "")).strip()
-    return role in ["TEACHER", "Admin_Dev", "ADMIN_DEV"]
+    role = normalize_role(user)
+    return role in ["TEACHER", "ADMIN", "ADMIN_DEV", "ADMIN USER"]
+
+
+def is_admin(user):
+    role = normalize_role(user)
+    return role in ["ADMIN", "ADMIN_DEV", "ADMIN USER"]
 
 
 def is_student(user):
-    role = str(user.get("role", "")).strip()
+    role = normalize_role(user)
     return role == "STUDENT"
 
 
@@ -20,10 +29,36 @@ def get_user_class_name(user):
         user.get("className")
         or user.get("class")
         or user.get("lop")
-        or user.get("grade")
         or user.get("studentClass")
         or ""
     )
+
+
+def get_user_grade(user):
+    return str(
+        user.get("grade")
+        or user.get("khoi")
+        or user.get("gradeLevel")
+        or user.get("studentGrade")
+        or ""
+    ).strip()
+
+
+def normalize_class_name(value):
+    return str(value or "").replace(" ", "").strip().lower()
+
+
+def assert_exam_owner_or_admin(current_user, exam_data):
+    if is_admin(current_user):
+        return
+
+    teacher_id = exam_data.get("teacherId")
+    current_uid = current_user.get("uid")
+
+    if teacher_id and current_uid and teacher_id == current_uid:
+        return
+
+    raise Exception("Bạn không có quyền chỉnh sửa bài thi này")
 
 
 def serialize_firestore_value(value):
@@ -149,13 +184,27 @@ def get_latest_result_for_user(exam_id, user_id):
 
 def can_student_view_exam(current_user, exam_data):
     status = exam_data.get("status", "public")
-    selected_classes = exam_data.get("selectedClasses", [])
+    selected_classes = exam_data.get("selectedClasses", []) or []
+    selected_grades = exam_data.get("selectedGrades", []) or []
+
     student_class = get_user_class_name(current_user)
+    student_grade = get_user_grade(current_user)
 
-    is_public = status == "public"
-    is_assigned = student_class and student_class in selected_classes
+    if status == "public":
+        if selected_grades:
+            return student_grade in [str(item).strip() for item in selected_grades]
 
-    return is_public or is_assigned
+        return True
+
+    normalized_student_class = normalize_class_name(student_class)
+
+    return bool(
+        normalized_student_class
+        and any(
+            normalize_class_name(item) == normalized_student_class
+            for item in selected_classes
+        )
+    )
 
 
 def get_default_scoring():
@@ -268,7 +317,12 @@ def create_exam(current_user, payload):
         "studentResultCount": 0,
         "teacherId": current_user.get("uid"),
         "teacherEmail": current_user.get("email"),
-        "teacherName": current_user.get("name"),
+        "teacherName": (
+            current_user.get("name")
+            or current_user.get("displayName")
+            or current_user.get("fullName")
+            or current_user.get("email")
+        ),
         "createdAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }
@@ -306,6 +360,9 @@ def update_exam(current_user, exam_id, payload):
 
     if not exam_doc.exists:
         raise Exception("Không tìm thấy bài thi")
+
+    exam_data = exam_doc.to_dict() or {}
+    assert_exam_owner_or_admin(current_user, exam_data)
 
     questions = payload.pop("questions", None)
 
@@ -358,6 +415,9 @@ def delete_exam(current_user, exam_id):
 
     if not exam_doc.exists:
         raise Exception("Không tìm thấy bài thi")
+
+    exam_data = exam_doc.to_dict() or {}
+    assert_exam_owner_or_admin(current_user, exam_data)
 
     for sub_collection in ["questions", "results", "attempts"]:
         docs = exam_ref.collection(sub_collection).stream()
@@ -487,6 +547,9 @@ def get_exam_results(current_user, exam_id):
 
     if not exam_doc.exists:
         raise Exception("Không tìm thấy bài thi")
+
+    exam_data = exam_doc.to_dict() or {}
+    assert_exam_owner_or_admin(current_user, exam_data)
 
     results = get_exam_results_data(exam_id)
 
