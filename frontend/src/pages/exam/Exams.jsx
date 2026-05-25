@@ -209,13 +209,6 @@ function TeacherView(page) {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={page.openStatsModal}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-              >
-                Thống kê
-              </button>
-
-              <button
                 onClick={page.openCreateModal}
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
               >

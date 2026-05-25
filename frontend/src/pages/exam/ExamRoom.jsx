@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock3, Maximize2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, LockKeyhole, Maximize2 } from 'lucide-react'
 
 import useExamRoom from '../../hooks/useExamRoom'
 
@@ -10,6 +10,7 @@ function ExamRoom() {
     preview,
     isTeacher,
     hasStarted,
+    fullscreenBlocked,
 
     answers,
     textAnswers,
@@ -21,11 +22,14 @@ function ExamRoom() {
     formatTime,
 
     startExam,
+    restoreFullscreen,
     handleAnswer,
     handleTrueFalseAnswer,
     handleTextAnswer,
     handleSubmit,
   } = useExamRoom()
+
+  const lockedByFullscreen = fullscreenBlocked && !preview && !isTeacher
 
   if (loading) {
     return (
@@ -83,6 +87,35 @@ function ExamRoom() {
 
   return (
     <section className="min-h-screen bg-slate-100">
+      {lockedByFullscreen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[32px] border border-red-200 bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-red-600 text-white shadow-lg shadow-red-500/25">
+              <LockKeyhole className="h-10 w-10" />
+            </div>
+
+            <h2 className="mt-6 text-3xl font-black text-slate-950">
+              Bạn đã thoát toàn màn hình
+            </h2>
+
+            <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
+              Hệ thống đã ghi nhận vi phạm. Bạn phải quay lại toàn màn hình mới được tiếp tục làm bài.
+            </p>
+
+            <div className="mt-6 rounded-2xl bg-red-50 p-4 text-sm font-black text-red-700">
+              Vi phạm: {violations}/{exam.maxFullscreenViolations ?? 2}
+            </div>
+
+            <button
+              type="button"
+              onClick={restoreFullscreen}
+              className="mt-7 w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700"
+            >
+              Quay lại toàn màn hình
+            </button>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
           <div>
@@ -117,7 +150,7 @@ function ExamRoom() {
             {!preview && !isTeacher && (
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || lockedByFullscreen}
                 onClick={() => handleSubmit(false)}
                 className="rounded-2xl bg-emerald-600 px-7 py-3 text-base font-black text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -170,7 +203,7 @@ function ExamRoom() {
 
                             <button
                               type="button"
-                              disabled={preview || isTeacher}
+                              disabled={preview || isTeacher || lockedByFullscreen}
                               onClick={() =>
                                 handleTrueFalseAnswer(question.id, answerIndex, true)
                               }
@@ -185,7 +218,7 @@ function ExamRoom() {
 
                             <button
                               type="button"
-                              disabled={preview || isTeacher}
+                              disabled={preview || isTeacher || lockedByFullscreen}
                               onClick={() =>
                                 handleTrueFalseAnswer(question.id, answerIndex, false)
                               }
@@ -212,7 +245,7 @@ function ExamRoom() {
                           <input
                             key={item}
                             value={currentValue[item] || ''}
-                            disabled={preview || isTeacher}
+                            disabled={preview || isTeacher || lockedByFullscreen}
                             onChange={(event) => {
                               const nextValue = [...currentValue]
                               nextValue[item] = event.target.value
@@ -227,7 +260,7 @@ function ExamRoom() {
                   ) : question.type === 'essay' || question.type === 'code' ? (
                     <div className="mt-8">
                       <textarea
-                        disabled={preview || isTeacher}
+                        disabled={preview || isTeacher || lockedByFullscreen}
                         value={textAnswers[question.id] || ''}
                         onChange={(event) =>
                           handleTextAnswer(question.id, event.target.value)
@@ -246,7 +279,7 @@ function ExamRoom() {
                           <button
                             key={answer.id ?? answerIndex}
                             type="button"
-                            disabled={preview || isTeacher}
+                            disabled={preview || isTeacher || lockedByFullscreen}
                             onClick={() => handleAnswer(question.id, answerIndex)}
                             className={`flex w-full items-center gap-5 rounded-3xl border px-6 py-5 text-left transition ${
                               selected

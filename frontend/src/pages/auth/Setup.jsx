@@ -7,13 +7,13 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const teacherSubjects = [
   "Toán",
-  "Vật lý",
+  "Vật lí",
   "Hóa học",
   "Sinh học",
   "Tin học",
   "Ngữ văn",
   "Lịch sử",
-  "Địa lý",
+  "Địa lí",
   "Tiếng Anh",
   "Công nghệ",
   "Quốc phòng - An ninh",
@@ -59,6 +59,17 @@ const provinces = [
   "Tuyên Quang",
   "Vĩnh Long",
 ];
+
+const gradeOptions = [
+  { value: "10", label: "Khối 10" },
+  { value: "11", label: "Khối 11" },
+  { value: "12", label: "Khối 12" },
+];
+
+const normalizeGrade = (value = "") => {
+  const match = String(value).match(/10|11|12/);
+  return match ? match[0] : "";
+};
 
 function Setup() {
   const [step, setStep] = useState(1);
@@ -123,6 +134,9 @@ function Setup() {
         return;
       }
 
+      const normalizedGrade = role === "STUDENT" ? normalizeGrade(grade) : "";
+      const studentClassName = normalizedGrade ? `Khối ${normalizedGrade}` : "";
+
       await setDoc(
         doc(db, "users", user.uid),
         {
@@ -131,19 +145,31 @@ function Setup() {
           photoURL: user.photoURL || "",
           avatar: user.photoURL || "",
           role,
-          fullName,
-          name: fullName,
-          school,
-          grade: role === "STUDENT" ? grade : "",
-          className: "",
+          fullName: fullName.trim(),
+          name: fullName.trim(),
+          school: school.trim(),
+
+          // Quan trọng: useExams.jsx đang đọc các field này để lọc bài thi theo khối.
+          grade: normalizedGrade,
+          khoi: normalizedGrade,
+          gradeLevel: normalizedGrade,
+          studentGrade: normalizedGrade,
+
+          // Giữ dữ liệu lớp để không lỗi khi các màn khác đọc className / classes.
+          className: role === "STUDENT" ? studentClassName : "",
+          studentClass: role === "STUDENT" ? studentClassName : "",
+          classes: role === "STUDENT" && studentClassName ? [studentClassName] : [],
+
           subject: role === "TEACHER" ? subject : "",
+          teacherSubject: role === "TEACHER" ? subject : "",
           phone,
-          facebook,
+          facebook: facebook.trim(),
           city,
-          address,
+          address: address.trim(),
           points: 0,
           learningStreak: 0,
           isSetupComplete: true,
+          updatedAt: new Date().toISOString(),
           createdAt: new Date().toISOString(),
         },
         { merge: true }
@@ -337,9 +363,11 @@ function Setup() {
                   className={selectClass}
                 >
                   <option value="">Chọn khối</option>
-                  <option value="10">Khối 10</option>
-                  <option value="11">Khối 11</option>
-                  <option value="12">Khối 12</option>
+                  {gradeOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
                 </select>
               )}
 

@@ -110,6 +110,7 @@ export default function Profile() {
     phone: '',
     school: '',
     className: '',
+    grade: '',
     subject: '',
     city: '',
     learningStreak: 0,
@@ -205,8 +206,22 @@ export default function Profile() {
         bio: userDetails.bio || '',
         phone: userDetails.phone || '',
         school: userDetails.school || '',
-        className: userDetails.className || '',
-        subject: userDetails.subject || '',
+        className: userDetails.className || userDetails.class || userDetails.lop || userDetails.studentClass || '',
+        grade: String(
+          userDetails.grade ||
+            userDetails.khoi ||
+            userDetails.gradeLevel ||
+            userDetails.studentGrade ||
+            '',
+        ).trim(),
+        subject:
+          userDetails.subject ||
+          userDetails.teacherSubject ||
+          userDetails.major ||
+          userDetails.specialization ||
+          userDetails.chuyenMon ||
+          userDetails['chuyênMôn'] ||
+          '',
         city: userDetails.city || '',
         learningStreak: userDetails.learningStreak || 0,
         points: userDetails.points || 0,
@@ -270,6 +285,13 @@ export default function Profile() {
 
       const dataToSave = {
         ...profileData,
+        khoi: profileData.grade,
+        gradeLevel: profileData.grade,
+        studentGrade: profileData.grade,
+        teacherSubject: profileData.subject,
+        major: profileData.subject,
+        specialization: profileData.subject,
+        chuyenMon: profileData.subject,
       }
 
       const userRef = doc(db, 'users', user.uid)
@@ -796,22 +818,22 @@ export default function Profile() {
                 label={
                   isTeacher
                     ? 'Chuyên môn'
-                    : 'Lớp'
+                    : 'Khối'
                 }
                 value={
                   isTeacher
                     ? profileData.subject
-                    : profileData.className
+                    : profileData.grade
                 }
                 name={
                   isTeacher
                     ? 'subject'
-                    : 'className'
+                    : 'grade'
                 }
                 isEditing={isEditing}
                 onChange={handleChange}
                 theme={theme}
-                readOnly={isTeacher}
+                readOnly={false}
               />
 
             </div>

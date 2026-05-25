@@ -48,6 +48,8 @@ function ExamCard({
   const canRetake = attemptCount < maxAttempts
 
   const isDisabled = !canRetake
+  const teacherCode = exam.teacherCode || String(exam.code || '').split('_')[0] || 'GV'
+  const shouldShowExamCode = exam.status === 'public' && exam.code
 
   const examLinkState = {
     role,
@@ -109,6 +111,18 @@ function ExamCard({
           <Clock3 className="h-4 w-4" />
           Còn {attemptCount}/{maxAttempts} lượt làm
         </p>
+
+        <p className="flex items-center gap-2">
+          <FileText className="h-4 w-4" />
+          Mã GV: {teacherCode}
+        </p>
+
+        {shouldShowExamCode ? (
+          <p className="flex items-center gap-2 font-black text-blue-600 dark:text-blue-200">
+            <FileText className="h-4 w-4" />
+            Mã đề: {exam.code}
+          </p>
+        ) : null}
       </div>
 
       {hasResult ? (
