@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { doc, getDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 
 import { auth, db } from '../components/firebase'
 import useSyncedDarkMode from './useSyncedDarkMode'
@@ -19,6 +19,8 @@ import {
   normalizeSubject,
   subjectCodes,
   getExamCode,
+  getTeacherNameAbbreviation,
+  canManageExams,
 } from '../utils/examHelpers'
 
 export default function useExams() {
@@ -31,6 +33,7 @@ export default function useExams() {
   const [teacherName, setTeacherName] = useState('GiaoVien')
 
   const [studentClass, setStudentClass] = useState('')
+  const [studentGrade, setStudentGrade] = useState('')
   const [studentClasses, setStudentClasses] = useState([])
   const [classes, setClasses] = useState([])
 
@@ -107,11 +110,20 @@ export default function useExams() {
           'Toán'
         setTeacherSubject(normalizeSubject(fixedTeacherSubject))
 
+        const userGrade = String(
+          userData.grade ||
+            userData.khoi ||
+            userData.gradeLevel ||
+            userData.studentGrade ||
+            '',
+        ).trim()
+
+        setStudentGrade(userGrade)
+
         const userClass = String(
           userData.className ||
             userData.class ||
             userData.lop ||
-            userData.grade ||
             userData.studentClass ||
             '',
         ).trim()
@@ -122,8 +134,32 @@ export default function useExams() {
         }
 
         const userClasses = userData.classes || userData.classList || userData.managedClasses || []
-        if (Array.isArray(userClasses)) {
+
+        if (Array.isArray(userClasses) && userClasses.length) {
           setClasses(userClasses.filter(Boolean))
+        }
+
+        try {
+          const classesSnap = await getDocs(collection(db, 'classes'))
+          const classList = classesSnap.docs
+            .map((classDoc) => {
+              const classData = classDoc.data() || {}
+
+              return (
+                classData.name ||
+                classData.className ||
+                classData.title ||
+                classData.code ||
+                classDoc.id
+              )
+            })
+            .filter(Boolean)
+
+          if (classList.length) {
+            setClasses(Array.from(new Set(classList)))
+          }
+        } catch (classesError) {
+          console.warn('Không thể tải dữ liệu Classes:', classesError)
         }
       } catch (error) {
         console.error(error)
@@ -142,6 +178,51 @@ export default function useExams() {
     }
   }, [roleLoading])
 
+  const getExamOwnerId = (exam = {}) =>
+    String(
+      exam.teacherId ||
+        exam.createdBy ||
+        exam.createdByUid ||
+        exam.ownerId ||
+        exam.userId ||
+        '',
+    ).trim()
+
+  const getExamTeacherName = (exam = {}) =>
+    String(
+      exam.teacherName ||
+        exam.createdByName ||
+        exam.ownerName ||
+        exam.authorName ||
+        '',
+    ).trim()
+
+  const canEditExam = (exam = {}) => {
+    if (!canManageExams(role)) return false
+
+    const normalizedRole = String(role || '').trim().toUpperCase()
+    if (normalizedRole === 'ADMIN_DEV' || normalizedRole === 'ADMIN') return true
+
+    const ownerId = getExamOwnerId(exam)
+    if (ownerId && currentUserId) return ownerId === currentUserId
+
+    // Fallback for old exams created before teacherId was saved.
+    // This keeps the original teacher able to manage their old exams by matching teacher name/code.
+    const examTeacherName = getExamTeacherName(exam)
+    if (examTeacherName && teacherName) {
+      return examTeacherName.toLowerCase() === String(teacherName).trim().toLowerCase()
+    }
+
+    const teacherCode = getTeacherNameAbbreviation(teacherName)
+    const examTeacherCode = String(exam.teacherCode || '').trim()
+    if (examTeacherCode && teacherCode) return examTeacherCode === teacherCode
+
+    const examCodePrefix = String(exam.code || '').split('_')[0]
+    if (examCodePrefix && teacherCode) return examCodePrefix === teacherCode
+
+    return false
+  }
+
   const visibleExams = useMemo(() => {
     const now = new Date()
 
@@ -156,12 +237,23 @@ export default function useExams() {
         const totalScore = Number(exam.totalScore || 0)
         const scorePerQuestion = Number(exam.scorePerQuestion || 0)
 
+        const teacherCode = String(exam.teacherCode || String(exam.code || '').split('_')[0] || '').trim()
+        const ownerId = getExamOwnerId(exam)
+        const examTeacherName = getExamTeacherName(exam)
+
         return {
           ...exam,
+          teacherCode,
+          ownerId,
+          teacherName: exam.teacherName || examTeacherName,
+          canEdit: canEditExam(exam),
+          canDelete: canEditExam(exam),
           status: exam.status || 'public',
           questions: exam.questions ?? [],
           studentResults: exam.studentResults ?? [],
           attempts: exam.attempts ?? [],
+          selectedGrades: exam.selectedGrades ?? [],
+          selectedClasses: exam.selectedClasses ?? [],
           questionCount,
           totalScore,
           scorePerQuestion,
@@ -175,7 +267,14 @@ export default function useExams() {
         if (roleLoading) return false
 
         if (isStudentRole(role)) {
-          const isPublicExam = exam.status === 'public'
+          const normalizedStudentGrade = String(studentGrade || '').trim()
+          const selectedGrades = exam.selectedGrades ?? []
+
+          const isPublicExam =
+            exam.status === 'public' &&
+            selectedGrades.length > 0 &&
+            selectedGrades.map(String).includes(normalizedStudentGrade)
+
           const normalizedStudentClasses = studentClasses.map(normalizeClassName)
           const isAssignedPrivateExam =
             exam.status === 'private' &&
@@ -204,8 +303,11 @@ export default function useExams() {
   }, [
     exams,
     role,
+    currentUserId,
+    teacherName,
     roleLoading,
     studentClasses,
+    studentGrade,
     search,
     subjectFilter,
     privacyFilter,
@@ -229,14 +331,23 @@ export default function useExams() {
     const totalScore = Number(exam.totalScore || 0)
     const scorePerQuestion = Number(exam.scorePerQuestion || 0)
 
+    const fixedTeacherCode = getTeacherNameAbbreviation(teacherName)
+
     return {
       title: exam.title,
       subject: fixedExamSubject,
       subjectCode: fixedSubjectCode,
       code: getExamCode(teacherName, fixedExamSubject, exam.codeNumber),
+      teacherId: exam.teacherId || exam.createdBy || currentUserId,
+      createdBy: exam.createdBy || exam.teacherId || currentUserId,
+      ownerId: exam.ownerId || exam.teacherId || exam.createdBy || currentUserId,
+      teacherName,
+      createdByName: teacherName,
+      teacherCode: fixedTeacherCode,
       topic: exam.topic,
       status: exam.status,
       selectedClasses: exam.selectedClasses ?? [],
+      selectedGrades: exam.selectedGrades ?? [],
       attemptMode: exam.attemptMode,
       maxAttempts: Number(exam.maxAttempts || 1),
       duration: Number(exam.duration || 45),
@@ -257,6 +368,13 @@ export default function useExams() {
       const payload = normalizeExamPayload(exam)
 
       if (exam.id) {
+        const originalExam = exams.find((item) => item.id === exam.id) || exam
+
+        if (!canEditExam(originalExam)) {
+          toast.error('Bạn không có quyền chỉnh sửa đề thi của giáo viên khác')
+          return
+        }
+
         await updateExamApi(exam.id, payload)
         toast.success('Đã cập nhật bài thi')
       } else {
@@ -279,6 +397,14 @@ export default function useExams() {
 
   const deleteExam = async (examId) => {
     try {
+      const originalExam = exams.find((item) => item.id === examId)
+
+      if (originalExam && !canEditExam(originalExam)) {
+        toast.error('Bạn không có quyền xóa đề thi của giáo viên khác')
+        setDeleteConfirmExam(null)
+        return
+      }
+
       await deleteExamApi(examId)
       toast.success('Đã xóa đề thi')
       setDeleteConfirmExam(null)
@@ -325,6 +451,8 @@ export default function useExams() {
     teacherName,
     studentClass,
     setStudentClass,
+    studentGrade,
+    setStudentGrade,
     studentClasses,
     setStudentClasses,
     classes,
@@ -359,5 +487,6 @@ export default function useExams() {
     saveExam,
     deleteExam,
     duplicateExam,
+    canEditExam,
   }
 }

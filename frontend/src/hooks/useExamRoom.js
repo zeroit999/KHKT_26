@@ -24,6 +24,7 @@ export default function useExamRoom() {
   const [submitting, setSubmitting] = useState(false)
 
   const [hasStarted, setHasStarted] = useState(false)
+  const [fullscreenBlocked, setFullscreenBlocked] = useState(false)
 
   const [answers, setAnswers] = useState({})
   const [textAnswers, setTextAnswers] = useState({})
@@ -31,6 +32,11 @@ export default function useExamRoom() {
   const [violations, setViolations] = useState(0)
 
   const submittedRef = useRef(false)
+  const violationsRef = useRef(0)
+
+  useEffect(() => {
+    violationsRef.current = violations
+  }, [violations])
 
   useEffect(() => {
     const loadExam = async () => {
@@ -68,20 +74,55 @@ export default function useExamRoom() {
     loadExam()
   }, [examId])
 
-  const startExam = async () => {
+  const requestExamFullscreen = useCallback(async () => {
+    if (preview || isTeacher) return true
+
+    if (!document.fullscreenEnabled) {
+      toast.error('Trình duyệt không cho phép bật toàn màn hình')
+      return false
+    }
+
     try {
-      if (!preview && !isTeacher && document.documentElement.requestFullscreen) {
+      if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen()
       }
 
-      setHasStarted(true)
+      const success = Boolean(document.fullscreenElement)
+
+      if (!success) {
+        toast.error('Bạn cần cho phép toàn màn hình để làm bài')
+        return false
+      }
+
+      setFullscreenBlocked(false)
+      return true
     } catch (error) {
       console.error(error)
-      toast.error('Bạn cần cho phép toàn màn hình để bắt đầu làm bài')
+      toast.error('Bạn cần cho phép toàn màn hình để làm bài')
+      return false
+    }
+  }, [preview, isTeacher])
+
+  const startExam = async () => {
+    const canStart = await requestExamFullscreen()
+
+    if (!canStart) return
+
+    setHasStarted(true)
+  }
+
+  const restoreFullscreen = async () => {
+    const restored = await requestExamFullscreen()
+
+    if (restored) {
+      setFullscreenBlocked(false)
+      toast.success('Đã quay lại toàn màn hình')
     }
   }
 
   const handleAnswer = (questionId, answerIndex) => {
+    if (fullscreenBlocked && !preview && !isTeacher) return
+
     setAnswers((prev) => ({
       ...prev,
       [questionId]: answerIndex,
@@ -89,6 +130,8 @@ export default function useExamRoom() {
   }
 
   const handleTrueFalseAnswer = (questionId, answerIndex, value) => {
+    if (fullscreenBlocked && !preview && !isTeacher) return
+
     setAnswers((prev) => ({
       ...prev,
       [questionId]: {
@@ -99,6 +142,8 @@ export default function useExamRoom() {
   }
 
   const handleTextAnswer = (questionId, value) => {
+    if (fullscreenBlocked && !preview && !isTeacher) return
+
     setTextAnswers((prev) => ({
       ...prev,
       [questionId]: value,
@@ -158,10 +203,14 @@ export default function useExamRoom() {
   }
 
   const handleSubmit = useCallback(
-    async (autoSubmit = false) => {
+    async (autoSubmit = false, overrideViolations = null) => {
       if (submittedRef.current || !exam) return
 
       submittedRef.current = true
+
+      const submitViolations = Number(
+        overrideViolations ?? violationsRef.current ?? violations ?? 0,
+      )
 
       try {
         setSubmitting(true)
@@ -170,7 +219,7 @@ export default function useExamRoom() {
           await submitExamApi(exam.id, {
             answers,
             textAnswers: normalizedTextAnswers,
-            fullscreenViolations: violations,
+            fullscreenViolations: submitViolations,
           })
         }
 
@@ -184,7 +233,7 @@ export default function useExamRoom() {
             answers,
             textAnswers: normalizedTextAnswers,
             autoSubmit,
-            violations,
+            violations: submitViolations,
           },
         })
       } catch (error) {
@@ -230,19 +279,27 @@ export default function useExamRoom() {
   }, [exam, preview, isTeacher, hasStarted, handleSubmit])
 
   useEffect(() => {
-    if (!exam || preview || isTeacher || !hasStarted) return
+    if (!exam || preview || isTeacher || !hasStarted) return undefined
 
     const handleFullscreenChange = () => {
-      if (document.fullscreenElement) return
+      if (submittedRef.current) return
+
+      if (document.fullscreenElement) {
+        setFullscreenBlocked(false)
+        return
+      }
+
+      setFullscreenBlocked(true)
 
       setViolations((prev) => {
         const next = prev + 1
         const max = Number(exam.maxFullscreenViolations ?? 2)
 
+        violationsRef.current = next
         toast.error(`Bạn đã thoát toàn màn hình (${next}/${max})`)
 
         if (next >= max) {
-          handleSubmit(true)
+          setTimeout(() => handleSubmit(true, next), 0)
         }
 
         return next
@@ -256,6 +313,22 @@ export default function useExamRoom() {
     }
   }, [exam, preview, isTeacher, hasStarted, handleSubmit])
 
+  useEffect(() => {
+    if (!exam || preview || isTeacher || !hasStarted) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' || event.key === 'F11') {
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true)
+    }
+  }, [exam, preview, isTeacher, hasStarted])
+
   return {
     exam,
     loading,
@@ -263,6 +336,7 @@ export default function useExamRoom() {
     preview,
     isTeacher,
     hasStarted,
+    fullscreenBlocked,
 
     answers,
     textAnswers,
@@ -274,6 +348,7 @@ export default function useExamRoom() {
     formatTime,
 
     startExam,
+    restoreFullscreen,
     handleAnswer,
     handleTrueFalseAnswer,
     handleTextAnswer,

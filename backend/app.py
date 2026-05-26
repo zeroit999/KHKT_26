@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 from flask import Flask, jsonify, request
+=======
+import os
+
+from flask import Flask, jsonify
+>>>>>>> 5024c5e6eab2d6fbc983bf241bc243a9f220b170
 from flask_cors import CORS
 
 from auth.auth_routes import auth_bp
@@ -10,6 +16,7 @@ import tempfile
 from docx import Document
 from pypdf import PdfReader
 
+<<<<<<< HEAD
 
 DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
@@ -29,6 +36,38 @@ def get_allowed_origins():
     ]
 
     return allowed_origins or DEFAULT_ALLOWED_ORIGINS
+=======
+def get_allowed_origins():
+    origins = []
+
+    config_origins = getattr(Config, "ALLOWED_ORIGINS", []) or []
+    if isinstance(config_origins, str):
+        config_origins = config_origins.split(",")
+
+    origins.extend(config_origins)
+
+    env_origins = os.environ.get("ALLOWED_ORIGINS", "")
+    if env_origins:
+        origins.extend(env_origins.split(","))
+
+    cleaned = [origin.strip() for origin in origins if str(origin or "").strip()]
+
+    if cleaned:
+        return cleaned
+
+    return [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+
+def create_app():
+    app = Flask(__name__)
+
+    app.config["SECRET_KEY"] = getattr(Config, "SECRET_KEY", os.environ.get("SECRET_KEY", "change-me"))
+>>>>>>> 5024c5e6eab2d6fbc983bf241bc243a9f220b170
 
 
 def configure_cors(app):
@@ -167,6 +206,11 @@ app = create_app()
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
+<<<<<<< HEAD
         port=5000,
         debug=True,
+=======
+        port=int(os.environ.get("PORT", 5000)),
+        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+>>>>>>> 5024c5e6eab2d6fbc983bf241bc243a9f220b170
     )
