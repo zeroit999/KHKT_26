@@ -708,7 +708,7 @@ function CppNote() {
   )
 }
 
-function RatingStars({ selectedRating, ratingAverage, ratingCount,    , onRate }) {
+function RatingStars({ selectedRating, ratingAverage, ratingCount, onRate }) {
   return (
     <section className="relative mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-500 dark:text-amber-300">Đánh giá bài học</div>

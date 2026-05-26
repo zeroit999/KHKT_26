@@ -6,7 +6,7 @@ import {
   X,
 } from 'lucide-react'
 
-import useExamsPage from '../../hooks/useExamsPage'
+import useExamsPage from '../../hooks/exam/useExamsPage.js'
 
 import CreateExamModal from '../../components/exam/CreateExamModal.jsx'
 import StatsModal from '../../components/exam/StatsModal.jsx'

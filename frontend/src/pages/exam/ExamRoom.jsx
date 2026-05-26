@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3, LockKeyhole, Maximize2 } from 'lucide-react'
 
-import useExamRoom from '../../hooks/useExamRoom'
+import useExamRoom from '../../hooks/exam/useExamRoom'
 
 function ExamRoom() {
   const {

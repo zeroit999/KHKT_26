@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 
-import { auth, db } from '../components/firebase'
-import useSyncedDarkMode from './useSyncedDarkMode'
+import { auth, db } from '../../components/firebase'
+import useSyncedDarkMode from '../common/useSyncedDarkMode'
 
 import {
   createExamApi,
   deleteExamApi,
   getExamsApi,
   updateExamApi,
-} from '../api/examApi'
+} from '../../api/examApi'
 
 import {
   getDateTimeValue,
@@ -21,7 +21,7 @@ import {
   getExamCode,
   getTeacherNameAbbreviation,
   canManageExams,
-} from '../utils/examHelpers'
+} from '../../utils/examHelpers'
 
 export default function useExams() {
   const dark = useSyncedDarkMode()

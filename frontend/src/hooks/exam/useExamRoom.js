@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
-import { getExamDetailApi, submitExamApi } from '../api/examApi'
+import { getExamDetailApi, submitExamApi } from '../../api/examApi'
 
 export default function useExamRoom() {
   const navigate = useNavigate()

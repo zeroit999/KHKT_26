@@ -9,7 +9,7 @@ import {
   isStudentRole,
   normalizeSubject,
   teacherSubjects,
-} from '../utils/examHelpers'
+} from '../../utils/examHelpers'
 
 export default function useExamsPage() {
   const navigate = useNavigate()

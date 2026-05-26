@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore'
 
 import { db } from '../../components/firebase'
-import useSyncedDarkMode from '../../hooks/useSyncedDarkMode'
+import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode'
 
 const gradeTabs = [
   { value: 'all', label: 'Tất cả' },
