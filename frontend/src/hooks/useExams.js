@@ -19,9 +19,14 @@ import {
   normalizeSubject,
   subjectCodes,
   getExamCode,
-  getTeacherNameAbbreviation,
-  canManageExams,
 } from '../utils/examHelpers'
+
+const normalizeGradeValue = (value = '') => {
+  const text = String(value || '').trim()
+  const match = text.match(/\d+/)
+
+  return match ? match[0] : text
+}
 
 export default function useExams() {
   const dark = useSyncedDarkMode()
@@ -137,6 +142,9 @@ export default function useExams() {
 
         if (Array.isArray(userClasses) && userClasses.length) {
           setClasses(userClasses.filter(Boolean))
+          setStudentClasses((current) =>
+            current.length ? current : userClasses.filter(Boolean),
+          )
         }
 
         try {
@@ -178,51 +186,6 @@ export default function useExams() {
     }
   }, [roleLoading])
 
-  const getExamOwnerId = (exam = {}) =>
-    String(
-      exam.teacherId ||
-        exam.createdBy ||
-        exam.createdByUid ||
-        exam.ownerId ||
-        exam.userId ||
-        '',
-    ).trim()
-
-  const getExamTeacherName = (exam = {}) =>
-    String(
-      exam.teacherName ||
-        exam.createdByName ||
-        exam.ownerName ||
-        exam.authorName ||
-        '',
-    ).trim()
-
-  const canEditExam = (exam = {}) => {
-    if (!canManageExams(role)) return false
-
-    const normalizedRole = String(role || '').trim().toUpperCase()
-    if (normalizedRole === 'ADMIN_DEV' || normalizedRole === 'ADMIN') return true
-
-    const ownerId = getExamOwnerId(exam)
-    if (ownerId && currentUserId) return ownerId === currentUserId
-
-    // Fallback for old exams created before teacherId was saved.
-    // This keeps the original teacher able to manage their old exams by matching teacher name/code.
-    const examTeacherName = getExamTeacherName(exam)
-    if (examTeacherName && teacherName) {
-      return examTeacherName.toLowerCase() === String(teacherName).trim().toLowerCase()
-    }
-
-    const teacherCode = getTeacherNameAbbreviation(teacherName)
-    const examTeacherCode = String(exam.teacherCode || '').trim()
-    if (examTeacherCode && teacherCode) return examTeacherCode === teacherCode
-
-    const examCodePrefix = String(exam.code || '').split('_')[0]
-    if (examCodePrefix && teacherCode) return examCodePrefix === teacherCode
-
-    return false
-  }
-
   const visibleExams = useMemo(() => {
     const now = new Date()
 
@@ -237,17 +200,8 @@ export default function useExams() {
         const totalScore = Number(exam.totalScore || 0)
         const scorePerQuestion = Number(exam.scorePerQuestion || 0)
 
-        const teacherCode = String(exam.teacherCode || String(exam.code || '').split('_')[0] || '').trim()
-        const ownerId = getExamOwnerId(exam)
-        const examTeacherName = getExamTeacherName(exam)
-
         return {
           ...exam,
-          teacherCode,
-          ownerId,
-          teacherName: exam.teacherName || examTeacherName,
-          canEdit: canEditExam(exam),
-          canDelete: canEditExam(exam),
           status: exam.status || 'public',
           questions: exam.questions ?? [],
           studentResults: exam.studentResults ?? [],
@@ -267,13 +221,17 @@ export default function useExams() {
         if (roleLoading) return false
 
         if (isStudentRole(role)) {
-          const normalizedStudentGrade = String(studentGrade || '').trim()
+          const normalizedStudentGrade = normalizeGradeValue(
+            studentGrade || studentClass || studentClasses[0],
+          )
           const selectedGrades = exam.selectedGrades ?? []
 
           const isPublicExam =
             exam.status === 'public' &&
             selectedGrades.length > 0 &&
-            selectedGrades.map(String).includes(normalizedStudentGrade)
+            selectedGrades
+              .map(normalizeGradeValue)
+              .includes(normalizedStudentGrade)
 
           const normalizedStudentClasses = studentClasses.map(normalizeClassName)
           const isAssignedPrivateExam =
@@ -303,9 +261,8 @@ export default function useExams() {
   }, [
     exams,
     role,
-    currentUserId,
-    teacherName,
     roleLoading,
+    studentClass,
     studentClasses,
     studentGrade,
     search,
@@ -331,21 +288,17 @@ export default function useExams() {
     const totalScore = Number(exam.totalScore || 0)
     const scorePerQuestion = Number(exam.scorePerQuestion || 0)
 
-    const fixedTeacherCode = getTeacherNameAbbreviation(teacherName)
-
     return {
       title: exam.title,
       subject: fixedExamSubject,
       subjectCode: fixedSubjectCode,
       code: getExamCode(teacherName, fixedExamSubject, exam.codeNumber),
-      teacherId: exam.teacherId || exam.createdBy || currentUserId,
-      createdBy: exam.createdBy || exam.teacherId || currentUserId,
-      ownerId: exam.ownerId || exam.teacherId || exam.createdBy || currentUserId,
-      teacherName,
-      createdByName: teacherName,
-      teacherCode: fixedTeacherCode,
       topic: exam.topic,
       status: exam.status,
+      createdBy: exam.createdBy || currentUserId,
+      teacherId: exam.teacherId || currentUserId,
+      ownerId: exam.ownerId || currentUserId,
+      teacherName,
       selectedClasses: exam.selectedClasses ?? [],
       selectedGrades: exam.selectedGrades ?? [],
       attemptMode: exam.attemptMode,
@@ -357,6 +310,7 @@ export default function useExams() {
       shuffleAnswers: Boolean(exam.shuffleAnswers),
       totalScore,
       scorePerQuestion,
+      scoring: exam.scoring ?? {},
       wordFileName: exam.wordFileName ?? '',
       maxFullscreenViolations: Number(exam.maxFullscreenViolations ?? 2),
       questions,
@@ -368,13 +322,6 @@ export default function useExams() {
       const payload = normalizeExamPayload(exam)
 
       if (exam.id) {
-        const originalExam = exams.find((item) => item.id === exam.id) || exam
-
-        if (!canEditExam(originalExam)) {
-          toast.error('Bạn không có quyền chỉnh sửa đề thi của giáo viên khác')
-          return
-        }
-
         await updateExamApi(exam.id, payload)
         toast.success('Đã cập nhật bài thi')
       } else {
@@ -397,14 +344,6 @@ export default function useExams() {
 
   const deleteExam = async (examId) => {
     try {
-      const originalExam = exams.find((item) => item.id === examId)
-
-      if (originalExam && !canEditExam(originalExam)) {
-        toast.error('Bạn không có quyền xóa đề thi của giáo viên khác')
-        setDeleteConfirmExam(null)
-        return
-      }
-
       await deleteExamApi(examId)
       toast.success('Đã xóa đề thi')
       setDeleteConfirmExam(null)
@@ -487,6 +426,5 @@ export default function useExams() {
     saveExam,
     deleteExam,
     duplicateExam,
-    canEditExam,
   }
 }

@@ -24,43 +24,6 @@ def is_student(user):
     return role == "STUDENT"
 
 
-def get_user_class_name(user):
-    return (
-        user.get("className")
-        or user.get("class")
-        or user.get("lop")
-        or user.get("studentClass")
-        or ""
-    )
-
-
-def get_user_grade(user):
-    return str(
-        user.get("grade")
-        or user.get("khoi")
-        or user.get("gradeLevel")
-        or user.get("studentGrade")
-        or ""
-    ).strip()
-
-
-def normalize_class_name(value):
-    return str(value or "").replace(" ", "").strip().lower()
-
-
-def assert_exam_owner_or_admin(current_user, exam_data):
-    if is_admin(current_user):
-        return
-
-    teacher_id = exam_data.get("teacherId")
-    current_uid = current_user.get("uid")
-
-    if teacher_id and current_uid and teacher_id == current_uid:
-        return
-
-    raise Exception("Bạn không có quyền chỉnh sửa bài thi này")
-
-
 def serialize_firestore_value(value):
     if hasattr(value, "isoformat"):
         return value.isoformat()
@@ -85,6 +48,88 @@ def serialize_doc_data(data):
             result[key] = serialize_firestore_value(value)
 
     return result
+
+
+def hydrate_current_user(current_user):
+    """
+    request.current_user lấy từ Firebase token chỉ có uid/email/name/role.
+    Học sinh cần thêm grade/className từ Firestore users/{uid}
+    để backend lọc đề công khai theo khối/lớp.
+    """
+
+    uid = current_user.get("uid")
+
+    if not uid:
+        return current_user
+
+    try:
+        user_doc = db.collection("users").document(uid).get()
+
+        if not user_doc.exists:
+            return current_user
+
+        user_data = serialize_doc_data(user_doc.to_dict() or {})
+
+        return {
+            **user_data,
+            **current_user,
+            "grade": current_user.get("grade") or user_data.get("grade"),
+            "khoi": current_user.get("khoi") or user_data.get("khoi"),
+            "gradeLevel": current_user.get("gradeLevel") or user_data.get("gradeLevel"),
+            "studentGrade": current_user.get("studentGrade") or user_data.get("studentGrade"),
+            "className": current_user.get("className") or user_data.get("className"),
+            "class": current_user.get("class") or user_data.get("class"),
+            "lop": current_user.get("lop") or user_data.get("lop"),
+            "studentClass": current_user.get("studentClass") or user_data.get("studentClass"),
+        }
+
+    except Exception as error:
+        print("HYDRATE CURRENT USER ERROR:", error)
+        return current_user
+
+
+def get_user_class_name(user):
+    return (
+        user.get("className")
+        or user.get("class")
+        or user.get("lop")
+        or user.get("studentClass")
+        or ""
+    )
+
+
+def get_user_grade(user):
+    return str(
+        user.get("grade")
+        or user.get("khoi")
+        or user.get("gradeLevel")
+        or user.get("studentGrade")
+        or ""
+    ).strip()
+
+
+def normalize_grade_value(value):
+    text = str(value or "").strip()
+    digits = "".join(char for char in text if char.isdigit())
+
+    return digits or text
+
+
+def normalize_class_name(value):
+    return str(value or "").replace(" ", "").strip().lower()
+
+
+def assert_exam_owner_or_admin(current_user, exam_data):
+    if is_admin(current_user):
+        return
+
+    teacher_id = exam_data.get("teacherId")
+    current_uid = current_user.get("uid")
+
+    if teacher_id and current_uid and teacher_id == current_uid:
+        return
+
+    raise Exception("Bạn không có quyền chỉnh sửa bài thi này")
 
 
 def get_question_count(exam_id):
@@ -183,28 +228,52 @@ def get_latest_result_for_user(exam_id, user_id):
 
 
 def can_student_view_exam(current_user, exam_data):
-    status = exam_data.get("status", "public")
-    selected_classes = exam_data.get("selectedClasses", []) or []
-    selected_grades = exam_data.get("selectedGrades", []) or []
+    status = str(exam_data.get("status", "public")).strip().lower()
+
+    selected_classes = (
+        exam_data.get("selectedClasses")
+        or exam_data.get("targetClasses")
+        or []
+    )
+
+    selected_grades = (
+        exam_data.get("selectedGrades")
+        or exam_data.get("targetGrades")
+        or []
+    )
 
     student_class = get_user_class_name(current_user)
     student_grade = get_user_grade(current_user)
 
+    normalized_student_class = normalize_class_name(student_class)
+    normalized_student_grade = normalize_grade_value(student_grade or student_class)
+
+    normalized_selected_classes = [
+        normalize_class_name(item)
+        for item in selected_classes
+        if item is not None
+    ]
+
+    normalized_selected_grades = [
+        normalize_grade_value(item)
+        for item in selected_grades
+        if item is not None
+    ]
+
     if status == "public":
-        if selected_grades:
-            return student_grade in [str(item).strip() for item in selected_grades]
+        if normalized_selected_grades:
+            if normalized_student_grade not in normalized_selected_grades:
+                return False
+
+        if normalized_selected_classes:
+            return normalized_student_class in normalized_selected_classes
 
         return True
 
-    normalized_student_class = normalize_class_name(student_class)
+    if normalized_selected_classes:
+        return normalized_student_class in normalized_selected_classes
 
-    return bool(
-        normalized_student_class
-        and any(
-            normalize_class_name(item) == normalized_student_class
-            for item in selected_classes
-        )
-    )
+    return False
 
 
 def get_default_scoring():
@@ -253,6 +322,8 @@ def build_exam_summary(current_user, exam_id, exam_data):
 
 
 def get_exams(current_user):
+    current_user = hydrate_current_user(current_user)
+
     role = current_user.get("role")
     exam_docs = db.collection("exams").stream()
     exams = []
@@ -278,6 +349,8 @@ def get_exams(current_user):
 
 
 def get_exam_detail(current_user, exam_id):
+    current_user = hydrate_current_user(current_user)
+
     exam_ref = db.collection("exams").document(exam_id)
     exam_doc = exam_ref.get()
 
@@ -438,6 +511,8 @@ def delete_exam(current_user, exam_id):
 
 
 def submit_exam(current_user, exam_id, payload):
+    current_user = hydrate_current_user(current_user)
+
     if not is_student(current_user):
         raise Exception("Chỉ học sinh mới được nộp bài thi")
 
