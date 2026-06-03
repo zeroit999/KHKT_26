@@ -25,10 +25,6 @@ function TeacherExamRow({
 }) {
   const questionCount = Number(exam.questionCount || exam.questions?.length || 0)
   const totalScore = Number(exam.totalScore || 0)
-  const canEdit = Boolean(exam.canEdit)
-  const canDelete = Boolean(exam.canDelete)
-  const teacherCode = exam.teacherCode || String(exam.code || '').split('_')[0] || 'GV'
-  const shouldShowExamCode = exam.status === 'public' && exam.code
 
   const statusText =
     exam.availabilityStatus === 'published'
@@ -70,22 +66,6 @@ function TeacherExamRow({
               )}
               {exam.status === 'public' ? 'Công khai' : 'Riêng tư'}
             </span>
-
-            {shouldShowExamCode ? (
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">
-                Mã đề: {exam.code}
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                Mã đề: Ẩn với đề riêng tư
-              </span>
-            )}
-
-            {!canEdit && (
-              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700 dark:bg-red-500/20 dark:text-red-200">
-                Chỉ xem - không phải đề của bạn
-              </span>
-            )}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-slate-500 dark:text-slate-300">
@@ -143,28 +123,18 @@ function TeacherExamRow({
 
           <button
             type="button"
-            disabled={!canEdit}
             onClick={() => onEdit(exam)}
-            className={`rounded-xl p-2 transition ${
-              canEdit
-                ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10'
-                : 'cursor-not-allowed text-slate-300 dark:text-slate-600'
-            }`}
-            title={canEdit ? 'Sửa' : 'Bạn không thể sửa đề thi của giáo viên khác'}
+            className="rounded-xl p-2 text-blue-600 transition hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10"
+            title="Sửa"
           >
             <Edit3 className="h-5 w-5" />
           </button>
 
           <button
             type="button"
-            disabled={!canDelete}
             onClick={() => onDelete(exam)}
-            className={`rounded-xl p-2 transition ${
-              canDelete
-                ? 'text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10'
-                : 'cursor-not-allowed text-slate-300 dark:text-slate-600'
-            }`}
-            title={canDelete ? 'Xóa' : 'Bạn không thể xóa đề thi của giáo viên khác'}
+            className="rounded-xl p-2 text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+            title="Xóa"
           >
             <Trash2 className="h-5 w-5" />
           </button>

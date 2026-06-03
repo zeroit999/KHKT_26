@@ -16,6 +16,9 @@ class Config:
     if not os.path.isabs(FIREBASE_ADMIN_KEY_PATH):
         FIREBASE_ADMIN_KEY_PATH = os.path.join(BASE_DIR, FIREBASE_ADMIN_KEY_PATH)
 
+    # Dùng khi deploy Render/Vercel/Railway: copy toàn bộ nội dung firebase-admin-key.json vào ENV này
+    FIREBASE_SERVICE_ACCOUNT = os.getenv("FIREBASE_SERVICE_ACCOUNT", "")
+
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev_jwt_secret_key")
     JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 1800))
     JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", 2592000))

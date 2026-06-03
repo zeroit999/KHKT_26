@@ -4,6 +4,7 @@ import { Clock3, FileText, Globe2, LockKeyhole } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import useExams from './useExams'
+import { getExamDetailApi } from '../api/examApi'
 import {
   canManageExams,
   isStudentRole,
@@ -28,7 +29,6 @@ export default function useExamsPage() {
     setDeleteConfirmExam,
     deleteConfirmExam,
     deleteExam,
-    canEditExam,
   } = state
 
   const isStudent = isStudentRole(role)
@@ -191,17 +191,12 @@ export default function useExamsPage() {
       ? Math.max(1, Number(exam.maxAttempts || 1))
       : 1
 
-  const getExamAudienceText = (exam) => {
-    if (exam.status === 'public') {
-      return exam.selectedGrades?.length
-        ? `Công khai cho khối ${exam.selectedGrades.join(', ')}`
-        : 'Công khai nhưng chưa chọn khối'
-    }
-
-    return exam.selectedClasses?.length
-      ? exam.selectedClasses.join(', ')
-      : 'Chưa chọn lớp'
-  }
+  const getExamAudienceText = (exam) =>
+    exam.status === 'public'
+      ? 'Công khai cho tất cả học sinh'
+      : exam.selectedClasses?.length
+        ? exam.selectedClasses.join(', ')
+        : 'Chưa chọn lớp'
 
   const handleOutOfAttempts = () => {
     toast.error('Bạn đã hết số lượt làm bài thi này')
@@ -212,14 +207,21 @@ export default function useExamsPage() {
     setCreateOpen(true)
   }
 
-  const openEditModal = (exam) => {
-    if (!canEditExam?.(exam)) {
-      toast.error('Bạn không có quyền chỉnh sửa đề thi của giáo viên khác')
-      return
-    }
+  const openEditModal = async (exam) => {
+    try {
+      const response = await getExamDetailApi(exam.id)
+      const fullExam = response.data?.exam ?? exam
 
-    setEditingExam(exam)
-    setCreateOpen(true)
+      setEditingExam(fullExam)
+      setCreateOpen(true)
+    } catch (error) {
+      console.error(error)
+      toast.error(
+        error?.response?.data?.message ||
+          error.message ||
+          'Không thể tải chi tiết đề thi',
+      )
+    }
   }
 
   const closeCreateModal = () => {
@@ -233,13 +235,6 @@ export default function useExamsPage() {
 
   const confirmDeleteExam = () => {
     if (!deleteConfirmExam?.id) return
-
-    if (!canEditExam?.(deleteConfirmExam)) {
-      toast.error('Bạn không có quyền xóa đề thi của giáo viên khác')
-      setDeleteConfirmExam(null)
-      return
-    }
-
     deleteExam(deleteConfirmExam.id)
   }
 

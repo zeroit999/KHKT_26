@@ -1,4 +1,5 @@
 import jwt
+import json
 import datetime
 import logging
 from functools import wraps
@@ -30,9 +31,20 @@ except ImportError:
 # =========================
 
 if not firebase_admin._apps:
-    cred = credentials.Certificate(
-        Config.FIREBASE_ADMIN_KEY_PATH
-    )
+
+    if Config.FIREBASE_SERVICE_ACCOUNT:
+        cred_dict = json.loads(
+            Config.FIREBASE_SERVICE_ACCOUNT
+        )
+
+        cred = credentials.Certificate(
+            cred_dict
+        )
+
+    else:
+        cred = credentials.Certificate(
+            Config.FIREBASE_ADMIN_KEY_PATH
+        )
 
     firebase_admin.initialize_app(cred)
 
