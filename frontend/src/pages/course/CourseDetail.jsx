@@ -671,8 +671,14 @@ function YoutubeProgressPlayer({
 
 function HonestyWarningModal({ onClose, isDarkMode }) {
   return (
-    <div className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}>
-      <div className="w-full max-w-md rounded-[2rem] border border-amber-200 bg-white p-6 text-center shadow-2xl shadow-amber-900/20 dark:border-amber-300/20 dark:bg-[#0f1324]">
+    <div
+      onClick={onClose}
+      className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-[2rem] border border-amber-200 bg-white p-6 text-center shadow-2xl shadow-amber-900/20 dark:border-amber-300/20 dark:bg-[#0f1324]"
+      >
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-400/15 text-4xl">
           ⚠️
         </div>
@@ -708,7 +714,7 @@ function CppNote() {
   )
 }
 
-function RatingStars({ selectedRating, ratingAverage, ratingCount, onRate }) {
+function RatingStars({ selectedRating, ratingAverage, ratingCount, ratingBurst, onRate }) {
   return (
     <section className="relative mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-500 dark:text-amber-300">Đánh giá bài học</div>
@@ -728,7 +734,11 @@ function RatingStars({ selectedRating, ratingAverage, ratingCount, onRate }) {
             ★
           </button>
         ))}
-        <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">Trung bình: ★ {ratingAverage} ({ratingCount} lượt)</span>
+
+        <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">
+          Trung bình: ★ {ratingAverage} ({ratingCount} lượt)
+        </span>
+
         {ratingBurst && (
           <div className="pointer-events-none absolute left-16 top-1/2">
             {Array.from({ length: 14 }).map((_, index) => (

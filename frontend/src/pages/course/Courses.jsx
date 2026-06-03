@@ -671,13 +671,11 @@ async function fetchCourses() {
         </section>
 
         <div ref={sortBoxRef} className="relative mt-6">
-          <button type="button" onClick={() => setShowSortBox((prev) => !prev)} className="inline-flex cursor-pointer items-center gap-3 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-300/40 hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f1324] dark:text-slate-200 dark:hover:bg-white/[0.08]"><span>🎛️</span>Sort / Lọc môn học<span>{showSortBox ? '▲' : '▼'}</span></button>
-          {showSortBox && (
-            <div className="absolute left-0 top-14 z-30 w-full max-w-3xl rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-300/60 dark:border-white/10 dark:bg-slate-900 dark:shadow-slate-950/50">
-              <div className="flex flex-wrap gap-3">{sortOptions.map((option) => <button key={option.value} type="button" onClick={() => setSortBy(option.value)} className={`rounded-full px-5 py-2 text-sm font-bold transition ${sortBy === option.value ? 'bg-sky-400 text-slate-950' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/[0.06] dark:text-slate-200 dark:hover:bg-white/[0.12]'}`}>{option.label}</button>)}</div>
-              <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10"><div className="flex flex-wrap gap-3"><button type="button" onClick={() => setActiveCategory('All')} className={`rounded-full border px-5 py-2 text-sm font-semibold transition ${activeCategory === 'All' ? 'border-sky-300 bg-sky-400 text-slate-950' : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-sky-300/40 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200'}`}>Tất cả</button>{subjects.map((subject) => <button key={subject} type="button" onClick={() => setActiveCategory(subject)} className={`rounded-full border px-5 py-2 text-sm font-semibold transition ${activeCategory === subject ? 'border-sky-300 bg-sky-400 text-slate-950' : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-sky-300/40 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200'}`}>{subject}</button>)}</div></div>
-            </div>
-          )}
+          <button type="button" aria-expanded={showSortBox} onClick={() => setShowSortBox((prev) => !prev)} className="inline-flex cursor-pointer items-center gap-3 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-300/40 hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f1324] dark:text-slate-200 dark:hover:bg-white/[0.08]"><span>🎛️</span>Sort / Lọc môn học<span>{showSortBox ? '▲' : '▼'}</span></button>
+          <div className={`absolute left-0 top-14 z-30 w-full max-w-3xl origin-top rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-300/60 transition duration-150 dark:border-white/10 dark:bg-slate-900 dark:shadow-slate-950/50 ${showSortBox ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-1 scale-[0.98] opacity-0'}`}>
+            <div className="flex flex-wrap gap-3">{sortOptions.map((option) => <button key={option.value} type="button" onClick={() => setSortBy(option.value)} className={`rounded-full px-5 py-2 text-sm font-bold transition ${sortBy === option.value ? 'bg-sky-400 text-slate-950' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/[0.06] dark:text-slate-200 dark:hover:bg-white/[0.12]'}`}>{option.label}</button>)}</div>
+            <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10"><div className="flex flex-wrap gap-3"><button type="button" onClick={() => setActiveCategory('All')} className={`rounded-full border px-5 py-2 text-sm font-semibold transition ${activeCategory === 'All' ? 'border-sky-300 bg-sky-400 text-slate-950' : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-sky-300/40 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200'}`}>Tất cả</button>{subjects.map((subject) => <button key={subject} type="button" onClick={() => setActiveCategory(subject)} className={`rounded-full border px-5 py-2 text-sm font-semibold transition ${activeCategory === subject ? 'border-sky-300 bg-sky-400 text-slate-950' : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-sky-300/40 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200'}`}>{subject}</button>)}</div></div>
+          </div>
         </div>
 
         {showCreateForm && canCreateELearning && <CreateCourseModal form={form} setForm={setForm} onSubmit={editingCourse ? handleUpdateCourse : handleCreateCourse} onClose={() => { setShowCreateForm(false); setEditingCourse(null); setForm(getEmptyForm(teacherSubject)) }} onWordUpload={handleWordUpload} uploadingWord={uploadingWord} currentUser={currentUser} teacherProfile={teacherProfile} teacherSubject={teacherSubject} teacherClasses={teacherClasses} isEditing={Boolean(editingCourse)} isDarkMode={isDarkMode} />}
@@ -917,11 +915,17 @@ function documentToolbarButtonClass(index, command) {
 
     if (!file || !currentUser) return
 
-    const isMp4File =
-      file.type === 'video/mp4' ||
-      file.name.toLowerCase().endsWith('.mp4')
+    const fileName = String(file.name || '').trim()
+    const normalizedFileName = fileName.replace(/\.+$/, '').toLowerCase()
+    const normalizedFileType = String(file.type || '').trim().toLowerCase()
+    const fileExtension = normalizedFileName.includes('.')
+      ? normalizedFileName.split('.').pop()
+      : ''
+    const isClearlyNotMp4 =
+      Boolean(fileExtension && fileExtension !== 'mp4') ||
+      Boolean(normalizedFileType && !normalizedFileType.includes('mp4') && !normalizedFileType.startsWith('video/'))
 
-    if (!isMp4File) {
+    if (isClearlyNotMp4) {
       setMp4ErrorOpen(true)
       return
     }
@@ -1000,7 +1004,12 @@ function applyLessonDocumentStyle(index, command) {
 
 
   return (
-    <div className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-50 overflow-y-auto bg-slate-900/45 px-4 py-6 backdrop-blur-md dark:bg-slate-950/80`}>
+    <div
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-50 overflow-y-auto bg-slate-900/45 px-4 py-6 backdrop-blur-md dark:bg-slate-950/80`}
+    >
       {mp4ErrorOpen && (
         <Mp4OnlyModal
           onClose={() => setMp4ErrorOpen(false)}
@@ -1057,13 +1066,13 @@ function applyLessonDocumentStyle(index, command) {
 
             <FormSection badge="02" title="Quyền xem và thời gian mở" subtitle="Trước thời gian mở, thẻ hiển thị 'Chưa mở' và học sinh không thể vào xem.">
               <div className="grid gap-4 md:grid-cols-3">
-                <select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value, className: event.target.value === 'public' ? '' : form.className })} className={fieldClass}>
+                <select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value, className: event.target.value === 'public' ? '' : form.className })} className={selectClass}>
                   <option value="public" className="bg-white text-slate-950 dark:bg-slate-900 dark:text-white">Công khai</option>
                   <option value="private" className="bg-white text-slate-950 dark:bg-slate-900 dark:text-white">Riêng tư</option>
                 </select>
 
                 {form.visibility === 'private' && (
-                  <select value={form.className} onChange={(event) => setForm({ ...form, className: event.target.value })} className={fieldClass} required>
+                  <select value={form.className} onChange={(event) => setForm({ ...form, className: event.target.value })} className={selectClass} required>
                     <option value="" className="bg-white text-slate-950 dark:bg-slate-900 dark:text-white">
                       {teacherClasses.length ? 'Chọn lớp' : 'Chưa có lớp trong Firebase'}
                     </option>
@@ -1104,7 +1113,7 @@ function applyLessonDocumentStyle(index, command) {
 
                     <div className="grid gap-3 md:grid-cols-2">
                       <input value={lesson.title} onChange={(event) => updateLesson(index, 'title', event.target.value)} placeholder="Tên bài nhỏ" className={fieldClass} />
-                      <select value={lesson.attachMode || 'youtube'} onChange={(event) => updateLesson(index, 'attachMode', event.target.value)} className={fieldClass}>
+                      <select value={lesson.attachMode || 'youtube'} onChange={(event) => updateLesson(index, 'attachMode', event.target.value)} className={selectClass}>
                         <option value="youtube" className="bg-white text-slate-950 dark:bg-slate-900 dark:text-white">YouTube</option>
                         <option value="file" className="bg-white text-slate-950 dark:bg-slate-900 dark:text-white">Word / PDF</option>
                         <option value="code" className="bg-white text-slate-950 dark:bg-slate-900 dark:text-white">Code</option>
@@ -1324,7 +1333,7 @@ function applyLessonDocumentStyle(index, command) {
 const fieldClass =
   'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 font-bold text-slate-900 outline-none placeholder:text-slate-400 transition focus:border-sky-400 focus:bg-slate-50 dark:border-white/10 dark:bg-[#111827] dark:text-white dark:placeholder:text-slate-400 dark:focus:border-sky-400 dark:focus:bg-[#111827]'
 const selectClass =
-  `${fieldClass} cursor-pointer appearance-none bg-[linear-gradient(45deg,transparent_50%,currentColor_50%),linear-gradient(135deg,currentColor_50%,transparent_50%)] bg-[length:6px_6px,6px_6px] bg-[position:calc(100%-20px)_50%,calc(100%-14px)_50%] bg-no-repeat pr-12`
+  `${fieldClass} cursor-pointer appearance-none [color-scheme:light] dark:[color-scheme:dark] bg-[linear-gradient(45deg,transparent_50%,currentColor_50%),linear-gradient(135deg,currentColor_50%,transparent_50%)] bg-[length:6px_6px,6px_6px] bg-[position:calc(100%-20px)_50%,calc(100%-14px)_50%] bg-no-repeat pr-12`
 
 const toolbarButtonClass =
   'cursor-pointer rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-sky-400 hover:text-slate-950 dark:bg-white/10 dark:text-white'
@@ -1471,7 +1480,12 @@ function TimeOpenInput({ value, onChange }) {
 
 function Mp4OnlyModal({ onClose, isDarkMode }) {
   return (
-    <div className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}>
+    <div
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}
+    >
       <div className="w-full max-w-md rounded-[2rem] border border-red-200 bg-white p-6 text-center shadow-2xl shadow-red-900/20 dark:border-red-300/20 dark:bg-[#0f1324]">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-red-500/10 text-4xl">
           🎬
@@ -1499,7 +1513,12 @@ function Mp4OnlyModal({ onClose, isDarkMode }) {
 
 function DeleteConfirmModal({ course, onCancel, onConfirm, isDarkMode }) {
   return (
-    <div className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}>
+    <div
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+      className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}
+    >
       <div className="w-full max-w-md rounded-[2rem] border border-slate-200 bg-white p-6 text-center shadow-2xl shadow-slate-900/20 dark:border-white/10 dark:bg-[#0f1324] dark:shadow-red-950/30">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-red-500/10 text-4xl shadow-lg shadow-red-500/10">
           🗑️
@@ -1544,7 +1563,12 @@ function AchievementModal({ achievement, onClose, isDarkMode }) {
   const watchedDates = new Set(achievement.watchedDates || [])
 
   return (
-    <div className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 backdrop-blur-md dark:bg-slate-950/80`}>
+    <div
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 backdrop-blur-md dark:bg-slate-950/80`}
+    >
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-900/20 dark:border-white/10 dark:bg-slate-900">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
