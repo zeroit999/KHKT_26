@@ -1,22 +1,15 @@
-<<<<<<< HEAD
-from flask import Flask, jsonify, request
-=======
 import os
+import tempfile
 
-from flask import Flask, jsonify
->>>>>>> 5024c5e6eab2d6fbc983bf241bc243a9f220b170
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from docx import Document
+from pypdf import PdfReader
 
 from auth.auth_routes import auth_bp
 from exams.exam_routes import exam_bp
 from config.config import Config
 
-import os
-import tempfile
-from docx import Document
-from pypdf import PdfReader
-
-<<<<<<< HEAD
 
 DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
@@ -29,45 +22,27 @@ SUPPORTED_FILE_EXTENSIONS = {".docx", ".pdf"}
 
 
 def get_allowed_origins():
-    allowed_origins = [
-        origin.strip()
-        for origin in Config.ALLOWED_ORIGINS
-        if origin.strip()
-    ]
-
-    return allowed_origins or DEFAULT_ALLOWED_ORIGINS
-=======
-def get_allowed_origins():
     origins = []
 
     config_origins = getattr(Config, "ALLOWED_ORIGINS", []) or []
+
     if isinstance(config_origins, str):
         config_origins = config_origins.split(",")
 
     origins.extend(config_origins)
 
     env_origins = os.environ.get("ALLOWED_ORIGINS", "")
+
     if env_origins:
         origins.extend(env_origins.split(","))
 
-    cleaned = [origin.strip() for origin in origins if str(origin or "").strip()]
-
-    if cleaned:
-        return cleaned
-
-    return [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+    cleaned_origins = [
+        origin.strip()
+        for origin in origins
+        if str(origin or "").strip()
     ]
 
-
-def create_app():
-    app = Flask(__name__)
-
-    app.config["SECRET_KEY"] = getattr(Config, "SECRET_KEY", os.environ.get("SECRET_KEY", "change-me"))
->>>>>>> 5024c5e6eab2d6fbc983bf241bc243a9f220b170
+    return cleaned_origins or DEFAULT_ALLOWED_ORIGINS
 
 
 def configure_cors(app):
@@ -101,15 +76,17 @@ def register_blueprints(app):
 
 def extract_docx_text(file_path):
     document = Document(file_path)
+
     return "\n".join(
         paragraph.text
         for paragraph in document.paragraphs
         if paragraph.text.strip()
-    )
+    ).strip()
 
 
 def extract_pdf_text(file_path):
     reader = PdfReader(file_path)
+
     return "\n".join(
         page.extract_text() or ""
         for page in reader.pages
@@ -129,7 +106,11 @@ def extract_file_text(file_path, suffix):
 def create_app():
     app = Flask(__name__)
 
-    app.config["SECRET_KEY"] = Config.SECRET_KEY
+    app.config["SECRET_KEY"] = getattr(
+        Config,
+        "SECRET_KEY",
+        os.environ.get("SECRET_KEY", "change-me"),
+    )
 
     configure_cors(app)
     register_blueprints(app)
@@ -206,11 +187,6 @@ app = create_app()
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
-<<<<<<< HEAD
-        port=5000,
-        debug=True,
-=======
         port=int(os.environ.get("PORT", 5000)),
         debug=os.environ.get("FLASK_DEBUG", "0") == "1",
->>>>>>> 5024c5e6eab2d6fbc983bf241bc243a9f220b170
     )
