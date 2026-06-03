@@ -4,7 +4,7 @@ import { Clock3, FileText, Globe2, LockKeyhole } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import useExams from './useExams'
-import { getExamDetailApi } from '../api/examApi'
+import { getExamDetailApi } from '../../api/examApi'
 import {
   canManageExams,
   isStudentRole,
