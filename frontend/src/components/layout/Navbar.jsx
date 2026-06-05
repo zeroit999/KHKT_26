@@ -74,7 +74,7 @@ export default function Navbar({
     () => [
       { label: 'Trang chủ', path: '/' },
       { label: 'Đề thi', path: '/exams' },
-      { label: 'E-Learning', path: '/courses' },
+      { label: 'E-Learning', path: '/e-learning' },
       { label: 'Xếp hạng', path: '/leaderboard' },
       { label: 'Dashboard', path: '/dashboard' },
       ...(userDetails?.role === 'TEACHER'

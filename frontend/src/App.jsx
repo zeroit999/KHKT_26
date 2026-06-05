@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 
 import {
   BrowserRouter,
@@ -6,6 +6,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router-dom'
 
 import { AnimatePresence, motion } from 'framer-motion'
@@ -19,8 +20,8 @@ import ExamRoom from './pages/exam/ExamRoom.jsx'
 import ResultPage from './pages/exam/ResultPage.jsx'
 import Dashboard from './pages/dashboard/Dashboard.jsx'
 import Leaderboard from './pages/dashboard/Leaderboard.jsx'
-import Courses from './pages/course//Courses.jsx'
-import CourseDetail from './pages/course/CourseDetail.jsx'
+import ELearning from './pages/e-learning/E-learning.jsx'
+import ELearningDetail from './pages/e-learning/E-learningDetail.jsx'
 import LearningPage from './pages/learning/LearningPage.jsx'
 import AdminDashboard from './pages/dashboard/AdminDashboard.jsx'
 import Classes from './pages/learning/Classes.jsx'
@@ -32,6 +33,36 @@ import Register from './components/Signpage/register.jsx'
 import Profile from './components/Signpage/profile.jsx'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'
+
+
+
+function getInitialDarkMode() {
+  if (typeof window === 'undefined') return false
+
+  const savedDarkMode = window.localStorage.getItem('darkMode')
+  const savedTheme = window.localStorage.getItem('theme') || window.localStorage.getItem('color-theme')
+
+  if (savedDarkMode === 'true' || savedTheme === 'dark') return true
+  if (savedDarkMode === 'false' || savedTheme === 'light') return false
+
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+}
+
+function applyDarkModeToDocument(isDark) {
+  if (typeof document === 'undefined') return
+
+  document.documentElement.classList.toggle('dark', isDark)
+  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+
+  const favicon = document.getElementById('favicon')
+  if (favicon) {
+    favicon.setAttribute('href', isDark ? '/dark-mode.png' : '/light-mode.png')
+  }
+}
+
+function normalizeAppRole(role) {
+  return String(role || '').trim().replace(/[\s_-]/g, '').toUpperCase()
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -83,10 +114,8 @@ function TeacherRoute({ children }) {
   if (isLoading) return <LoadingScreen />
   if (!user) return <Navigate to="/login" replace />
 
-  const allowed =
-    userDetails?.role === 'TEACHER' ||
-    userDetails?.role === 'Admin_Dev' ||
-    userDetails?.role === 'ADMIN_DEV'
+  const normalizedRole = normalizeAppRole(userDetails?.role)
+  const allowed = normalizedRole === 'TEACHER' || normalizedRole === 'ADMINDEV'
 
   if (!allowed) return <Navigate to="/" replace />
 
@@ -99,9 +128,7 @@ function AdminDevRoute({ children }) {
   if (isLoading) return <LoadingScreen />
   if (!user) return <Navigate to="/login" replace />
 
-  const allowed =
-    userDetails?.role === 'Admin_Dev' ||
-    userDetails?.role === 'ADMIN_DEV'
+  const allowed = normalizeAppRole(userDetails?.role) === 'ADMINDEV'
 
   if (!allowed) return <Navigate to="/" replace />
 
@@ -132,6 +159,12 @@ function ProfileRoute() {
   }
 
   return <Profile />
+}
+
+
+function LegacyCourseDetailRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/e-learning/${id}`} replace />
 }
 
 function AppContent({ darkMode, onToggleDarkMode }) {
@@ -259,20 +292,23 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 }
               />
 
+              <Route path="/courses" element={<Navigate to="/e-learning" replace />} />
+              <Route path="/courses/:id" element={<LegacyCourseDetailRedirect />} />
+
               <Route
-                path="/courses"
+                path="/e-learning"
                 element={
                   <ProtectedRoute>
-                    <Courses />
+                    <ELearning />
                   </ProtectedRoute>
                 }
               />
 
               <Route
-                path="/courses/:id"
+                path="/e-learning/:id"
                 element={
                   <ProtectedRoute>
-                    <CourseDetail />
+                    <ELearningDetail />
                   </ProtectedRoute>
                 }
               />
@@ -333,22 +369,18 @@ function AppContent({ darkMode, onToggleDarkMode }) {
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('darkMode') === 'true'
+    const initialDarkMode = getInitialDarkMode()
+    applyDarkModeToDocument(initialDarkMode)
+    return initialDarkMode
   })
+
+  useLayoutEffect(() => {
+    applyDarkModeToDocument(darkMode)
+  }, [darkMode])
 
   useEffect(() => {
     localStorage.setItem('darkMode', String(darkMode))
-
-    document.documentElement.classList.toggle('dark', darkMode)
-
-    const favicon = document.getElementById('favicon')
-
-    if (favicon) {
-      favicon.setAttribute(
-        'href',
-        darkMode ? '/dark-mode.png' : '/light-mode.png',
-      )
-    }
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
   const toastOptions = useMemo(
