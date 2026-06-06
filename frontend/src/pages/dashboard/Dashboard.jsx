@@ -1,19 +1,3 @@
-// import MaintenanceState from '../../components/ui/MaintenanceState.jsx'
-
-// function Dashboard() {
-//   return (
-//     <MaintenanceState
-//       badge="Dashboard"
-//       title="Đang bảo trì"
-//       subtitle="Dữ liệu dashboard đang được cập nhật"
-//       description="Vui lòng quay lại sau"
-//     />
-//   )
-// }
-
-// export default Dashboard
-
-
 import { useState } from 'react'
 import { BarChart3, Database, Filter, MoreHorizontal, Plus, Search, UploadCloud, UsersRound } from 'lucide-react'
 import { adminQuestions, progressData } from '../../data/mockData.js'
