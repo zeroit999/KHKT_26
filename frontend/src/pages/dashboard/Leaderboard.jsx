@@ -270,6 +270,65 @@ const getBadgeList = (student = {}) => {
   if (student.submissions >= 10) badges.push({ icon: BookOpen, label: 'Học giả', className: 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-200' })
   if (student.streak >= 7) badges.push({ icon: Flame, label: 'Chăm chỉ', className: 'bg-orange-100 text-orange-700 dark:bg-orange-400/15 dark:text-orange-200' })
   if (student.averageScore >= 8) badges.push({ icon: Zap, label: 'Hiệu suất cao', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' })
+  if (student.rank === 2) badges.push({
+    icon: Medal,
+    label: 'Ngôi sao bạc',
+    className: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300'
+  })
+
+  if (student.rank === 3) badges.push({
+    icon: Award,
+    label: 'Top 3 xuất sắc',
+    className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+  })
+
+    if (student.points >= 1000) badges.push({
+    icon: Star,
+    label: 'Siêu sao',
+    className: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'
+  })
+
+  if (student.points >= 1500) badges.push({
+    icon: Gem,
+    label: 'Huyền thoại',
+    className: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'
+  })
+
+   if (student.streak >= 14) badges.push({
+    icon: Flame,
+    label: 'Bền bỉ 14 ngày',
+    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  })
+
+  if (student.streak >= 30) badges.push({
+    icon: Rocket,
+    label: 'Không bỏ cuộc',
+    className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+  })
+
+  if (student.averageScore >= 9) badges.push({
+    icon: Brain,
+    label: 'Xuất sắc',
+    className: 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300'
+  })
+
+  if (student.averageScore === 10) badges.push({
+    icon: Sparkles,
+    label: 'Điểm tuyệt đối',
+    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+  })
+
+    if (student.submissions >= 20) badges.push({
+    icon: BookMarked,
+    label: 'Nộp bài đều đặn',
+    className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
+  })
+
+  if (student.submissions >= 50) badges.push({
+    icon: Library,
+    label: 'Máy cày bài',
+    className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+  })
 
   return badges.slice(0, 3)
 }
@@ -321,7 +380,7 @@ function EmptyState({ onReload }) {
       <button
         type="button"
         onClick={onReload}
-        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700"
+        className="mt-6 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700"
       >
         <RefreshCcw className="h-4 w-4" />
         Tải lại dữ liệu
@@ -523,7 +582,7 @@ function PodiumCard({ item, spot, equalRankHeight, onOpenProfile }) {
       <button
         type="button"
         onClick={() => onOpenProfile(item)}
-        className={`relative z-10 mx-auto w-full max-w-sm rounded-[2rem] border p-6 text-center shadow-xl backdrop-blur transition hover:-translate-y-1 hover:shadow-2xl ${
+        className={`relative z-10 mx-auto w-full max-w-sm cursor-pointer rounded-[2rem] border p-6 text-center shadow-xl backdrop-blur transition hover:-translate-y-1 hover:shadow-2xl ${
           shellByRank[rank] || shellByRank[3]
         } ${isChampionSpot ? 'lg:-translate-y-4' : ''}`}
       >
@@ -658,7 +717,7 @@ function ProfileModal({ student, onClose }) {
               <p className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-300">{student.handle}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-2xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
+          <button type="button" onClick={onClose} className="cursor-pointer rounded-2xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1063,7 +1122,7 @@ function Leaderboard() {
               <button
                 type="button"
                 onClick={() => setFilterOpen((current) => !current)}
-                className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 lg:w-auto"
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 lg:w-auto"
               >
                 <Filter className="h-5 w-5 text-violet-600 dark:text-violet-300" />
                 Lọc
@@ -1088,7 +1147,7 @@ function Leaderboard() {
                               key={tab.value}
                               type="button"
                               onClick={() => setActiveScope(tab.value)}
-                              className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
+                              className={`cursor-pointer rounded-2xl border px-5 py-3 text-sm font-black transition ${
                                 activeScope === tab.value
                                   ? 'border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
                                   : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-300 hover:bg-blue-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
@@ -1114,7 +1173,7 @@ function Leaderboard() {
                                 setDateFrom('')
                                 setDateTo('')
                               }}
-                              className={`rounded-2xl border px-4 py-2.5 text-xs font-black transition ${
+                              className={`cursor-pointer rounded-2xl border px-4 py-2.5 text-xs font-black transition ${
                                 activeTime === tab.value && !dateFrom && !dateTo
                                   ? 'border-amber-400 bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/25'
                                   : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-amber-300 hover:bg-amber-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
@@ -1141,7 +1200,7 @@ function Leaderboard() {
                                 setDateFrom(event.target.value)
                                 setActiveTime('all')
                               }}
-                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 outline-none transition focus:border-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 outline-none transition focus:border-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
                             />
                           </div>
 
@@ -1157,7 +1216,7 @@ function Leaderboard() {
                                 setDateTo(event.target.value)
                                 setActiveTime('all')
                               }}
-                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 outline-none transition focus:border-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                              className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 outline-none transition focus:border-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1170,7 +1229,7 @@ function Leaderboard() {
                               setDateTo('')
                               setActiveTime('all')
                             }}
-                            className="mt-3 rounded-xl bg-slate-100 px-4 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/15"
+                            className="mt-3 cursor-pointer rounded-xl bg-slate-100 px-4 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/15"
                           >
                             Xóa khoảng thời gian
                           </button>
@@ -1227,7 +1286,7 @@ function Leaderboard() {
                         key={student.id}
                         type="button"
                         onClick={() => activeScope === 'student' && setSelectedStudent(student)}
-                        className={`grid w-full gap-4 px-6 py-4 text-left text-sm font-semibold text-slate-600 transition dark:text-slate-300 lg:grid-cols-[90px_1.45fr_130px_120px_120px_120px] lg:items-center ${
+                        className={`grid w-full cursor-pointer gap-4 px-6 py-4 text-left text-sm font-semibold text-slate-600 transition dark:text-slate-300 lg:grid-cols-[90px_1.45fr_130px_120px_120px_120px] lg:items-center ${
                           isMe
                             ? 'bg-cyan-50 ring-2 ring-inset ring-cyan-300 dark:bg-cyan-400/10 dark:ring-cyan-300/40'
                             : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'
