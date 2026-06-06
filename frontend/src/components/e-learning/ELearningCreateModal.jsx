@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { db, storage } from '../../components/firebase'
 
 const initialForm = {
   title: '',
@@ -10,14 +13,17 @@ const initialForm = {
   openAt: '',
   thumbnailFileName: '',
   thumbnailPreview: '',
+  thumbnailFile: null,
   attachMode: 'youtube',
   youtubeUrl: '',
   fileName: '',
   filePreviewUrl: '',
   fileType: '',
+  file: null,
   documentFileName: '',
   documentPreviewUrl: '',
   documentFileType: '',
+  documentFile: null,
   codeLanguage: 'javascript',
   codeContent: '',
   documentContent: '',
@@ -30,9 +36,11 @@ const initialForm = {
       fileName: '',
       filePreviewUrl: '',
       fileType: '',
+      file: null,
       documentFileName: '',
       documentPreviewUrl: '',
       documentFileType: '',
+      documentFile: null,
       codeLanguage: 'javascript',
       codeContent: '',
       documentContent: '',
@@ -47,9 +55,12 @@ function ELearningCreateModal({
   teacherProfile,
   teacherClasses = [],
   loadingClasses = false,
+  currentUser = null,
+  onCreated,
 }) {
   const [form, setForm] = useState(initialForm)
   const [activeStep, setActiveStep] = useState(1)
+  const [saving, setSaving] = useState(false)
 
   const latestFormRef = useRef(form)
   const contentScrollRef = useRef(null)
@@ -144,8 +155,16 @@ function ELearningCreateModal({
       { step: 4, ref: sectionFourRef },
     ]
 
+    const scrollBottom = container.scrollTop + container.clientHeight
+    const nearBottom = scrollBottom >= container.scrollHeight - 16
+
+    if (nearBottom) {
+      setActiveStep(4)
+      return
+    }
+
     const containerTop = container.getBoundingClientRect().top
-    const offset = 140
+    const offset = Math.min(220, container.clientHeight * 0.38)
 
     let currentStep = 1
 
@@ -195,6 +214,7 @@ function ELearningCreateModal({
         ...prev,
         thumbnailFileName: file.name,
         thumbnailPreview: previewUrl,
+        thumbnailFile: file,
       }
     })
 
@@ -209,6 +229,7 @@ function ELearningCreateModal({
         ...prev,
         thumbnailFileName: '',
         thumbnailPreview: '',
+        thumbnailFile: null,
       }
     })
   }
@@ -218,6 +239,7 @@ function ELearningCreateModal({
     if (!file) return
 
     const previewUrl = URL.createObjectURL(file)
+    const fileKey = resolveFileStateKey(nameKey)
 
     setForm((prev) => {
       revokeIfBlob(prev[previewKey])
@@ -227,6 +249,7 @@ function ELearningCreateModal({
         [nameKey]: file.name,
         [previewKey]: previewUrl,
         [typeKey]: file.type || '',
+        [fileKey]: file,
       }
     })
 
@@ -246,9 +269,11 @@ function ELearningCreateModal({
           fileName: '',
           filePreviewUrl: '',
           fileType: '',
+          file: null,
           documentFileName: '',
           documentPreviewUrl: '',
           documentFileType: '',
+          documentFile: null,
           codeLanguage: 'javascript',
           codeContent: '',
           documentContent: '',
@@ -285,6 +310,7 @@ function ELearningCreateModal({
     if (!file) return
 
     const previewUrl = URL.createObjectURL(file)
+    const fileKey = resolveFileStateKey(nameKey)
 
     setForm((prev) => {
       const nextLessons = [...prev.lessons]
@@ -297,6 +323,7 @@ function ELearningCreateModal({
         [nameKey]: file.name,
         [previewKey]: previewUrl,
         [typeKey]: file.type || '',
+        [fileKey]: file,
       }
 
       return {
@@ -323,19 +350,141 @@ function ELearningCreateModal({
     })
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
-    const payload = {
-      ...form,
-      subject: fixedTeacherSubject,
-      teacherName,
-      courseCode: eLearningCodePreview,
-      className: form.visibility === 'private' ? form.className : '',
+    if (saving) return
+
+    if (!currentUser?.uid) {
+      alert('Bạn cần đăng nhập bằng tài khoản giáo viên để đăng bài E-learning.')
+      return
     }
 
-    console.log('Dữ liệu bài E-learning:', payload)
-    onClose()
+    if (!form.title.trim() || !form.topic.trim() || !form.description.trim()) {
+      alert('Vui lòng nhập đầy đủ tên bài, chủ đề và mô tả bài học.')
+      return
+    }
+
+    if (form.visibility === 'private' && !form.className) {
+      alert('Vui lòng chọn lớp được phép xem bài học riêng tư.')
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      const thumbnailUpload = await uploadSelectedFile(
+        form.thumbnailFile,
+        `course-thumbnails/${currentUser.uid}`,
+      )
+
+      const mainFileUpload = await uploadSelectedFile(
+        form.file,
+        `course-files/${currentUser.uid}/main`,
+      )
+
+      const mainDocumentUpload = await uploadSelectedFile(
+        form.documentFile,
+        `course-files/${currentUser.uid}/documents`,
+      )
+
+      const lessons = await Promise.all(
+        form.lessons.map(async (lesson, index) => {
+          const lessonFileUpload = await uploadSelectedFile(
+            lesson.file,
+            `course-files/${currentUser.uid}/lessons/${index + 1}`,
+          )
+
+          const lessonDocumentUpload = await uploadSelectedFile(
+            lesson.documentFile,
+            `course-files/${currentUser.uid}/lesson-documents/${index + 1}`,
+          )
+
+          return {
+            title: lesson.title || `Bài ${index + 1}`,
+            content: lesson.content || '',
+            attachMode: lesson.attachMode || 'youtube',
+            youtubeUrl: lesson.youtubeUrl || '',
+            fileName: lessonFileUpload.name || lesson.fileName || '',
+            fileUrl: lessonFileUpload.url || '',
+            fileType: lessonFileUpload.type || lesson.fileType || '',
+            wordFileName: lessonFileUpload.name || lesson.fileName || '',
+            wordFileUrl: lessonFileUpload.url || '',
+            documentFileName: lessonDocumentUpload.name || lesson.documentFileName || '',
+            documentFileUrl: lessonDocumentUpload.url || '',
+            documentFileType: lessonDocumentUpload.type || lesson.documentFileType || '',
+            codeLanguage: lesson.codeLanguage || 'javascript',
+            codeContent: lesson.codeContent || '',
+            documentContent: lesson.documentContent || '',
+            richDocument: lesson.documentContent || '',
+          }
+        }),
+      )
+
+      const payload = {
+        title: form.title.trim(),
+        topic: form.topic.trim(),
+        description: form.description.trim(),
+        content: form.description.trim(),
+        subject: fixedTeacherSubject,
+        category: fixedTeacherSubject,
+        teacherSubject: fixedTeacherSubject,
+        teacherCode: String(form.teacherCode || '0000').replace(/\D/g, '').slice(0, 4).padEnd(4, '0'),
+        courseCode: eLearningCodePreview,
+        eLearningCode: eLearningCodePreview,
+        visibility: form.visibility,
+        className: form.visibility === 'private' ? form.className : '',
+        classNames: form.visibility === 'private' && form.className ? [form.className] : [],
+        openAt: form.openAt || '',
+        openAtMs: getOpenAtMs(form.openAt),
+        thumbnail: thumbnailUpload.url || '',
+        thumbnailFileName: thumbnailUpload.name || form.thumbnailFileName || '',
+        attachMode: form.attachMode,
+        youtubeUrl: form.youtubeUrl || '',
+        fileName: mainFileUpload.name || form.fileName || '',
+        fileUrl: mainFileUpload.url || '',
+        fileType: mainFileUpload.type || form.fileType || '',
+        wordFileName: mainFileUpload.name || form.fileName || '',
+        wordFileUrl: mainFileUpload.url || '',
+        documentFileName: mainDocumentUpload.name || form.documentFileName || '',
+        documentFileUrl: mainDocumentUpload.url || '',
+        documentFileType: mainDocumentUpload.type || form.documentFileType || '',
+        codeLanguage: form.codeLanguage || 'javascript',
+        codeContent: form.codeContent || '',
+        documentContent: form.documentContent || '',
+        richDocument: form.documentContent || '',
+        lessons,
+        lessonCount: lessons.length,
+        duration: form.youtubeUrl ? 'Đang cập nhật' : '---',
+        teacherId: currentUser.uid,
+        createdByUid: currentUser.uid,
+        createdBy: currentUser.uid,
+        teacherEmail: currentUser.email || teacherProfile?.email || '',
+        teacherName,
+        teacherDisplayName: teacherName,
+        status: 'published',
+        studentCount: 0,
+        progress: 0,
+        rating: 0,
+        ratingTotal: 0,
+        ratingCount: 0,
+        views: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+
+      const docRef = await addDoc(collection(db, 'eLearnings'), payload)
+
+      setForm(initialForm)
+      setActiveStep(1)
+      onCreated?.({ id: docRef.id, ...payload })
+      onClose()
+    } catch (error) {
+      console.error('Lỗi khi đăng bài E-learning:', error)
+      alert('Không thể đăng bài E-learning. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -344,9 +493,9 @@ function ELearningCreateModal({
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
-      className={`${
-        isDarkMode ? 'dark ' : ''
-      }fixed inset-0 z-[999] overflow-y-auto bg-slate-950/90 px-4 py-6 text-slate-950 backdrop-blur-xl dark:text-white`}
+      className={`fixed inset-0 z-[999] overflow-y-auto px-4 py-6 text-slate-950 backdrop-blur-md dark:text-white ${
+        isDarkMode ? 'dark bg-slate-950/80' : 'bg-slate-200/70'
+      }`}
     >
       <form
         onSubmit={handleSubmit}
@@ -810,9 +959,10 @@ function ELearningCreateModal({
           <footer className="border-t border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-[#050816]/95">
             <button
               type="submit"
-              className="w-full rounded-2xl bg-gradient-to-r from-sky-400 to-violet-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-sky-500/20 transition hover:-translate-y-0.5"
+              disabled={saving}
+              className="w-full rounded-2xl bg-gradient-to-r from-sky-400 to-violet-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-sky-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
-              Lưu bản nháp
+              {saving ? 'Đang đăng bài...' : 'Đăng bài E-learning'}
             </button>
           </footer>
         </div>
@@ -885,57 +1035,47 @@ function CustomSelect({ value, onChange, options }) {
 }
 
 function DateTimeInput({ value, onChange }) {
-  const dateValue = value ? value.split('T')[0] : ''
-  const timeValue = value ? value.split('T')[1] : ''
+  const [dateValue = '', timeValue = ''] = String(value || '').split('T')
 
-  function updateDateInput(rawValue) {
-    const formattedDate = formatDateText(rawValue)
-    const nextTime = timeValue || '07:00'
-    const dateIso = convertDateTextToIso(formattedDate)
-
-    if (!dateIso) {
+  function updateDateInput(nextDate) {
+    if (!nextDate) {
       onChange('')
       return
     }
 
-    onChange(`${dateIso}T${nextTime}`)
+    onChange(`${nextDate}T${timeValue || '07:00'}`)
   }
 
-  function updateTimeInput(rawValue) {
-    const formattedTime = formatTimeText(rawValue)
+  function updateTimeInput(nextTime) {
     const nextDate = dateValue || getTodayValue()
 
-    if (!formattedTime) {
-      onChange(`${nextDate}T`)
+    if (!nextTime) {
+      onChange(`${nextDate}T07:00`)
       return
     }
 
-    onChange(`${nextDate}T${formattedTime}`)
+    onChange(`${nextDate}T${nextTime}`)
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 transition focus-within:border-sky-400 dark:border-white/10 dark:bg-slate-950">
+    <div className="rounded-2xl border border-sky-400 bg-white px-4 py-3 transition focus-within:ring-2 focus-within:ring-sky-300 dark:bg-slate-950">
       <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
         Thời gian mở
       </label>
 
       <div className="grid grid-cols-2 gap-2">
         <input
-          type="text"
-          value={dateValue ? convertIsoDateToText(dateValue) : ''}
+          type="date"
+          value={dateValue}
           onChange={(event) => updateDateInput(event.target.value)}
-          placeholder="dd/mm/yyyy"
-          inputMode="numeric"
-          className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-900 outline-none placeholder:text-slate-400 transition focus:border-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-500"
+          className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-900 outline-none transition focus:border-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
         />
 
         <input
-          type="text"
-          value={timeValue || ''}
+          type="time"
+          value={timeValue}
           onChange={(event) => updateTimeInput(event.target.value)}
-          placeholder="hh:mm"
-          inputMode="numeric"
-          className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-900 outline-none placeholder:text-slate-400 transition focus:border-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-500"
+          className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-900 outline-none transition focus:border-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-white"
         />
       </div>
     </div>
@@ -1211,51 +1351,41 @@ function Textarea({ value, onChange, placeholder, rows = 4, mono = false }) {
 const fieldClass =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 font-bold text-slate-900 outline-none placeholder:text-slate-400 transition focus:border-sky-400 focus:bg-white dark:border-white/10 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-sky-400 dark:focus:bg-slate-950'
 
-function formatDateText(value) {
-  const digits = String(value || '')
-    .replace(/\D/g, '')
-    .slice(0, 8)
 
-  if (digits.length <= 2) return digits
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
-
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+function resolveFileStateKey(nameKey) {
+  return String(nameKey || '').startsWith('document') ? 'documentFile' : 'file'
 }
 
-function formatTimeText(value) {
-  const digits = String(value || '')
-    .replace(/\D/g, '')
-    .slice(0, 4)
+async function uploadSelectedFile(file, folder) {
+  if (!file) {
+    return {
+      name: '',
+      url: '',
+      type: '',
+      path: '',
+    }
+  }
 
-  if (!digits) return ''
-  if (digits.length <= 2) return digits
+  const safeName = `${Date.now()}-${String(file.name || 'file').replace(/[\\/#?%*:|"<>]/g, '-')}`
+  const filePath = `${folder}/${safeName}`
+  const fileRef = ref(storage, filePath)
 
-  const hour = digits.slice(0, 2)
-  const minute = digits.slice(2)
+  await uploadBytes(fileRef, file)
 
-  return `${hour}:${minute}`
+  return {
+    name: file.name || safeName,
+    url: await getDownloadURL(fileRef),
+    type: file.type || '',
+    path: filePath,
+  }
 }
 
-function convertDateTextToIso(value) {
-  const parts = String(value || '').split('/')
+function getOpenAtMs(value) {
+  if (!value) return 0
 
-  if (parts.length !== 3) return ''
+  const time = new Date(value).getTime()
 
-  const [day, month, year] = parts
-
-  if (day.length !== 2 || month.length !== 2 || year.length !== 4) return ''
-
-  return `${year}-${month}-${day}`
-}
-
-function convertIsoDateToText(value) {
-  const parts = String(value || '').split('-')
-
-  if (parts.length !== 3) return ''
-
-  const [year, month, day] = parts
-
-  return `${day}/${month}/${year}`
+  return Number.isFinite(time) ? time : 0
 }
 
 function getTodayValue() {

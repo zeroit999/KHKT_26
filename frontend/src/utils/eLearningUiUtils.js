@@ -4,11 +4,11 @@ export function normalizeRole(role) {
 
 export function isTeacherLike(role) {
   const normalized = normalizeRole(role)
-  return ['TEACHER', 'ADMINDEV', 'ADMIN'].includes(normalized)
+  return ['TEACHER', 'ADMINDEV', 'ADMIN', 'GIAOVIEN', 'GIÁOVIÊN'].includes(normalized)
 }
 
 export function isAdminDev(role) {
-  return normalizeRole(role) === 'ADMINDEV'
+  return ['ADMINDEV', 'ADMIN'].includes(normalizeRole(role))
 }
 
 export function isStudent(role) {
@@ -17,9 +17,11 @@ export function isStudent(role) {
 
 export function formatOpenTime(value) {
   if (!value) return 'Chưa đặt lịch'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('vi-VN', {
+
+  const time = getTimeValue(value)
+  if (!time) return String(value)
+
+  return new Date(time).toLocaleString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
     day: '2-digit',
@@ -32,28 +34,31 @@ export function getStatusText(status) {
   if (status === 'published') return 'Đã xuất bản'
   if (status === 'draft') return 'Bản nháp'
   if (status === 'pending') return 'Chờ duyệt'
+  if (status === 'scheduled') return 'Đã lên lịch'
   return 'Đang cập nhật'
 }
 
 export function resolveDisplayRole(role) {
   const normalized = normalizeRole(role)
 
-  if (
-    normalized === 'ADMINDEV' ||
-    normalized === 'ADMIN_DEV' ||
-    normalized === 'ADMINDEV' ||
-    normalized === 'ADMIN'
-  ) {
+  if (normalized === 'ADMINDEV' || normalized === 'ADMIN') {
     return 'Admin_dev'
   }
 
-  if (
-    normalized === 'TEACHER' ||
-    normalized === 'GIAOVIEN' ||
-    normalized === 'GIÁOVIÊN'
-  ) {
+  if (normalized === 'TEACHER' || normalized === 'GIAOVIEN' || normalized === 'GIÁOVIÊN') {
     return 'TEACHER'
   }
 
   return 'STUDENT'
+}
+
+function getTimeValue(value) {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.toDate === 'function') return value.toDate().getTime()
+  if (value.seconds) return value.seconds * 1000
+
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) ? time : 0
 }

@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
 
 import AppLayout from './components/layout/AppLayout.jsx'
+import LoadingSkeleton from './components/ui/LoadingSkeleton.jsx'
 
 import Home from './pages/Home.jsx'
 import Exams from './pages/exam/Exams.jsx'
@@ -78,27 +79,8 @@ function ScrollToTop() {
 }
 
 function LoadingScreen() {
-  const isDark = document.documentElement.classList.contains('dark')
-
-  return (
-    <div
-      className={`flex min-h-screen items-center justify-center transition-colors duration-300 ${
-        isDark ? 'bg-[#020817] text-white' : 'bg-slate-100 text-slate-900'
-      }`}
-    >
-      <div className="flex flex-col items-center gap-4">
-        <div
-          className={`h-10 w-10 animate-spin rounded-full border-4 border-t-transparent ${
-            isDark ? 'border-cyan-400' : 'border-blue-600'
-          }`}
-        />
-
-        <p className="text-lg font-semibold">Đang tải...</p>
-      </div>
-    </div>
-  )
+  return <LoadingSkeleton />
 }
-
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth()
 
