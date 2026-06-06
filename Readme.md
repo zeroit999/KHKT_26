@@ -47,7 +47,19 @@ cd backend
 ```bash
 npm install
 ```
-## Chạy NodeJS Server
+
+## Tạo môi trường ảo
+'''bash
+python -m venv venv
+''' 
+
+## Kích hoạt môi trường ảo
+'''bash
+venv\Scripts\Activate
+'''
+
+## Cài 
+
 
 
 # Build logic tại Colab:
