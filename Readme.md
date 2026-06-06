@@ -58,7 +58,14 @@ python -m venv venv
 venv\Scripts\Activate
 '''
 
-## Cài 
+## Cài package
+'''bash
+pip install -r requirements.txt
+'''
+
+'''bash
+python app.py
+'''
 
 
 
