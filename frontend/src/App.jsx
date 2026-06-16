@@ -14,6 +14,7 @@ import { Toaster } from 'react-hot-toast'
 
 import AppLayout from './components/layout/AppLayout.jsx'
 import LoadingSkeleton from './components/ui/LoadingSkeleton.jsx'
+import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx'
 
 import Home from './pages/Home.jsx'
 import Exams from './pages/exam/Exams.jsx'
@@ -35,13 +36,13 @@ import Profile from './components/Signpage/profile.jsx'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'
 
-
-
 function getInitialDarkMode() {
   if (typeof window === 'undefined') return false
 
   const savedDarkMode = window.localStorage.getItem('darkMode')
-  const savedTheme = window.localStorage.getItem('theme') || window.localStorage.getItem('color-theme')
+  const savedTheme =
+    window.localStorage.getItem('theme') ||
+    window.localStorage.getItem('color-theme')
 
   if (savedDarkMode === 'true' || savedTheme === 'dark') return true
   if (savedDarkMode === 'false' || savedTheme === 'light') return false
@@ -81,6 +82,7 @@ function ScrollToTop() {
 function LoadingScreen() {
   return <LoadingSkeleton />
 }
+
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth()
 
@@ -142,7 +144,6 @@ function ProfileRoute() {
 
   return <Profile />
 }
-
 
 function LegacyCourseDetailRedirect() {
   const { id } = useParams()
@@ -417,6 +418,8 @@ function App() {
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode((prev) => !prev)}
         />
+
+        <ChatbotWidget />
 
         <Toaster position="top-right" toastOptions={toastOptions} />
       </BrowserRouter>
