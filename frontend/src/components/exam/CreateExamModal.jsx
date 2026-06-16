@@ -1397,7 +1397,7 @@ function CreateExamModal({
         {renderScoreSettings()}
 
         <div className="mt-6 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="sticky top-0 z-20 -mx-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-slate-950/95">
             <div>
               <h3 className="text-xl font-black text-slate-950 dark:text-white">
                 Câu hỏi
@@ -1446,7 +1446,7 @@ function CreateExamModal({
           {form.questions.map(renderQuestion)}
         </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 dark:border-white/10 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 z-30 -mx-6 mt-6 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 px-6 py-5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}

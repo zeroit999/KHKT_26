@@ -1,6 +1,30 @@
-import { AlertTriangle, CheckCircle2, Clock3, LockKeyhole, Maximize2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  LockKeyhole,
+  Maximize2,
+} from 'lucide-react'
 
 import useExamRoom from '../../hooks/exam/useExamRoom'
+
+const renderRichContent = (content = '') => {
+  const rawContent = String(content || '')
+
+  const html = rawContent
+    .replace(
+      /<img\s+/g,
+      '<img class="my-5 max-h-[420px] max-w-full rounded-2xl border border-slate-200 object-contain shadow-sm" ',
+    )
+    .replace(/\n/g, '<br />')
+
+  return (
+    <div
+      className="max-w-none text-3xl font-black leading-tight text-slate-950"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
 
 function ExamRoom() {
   const {
@@ -64,7 +88,8 @@ function ExamRoom() {
           </h1>
 
           <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
-            Bài thi yêu cầu chế độ toàn màn hình. Khi bắt đầu, hệ thống sẽ ghi nhận số lần thoát toàn màn hình.
+            Bài thi yêu cầu chế độ toàn màn hình. Khi bắt đầu, hệ thống sẽ ghi
+            nhận số lần thoát toàn màn hình.
           </p>
 
           <div className="mt-6 rounded-2xl bg-orange-50 p-4 text-left text-sm font-bold text-orange-700">
@@ -99,7 +124,8 @@ function ExamRoom() {
             </h2>
 
             <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
-              Hệ thống đã ghi nhận vi phạm. Bạn phải quay lại toàn màn hình mới được tiếp tục làm bài.
+              Hệ thống đã ghi nhận vi phạm. Bạn phải quay lại toàn màn hình mới
+              được tiếp tục làm bài.
             </p>
 
             <div className="mt-6 rounded-2xl bg-red-50 p-4 text-sm font-black text-red-700">
@@ -116,6 +142,7 @@ function ExamRoom() {
           </div>
         </div>
       )}
+
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
           <div>
@@ -174,9 +201,7 @@ function ExamRoom() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-3xl font-black leading-tight text-slate-950">
-                    {question.question}
-                  </h2>
+                  {renderRichContent(question.question)}
 
                   {question.type === 'truefalse' ? (
                     <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200">

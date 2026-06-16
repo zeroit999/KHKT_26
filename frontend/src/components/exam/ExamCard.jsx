@@ -45,6 +45,7 @@ function ExamCard({
       0,
     ) ?? 0
 
+
   const canRetake = attemptCount < maxAttempts
 
   const isDisabled = !canRetake

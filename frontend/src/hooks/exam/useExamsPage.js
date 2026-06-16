@@ -12,6 +12,38 @@ import {
   teacherSubjects,
 } from '../../utils/examHelpers'
 
+
+const calculateLeaderboardPoints = (score, maxScore = 10) => {
+  const safeMaxScore = Math.max(1, Number(maxScore || 10))
+  const safeScore = Math.max(0, Number(score || 0))
+
+  return Number(((Math.min(safeScore, safeMaxScore) / safeMaxScore) * 1.05).toFixed(2))
+}
+
+const getResultStudentKey = (result = {}) =>
+  String(
+    result.studentId ||
+      result.userId ||
+      result.uid ||
+      result.studentEmail ||
+      result.email ||
+      result.studentName ||
+      result.name ||
+      'unknown',
+  )
+
+const getResultStudentName = (result = {}) =>
+  String(
+    result.studentName ||
+      result.studentDisplayName ||
+      result.displayName ||
+      result.fullName ||
+      result.name ||
+      result.studentEmail ||
+      result.email ||
+      'Tên học sinh',
+  ).trim()
+
 export default function useExamsPage() {
   const navigate = useNavigate()
   const state = useExams()
@@ -62,6 +94,70 @@ export default function useExamsPage() {
         ).toFixed(1)
       : '0.0'
   }, [visibleExams, currentUserId])
+
+
+  const leaderboard = useMemo(() => {
+    const students = new Map()
+
+    visibleExams.forEach((exam) => {
+      const bestByStudentInExam = new Map()
+      const maxScore = Number(exam.totalScore || 10) || 10
+
+      ;(exam.studentResults ?? []).forEach((result) => {
+        const studentKey = getResultStudentKey(result)
+        const score = Number(result.score || 0)
+        const currentBest = bestByStudentInExam.get(studentKey)
+
+        if (!currentBest || score > Number(currentBest.score || 0)) {
+          bestByStudentInExam.set(studentKey, result)
+        }
+      })
+
+      bestByStudentInExam.forEach((result, studentKey) => {
+        const previous = students.get(studentKey) ?? {
+          id: studentKey,
+          name: getResultStudentName(result),
+          points: 0,
+          totalScore: 0,
+          completedExams: 0,
+          bestScore: 0,
+        }
+
+        const score = Number(result.score || 0)
+        const points = calculateLeaderboardPoints(score, maxScore)
+
+        students.set(studentKey, {
+          ...previous,
+          name: previous.name === 'Tên học sinh' ? getResultStudentName(result) : previous.name,
+          points: Number((previous.points + points).toFixed(2)),
+          totalScore: previous.totalScore + score,
+          completedExams: previous.completedExams + 1,
+          bestScore: Math.max(previous.bestScore, score),
+        })
+      })
+    })
+
+    return Array.from(students.values())
+      .map((student) => ({
+        ...student,
+        averageScore: student.completedExams
+          ? Number((student.totalScore / student.completedExams).toFixed(1))
+          : 0,
+      }))
+      .sort((a, b) =>
+        b.points - a.points ||
+        b.averageScore - a.averageScore ||
+        b.bestScore - a.bestScore ||
+        a.name.localeCompare(b.name, 'vi'),
+      )
+      .map((student, index) => ({ ...student, rank: index + 1 }))
+  }, [visibleExams])
+
+  const currentStudentRank = useMemo(() => {
+    if (!currentUserId) return null
+
+    return leaderboard.find((student) => student.id === currentUserId) ?? null
+  }, [leaderboard, currentUserId])
 
   const studentStatCards = [
     {
@@ -245,6 +341,9 @@ export default function useExamsPage() {
     availableSubjects,
     studentStatCards,
     teacherStatCards,
+    leaderboard,
+    currentStudentRank,
+    calculateLeaderboardPoints,
     openByCode,
     copyExamLink,
     previewExam,

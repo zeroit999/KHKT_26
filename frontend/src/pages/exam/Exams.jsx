@@ -1,8 +1,10 @@
 import {
+  Award,
   BookOpen,
   FileText,
   Plus,
   Search,
+  Trophy,
   X,
 } from 'lucide-react'
 
@@ -13,6 +15,7 @@ import StatsModal from '../../components/exam/StatsModal.jsx'
 import ExamCard from '../../components/exam/ExamCard.jsx'
 import TeacherExamRow from '../../components/exam/TeacherExamRow.jsx'
 import StudentResultsModal from '../../components/exam/StudentResultsModal.jsx'
+import DarkModeSelect from '../../components/exam/DarkModeSelect.jsx'
 
 function LoadingState({ dark }) {
   return (
@@ -54,6 +57,71 @@ function StatCard({ label, value, Icon, iconClass }) {
           <Icon className="h-6 w-6" />
         </div>
       </div>
+    </div>
+  )
+}
+
+
+function LeaderboardCard({ leaderboard = [], currentStudentRank = null, compact = false }) {
+  const topStudents = leaderboard.slice(0, compact ? 5 : 10)
+
+  return (
+    <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Trophy className="h-6 w-6 text-amber-500" />
+            <h2 className="text-xl font-black text-slate-950 dark:text-white">
+              Bảng xếp hạng toàn hệ thống
+            </h2>
+          </div>
+          <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+            Điểm cộng = điểm bài thi / 10 × 1.05. Ví dụ: 10đ được +1.05 điểm.
+          </p>
+        </div>
+
+        {currentStudentRank ? (
+          <div className="rounded-2xl bg-amber-100 px-4 py-3 text-sm font-black text-amber-700 dark:bg-amber-500/20 dark:text-amber-100">
+            Hạng của bạn: #{currentStudentRank.rank} • {currentStudentRank.points.toFixed(2)} điểm
+          </div>
+        ) : null}
+      </div>
+
+      {topStudents.length ? (
+        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+          <div className="grid grid-cols-[80px_1fr_120px_120px] gap-3 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:bg-white/5 dark:text-slate-300">
+            <span>Hạng</span>
+            <span>Học sinh</span>
+            <span>Điểm cộng</span>
+            <span>Bài đã làm</span>
+          </div>
+
+          <div className="divide-y divide-slate-200 dark:divide-white/10">
+            {topStudents.map((student) => (
+              <div
+                key={student.id}
+                className="grid grid-cols-[80px_1fr_120px_120px] gap-3 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200"
+              >
+                <span className="inline-flex items-center gap-2 font-black text-amber-600 dark:text-amber-200">
+                  <Award className="h-4 w-4" />
+                  #{student.rank}
+                </span>
+                <span className="truncate text-slate-950 dark:text-white">
+                  {student.name}
+                </span>
+                <span className="font-black text-blue-600 dark:text-blue-200">
+                  {student.points.toFixed(2)}
+                </span>
+                <span>{student.completedExams}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl bg-slate-50 p-6 text-center text-sm font-bold text-slate-500 dark:bg-white/5 dark:text-slate-300">
+          Chưa có dữ liệu xếp hạng.
+        </div>
+      )}
     </div>
   )
 }
@@ -100,18 +168,18 @@ function StudentView(page) {
                 />
               </div>
 
-              <select
+              <DarkModeSelect
                 value={page.subjectFilter}
-                onChange={(event) => page.setSubjectFilter(event.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
-              >
-                <option value="all">Tất cả môn học</option>
-                {page.availableSubjects.map((subject) => (
-                  <option key={subject} value={subject}>
-                    {subject}
-                  </option>
-                ))}
-              </select>
+                onChange={page.setSubjectFilter}
+                options={[
+                  { value: 'all', label: 'Tất cả môn học' },
+                  ...page.availableSubjects.map((subject) => ({
+                    value: subject,
+                    label: subject,
+                  })),
+                ]}
+                buttonClassName="rounded-xl bg-white px-4 py-3 text-sm dark:bg-slate-900"
+              />
 
               <div className="flex gap-2">
                 <input
@@ -130,6 +198,12 @@ function StudentView(page) {
               </div>
             </div>
           </div>
+
+          <LeaderboardCard
+            leaderboard={page.leaderboard}
+            currentStudentRank={page.currentStudentRank}
+            compact
+          />
 
           {page.visibleExams.length ? (
             <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -209,13 +283,6 @@ function TeacherView(page) {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={page.openStatsModal}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-              >
-                Thống kê
-              </button>
-
-              <button
                 onClick={page.openCreateModal}
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
               >
@@ -245,28 +312,32 @@ function TeacherView(page) {
                 />
               </div>
 
-              <select
+              <DarkModeSelect
                 value={page.privacyFilter}
-                onChange={(event) => page.setPrivacyFilter(event.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
-              >
-                <option value="all">Tất cả đề thi</option>
-                <option value="public">Công khai</option>
-                <option value="private">Riêng tư</option>
-              </select>
+                onChange={page.setPrivacyFilter}
+                options={[
+                  { value: 'all', label: 'Tất cả đề thi' },
+                  { value: 'public', label: 'Công khai' },
+                  { value: 'private', label: 'Riêng tư' },
+                ]}
+                buttonClassName="rounded-xl bg-white px-4 py-3 text-sm dark:bg-slate-900"
+              />
 
-              <select
+              <DarkModeSelect
                 value={page.publishFilter}
-                onChange={(event) => page.setPublishFilter(event.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="published">Hoạt động</option>
-                <option value="draft">Chưa mở</option>
-                <option value="ended">Đã kết thúc</option>
-              </select>
+                onChange={page.setPublishFilter}
+                options={[
+                  { value: 'all', label: 'Tất cả trạng thái' },
+                  { value: 'published', label: 'Hoạt động' },
+                  { value: 'draft', label: 'Chưa mở' },
+                  { value: 'ended', label: 'Đã kết thúc' },
+                ]}
+                buttonClassName="rounded-xl bg-white px-4 py-3 text-sm dark:bg-slate-900"
+              />
             </div>
           </div>
+
+          <LeaderboardCard leaderboard={page.leaderboard} />
 
           {page.visibleExams.length ? (
             <div className="mt-5 space-y-4">

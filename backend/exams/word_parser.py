@@ -1,5 +1,8 @@
+import base64
 import re
+
 from docx import Document
+from docx.oxml.ns import qn
 
 
 SECTION_PATTERNS = [
@@ -20,6 +23,34 @@ def create_id(prefix, index):
 
 def is_underlined_run(run):
     return bool(run.underline)
+
+
+def build_image_html(image_part):
+    content_type = image_part.content_type or "image/png"
+    image_base64 = base64.b64encode(image_part.blob).decode("utf-8")
+    return f'<img src="data:{content_type};base64,{image_base64}" />'
+
+
+def get_run_images(run, document):
+    images = []
+
+    for element in run._element.iter():
+        if not str(element.tag).endswith("}blip"):
+            continue
+
+        embed_id = element.get(qn("r:embed"))
+
+        if not embed_id:
+            continue
+
+        image_part = document.part.related_parts.get(embed_id)
+
+        if not image_part:
+            continue
+
+        images.append(build_image_html(image_part))
+
+    return images
 
 
 def split_segments(text):
@@ -46,25 +77,44 @@ def split_segments(text):
     return segments
 
 
+def flush_text_segments(text, underlined_text, segments):
+    for item in split_segments(text):
+        segments.append({
+            "text": item,
+            "underlinedText": underlined_text,
+            "isImage": False,
+        })
+
+
 def read_segments(file_stream):
     document = Document(file_stream)
     segments = []
 
     for paragraph in document.paragraphs:
-        text = paragraph.text or ""
-
-        if not text.strip():
-            continue
-
         underlined_text = normalize_space(
             " ".join(run.text for run in paragraph.runs if is_underlined_run(run))
         )
 
-        for item in split_segments(text):
-            segments.append({
-                "text": item,
-                "underlinedText": underlined_text,
-            })
+        text_buffer = ""
+
+        for run in paragraph.runs:
+            if run.text:
+                text_buffer += run.text
+
+            run_images = get_run_images(run, document)
+
+            if run_images:
+                flush_text_segments(text_buffer, underlined_text, segments)
+                text_buffer = ""
+
+                for image_html in run_images:
+                    segments.append({
+                        "text": image_html,
+                        "underlinedText": "",
+                        "isImage": True,
+                    })
+
+        flush_text_segments(text_buffer, underlined_text, segments)
 
     return segments
 
@@ -81,7 +131,6 @@ def detect_section(text, current_section):
 
 def is_section_line(text):
     upper = normalize_space(text).upper()
-
     return any(re.search(pattern, upper) for _, pattern in SECTION_PATTERNS)
 
 
@@ -203,6 +252,9 @@ def parse_part2_answer(segment):
 
 
 def parse_answer_segment(segment, section):
+    if segment.get("isImage"):
+        return None
+
     if section == "part2":
         return parse_part2_answer(segment)
 
@@ -281,6 +333,12 @@ def finalize_question(question, questions):
     questions.append(question)
 
 
+def append_to_question(question, content):
+    question["question"] = normalize_space(
+        f"{question.get('question', '')}\n{content}"
+    )
+
+
 def parse_docx_exam(file_stream):
     segments = read_segments(file_stream)
 
@@ -294,6 +352,13 @@ def parse_docx_exam(file_stream):
         text = normalize_space(segment["text"])
 
         if not text:
+            continue
+
+        if segment.get("isImage"):
+            if current_question:
+                append_to_question(current_question, text)
+            elif current_passage:
+                current_passage = normalize_space(f"{current_passage}\n{text}")
             continue
 
         detected_section = detect_section(text, current_section)
@@ -351,9 +416,7 @@ def parse_docx_exam(file_stream):
             current_question["_parsedAnswers"].append(parsed_answer)
             continue
 
-        current_question["question"] = normalize_space(
-            f"{current_question.get('question', '')}\n{text}"
-        )
+        append_to_question(current_question, text)
 
     finalize_question(current_question, questions)
 
