@@ -18,6 +18,7 @@ load_dotenv()
 
 
 DEFAULT_ALLOWED_ORIGINS = [
+    "https://ai-exam-monitoring.vercel.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
@@ -117,15 +118,10 @@ def configure_cors(app):
         app,
         resources={
             r"/*": {
-                "origins": [
-                    "http://localhost:5173",
-                    "http://127.0.0.1:5173",
-                    "http://localhost:3000",
-                    "http://127.0.0.1:3000",
-                ],
+                "origins": get_allowed_origins(),
             }
         },
-        supports_credentials=False,
+        supports_credentials=True,
         allow_headers=[
             "Content-Type",
             "Authorization",

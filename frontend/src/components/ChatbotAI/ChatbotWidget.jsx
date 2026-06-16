@@ -3,10 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
 
-const API_URL = import.meta.env.VITE_API_URL
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
-if (!API_URL) {
-  throw new Error('Missing environment variable: VITE_API_URL')
+if (!API_BASE_URL) {
+  throw new Error('Missing environment variable: VITE_API_BASE_URL')
 }
 
 function normalizeReply(text) {
@@ -92,7 +92,7 @@ export default function ChatbotWidget() {
     setLoading(true)
 
     try {
-      const response = await fetch(`${API_URL}/api/chat`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
@@ -104,14 +104,17 @@ export default function ChatbotWidget() {
 
       const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data?.reply || 'Không thể kết nối tới ZUNY AI.')
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           role: 'assistant',
           content: normalizeReply(
-            data.reply ||
-              'Xin lỗi, tôi chưa có câu trả lời cho câu hỏi này.'
+            data.reply || 'Xin lỗi, tôi chưa có câu trả lời cho câu hỏi này.',
           ),
         },
       ])
@@ -121,8 +124,7 @@ export default function ChatbotWidget() {
         {
           id: Date.now() + 1,
           role: 'assistant',
-          content:
-            'Không thể kết nối tới ZUNY AI. Vui lòng thử lại sau.',
+          content: 'Không thể kết nối tới ZUNY AI. Vui lòng thử lại sau.',
         },
       ])
     } finally {
@@ -227,9 +229,7 @@ export default function ChatbotWidget() {
                 <div
                   key={message.id}
                   className={`mb-4 flex items-end gap-3 ${
-                    message.role === 'user'
-                      ? 'justify-end'
-                      : 'justify-start'
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
                   {message.role === 'assistant' && (
