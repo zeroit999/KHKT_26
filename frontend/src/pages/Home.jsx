@@ -242,15 +242,6 @@ function Home() {
                   Bắt đầu luyện thi
                 </GradientButton>
               </Link>
-
-              <Link to="/dashboard">
-                <GradientButton
-                  variant="subtle"
-                  icon={BarChart3}
-                >
-                  Xem dashboard
-                </GradientButton>
-              </Link>
             </motion.div>
           </div>
 

@@ -1,4 +1,4 @@
-import { Bot, Send, X } from 'lucide-react'
+import { Send, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
@@ -32,6 +32,10 @@ export default function ChatbotWidget() {
   const isDark = useSyncedDarkMode()
   const messagesEndRef = useRef(null)
   const { user, userDetails } = useAuth()
+
+  const botLogo = isDark
+    ? '/logo_chatbot-darkmode.png'
+    : '/logo_chatbot-lightmode.png'
 
   const userName =
     userDetails?.displayName ||
@@ -132,6 +136,27 @@ export default function ChatbotWidget() {
     }
   }
 
+  const renderBotAvatar = (size = 'small') => {
+    const sizeClass = size === 'large' ? 'h-10 w-10 rounded-2xl' : 'h-8 w-8 rounded-full'
+    const imgSizeClass = size === 'large' ? 'h-8 w-8' : 'h-6 w-6'
+
+    return (
+      <div
+        className={`flex shrink-0 items-center justify-center overflow-hidden shadow-sm ${sizeClass} ${
+          isDark
+            ? 'bg-violet-500 text-white shadow-violet-500/30'
+            : 'bg-cyan-500 text-white shadow-cyan-500/30'
+        }`}
+      >
+        <img
+          src={botLogo}
+          alt="ZUNY AI"
+          className={`${imgSizeClass} object-contain`}
+        />
+      </div>
+    )
+  }
+
   const renderUserAvatar = () => (
     <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#9b7b6a] text-xs font-bold text-white shadow-sm">
       {userAvatar ? (
@@ -185,15 +210,7 @@ export default function ChatbotWidget() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg ${
-                    isDark
-                      ? 'bg-violet-500 text-white shadow-violet-500/30'
-                      : 'bg-cyan-500 text-white shadow-cyan-500/30'
-                  }`}
-                >
-                  <Bot className="h-5 w-5" />
-                </div>
+                {renderBotAvatar('large')}
 
                 <div>
                   <h2 className="text-sm font-black leading-none">
@@ -219,6 +236,7 @@ export default function ChatbotWidget() {
                     ? 'text-violet-300 hover:bg-violet-500/20'
                     : 'text-cyan-600 hover:bg-cyan-100'
                 }`}
+                aria-label="Đóng chatbot"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -232,17 +250,7 @@ export default function ChatbotWidget() {
                     message.role === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  {message.role === 'assistant' && (
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${
-                        isDark
-                          ? 'bg-violet-500 text-white'
-                          : 'bg-cyan-500 text-white'
-                      }`}
-                    >
-                      <Bot className="h-4 w-4" />
-                    </div>
-                  )}
+                  {message.role === 'assistant' && renderBotAvatar()}
 
                   <div
                     className={`max-w-[70%] break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
@@ -264,15 +272,7 @@ export default function ChatbotWidget() {
 
               {loading && (
                 <div className="mb-4 flex items-end gap-3">
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${
-                      isDark
-                        ? 'bg-violet-500 text-white'
-                        : 'bg-cyan-500 text-white'
-                    }`}
-                  >
-                    <Bot className="h-4 w-4" />
-                  </div>
+                  {renderBotAvatar()}
 
                   <div
                     className={`max-w-[70%] rounded-2xl rounded-bl-md px-4 py-3 text-sm shadow-sm ${
@@ -332,6 +332,7 @@ export default function ChatbotWidget() {
                       ? 'bg-violet-500 hover:bg-violet-600'
                       : 'bg-cyan-500 hover:bg-cyan-600'
                   }`}
+                  aria-label="Gửi tin nhắn"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -345,13 +346,18 @@ export default function ChatbotWidget() {
         <button
           type="button"
           onClick={handleToggle}
-          className={`flex h-14 w-14 items-center justify-center rounded-full border shadow-xl transition-all duration-500 hover:scale-105 ${
+          className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border shadow-xl transition-all duration-500 hover:scale-105 ${
             isDark
-              ? 'border-violet-400/40 bg-[#080808] text-white shadow-violet-500/30'
-              : 'border-cyan-200 bg-white text-cyan-700 shadow-cyan-500/30'
+              ? 'border-violet-400/40 bg-[#080808] shadow-violet-500/30'
+              : 'border-cyan-200 bg-white shadow-cyan-500/30'
           }`}
+          aria-label="Mở chatbot"
         >
-          <Bot className="h-7 w-7" />
+          <img
+            src={botLogo}
+            alt="ZUNY AI"
+            className="h-10 w-10 object-contain"
+          />
         </button>
       )}
     </div>
