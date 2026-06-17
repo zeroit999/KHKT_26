@@ -76,7 +76,7 @@ export default function Navbar({
       { label: 'Đề thi', path: '/exams' },
       { label: 'E-Learning', path: '/e-learning' },
       { label: 'Xếp hạng', path: '/leaderboard' },
-      { label: 'Dashboard', path: '/dashboard' },
+      { label: 'Cộng đồng', path: '/forum' },
       ...(userDetails?.role === 'TEACHER'
         ? [{ label: 'Quản lý lớp học', path: '/classes' }]
         : []),

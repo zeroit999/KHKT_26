@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Award,
   BookOpen,
@@ -6,8 +6,10 @@ import {
   ChevronDown,
   Filter,
   Flame,
+  Gem,
   Medal,
   RefreshCcw,
+  Rocket,
   Search,
   ShieldCheck,
   Sparkles,
@@ -19,7 +21,6 @@ import {
   UserRound,
   UsersRound,
   X,
-  Zap,
 } from 'lucide-react'
 import { collection, getDocs } from 'firebase/firestore'
 
@@ -90,6 +91,25 @@ const getStudentName = (student = {}) => {
     student.studentEmail ||
     'Học sinh'
   )
+}
+
+const getInitial = (value = '') => {
+  const text = String(value || '').trim()
+
+  if (!text) return 'HS'
+
+  const words = text
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (!words.length) return 'HS'
+
+  const initials = words
+    .slice(-2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('')
+
+  return initials || text.charAt(0).toUpperCase() || 'HS'
 }
 
 const getStudentHandle = (student = {}) => {
@@ -267,9 +287,7 @@ const getBadgeList = (student = {}) => {
 
   if (student.rank === 1) badges.push({ icon: Trophy, label: 'Quán quân', className: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200' })
   if (student.points >= 800) badges.push({ icon: ShieldCheck, label: 'Olympian', className: 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200' })
-  if (student.submissions >= 10) badges.push({ icon: BookOpen, label: 'Học giả', className: 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-200' })
   if (student.streak >= 7) badges.push({ icon: Flame, label: 'Chăm chỉ', className: 'bg-orange-100 text-orange-700 dark:bg-orange-400/15 dark:text-orange-200' })
-  if (student.averageScore >= 8) badges.push({ icon: Zap, label: 'Hiệu suất cao', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' })
   if (student.rank === 2) badges.push({
     icon: Medal,
     label: 'Ngôi sao bạc',
@@ -306,30 +324,6 @@ const getBadgeList = (student = {}) => {
     className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
   })
 
-  if (student.averageScore >= 9) badges.push({
-    icon: Brain,
-    label: 'Xuất sắc',
-    className: 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300'
-  })
-
-  if (student.averageScore === 10) badges.push({
-    icon: Sparkles,
-    label: 'Điểm tuyệt đối',
-    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
-  })
-
-    if (student.submissions >= 20) badges.push({
-    icon: BookMarked,
-    label: 'Nộp bài đều đặn',
-    className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
-  })
-
-  if (student.submissions >= 50) badges.push({
-    icon: Library,
-    label: 'Máy cày bài',
-    className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
-  })
-
   return badges.slice(0, 3)
 }
 
@@ -349,6 +343,24 @@ const calculateStreak = (dateKeys = []) => {
   return streak
 }
 
+const getStartOfLocalDay = (value = Date.now()) => {
+  const date = new Date(value)
+  date.setHours(0, 0, 0, 0)
+  return date.getTime()
+}
+
+const getEndOfLocalDay = (value = Date.now()) => {
+  const date = new Date(value)
+  date.setHours(23, 59, 59, 999)
+  return date.getTime()
+}
+
+const isSameLocalDate = (value, compareValue = Date.now()) => {
+  const millis = toMillis(value)
+  if (!millis) return false
+  return millis >= getStartOfLocalDay(compareValue) && millis <= getEndOfLocalDay(compareValue)
+}
+
 function LoadingState({ dark }) {
   return (
     <div className={dark ? 'dark' : ''}>
@@ -363,6 +375,46 @@ function LoadingState({ dark }) {
           </p>
         </div>
       </section>
+    </div>
+  )
+}
+
+function RankingGuideModal({ open, onClose }) {
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-950"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">
+              <Trophy className="h-4 w-4" />
+              Hướng dẫn bảng xếp hạng
+            </p>
+            <h2 className="mt-4 text-3xl font-black text-slate-950 dark:text-white">
+              Hướng dẫn chưa có
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-base font-black text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+          Hướng dẫn chưa có
+        </div>
+      </div>
     </div>
   )
 }
@@ -462,7 +514,7 @@ function BadgePills({ badges }) {
   )
 }
 
-function LeaderboardHeroBackground({ students, totalSubmissions, highestPoint, currentChampion }) {
+function LeaderboardHeroBackground({ students, highestPoint, currentChampion, onOpenGuide }) {
   const championTime =
     currentChampion?.latestSubmitAt ||
     (currentChampion?.firstSubmitAt === Number.MAX_SAFE_INTEGER ? 0 : currentChampion?.firstSubmitAt)
@@ -472,11 +524,24 @@ function LeaderboardHeroBackground({ students, totalSubmissions, highestPoint, c
       <div className="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.04)_1px,transparent_1px)] bg-[size:48px_48px] dark:bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)]" />
 
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8 inline-flex items-center gap-3 rounded-full bg-white/80 px-4 py-2 text-sm font-black uppercase tracking-[0.16em] text-blue-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-blue-200 dark:ring-white/10">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white">
-            <Star className="h-5 w-5 fill-current" />
-          </span>
-          Ranking Overview
+        <div className="mb-8 flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white/80 px-4 py-2 text-sm font-black uppercase tracking-[0.16em] text-blue-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-blue-200 dark:ring-white/10">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white">
+              <Star className="h-5 w-5 fill-current" />
+            </span>
+            Ranking Overview
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenGuide}
+            className="inline-flex cursor-pointer items-center gap-3 rounded-full bg-white/80 px-4 py-2 text-sm font-black uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:bg-emerald-50 hover:ring-emerald-200 dark:bg-white/5 dark:text-emerald-200 dark:ring-white/10 dark:hover:bg-emerald-400/10 dark:hover:ring-emerald-300/30"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+              <BookOpen className="h-5 w-5" />
+            </span>
+            Hướng dẫn
+          </button>
         </div>
 
         <div className="grid gap-8 xl:grid-cols-[1fr_380px] xl:items-end">
@@ -501,10 +566,6 @@ function LeaderboardHeroBackground({ students, totalSubmissions, highestPoint, c
                 <UsersRound className="h-4 w-4" />
                 {students.length} học sinh
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 dark:border-indigo-300/20 dark:bg-indigo-400/10 dark:text-indigo-200">
-                <BookOpen className="h-4 w-4" />
-                {totalSubmissions.toLocaleString('vi-VN')} bài làm
-              </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-700 dark:border-amber-300/20 dark:bg-amber-400/10 dark:text-amber-200">
                 <Flame className="h-4 w-4" />
                 Cao nhất: {highestPoint} điểm
@@ -520,7 +581,7 @@ function LeaderboardHeroBackground({ students, totalSubmissions, highestPoint, c
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-600 dark:text-amber-300">
-                  Lần cuối đứng giải nhất
+                  Thời gian học sinh đã đứng đầu bảng xếp hạng
                 </p>
                 <h2 className="mt-2 truncate text-xl font-black text-slate-950 dark:text-white">
                   {currentChampion?.name || 'Chưa có giải nhất'}
@@ -530,7 +591,7 @@ function LeaderboardHeroBackground({ students, totalSubmissions, highestPoint, c
                 </p>
                 {currentChampion && (
                   <p className="mt-3 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-400/15 dark:text-amber-200">
-                    {currentChampion.points} điểm • {currentChampion.submissions} bài làm
+                    {currentChampion.points} điểm
                   </p>
                 )}
               </div>
@@ -599,17 +660,13 @@ function PodiumCard({ item, spot, equalRankHeight, onOpenProfile }) {
         <p className="mt-1 truncate text-sm font-bold text-blue-600 dark:text-blue-300">{item.handle}</p>
         <p className="mt-3 line-clamp-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{item.school}</p>
         <span className="mt-4 inline-flex rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300">
-          • Lớp {item.className || '—'}
+         {item.className || 'Chưa cập nhật khối'}
         </span>
         <BadgePills badges={badges} />
-        <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
             <p className={`text-xl font-black ${textByRank[rank] || textByRank[3]}`}>{item.points}</p>
             <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">điểm</p>
-          </div>
-          <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
-            <p className="text-xl font-black text-slate-800 dark:text-slate-200">{item.submissions}</p>
-            <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">bài</p>
           </div>
           <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
             <p className="text-xl font-black text-orange-600 dark:text-orange-300">{item.streak}</p>
@@ -695,47 +752,122 @@ function ProfileModal({ student, onClose }) {
   if (!student) return null
 
   const badges = getBadgeList(student)
+  const streak = Number(student.streak || 0)
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
       <div
         className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl text-3xl font-black ${student.avatarClass}`}>
-              {student.initial}
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-emerald-400 to-cyan-500 text-3xl font-black text-white">
+              {getInitial(student.name)}
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-300">
                 Hồ sơ học sinh
               </p>
-              <h2 className="mt-2 truncate text-3xl font-black text-slate-950 dark:text-white">
+              <h2 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">
                 {student.name}
               </h2>
-              <p className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-300">{student.handle}</p>
+              <p className="mt-1 text-sm font-bold text-blue-500">
+                @{student.username}
+              </p>
+
+              {badges.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {badges.map((badge) => {
+                    const Icon = badge.icon
+
+                    return (
+                      <span
+                        key={badge.label}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400/15 px-3 py-1 text-xs font-black text-yellow-300"
+                      >
+                        {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                        {badge.label}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="cursor-pointer rounded-2xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <BadgePills badges={badges} />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
+            <Trophy className="h-5 w-5 text-violet-300" />
+            <p className="mt-4 text-2xl font-black text-slate-950 dark:text-white">
+              #{student.rank}
+            </p>
+            <p className="text-xs font-bold text-slate-400">Hạng</p>
+          </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <ProfileMetric label="Hạng" value={`#${student.rank}`} Icon={Trophy} />
-          <ProfileMetric label="Điểm" value={student.points} Icon={Target} />
-          <ProfileMetric label="Bài làm" value={student.submissions} Icon={BookOpen} />
-          <ProfileMetric label="Streak" value={`${student.streak} ngày`} Icon={Flame} />
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
+            <Target className="h-5 w-5 text-violet-300" />
+            <p className="mt-4 text-2xl font-black text-slate-950 dark:text-white">
+              {student.points}
+            </p>
+            <p className="text-xs font-bold text-slate-400">Điểm</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
+            <Flame
+              className={`h-5 w-5 ${
+                streak > 0
+                  ? 'fill-red-500 text-red-500'
+                  : 'fill-slate-500 text-slate-500 opacity-60'
+              }`}
+            />
+            <p className="mt-4 text-2xl font-black text-slate-950 dark:text-white">
+              {streak} ngày
+            </p>
+            <p className="text-xs font-bold text-slate-400">Streak</p>
+          </div>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <InfoPanel label="Trường / Lớp" value={student.school} />
-          <InfoPanel label="Lớp" value={student.className || 'Chưa cập nhật'} />
-          <InfoPanel label="Điểm trung bình" value={student.averageScore.toFixed(1)} />
-          <InfoPanel label="Lần nộp gần nhất" value={formatDateTimeText(student.latestSubmitAt)} />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+              Trường / Lớp
+            </p>
+            <p className="mt-3 font-black text-slate-950 dark:text-white">
+              {student.school || 'Chưa cập nhật'}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+              Lớp
+            </p>
+            <p className="mt-3 font-black text-slate-950 dark:text-white">
+              {student.className || 'Chưa cập nhật'}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5 sm:col-span-2">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+              Lần nộp gần nhất
+            </p>
+            <p className="mt-3 font-black text-slate-950 dark:text-white">
+              {student.lastSubmitText || 'Chưa có thời gian'}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -772,12 +904,12 @@ function aggregateGroups(students, scope, firebaseClasses = []) {
       return
     }
 
-    const key = scope === 'class' ? studentClassName || 'Chưa có lớp trong Firebase' : student.school || 'Chưa cập nhật'
+    const key = scope === 'class' ? studentClassName || 'Chưa có lớp trong dữ liệu' : student.school || 'Chưa cập nhật'
     const existing = groupMap.get(key) || {
       id: key,
       name: key,
       handle: scope === 'class' ? 'BXH lớp' : 'BXH trường',
-      school: scope === 'class' ? 'Dữ liệu từ Firebase classes' : 'Nhóm theo trường',
+      school: scope === 'class' ? 'Dữ liệu từ classes' : 'Nhóm theo trường',
       grade: scope === 'class' ? '—' : '—',
       className: key,
       initial: key.charAt(0).toUpperCase() || 'N',
@@ -786,7 +918,6 @@ function aggregateGroups(students, scope, firebaseClasses = []) {
       submissions: 0,
       solved: 0,
       streak: 0,
-      averageScore: 0,
       latestSubmitAt: 0,
       firstSubmitAt: Number.MAX_SAFE_INTEGER,
       memberCount: 0,
@@ -800,7 +931,6 @@ function aggregateGroups(students, scope, firebaseClasses = []) {
     existing.latestSubmitAt = Math.max(existing.latestSubmitAt, student.latestSubmitAt)
     existing.firstSubmitAt = Math.min(existing.firstSubmitAt, student.firstSubmitAt)
     existing.memberCount += 1
-    existing.averageScore = existing.submissions ? existing.points / existing.submissions / 100 : 0
 
     groupMap.set(key, existing)
   })
@@ -832,10 +962,12 @@ function Leaderboard() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
+  const filterBoxRef = useRef(null)
   const [activeScope, setActiveScope] = useState('student')
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
   const [selectedStudent, setSelectedStudent] = useState(null)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   const currentUserId = auth.currentUser?.uid || ''
 
@@ -970,6 +1102,24 @@ function Leaderboard() {
     loadLeaderboard()
   }, [])
 
+
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (!filterOpen) return
+
+    if (
+      filterBoxRef.current &&
+      !filterBoxRef.current.contains(event.target)
+    ) {
+      setFilterOpen(false)
+    }
+  }
+
+  document.addEventListener('mousedown', handleClickOutside)
+
+  return () => document.removeEventListener('mousedown', handleClickOutside)
+}, [filterOpen])
+
   const computedStudents = useMemo(() => {
     const { start, end } = getTimeWindowRange(activeTime, dateFrom, dateTo)
     const windowEnd = end || Date.now()
@@ -1000,7 +1150,6 @@ function Leaderboard() {
       const submissions = scopedItems.length
       const latestSubmitAt = scopedItems.reduce((max, item) => Math.max(max, item.submitAt), 0)
       const firstSubmitAt = scopedItems.reduce((min, item) => (item.submitAt ? Math.min(min, item.submitAt) : min), Number.MAX_SAFE_INTEGER)
-      const averageScore = submissions ? scopedItems.reduce((total, item) => total + Number(item.score || 0), 0) / submissions : 0
 
       return {
         ...student,
@@ -1010,7 +1159,6 @@ function Leaderboard() {
         solved: Object.keys(bestByExam).length,
         latestSubmitAt,
         firstSubmitAt,
-        averageScore,
       }
     })
 
@@ -1020,7 +1168,6 @@ function Leaderboard() {
       const timeB = b.firstSubmitAt ?? Number.MAX_SAFE_INTEGER
       if (timeA !== timeB) return timeA - timeB
       if (b.solved !== a.solved) return b.solved - a.solved
-      if (a.submissions !== b.submissions) return a.submissions - b.submissions
       return String(a.name).localeCompare(String(b.name), 'vi')
     })
 
@@ -1098,8 +1245,6 @@ function Leaderboard() {
     const podiumIds = new Set(podium.map((student) => student.id))
     return { topThree: podium, rest: scopedRows.filter((student) => !podiumIds.has(student.id)) }
   }, [scopedRows, searchKeyword, visibleRows, activeScope])
-
-  const totalSubmissions = computedStudents.reduce((total, student) => total + student.submissions, 0)
   const highestPoint = computedStudents.reduce((max, student) => Math.max(max, student.points), 0)
   const currentChampion = scopedRows.find((student) => student.rank === 1)
   const currentUserRow = scopedRows.find((student) => student.id === currentUserId || student.uid === currentUserId)
@@ -1111,14 +1256,14 @@ function Leaderboard() {
       <section className="min-h-screen bg-slate-50 text-slate-950 transition dark:bg-slate-950 dark:text-white">
         <LeaderboardHeroBackground
           students={computedStudents}
-          totalSubmissions={totalSubmissions}
           highestPoint={highestPoint}
           currentChampion={currentChampion}
+          onOpenGuide={() => setGuideOpen(true)}
         />
 
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="relative w-full lg:w-auto">
+            <div ref={filterBoxRef} className="relative w-full lg:w-auto">
               <button
                 type="button"
                 onClick={() => setFilterOpen((current) => !current)}
@@ -1267,13 +1412,12 @@ function Leaderboard() {
               {!searchKeyword && activeScope === 'student' && topThree.length > 0 && <PodiumStage topThree={topThree} onOpenProfile={setSelectedStudent} />}
 
               <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-2xl dark:shadow-black/20">
-                <div className="grid grid-cols-[90px_1.45fr_130px_120px_120px_120px] gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400 max-lg:hidden">
+                <div className="grid grid-cols-[90px_1.45fr_130px_130px_130px] gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400 max-lg:hidden">
                   <span>Hạng</span>
                   <span>{activeScope === 'student' ? 'Học sinh' : activeScope === 'class' ? 'Lớp' : 'Trường'}</span>
                   <span>{activeScope === 'class' ? 'Thành viên' : 'Lớp'}</span>
-                  <span>Số bài</span>
-                  <span>TB</span>
-                  <span className="text-right">Điểm</span>
+<span>Điểm</span>
+<span className="text-right">Streak</span>
                 </div>
 
                 <div className="divide-y divide-slate-200 dark:divide-white/10">
@@ -1286,7 +1430,7 @@ function Leaderboard() {
                         key={student.id}
                         type="button"
                         onClick={() => activeScope === 'student' && setSelectedStudent(student)}
-                        className={`grid w-full cursor-pointer gap-4 px-6 py-4 text-left text-sm font-semibold text-slate-600 transition dark:text-slate-300 lg:grid-cols-[90px_1.45fr_130px_120px_120px_120px] lg:items-center ${
+                        className={`grid w-full cursor-pointer gap-4 px-6 py-4 text-left text-sm font-semibold text-slate-600 transition dark:text-slate-300 lg:grid-cols-[90px_1.45fr_130px_130px_130px] lg:items-center ${
                           isMe
                             ? 'bg-cyan-50 ring-2 ring-inset ring-cyan-300 dark:bg-cyan-400/10 dark:ring-cyan-300/40'
                             : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'
@@ -1329,24 +1473,29 @@ function Leaderboard() {
 
                         <div>
                           <span className="inline-flex rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300">
-                            {activeScope === 'class' ? `${student.memberCount || 0} thành viên` : `• Lớp ${student.className || '—'}`}
+                            {activeScope === 'class' ? `${student.memberCount || 0} thành viên` : `•  ${student.className || '—'}`}
                           </span>
                         </div>
 
-                        <div>
-                          <p className="text-base font-black text-slate-950 dark:text-white">{student.submissions}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-500">bài làm</p>
-                        </div>
+                     <div>
+  <p className="text-lg font-black text-blue-700 dark:text-blue-200">
+    {student.points}
+  </p>
+  <p className="text-xs text-slate-500 dark:text-slate-500">điểm</p>
+</div>
 
-                        <div>
-                          <p className="text-base font-black text-emerald-700 dark:text-emerald-200">{student.averageScore.toFixed(1)}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-500">điểm TB</p>
-                        </div>
-
-                        <div className="lg:text-right">
-                          <p className="text-lg font-black text-blue-700 dark:text-blue-200">{student.points}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-500">điểm</p>
-                        </div>
+<div className="flex items-center justify-end gap-2">
+  {Number(student.streak || 0) > 0 ? (
+    <>
+      <span className="text-lg font-black text-orange-500">
+        {student.streak}
+      </span>
+      <Flame className="h-5 w-5 fill-red-500 text-red-500" />
+    </>
+  ) : (
+    <Flame className="h-5 w-5 fill-slate-500 text-slate-500 opacity-60" />
+  )}
+</div>
                       </button>
                     )
                   })}
@@ -1364,6 +1513,10 @@ function Leaderboard() {
         </main>
 
         <ProfileModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />
+        <RankingGuideModal
+          open={guideOpen}
+          onClose={() => setGuideOpen(false)}
+        />
       </section>
     </div>
   )

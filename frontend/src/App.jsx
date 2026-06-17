@@ -20,12 +20,11 @@ import Home from './pages/Home.jsx'
 import Exams from './pages/exam/Exams.jsx'
 import ExamRoom from './pages/exam/ExamRoom.jsx'
 import ResultPage from './pages/exam/ResultPage.jsx'
-import Dashboard from './pages/dashboard/Dashboard.jsx'
-import Leaderboard from './pages/dashboard/Leaderboard.jsx'
+import Forum from './pages/forum/Forum.jsx'
+import Leaderboard from './pages/leaderboard/Leaderboard.jsx'
 import ELearning from './pages/e-learning/E-learning.jsx'
 import ELearningDetail from './pages/e-learning/E-learningDetail.jsx'
 import LearningPage from './pages/learning/LearningPage.jsx'
-import AdminDashboard from './pages/dashboard/AdminDashboard.jsx'
 import Classes from './pages/learning/Classes.jsx'
 import Setup from './pages/auth/Setup.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -258,10 +257,10 @@ function AppContent({ darkMode, onToggleDarkMode }) {
               />
 
               <Route
-                path="/dashboard"
+                path="/Forum"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <Forum />
                   </ProtectedRoute>
                 }
               />
@@ -332,14 +331,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 }
               />
 
-              <Route
-                path="/admin"
-                element={
-                  <AdminDevRoute>
-                    <AdminDashboard />
-                  </AdminDevRoute>
-                }
-              />
+
 
               <Route path="*" element={<NotFound />} />
             </Routes>
