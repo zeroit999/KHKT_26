@@ -28,6 +28,7 @@ import LearningPage from './pages/learning/LearningPage.jsx'
 import Classes from './pages/learning/Classes.jsx'
 import Setup from './pages/auth/Setup.jsx'
 import NotFound from './pages/NotFound.jsx'
+import Setting from './pages/setting/Setting.jsx'
 
 import Login from './components/Signpage/login.jsx'
 import Register from './components/Signpage/register.jsx'
@@ -331,7 +332,17 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 }
               />
 
-
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <Setting
+                      darkMode={darkMode}
+                      onToggleDarkMode={onToggleDarkMode}
+                    />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route path="*" element={<NotFound />} />
             </Routes>

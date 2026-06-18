@@ -242,6 +242,7 @@ function Home() {
                   Bắt đầu luyện thi
                 </GradientButton>
               </Link>
+<<<<<<< HEAD
 
               <Link to="/Forum">
                 <GradientButton
@@ -251,6 +252,8 @@ function Home() {
                   Xem dashboard
                 </GradientButton>
               </Link>
+=======
+>>>>>>> eb1f63ae654c228fc9c0c67e0757d931cfd85e05
             </motion.div>
           </div>
 
