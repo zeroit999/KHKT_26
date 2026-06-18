@@ -243,7 +243,7 @@ function Home() {
                 </GradientButton>
               </Link>
 
-              <Link to="/dashboard">
+              <Link to="/Forum">
                 <GradientButton
                   variant="subtle"
                   icon={BarChart3}

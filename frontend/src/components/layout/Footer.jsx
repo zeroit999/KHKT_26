@@ -17,7 +17,7 @@ const quickLinks = [
   { label: 'Kho đề thi', href: '/exams' },
   { label: 'E-Learning', href: '/courses' },
   { label: 'Bảng xếp hạng', href: '/leaderboard' },
-  { label: 'Dashboard', href: '/dashboard' },
+  { label: 'Cộng đồng', href: '/Forum' },
 ]
 
 function Footer({ darkMode }) {
