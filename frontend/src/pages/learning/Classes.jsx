@@ -17,6 +17,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 import { auth, db } from '../../components/firebase.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import MaintenanceState from '../../components/ui/MaintenanceState.jsx';
 
 function getSchoolYear(date = new Date()) {
   const year = date.getFullYear();
@@ -130,7 +131,7 @@ function getClassCoverStyle(classItem, index = 0) {
   return `url("${cover}")`;
 }
 
-function Classes() {
+function TeacherClasses() {
   const { userDetails } = useAuth();
   const [activeTab, setActiveTab] = useState('students');
   const [queryText, setQueryText] = useState('');
@@ -2051,5 +2052,23 @@ const styles = `
 .dark .class-hub-page{background:#0b1020;color:#f8fafc}.dark .hub-action-card{box-shadow:0 1px 12px rgba(0,0,0,.35)}.dark .play-preview{background:rgba(15,23,42,.65);border-color:#334155;color:#93c5fd}.dark .class-tile{background:#111827;border-color:#1f2937;box-shadow:0 4px 14px rgba(0,0,0,.35)}.dark .class-tile:hover{box-shadow:0 12px 26px rgba(0,0,0,.5)}.dark .class-tile-body h3{color:#f8fafc}.dark .class-tile-body p{color:#cbd5e1}.dark .class-icon{background:#1e3a8a;color:#bfdbfe}.dark .tile-menu{color:#cbd5e1}.dark .tile-edit-btn{background:rgba(15,23,42,.9);color:#e5e7eb}.dark .tile-edit-btn:hover{background:#1e293b;color:#60a5fa}.dark .settings-preview{background:#0f172a;border-color:#334155}.dark .preview-logo{border-color:#111827}@media (prefers-color-scheme: dark){.class-hub-page{background:#0b1020;color:#f8fafc}.play-preview{background:rgba(15,23,42,.65);border-color:#334155;color:#93c5fd}.hub-empty-state{background:#111827;border-color:#1f2937;box-shadow:0 2px 10px rgba(0,0,0,.35)}.hub-empty-state h1{color:#f8fafc}.hub-empty-state p{color:#cbd5e1}.class-tile{background:#111827;border-color:#1f2937;box-shadow:0 4px 14px rgba(0,0,0,.35)}.class-tile-body h3{color:#f8fafc}.class-tile-body p{color:#cbd5e1}.class-icon{background:#1e3a8a;color:#bfdbfe}.tile-menu-popover{background:#111827;border-color:#334155}.tile-menu-popover button{color:#e5e7eb}.tile-menu-popover button:hover{background:#1e293b}.tile-menu-popover .delete-menu-item{color:#fca5a5}.tile-menu-popover .delete-menu-item:hover{background:#3f1d24}.settings-section{border-color:#334155;background:#0f172a}.settings-danger-row strong{color:#f8fafc}.settings-danger-row p{color:#cbd5e1}.tile-menu{color:#cbd5e1}}
 .skeleton-tile{pointer-events:none;cursor:default}.skeleton-cover{height:142px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}.skeleton-line{border-radius:6px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}.skeleton-title{height:18px;width:60%;margin-bottom:10px}.skeleton-sub{height:14px;width:80%}@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}.dark .skeleton-cover,.dark .skeleton-line{background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}@media (max-width:1100px){.class-card-grid{grid-template-columns:repeat(3,minmax(190px,1fr))}.hub-top{grid-template-columns:1fr}.class-tabs{gap:22px;overflow-x:auto}.class-tabs button{white-space:nowrap}}@media (max-width:920px){.settings-danger-row{align-items:flex-start;flex-direction:column}.settings-danger-row .danger-btn{width:100%}}@media (max-width:920px){.hero{padding:24px}.hero-actions{align-items:flex-start;flex-direction:column}.student-grid{grid-template-columns:1fr 1fr}.summary-grid{grid-template-columns:1fr 1fr}.toolbar{flex-direction:column}.primary-btn{min-height:48px}.hero-stats{gap:24px}}@media (max-width:640px){.class-card-grid{grid-template-columns:1fr}.hub-top,.class-hub{padding-left:16px;padding-right:16px}.hub-action-card{padding:18px;min-height:86px}.modal-grid{grid-template-columns:1fr}.modal-actions{flex-direction:column}.ghost-btn,.modal-submit,.danger-btn{width:100%;min-height:44px}.student-grid{grid-template-columns:1fr}.hero{height:auto;align-items:flex-start;flex-direction:column}.table-wrap{overflow-x:auto}.summary-grid{grid-template-columns:1fr}}
 `;
+
+
+function Classes() {
+  const { userDetails } = useAuth();
+
+  if (userDetails?.role === 'STUDENT') {
+    return (
+      <MaintenanceState
+        badge="Lớp học"
+        title="Tính năng đang bảo trì"
+        subtitle="Lớp học dành cho học sinh đang được phát triển"
+        description="Chúng tôi đang hoàn thiện trải nghiệm lớp học. Vui lòng quay lại trong thời gian sớm nhất."
+      />
+    );
+  }
+
+  return <TeacherClasses />;
+}
 
 export default Classes;

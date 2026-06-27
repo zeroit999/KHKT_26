@@ -1,0 +1,3792 @@
+[
+  {
+    "name": "THPT Việt Nam -Ba Lan (Điểm trường THPT Việt Nam - Ba Lan)",
+    "province": "Hà Nội",
+    "ward": "Phường Hoàng liệt",
+    "address": "Số 1 ngõ 48 đường Ngọc Hồi - Phường Hoàng liệt - Quận Hoàng Mai - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6166"
+  },
+  {
+    "name": "THPT Phạm Hồng Thái Cơ Sở 1 (Điểm trường THPT Phạm Hồng Thái)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 1, Phố Nguyễn Văn Ngọc, Ba Đình, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/7229"
+  },
+  {
+    "name": "Trường Trung học phổ thông kiến trúc",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/8227"
+  },
+  {
+    "name": "Trường THPT Văn Hiến CS1 (Điểm trường THPT Văn Hiến)",
+    "province": "Hà Nội",
+    "ward": "Phường Minh Khai",
+    "address": "310 Minh Khai (18C Tam Trinh). phường Minh Khai",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6872"
+  },
+  {
+    "name": "Trường THPT Bắc Hà - Đống Đa (Điểm trường THPT Bắc Hà - Đống Đa)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 1A, ngõ 538, Láng Hạ, Đống Đa, hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6132"
+  },
+  {
+    "name": "Trường THPT Mai Hắc Đế (Điểm trường THPT Mai Hắc Đế)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6143"
+  },
+  {
+    "name": "THPT Nguyễn Du - Mê Linh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 20 Tôn Thất Tùng, quận Đống Đa, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5567"
+  },
+  {
+    "name": "THPT Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5556"
+  },
+  {
+    "name": "THPT Đại Việt",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5557"
+  },
+  {
+    "name": "Trường Quốc tế đa cấp Anh - Hà Nội (BIS)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Lô H3-H4 Khu đô thị sinh thái Vincom Village, quận Long Biên, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5554"
+  },
+  {
+    "name": "Trường Quốc Tế Liên Hợp Quốc Hà Nội (UNIS Hanoi)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5537"
+  },
+  {
+    "name": "Trường Tiểu học, THCS và THPT quốc tế Hà Nội (HIS)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5538"
+  },
+  {
+    "name": "Trường Pháp Alexandre Yersin Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5539"
+  },
+  {
+    "name": "Trường PT đa cấp Concordia Hanoi",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5540"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học Cơ sở và Trung học Phổ thông quốc tế Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5543"
+  },
+  {
+    "name": "THPT Phan Đình Phùng",
+    "province": "Hà Nội",
+    "ward": "Phường Quán Thánh",
+    "address": "30 Phan Đình Phùng, phường Quán Thánh, quận Ba Đình, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/23"
+  },
+  {
+    "name": "THPT Hoàng Long",
+    "province": "Hà Nội",
+    "ward": "Phường Ngọc Hà",
+    "address": "Số 94 ngõ 189 Hoàng Hoa Thám, phường Ngọc Hà, TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/29"
+  },
+  {
+    "name": "Trường Tiểu học, THCS và THPT Thực Nghiệm KHGD",
+    "province": "Hà Nội",
+    "ward": "Phường Giảng Võ",
+    "address": "Số 50 - 52 Liễu Giai - Phường Giảng Võ - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/24"
+  },
+  {
+    "name": "THPT Nguyễn Trãi - Ba Đình",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/21"
+  },
+  {
+    "name": "THPT Phạm Hồng Thái",
+    "province": "Hà Nội",
+    "ward": "Phường Giảng Võ",
+    "address": "Số 1, Nguyễn Văn Ngọc, Phường Giảng Võ, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/22"
+  },
+  {
+    "name": "THPT Trần Phú - Hoàn Kiếm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 8 Hai Bà Trưng",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/30"
+  },
+  {
+    "name": "THPT Việt Đức",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/31"
+  },
+  {
+    "name": "THPT Tây Hồ",
+    "province": "Hà Nội",
+    "ward": "Phường Phú Thượng",
+    "address": "41 Phú Thượng, Phường Phú Thượng,T.P Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/34"
+  },
+  {
+    "name": "Trường THPT Hà Nội Academy",
+    "province": "Hà Nội",
+    "ward": "Phường Phú Thượng",
+    "address": "Lô D45-D46 KĐT Quốc tế Nam Thăng Long - Ciputra Hà Nội, Phường Phú Thượng, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/35"
+  },
+  {
+    "name": "THPT Đinh Tiên Hoàng - Ba Đình",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 10 Chương Dương Độ",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/26"
+  },
+  {
+    "name": "THPT Hồng Hà",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/75"
+  },
+  {
+    "name": "Trường THPT Nguyễn Đình Chiểu (Điểm trường THPT Nguyễn Đình Chiểu)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6784"
+  },
+  {
+    "name": "THPT Chuyên Chu Văn An",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 10, Thụy Khuê, Tây Hồ, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/33"
+  },
+  {
+    "name": "THPT Đông Đô",
+    "province": "Hà Nội",
+    "ward": "Phường Tây Hồ",
+    "address": "Số 8 Phố Võng Thị, phường Tây Hồ, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/36"
+  },
+  {
+    "name": "THPT Phan Chu Trinh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 481 Âu Cơ - Nhật Tân - Tây Hồ - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/37"
+  },
+  {
+    "name": "TH, THCS, THPT song ngữ quốc tế Horizon tại TP Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/64"
+  },
+  {
+    "name": "THPT Nguyễn Gia Thiều",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 27 ngõ 298 đường Ngọc Lâm",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/40"
+  },
+  {
+    "name": "THPT Tây Sơn",
+    "province": "Hà Nội",
+    "ward": "Phường Bồ Đề",
+    "address": "Số 2 ngõ 167 Gia Quất, phường Bồ Đề, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/41"
+  },
+  {
+    "name": "THPT Vạn Xuân - Long Biên",
+    "province": "Hà Nội",
+    "ward": "Phường Bồ Đề",
+    "address": "Số 56 Phố Hoàng Như Tiếp - Phường Bồ Đề - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/43"
+  },
+  {
+    "name": "THPT Wellspring - Mùa Xuân",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 95 - Ái Mộ - Bồ Đề - Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/122"
+  },
+  {
+    "name": "THPT Lý Thường Kiệt",
+    "province": "Hà Nội",
+    "ward": "Phường Việt Hưng",
+    "address": "Tổ 11, phường Việt Hưng, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/39"
+  },
+  {
+    "name": "THPT Lê Văn Thiêm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 44 - Phố Ô Cách - Việt Hưng - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/42"
+  },
+  {
+    "name": "THCS - THPT Marie Curie - Long Biên",
+    "province": "Hà Nội",
+    "ward": "Phường Việt Hưng",
+    "address": "Lô đất TH-06, Phố Ngô Huy Quỳnh, TDP 14, KĐTM Việt Hưng, Phường Việt Hưng, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/38"
+  },
+  {
+    "name": "THPT Phúc Lợi",
+    "province": "Hà Nội",
+    "ward": "Phường Phúc Lợi",
+    "address": "Tổ 4, phường Phúc Lợi, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/123"
+  },
+  {
+    "name": "TH, THCS & THPT Vinschool The Harmony",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/196"
+  },
+  {
+    "name": "THPT Thạch Bàn",
+    "province": "Hà Nội",
+    "ward": "Phường Long Biên",
+    "address": "Phố Vũ Đình Tụng, phường Long Biên, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/44"
+  },
+  {
+    "name": "THPT Cầu Giấy",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngõ 118 Nguyễn Khánh Toàn, Quan Hoa, Cầu Giấy, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/47"
+  },
+  {
+    "name": "THCS và THPT Nguyễn Bỉnh Khiêm - Cầu Giấy",
+    "province": "Hà Nội",
+    "ward": "Phường Nghĩa Đô",
+    "address": "Số 6, phố Trần Quốc Hoàn, Phường Nghĩa Đô, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/51"
+  },
+  {
+    "name": "THPT Nguyễn Huệ - Bắc Từ Liêm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "KĐT Nam Cường - ngõ 234 Hoàng Quốc Việt - Nghĩa Đô - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/55"
+  },
+  {
+    "name": "Trường THCS &THPT Hà Thành",
+    "province": "Hà Nội",
+    "ward": "Phường Nghĩa Đô",
+    "address": "36A, Phạm Văn Đồng, Phường Nghĩa Đô, Hà nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/25"
+  },
+  {
+    "name": "THPT Trần Thánh Tông",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Đường Trung Văn, Nam Từ Liêm, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/145"
+  },
+  {
+    "name": "Trường TH-THCS-THPT Everest",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Lô TH1- TH2 khu đô thị mới Nghĩa Đô - Tổ dân phố Hoàng 24 - Nghĩa Đô - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/154"
+  },
+  {
+    "name": "THPT Chuyên Đại học Sư Phạm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5542"
+  },
+  {
+    "name": "THCS-THPT Nguyễn Tất Thành",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "136 đường Xuân Thuỷ",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/56"
+  },
+  {
+    "name": "Tiểu học, THCS và THPT Đa Trí Tuệ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/50"
+  },
+  {
+    "name": "THCS và THPT Dewey Cầu Giấy",
+    "province": "Hà Nội",
+    "ward": "Phường Cầu Giấy",
+    "address": "89 Khúc Thừa Dụ, Phường Cầu Giấy, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/45"
+  },
+  {
+    "name": "THPT Chuyên Ngoại ngữ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5552"
+  },
+  {
+    "name": "THPT Hoàng Quán Chi",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5833"
+  },
+  {
+    "name": "THPT Yên Hòa",
+    "province": "Hà Nội",
+    "ward": "Phường Yên Hòa",
+    "address": "251 Nguyễn Khang, phường Yên Hòa, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/48"
+  },
+  {
+    "name": "THPT Chuyên Hà Nội - Amsterdam",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 1, Hoàng Minh Giám",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/54"
+  },
+  {
+    "name": "THPT EINSTEIN",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/63"
+  },
+  {
+    "name": "THPT Lý Thái Tổ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/49"
+  },
+  {
+    "name": "THCS và THPT Nguyễn Siêu",
+    "province": "Hà Nội",
+    "ward": "Phường Yên Hòa",
+    "address": "Số 35 đường Mạc Thái Tổ, phường Yên Hòa, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/52"
+  },
+  {
+    "name": "Tiểu học, Trung học cơ sở và Trung học phổ thông Hà Nội - Toronto",
+    "province": "Hà Nội",
+    "ward": "Phường Yên Hòa",
+    "address": "Lô TH3, Khu đô thị Đông Nam Trần Duy Hưng, phường Yên Hòa, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/11"
+  },
+  {
+    "name": "THPT Lương Văn Can",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Lô NT1 khu đô thị Nam Trung Yên - Trung Hòa - Cầu Giấy - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/88"
+  },
+  {
+    "name": "THCS và THPT Lương Thế Vinh",
+    "province": "Hà Nội",
+    "ward": "Phường Yên Hòa",
+    "address": "số 35 Đinh Núp, phường Yên Hòa, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/153"
+  },
+  {
+    "name": "THPT Đống Đa",
+    "province": "Hà Nội",
+    "ward": "Phường Ô Chợ Dừa",
+    "address": "Số 10 Quan Thổ 1 Tôn Đức Thắng - phường Ô Chợ Dừa - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/57"
+  },
+  {
+    "name": "THPT Hoàng Cầu",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "27 ngõ 44 phố Nguyễn Phúc Lai, Ô Chợ Dừa, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/62"
+  },
+  {
+    "name": "THPT Văn Lang",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/28"
+  },
+  {
+    "name": "THPT Phan Huy Chú - Đống Đa",
+    "province": "Hà Nội",
+    "ward": "Phường Láng",
+    "address": "Số 34, ngõ 49, phố Huỳnh Thúc Kháng, phường Láng, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/60"
+  },
+  {
+    "name": "THPT Bắc Hà - Đống Đa",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 1A, ngõ 538 đường Láng",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/65"
+  },
+  {
+    "name": "THCS&THPT Alfred Nobel",
+    "province": "Hà Nội",
+    "ward": "Phường Láng",
+    "address": "28 Đường Huỳnh Thúc Khàng kéo dài, Phường Láng, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/93"
+  },
+  {
+    "name": "THPT Kim Liên",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 1 ngõ 4C Đặng Văn Ngữ",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/58"
+  },
+  {
+    "name": "Phổ thông TH School",
+    "province": "Hà Nội",
+    "ward": "Phường Kim Liên",
+    "address": "Địa chỉ: 04 - 06 Phố Chùa Bộc, phường Kim Liên, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/68"
+  },
+  {
+    "name": "THPT Phùng Khắc Khoan- Đống Đa",
+    "province": "Hà Nội",
+    "ward": "Phường Kim Liên",
+    "address": "Số 85 - Phố Lương Định Của - Phường Kim Liên - Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/104"
+  },
+  {
+    "name": "THPT Quang Trung - Đống Đa",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "178 Đường Láng",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/61"
+  },
+  {
+    "name": "THPT Lê Quý Đôn - Đống Đa",
+    "province": "Hà Nội",
+    "ward": "Xã Đàn 2",
+    "address": "195 ngõ Xã Đàn 2, phường Đống Đa, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/59"
+  },
+  {
+    "name": "THPT Trần Nhân Tông",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "15 phố Hương Viên",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/71"
+  },
+  {
+    "name": "Trường Tiểu học, THCS và THPT Vinschool",
+    "province": "Hà Nội",
+    "ward": "Phường Vĩnh Tuy",
+    "address": "T35,T36,T37 Khu đô thị Times City, 458 Minh Khai, Phường Vĩnh Tuy, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/244"
+  },
+  {
+    "name": "THPT Đoàn Kết - Hai Bà Trưng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "174 Phố Hồng Mai",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/69"
+  },
+  {
+    "name": "THPT Thăng Long",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "44 phố Tạ Quang Bửu",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/70"
+  },
+  {
+    "name": "THCS và THPT Tạ Quang Bửu",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Tòa nhà C, số 92 Lê Thanh Nghị",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/74"
+  },
+  {
+    "name": "THPT Hoàng Diệu",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 9 Bùi Ngọc Dương",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/81"
+  },
+  {
+    "name": "THCS-THPT Hoàng Diệu (Điểm trường THPT Hoàng Diệu)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "số 9, Phố Bùi Ngọc Dương, Hai Bà Trưng, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6168"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Reigate Grammar Việt Nam",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5546"
+  },
+  {
+    "name": "THCS & THPT Quốc tế Thăng Long",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Lô X1-Khu đô thị Bắc Linh Đàm",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/84"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Ngôi sao Hà Nội - Hoàng Mai",
+    "province": "Hà Nội",
+    "ward": "Phường Định Công",
+    "address": "Lô TH và PT, Khu đô thị Kim Văn - Kim Lũ, phường Định Công, Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/13"
+  },
+  {
+    "name": "THCS và THPT Dwight Hà Nội",
+    "province": "Hà Nội",
+    "ward": "Phường Định Công",
+    "address": "Lô 19TH, KĐT The Manor Central Park, đường Nguyễn Xiển, Phường Định Công, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/16"
+  },
+  {
+    "name": "THPT Văn Hiến",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/32"
+  },
+  {
+    "name": "THPT Đông Kinh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/72"
+  },
+  {
+    "name": "THPT Nguyễn Đình Chiểu",
+    "province": "Hà Nội",
+    "ward": "Phường Hồng Hà",
+    "address": "Số 2 Phố Lãng Yên, phường Hồng Hà, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/82"
+  },
+  {
+    "name": "THPT Hoàng Văn Thụ",
+    "province": "Hà Nội",
+    "ward": "Phường Hoàng Mai",
+    "address": "Số 234 đường Lĩnh Nam - Phường Hoàng Mai - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/77"
+  },
+  {
+    "name": "THPT Trương Định",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 204 phố Tân Mai",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/78"
+  },
+  {
+    "name": "THPT Trần Quang Khải",
+    "province": "Hà Nội",
+    "ward": "Phường Thịnh Liệt",
+    "address": "Ngõ 1277, đường giải Phóng, Phường Thịnh Liệt, quận Hoàng Mai, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/83"
+  },
+  {
+    "name": "THPT Mai Hắc Đế",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 29A, ngõ 124, phố Vĩnh Tuy, quận Hai Bà Trưng, tp Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/73"
+  },
+  {
+    "name": "THCS-THPT Quốc tế Singapore tại thành phố Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Đường số 2, Khu đô thị Gamuda Gardens",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5"
+  },
+  {
+    "name": "THPT Việt Nam - Ba Lan",
+    "province": "Hà Nội",
+    "ward": "Phường Hoàng Liệt",
+    "address": "Số 1, Ngõ 48, đường Ngọc Hồi, phường Hoàng Liệt, Quận Hoàng Mai, Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/79"
+  },
+  {
+    "name": "THPT Đỗ Mười",
+    "province": "Hà Nội",
+    "ward": "Phường Yên Sở",
+    "address": "286 phố Trần Thủ Độ, phường Yên Sở, Thành phố Hầ Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/17"
+  },
+  {
+    "name": "Trung học phổ thông Galileo",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/76"
+  },
+  {
+    "name": "THPT Trần Hưng Đạo - Thanh Xuân",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngõ 477, Nguyễn Trãi",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/86"
+  },
+  {
+    "name": "THPT May",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/80"
+  },
+  {
+    "name": "THPT Khương Đình",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngách 29/78 Khương Hạ",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/20"
+  },
+  {
+    "name": "TH, THCS và THPT Khương Hạ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 31 Khương Hạ, Khương Đình, Thanh Xuân, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/8"
+  },
+  {
+    "name": "THPT Hồ Tùng Mậu",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/27"
+  },
+  {
+    "name": "THPT Huỳnh Thúc Kháng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/138"
+  },
+  {
+    "name": "THPT Nhân Chính",
+    "province": "Hà Nội",
+    "ward": "Phường Thanh Xuân",
+    "address": "Phố Ngụy Như Kon Tum, phường Thanh Xuân, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/85"
+  },
+  {
+    "name": "THPT Đào Duy Từ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 182 Lương Thế Vinh, Thanh Xuân, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/87"
+  },
+  {
+    "name": "TH, THCS và THPT Sentia",
+    "province": "Hà Nội",
+    "ward": "Phường Thanh Xuân",
+    "address": "Số 19 Tố Hữu, Khu đô thị Phùng Khoang, Phường Thanh Xuân, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/148"
+  },
+  {
+    "name": "THPT Hoàng Mai",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/140"
+  },
+  {
+    "name": "THPT Chuyên Khoa học Xã hội và Nhân văn",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5553"
+  },
+  {
+    "name": "Trường quốc tế đa cấp Anh Việt Hoàng Gia (BVIS ROYAL)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5555"
+  },
+  {
+    "name": "Trường THPT chuyên Khoa học Tự nhiên",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 182 đường Lương Thế Vinh",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5566"
+  },
+  {
+    "name": "THPT Nguyễn Tất Thành",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/175"
+  },
+  {
+    "name": "THPT Đa Phúc",
+    "province": "Hà Nội",
+    "ward": "Xã Sóc Sơn",
+    "address": "Số 33, đường Núi Đôi, xã Sóc Sơn, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/94"
+  },
+  {
+    "name": "THPT Sóc Sơn",
+    "province": "Hà Nội",
+    "ward": "Xã Sóc Sơn",
+    "address": "Km số 1 - QL2 - Xã Sóc Sơn - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/97"
+  },
+  {
+    "name": "THPT Lam Hồng",
+    "province": "Hà Nội",
+    "ward": "Xã Sóc Sơn",
+    "address": "Khối 5 - xã Sóc Sơn - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/100"
+  },
+  {
+    "name": "THPT Lạc Long Quân",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Tổ 1 Thị Trân Sóc Sơn - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/102"
+  },
+  {
+    "name": "Phổ thông Phùng Hưng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngõ 2 Xa La",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5558"
+  },
+  {
+    "name": "THPT Minh Phú",
+    "province": "Hà Nội",
+    "ward": "Xã Kim Anh",
+    "address": "km9+500, quốc lộ 35, Xã Kim Anh, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/96"
+  },
+  {
+    "name": "THPT Trung Giã - Sóc Sơn",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Phố Nỷ, Trung Giã, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/98"
+  },
+  {
+    "name": "THPT Đặng Thai Mai",
+    "province": "Hà Nội",
+    "ward": "Xã Trung Giã",
+    "address": "Thôn 4 - xã Trung Giã - thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/101"
+  },
+  {
+    "name": "THPT Xuân Giang",
+    "province": "Hà Nội",
+    "ward": "Xã Đa Phúc",
+    "address": "xã Đa Phúc, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/99"
+  },
+  {
+    "name": "THPT Kim Anh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/95"
+  },
+  {
+    "name": "THPT Mạc Đĩnh Chi",
+    "province": "Hà Nội",
+    "ward": "Xã Nội Bài",
+    "address": "Tổ DC Kim Anh - Xã Nội Bài - TP Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/103"
+  },
+  {
+    "name": "THPT Cổ Loa",
+    "province": "Hà Nội",
+    "ward": "Xã Đông Hội",
+    "address": "Đường Đông Hội - xã Đông Hội- Huyện Đông Anh",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/106"
+  },
+  {
+    "name": "THPT Việt Hùng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5834"
+  },
+  {
+    "name": "THPT Kinh Đô",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/110"
+  },
+  {
+    "name": "THPT Vân Nội",
+    "province": "Hà Nội",
+    "ward": "Xã Phúc Thịnh Huyện Đông Anh Thành Phố Hà Nội",
+    "address": "Thôn Ba Chữ Xã Phúc Thịnh Huyện Đông Anh Thành Phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/108"
+  },
+  {
+    "name": "THPT Phúc Thịnh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5548"
+  },
+  {
+    "name": "Tiểu học, THCS & THPT Archimedes Đông Anh",
+    "province": "Hà Nội",
+    "ward": "Xã Phúc Thịnh",
+    "address": "Xã Phúc Thịnh, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/245"
+  },
+  {
+    "name": "THPT Phạm Ngũ Lão",
+    "province": "Hà Nội",
+    "ward": "Xã Phúc Thịnh",
+    "address": "Thôn Đìa, xã Phúc Thịnh, TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/113"
+  },
+  {
+    "name": "THPT Minh Trí",
+    "province": "Hà Nội",
+    "ward": "Xã Phúc Thịnh",
+    "address": "Số 11 ngõ 17, Thôn Bến Trung, Xã Phúc Thịnh, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/14"
+  },
+  {
+    "name": "THPT Đông Anh",
+    "province": "Hà Nội",
+    "ward": "Xã Thư Lâm",
+    "address": "Tổ 9, Xã Thư Lâm, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/107"
+  },
+  {
+    "name": "THPT Liên Hà",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/155"
+  },
+  {
+    "name": "THPT An Dương Vương",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Tổ 12",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/109"
+  },
+  {
+    "name": "THPT Bắc Thăng Long",
+    "province": "Hà Nội",
+    "ward": "Xã Thiên Lộc",
+    "address": "Thôn Bầu, xã Thiên Lộc, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/105"
+  },
+  {
+    "name": "TH, THCS & THPT Chu Văn An",
+    "province": "Hà Nội",
+    "ward": "Xã Thiên Lộc",
+    "address": "Số 5, Đường Kim Chung, Thôn Bầu, xã Thiên Lộc, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/112"
+  },
+  {
+    "name": "THPT Ngô Quyền - Đông Anh",
+    "province": "Hà Nội",
+    "ward": "Xã Vĩnh Ngọc",
+    "address": "Thôn Vĩnh Thanh - Xã Vĩnh Ngọc - huyện Đông Anh - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/111"
+  },
+  {
+    "name": "THPT Yên Viên",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 18 Hà Huy Tập, Phù Đổng, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/117"
+  },
+  {
+    "name": "THPT Lê Ngọc Hân",
+    "province": "Hà Nội",
+    "ward": "Xã Phù Đổng",
+    "address": "Số 28/622 Hà Huy Tập, xã Phù Đổng, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/118"
+  },
+  {
+    "name": "THPT Bắc Đuống",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 133 Đặng Phúc Thông",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/119"
+  },
+  {
+    "name": "PT Võ Thuật Bảo Long",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/3"
+  },
+  {
+    "name": "THPT Cao Bá Quát - Gia Lâm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 57 đường Cổ Bi - Gia Lâm - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/114"
+  },
+  {
+    "name": "THPT Dương Xá",
+    "province": "Hà Nội",
+    "ward": "Xã Gia Lâm",
+    "address": "Số 48, Đường Ỷ Lan, Xã Gia Lâm - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/115"
+  },
+  {
+    "name": "THPT Lý Thánh Tông",
+    "province": "Hà Nội",
+    "ward": "Xã Gia Lâm",
+    "address": "Xã Gia Lâm - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/120"
+  },
+  {
+    "name": "THPT Tô Hiệu - Gia Lâm",
+    "province": "Hà Nội",
+    "ward": "Xã Gia Lâm",
+    "address": "Số 163 - Đường Ỷ Lan - Xã Gia Lâm - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/121"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Dewey Ocean Park",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/15"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Brighton College Việt Nam - Ocean Park",
+    "province": "Hà Nội",
+    "ward": "Xã Gia Lâm",
+    "address": "TH01 & B2-CS01 Vinhomes Ocean Park, Đại Dương, xã Gia Lâm, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/12"
+  },
+  {
+    "name": "Trường TH-THCS-THPT Vinschool Ocean Park",
+    "province": "Hà Nội",
+    "ward": "Xã Gia Lâm",
+    "address": "Lô đất PT02, Khu đô thị Gia Lâm, Xã Gia Lâm, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/19"
+  },
+  {
+    "name": "THPT Nguyễn Văn Cừ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/116"
+  },
+  {
+    "name": "Phổ thông năng khiếu TDTT Hà Nội",
+    "province": "Hà Nội",
+    "ward": "Phường Từ Liêm",
+    "address": "Số 38 Lê Đức Thọ, phường Từ Liêm, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/126"
+  },
+  {
+    "name": "THCS-THPT Trần Quốc Tuấn",
+    "province": "Hà Nội",
+    "ward": "Phường Từ Liêm",
+    "address": "TDP số 3, Phường Từ Liêm, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/133"
+  },
+  {
+    "name": "THPT Mỹ Đình",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 89 Đường Mỹ Đình",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6"
+  },
+  {
+    "name": "THPT Trí Đức",
+    "province": "Hà Nội",
+    "ward": "Phường Từ Liêm",
+    "address": "Tổ dân phố số 5 Phú Mỹ, Phường Từ Liêm, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/141"
+  },
+  {
+    "name": "THCS & THPT Việt Úc Hà Nội",
+    "province": "Hà Nội",
+    "ward": "Phường Từ Liêm",
+    "address": "Khu đô thị Mỹ Đình 1, phường Từ Liêm, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/143"
+  },
+  {
+    "name": "THCS & THPT M.V. Lô-mô-nô-xốp",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 6 phố Trần Văn Cẩn, Khu đô thị Mỹ Đình 2",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/149"
+  },
+  {
+    "name": "THCS&THPT Marie Curie",
+    "province": "Hà Nội",
+    "ward": "Phường Từ Liêm",
+    "address": "Phố Trần Văn Lai, KĐT Mỹ Đình - Mễ Trì, phường Từ Liêm, Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/92"
+  },
+  {
+    "name": "THCS-THPT Lê Quý Đôn",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Lô 1 AII KĐT mới Mỹ Đình 1, đường Hàm Nghi",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/137"
+  },
+  {
+    "name": "THPT Trí Đức (Điểm trường THPT Trí Đức)",
+    "province": "Hà Nội",
+    "ward": "Phường Từ Liêm",
+    "address": "TDP số 5 Phú Mỹ, phường Từ Liêm, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6655"
+  },
+  {
+    "name": "THPT Thượng Cát",
+    "province": "Hà Nội",
+    "ward": "Phường Thượng Cát",
+    "address": "Phường Thượng Cát, Thành phố Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/130"
+  },
+  {
+    "name": "THPT Đoàn Thị Điểm",
+    "province": "Hà Nội",
+    "ward": "Phường Đông Ngạc",
+    "address": "KĐT Bắc Cổ Nhuế - Phường Đông Ngạc- Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/136"
+  },
+  {
+    "name": "THPT Xuân Đỉnh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 178 - đường Xuân Đỉnh - phường Xuân Đỉnh - thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/132"
+  },
+  {
+    "name": "Trung học Cơ sở và Trung học Phổ thông Dewey",
+    "province": "Hà Nội",
+    "ward": "Phường Xuân Đỉnh",
+    "address": "Lô H3-LC, khu đô thị Tây Hồ Tây, phường Xuân Đỉnh, thành phố Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/18"
+  },
+  {
+    "name": "TH&THCS Quốc tế Westlink Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5541"
+  },
+  {
+    "name": "THPT Tây Đô",
+    "province": "Hà Nội",
+    "ward": "Phường Minh Khai",
+    "address": "Đường Phú Minh, Phúc Lý 2, phường Minh Khai, bắc Từ Liêm, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5545"
+  },
+  {
+    "name": "THPT Hồng Đức",
+    "province": "Hà Nội",
+    "ward": "Phường Tây Tựu",
+    "address": "QL 32- Cụm CN Lai Xá- Phường Tây Tựu- TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/187"
+  },
+  {
+    "name": "THPT Nguyễn Thị Minh Khai",
+    "province": "Hà Nội",
+    "ward": "Phường Phú Diễn",
+    "address": "Phường Phú Diễn - Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/129"
+  },
+  {
+    "name": "Trường THCS - THPT Newton",
+    "province": "Hà Nội",
+    "ward": "Phường Phú Diễn",
+    "address": "Ngõ 136 Hồ Tùng Mậu, Phường Phú Diễn, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/146"
+  },
+  {
+    "name": "PTDL Hermann Gmeiner",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 2 Doãn Kế Thiện",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/53"
+  },
+  {
+    "name": "THPT Xuân Phương",
+    "province": "Hà Nội",
+    "ward": "Phường Xuân Phương",
+    "address": "Phường Xuân Phương, Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/134"
+  },
+  {
+    "name": "Trung học phổ thông FPT Tây Hà Nội",
+    "province": "Hà Nội",
+    "ward": "Phường Xuân Phương",
+    "address": "Phố Kiều Mai, phường Xuân Phương, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/135"
+  },
+  {
+    "name": "THPT Xuân Thủy",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/144"
+  },
+  {
+    "name": "THCS & THPT Phenikaa",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/125"
+  },
+  {
+    "name": "THPT Nguyễn Văn Huyên",
+    "province": "Hà Nội",
+    "ward": "Phường Xuân Phương",
+    "address": "55A Nhuệ Giang, phường Xuân Phương, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/66"
+  },
+  {
+    "name": "TH, THCS&THPT Korea Global School",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5547"
+  },
+  {
+    "name": "THPT Đại Mỗ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Đường Quang Tiến,Tổ dân phố An Thái ,phường Tây Mỗ ,Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/128"
+  },
+  {
+    "name": "THPT Phạm Văn Đồng",
+    "province": "Hà Nội",
+    "ward": "Phường Tây Mỗ",
+    "address": "Lô A26 - Khu A - KĐT Geleximco - Phường Tây Mỗ - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/127"
+  },
+  {
+    "name": "Tiểu học, THCS, THPT Vinschool Smart City",
+    "province": "Hà Nội",
+    "ward": "Phường Tây Mỗ",
+    "address": "Lô F4 - THCS 1, KĐT mới Tây Mỗ - Đại Mỗ, phường Tây Mỗ, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/124"
+  },
+  {
+    "name": "THPT Trung Văn",
+    "province": "Hà Nội",
+    "ward": "Phường Đại Mỗ",
+    "address": "Phố Tố Hữu - Phường Đại Mỗ - TP Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/131"
+  },
+  {
+    "name": "THPT Olympia",
+    "province": "Hà Nội",
+    "ward": "Phường Đại Mỗ",
+    "address": "Lô TH2, Khu đô thị mới Trung Văn, phường Đại Mỗ, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/142"
+  },
+  {
+    "name": "THPT Ngọc Hồi",
+    "province": "Hà Nội",
+    "ward": "Xã Thanh Trì",
+    "address": "Đường Lưu Phái, xã Thanh Trì, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/151"
+  },
+  {
+    "name": "THPT Ngô Thì Nhậm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/150"
+  },
+  {
+    "name": "THPT Nguyễn Quốc Trinh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/246"
+  },
+  {
+    "name": "THPT Đông Mỹ",
+    "province": "Hà Nội",
+    "ward": "Xã Nam Phù",
+    "address": "Xã Nam Phù, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/152"
+  },
+  {
+    "name": "THPT Lê Thánh Tông",
+    "province": "Hà Nội",
+    "ward": "Xã Nam Phù Thành phố Hà Nội",
+    "address": "Thôn Việt Yên Xã Nam Phù Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/139"
+  },
+  {
+    "name": "THPT Bắc Lương Sơn - Thạch Thất",
+    "province": "Hà Nội",
+    "ward": "Xã Yên Xuân",
+    "address": "Thôn 2 Yên Bình - Xã Yên Xuân - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/202"
+  },
+  {
+    "name": "THPT Mê Linh",
+    "province": "Hà Nội",
+    "ward": "Xã Quang Minh",
+    "address": "thôn Thường Lệ, xã Quang Minh, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/156"
+  },
+  {
+    "name": "THPT Quang Minh",
+    "province": "Hà Nội",
+    "ward": "Xã Quang Minh",
+    "address": "Thôn Chi Đông 2, xã Quang Minh, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/157"
+  },
+  {
+    "name": "THPT Tiến Thịnh",
+    "province": "Hà Nội",
+    "ward": "Xã Tiến Thịnh",
+    "address": "Xã Tiến Thịnh, huyện Mê Linh, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/159"
+  },
+  {
+    "name": "THPT Yên Lãng",
+    "province": "Hà Nội",
+    "ward": "Xã Yên Lãng Thành phố Hà Nội",
+    "address": "Thôn Bồng Mạc xã Yên Lãng Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/161"
+  },
+  {
+    "name": "THPT Tự Lập",
+    "province": "Hà Nội",
+    "ward": "Xã Tiến Thắng",
+    "address": "Thôn Phú Mỹ - Xã Tiến Thắng - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/160"
+  },
+  {
+    "name": "THPT Tiền Phong",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Thôn Trung Hậu - Xã Mê Linh - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/158"
+  },
+  {
+    "name": "THPT Ban Mai",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/171"
+  },
+  {
+    "name": "THCS&THPT Marie Curie - Hà Đông",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/9"
+  },
+  {
+    "name": "THPT Lê Lợi",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 72 - Phố Bà Triệu - P.Nguyễn Trãi - Q. Hà Đông - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/169"
+  },
+  {
+    "name": "THPT Lê Quý Đôn - Hà Đông",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 4 Nhuệ Giang, Hà Đông, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/164"
+  },
+  {
+    "name": "THPT Quang Trung - Hà Đông",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngõ 2 Đường Quang Trung, Hà Đông, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/165"
+  },
+  {
+    "name": "THPT Hà Đông",
+    "province": "Hà Nội",
+    "ward": "Phường Hà Đông",
+    "address": "Khu Đô thị Mỗ Lao - phường Hà Đông - thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/167"
+  },
+  {
+    "name": "THPT Xa La",
+    "province": "Hà Nội",
+    "ward": "Phường Hà Đông",
+    "address": "Số 1 dãy 5 lô 3 Khu Đô thị Xa La, phường Hà Đông, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/168"
+  },
+  {
+    "name": "TH, THCS và THPT Quốc tế Nhật Bản",
+    "province": "Hà Nội",
+    "ward": "Phường Hà Đông",
+    "address": "84A Nguyễn Thanh Bình, Phường Hà Đông, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/162"
+  },
+  {
+    "name": "THPT Ngô Gia Tự",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngõ 2, Xa La, Phúc La, Hà Đông, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/170"
+  },
+  {
+    "name": "c3hadong (Điểm trường THPT Hà Đông)",
+    "province": "Hà Nội",
+    "ward": "Phường Hà Đông",
+    "address": "Khu Đô thị Mỗ Lao - phường Hà Đông - Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6846"
+  },
+  {
+    "name": "Tiểu học, Trung học cơ sở và Trung học phổ thông True North",
+    "province": "Hà Nội",
+    "ward": "Phường Hà Đông",
+    "address": "Ô đất ký hiệu 3, Khu đô thị Mỗ Lao, Phường Hà Đông, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/10"
+  },
+  {
+    "name": "THPT Lê Hồng Phong",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/2"
+  },
+  {
+    "name": "THPT Tô Hiến Thành",
+    "province": "Hà Nội",
+    "ward": "Phường Văn Quán",
+    "address": "Số 42 Lương Ngọc Quyến, Phường Văn Quán, Quận Hà Đông, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/67"
+  },
+  {
+    "name": "THPT Phan Bội Châu",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Lô NT1 khu đô thị Văn Quán",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/91"
+  },
+  {
+    "name": "THPT Trần Hưng Đạo - Hà Đông",
+    "province": "Hà Nội",
+    "ward": "Phường Phú Lương",
+    "address": "Số 157 - Phố Xốm - Phường Phú Lương - TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/166"
+  },
+  {
+    "name": "THPT Chuyên Sơn Tây",
+    "province": "Hà Nội",
+    "ward": "Phường Sơn Tây",
+    "address": "Số 57 đường Đền Và - phường Sơn Tây - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/172"
+  },
+  {
+    "name": "Trường Hữu Nghị 80",
+    "province": "Hà Nội",
+    "ward": "Phường Sơn Tây",
+    "address": "Số 109, đường Đền Và, phường Sơn Tây, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5565"
+  },
+  {
+    "name": "THPT Tùng Thiện",
+    "province": "Hà Nội",
+    "ward": "Phường Tùng Thiện",
+    "address": "Số 20 phố Tùng Thiện, Phường Tùng Thiện, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/173"
+  },
+  {
+    "name": "THPT Xuân Khanh",
+    "province": "Hà Nội",
+    "ward": "Phường Tùng Thiện",
+    "address": "Số 175 Đá Bạc, phường Tùng Thiện, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/174"
+  },
+  {
+    "name": "THPT Quảng Oai",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 288 - đường Quảng Oai",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/180"
+  },
+  {
+    "name": "THPT Trần Phú - Ba Vì",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/179"
+  },
+  {
+    "name": "THPT Ngô Quyền - Ba Vì",
+    "province": "Hà Nội",
+    "ward": "Xã Cổ Đô",
+    "address": "Thôn Chợ Mơ - Xã Cổ Đô - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/182"
+  },
+  {
+    "name": "TH, THCS và THPT Minh Châu",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5835"
+  },
+  {
+    "name": "THPT Lương Thế Vinh - Ba Vì",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Thôn Tân Phú Mỹ - Vật Lại - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/181"
+  },
+  {
+    "name": "THPT Bất Bạt",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/178"
+  },
+  {
+    "name": "Phổ thông DTNT Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 105, Đường 414C, Thôn 7",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/176"
+  },
+  {
+    "name": "THPT Ba Vì",
+    "province": "Hà Nội",
+    "ward": "Xã Suối Hai",
+    "address": "Thôn 7, xã Suối Hai, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/177"
+  },
+  {
+    "name": "THPT Minh Quang",
+    "province": "Hà Nội",
+    "ward": "Xã Ba Vì",
+    "address": "Thôn Lặt, Xã Ba Vì, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/183"
+  },
+  {
+    "name": "Trường Hữu Nghị T78",
+    "province": "Hà Nội",
+    "ward": "Xã Tích Lộc",
+    "address": "Thôn Ổ Thôn, xã Tích Lộc, huyện Phúc Thọ, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5568"
+  },
+  {
+    "name": "THPT Phúc Thọ",
+    "province": "Hà Nội",
+    "ward": "Xã Võng Xuyên",
+    "address": "Xã Võng Xuyên - Huyện Phúc Thọ - Thàng Phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/185"
+  },
+  {
+    "name": "THPT Vân Cốc",
+    "province": "Hà Nội",
+    "ward": "Xã Phúc Lộc",
+    "address": "Thôn Nam Hà 5 - Xã Phúc Lộc - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/186"
+  },
+  {
+    "name": "THPT Ngọc Tảo",
+    "province": "Hà Nội",
+    "ward": "Xã Ngọc Tảo",
+    "address": "Thôn 8, xã Ngọc Tảo, huyện Phúc Thọ, TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/184"
+  },
+  {
+    "name": "THPT Đan Phượng",
+    "province": "Hà Nội",
+    "ward": "Thị trấn Phùng",
+    "address": "Số 19 - Phan Đình Phùng - Thị trấn Phùng - Đan Phượng - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/188"
+  },
+  {
+    "name": "THPT Thọ Xuân",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/1"
+  },
+  {
+    "name": "THPT Hồng Thái",
+    "province": "Hà Nội",
+    "ward": "Xã Ô Diên",
+    "address": "319 Hồng Hà - xã Ô Diên - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/189"
+  },
+  {
+    "name": "THPT Tân Lập",
+    "province": "Hà Nội",
+    "ward": "Xã Ô Diên",
+    "address": "Cụm 5 Tân Lập, xã Ô Diên, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/190"
+  },
+  {
+    "name": "THPT Green City Academy",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Cụm 13 thôn Thượng Hội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/90"
+  },
+  {
+    "name": "THPT Hoài Đức A",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "thôn Yên Bệ",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/191"
+  },
+  {
+    "name": "THPT Bình Minh",
+    "province": "Hà Nội",
+    "ward": "Xã Hoài Đức",
+    "address": "Xã Hoài Đức- TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/194"
+  },
+  {
+    "name": "THPT Việt Hoàng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/243"
+  },
+  {
+    "name": "THPT Vạn Xuân - Hoài Đức",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 11 thôn 2",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/193"
+  },
+  {
+    "name": "THPT Hoài Đức C",
+    "province": "Hà Nội",
+    "ward": "Xã Sơn Đồng",
+    "address": "Thôn Phương Bảng 1, xã Sơn Đồng, TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/195"
+  },
+  {
+    "name": "Trường Trung học phổ thông Edison",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/8228"
+  },
+  {
+    "name": "THPT Hoài Đức B",
+    "province": "Hà Nội",
+    "ward": "Xã An Khánh",
+    "address": "Thôn Ngãi Cầu, xã An Khánh, TP.Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/192"
+  },
+  {
+    "name": "THPT Chuyên Nguyễn Huệ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/163"
+  },
+  {
+    "name": "THPT Lômônôxốp Tây Hà Nội",
+    "province": "Hà Nội",
+    "ward": "Phường Dương Nội",
+    "address": "Phường Dương Nội, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/215"
+  },
+  {
+    "name": "Trường Mầm non và Phổ Thông Quốc Tế TT ParkCity Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5544"
+  },
+  {
+    "name": "Trường Trung học phổ thông H.A.S",
+    "province": "Hà Nội",
+    "ward": "Phường Dương Nội",
+    "address": "C35, Khu đô thị Geleximco, Phường Dương Nội, thành phố Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/89"
+  },
+  {
+    "name": "Phổ thông Quốc tế Việt Nam",
+    "province": "Hà Nội",
+    "ward": "Phường Dương Nội",
+    "address": "Phường Dương Nội, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/46"
+  },
+  {
+    "name": "THPT Phan Huy Chú Quốc Oai",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/201"
+  },
+  {
+    "name": "THPT Quốc Oai",
+    "province": "Hà Nội",
+    "ward": "Xã Quốc Oai",
+    "address": "Xã Quốc Oai",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/199"
+  },
+  {
+    "name": "THPT Minh Khai",
+    "province": "Hà Nội",
+    "ward": "Xã Kiều Phú",
+    "address": "Xã Kiều Phú - Quốc Oai - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/198"
+  },
+  {
+    "name": "Phổ thông Nguyễn Trực",
+    "province": "Hà Nội",
+    "ward": "Xã Đồng Quang",
+    "address": "Thôn Đồng Lư, xã Đồng Quang, Huyện Quốc oai",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/200"
+  },
+  {
+    "name": "THPT Thạch Thất",
+    "province": "Hà Nội",
+    "ward": "Xã Thạch Thất",
+    "address": "Số 120 - Đường 420, thôn 84, xã Thạch Thất, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/205"
+  },
+  {
+    "name": "THPT Hai Bà Trưng - Thạch Thất",
+    "province": "Hà Nội",
+    "ward": "Xã Hạ Bằng",
+    "address": "Thôn Mục Uyên 1 - Xã Hạ Bằng - TP.Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/203"
+  },
+  {
+    "name": "THPT FPT",
+    "province": "Hà Nội",
+    "ward": "Xã Thạch Hòa",
+    "address": "Khu Công nghệ cao Hòa Lạc, Km 29 Đại lộ Thăng Long, xã Thạch Hòa, huyện Thạch Thất, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/207"
+  },
+  {
+    "name": "Trung học cơ sở và Trung học phổ thông THSchool Hòa Lạc",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/208"
+  },
+  {
+    "name": "THPT Khoa học Giáo dục",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Nhà HT2, Khu đô thị Đại học Quốc gia Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/147"
+  },
+  {
+    "name": "THPT Minh Hà",
+    "province": "Hà Nội",
+    "ward": "Xã Tây Phương",
+    "address": "Số 1 đường H28 Canh Nậu - xã Tây Phương - Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/4"
+  },
+  {
+    "name": "THPT Phùng Khắc Khoan - Thạch Thất",
+    "province": "Hà Nội",
+    "ward": "Xã Tây Phương",
+    "address": "Thôn Bình Xá, Xã Tây Phương - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/204"
+  },
+  {
+    "name": "THPT Phan Huy Chú - Thạch Thất",
+    "province": "Hà Nội",
+    "ward": "Xã Bình Phú",
+    "address": "Xã Bình Phú - Huyện Thạch Thất",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/206"
+  },
+  {
+    "name": "THPT Chương Mỹ A",
+    "province": "Hà Nội",
+    "ward": "Phường Chương Mỹ",
+    "address": "Số 42 - Khu Yên Sơn - phường Chương Mỹ - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/210"
+  },
+  {
+    "name": "THPT Đặng Tiến Đông",
+    "province": "Hà Nội",
+    "ward": "Phường Chương Mỹ",
+    "address": "Phường Chương Mỹ, Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/214"
+  },
+  {
+    "name": "THPT Xuân Mai",
+    "province": "Hà Nội",
+    "ward": "Xã Xuân Mai",
+    "address": "Khu Tân Bình, xã Xuân Mai, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/212"
+  },
+  {
+    "name": "THPT Lâm Nghiệp",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/216"
+  },
+  {
+    "name": "THPT Ngô Sỹ Liên",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Khu Chiến thắng",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/213"
+  },
+  {
+    "name": "THPT Chúc Động",
+    "province": "Hà Nội",
+    "ward": "Xã Quảng Bị",
+    "address": "Thôn Bến - xã Quảng Bị - TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/209"
+  },
+  {
+    "name": "THPT Nguyễn Văn Trỗi",
+    "province": "Hà Nội",
+    "ward": "Xã Trần Phú",
+    "address": "Xã Trần Phú - Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/7"
+  },
+  {
+    "name": "THPT Chương Mỹ B",
+    "province": "Hà Nội",
+    "ward": "Xã Hòa Phú",
+    "address": "Thôn Hòa Xá, xã Hòa Phú, thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/211"
+  },
+  {
+    "name": "THPT Thanh Oai A",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/218"
+  },
+  {
+    "name": "Trung học Phổ thông IVS",
+    "province": "Hà Nội",
+    "ward": "Xã Thanh Oai",
+    "address": "Tổ 1, xã Thanh Oai, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/220"
+  },
+  {
+    "name": "THPT Thanh Oai B",
+    "province": "Hà Nội",
+    "ward": "Xã Tam Hưng",
+    "address": "Xã Tam Hưng, TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/219"
+  },
+  {
+    "name": "THPT Thanh Xuân",
+    "province": "Hà Nội",
+    "ward": "Xã Tam Hưng",
+    "address": "Quốc Lộ 427 Xã Tam Hưng - Thành Phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/221"
+  },
+  {
+    "name": "THPT Nguyễn Du - Thanh Oai",
+    "province": "Hà Nội",
+    "ward": "Xã Dân Hòa",
+    "address": "Xã Dân Hòa - Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/217"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Thăng Long",
+    "province": "Hà Nội",
+    "ward": "Xã Thường Tín",
+    "address": "Thôn Phố Vồi, Xã Thường Tín, TP. Hà Nội.",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/222"
+  },
+  {
+    "name": "THPT Nguyễn Trãi-Thường Tín",
+    "province": "Hà Nội",
+    "ward": "Xã Thường Tín",
+    "address": "Thôn Thượng Đình, xã Thường Tín - TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/224"
+  },
+  {
+    "name": "THPT Thường Tín",
+    "province": "Hà Nội",
+    "ward": "Xã Thường Tín",
+    "address": "Xã Thường Tín - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/225"
+  },
+  {
+    "name": "THPT Vân Tảo",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 34, Vân Hòa, Hồng Vân, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/227"
+  },
+  {
+    "name": "THPT Lý Tử Tấn",
+    "province": "Hà Nội",
+    "ward": "Xã Thượng Phúc",
+    "address": "Thôn Lộc Dư, Xã Thượng Phúc, Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/223"
+  },
+  {
+    "name": "THPT Tô Hiệu - Thường Tín",
+    "province": "Hà Nội",
+    "ward": "Xã Chương Dương",
+    "address": "thôn An Duyên -xã Chương Dương - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/226"
+  },
+  {
+    "name": "THPT Phú Xuyên A",
+    "province": "Hà Nội",
+    "ward": "Xã Phú Xuyên",
+    "address": "Thôn Phú Mỹ- Xã Phú Xuyên- Thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/229"
+  },
+  {
+    "name": "THPT Đồng Quan",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/228"
+  },
+  {
+    "name": "THPT Tân Dân",
+    "province": "Hà Nội",
+    "ward": "Xã Chuyên Mỹ",
+    "address": "Thôn Đại Nghiệp - xã Chuyên Mỹ - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/231"
+  },
+  {
+    "name": "THPT Phú Xuyên B",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/230"
+  },
+  {
+    "name": "THPT Nguyễn Bỉnh Khiêm - Phú Xuyên",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/232"
+  },
+  {
+    "name": "THPT Ứng Hòa A",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/236"
+  },
+  {
+    "name": "THPT Nguyễn Thượng Hiền - Ứng Hòa",
+    "province": "Hà Nội",
+    "ward": "Thị trấn Vân Đình",
+    "address": "Số 02 Đường Đê - Thị Trấn Vân Đình - Ứng Hòa - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/238"
+  },
+  {
+    "name": "THPT Trần Đăng Ninh",
+    "province": "Hà Nội",
+    "ward": "Xã Ứng Thiên",
+    "address": "Thôn Miêng Hạ, xã Ứng Thiên, TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/235"
+  },
+  {
+    "name": "THPT Ứng Hòa B",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/237"
+  },
+  {
+    "name": "THPT Đại Cường",
+    "province": "Hà Nội",
+    "ward": "Xã Ứng Hòa",
+    "address": "Xóm 25, Thôn Kim Giang, Xã Ứng Hòa, TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/233"
+  },
+  {
+    "name": "THPT Lưu Hoàng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Thôn Ngoại Hoàng - Hòa Xá - Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/234"
+  },
+  {
+    "name": "THPT Hợp Thanh",
+    "province": "Hà Nội",
+    "ward": "Xã Mỹ Đức",
+    "address": "Ngõ 184 - đường Sạt Nỏ, Thôn Vài - xã Mỹ Đức - thành phố Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/239"
+  },
+  {
+    "name": "THPT Mỹ Đức A",
+    "province": "Hà Nội",
+    "ward": "Xã Mỹ Đức",
+    "address": "Thôn Văn Giang - Xã Mỹ Đức - TP. Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/240"
+  },
+  {
+    "name": "THPT Mỹ Đức B",
+    "province": "Hà Nội",
+    "ward": "Xã An Mỹ",
+    "address": "Xã An Mỹ - Huyện Mỹ Đức -TP Hà Nội",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/241"
+  },
+  {
+    "name": "THPT Mỹ Đức C",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Trung học phổ thông",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/242"
+  },
+  {
+    "name": "Phổ thông năng khiếu TDTT Hà Nội (Hệ GDTX)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Đường Lê Đức Thọ, Mỹ Đình 2, Nam Từ Liêm, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5592"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Ba Đình",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 1 ngõ 294 Đội Cấn",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5593"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX Nguyễn Văn Tố quận Hoàn Kiếm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5665"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Tây Hồ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 57/15 An Dương Vương",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5668"
+  },
+  {
+    "name": "Trung tâm giáo dục nghề nghiệp - giáo dục thường xuyên Tây Hồ (Điểm trường Trung tâm GDNN-GDTX quận Tây Hồ)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6716"
+  },
+  {
+    "name": "Cơ sở 2 - Trường Trung cấp Kinh tế - Kỹ thuật và Công nghệ Hà Nội (Điểm trường Trung cấp kinh tế - Kỹ thuật và Công nghệ Hà Nội)",
+    "province": "Hà Nội",
+    "ward": "Phường Hồng Hà",
+    "address": "Số 102 Tân Ấp, phường Hồng Hà, TP Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6910"
+  },
+  {
+    "name": "Trung tâm bồi dưỡng kiến thức, kỹ năng DT EduVision",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5680"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Long Biên",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Ngõ 161 Phố Hoa Lâm - Việt Hưng - Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5672"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Cầu Giấy",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 2 - ngõ 181 - đường Xuân Thủy, Cầu Giấy, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5660"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Đống Đa",
+    "province": "Hà Nội",
+    "ward": "Phường Kim Kiên",
+    "address": "Số 6 Phạm Ngọc Thạch, Phường Kim Kiên, TP Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5594"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Hai Bà Trưng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5595"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Hoàng Mai- cơ sở 2 (Điểm trường Trung tâm GDNN-GDTX quận Hoàng Mai)",
+    "province": "Hà Nội",
+    "ward": "Phường Tương Mai",
+    "address": "Khu đô thị Đền Lừ, Phường Tương Mai, Thành phố Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6463"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Hoàng Mai",
+    "province": "Hà Nội",
+    "ward": "Phường Trần Phú",
+    "address": "Số 8,ngõ 22, đường Khuyến Lương, Phường Trần Phú, Hoàng Mai, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5663"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Thanh Xuân",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5596"
+  },
+  {
+    "name": "THPT Hoàng Mai (Hệ GDTX)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5591"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Sóc Sơn",
+    "province": "Hà Nội",
+    "ward": "Xã Sóc Sơn",
+    "address": "Thôn Miếu Thờ, Xã Sóc Sơn, Hà Nội.",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5597"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX Sóc Sơn (Điểm trường Trung tâm GDNN-GDTX Sóc Sơn)",
+    "province": "Hà Nội",
+    "ward": "Xã Sóc Sơn",
+    "address": "Thôn Miếu Thờ, Xã Sóc Sơn, Hà Nội.",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6811"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Đông Anh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5598"
+  },
+  {
+    "name": "Trung tâm GDNN - GDTX Gia Lâm ( CS Đặng Xá) (Điểm trường Trung tâm GDNN-GDTX huyện Gia Lâm)",
+    "province": "Hà Nội",
+    "ward": "Xã Thuận An",
+    "address": "Thôn Viên Ngoại, xã Thuận An, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6612"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Gia Lâm",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 6 đường Cổ Bi - Gia Lâm - Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5599"
+  },
+  {
+    "name": "Trung tâm GDNN - GDTX Gia Lâm ( CS Đa Tốn) (Điểm trường Trung tâm GDNN-GDTX huyện Gia Lâm)",
+    "province": "Hà Nội",
+    "ward": "Xã Bát Tràng",
+    "address": "Thôn Lê Xá, xã Bát Tràng, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/6611"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Nam Từ Liêm",
+    "province": "Hà Nội",
+    "ward": "Phường Phương Canh",
+    "address": "Số 283, Phường Phương Canh, quận Nam Từ Liêm, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5600"
+  },
+  {
+    "name": "Trung tâm Giáo dục nghề nghiệp-Giáo dục thường xuyên Thanh Trì",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5670"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Mê Linh",
+    "province": "Hà Nội",
+    "ward": "Xã Quang Minh",
+    "address": "Thôn Nội Đồng, xã Quang Minh, thành phố Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5664"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX quận Hà Đông",
+    "province": "Hà Nội",
+    "ward": "Phường Hà Đông",
+    "address": "Số 23 phố Bùi Bằng Đoàn, Phường Hà Đông, Thành phố Hà Nội.",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5662"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX thị xã Sơn Tây",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 129 đường Phú Thịnh",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5667"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Ba Vì",
+    "province": "Hà Nội",
+    "ward": "Xã Vật Lại",
+    "address": "Thôn Vật Phụ - Xã Vật Lại - Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5659"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Phúc Thọ",
+    "province": "Hà Nội",
+    "ward": "Xã Phúc Thọ",
+    "address": "Tổ dân phố số 3, xã Phúc Thọ, Thành phố Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5666"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Đan Phượng",
+    "province": "Hà Nội",
+    "ward": "Xã Đan Phượng",
+    "address": "Phố Phượng Trì - xã Đan Phượng - Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5601"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Hoài Đức",
+    "province": "Hà Nội",
+    "ward": "Xã Hoài Đức",
+    "address": "thôn Yên Vĩnh - xã Hoài Đức - Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5602"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Quốc Oai",
+    "province": "Hà Nội",
+    "ward": "Xã Quốc Oai",
+    "address": "Xã Quốc Oai - Thành phố Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5603"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Thạch Thất",
+    "province": "Hà Nội",
+    "ward": "Thị trấn Liên Quan",
+    "address": "Thị trấn Liên Quan - Huyện Thạch Thất - TP Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5669"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Chương Mỹ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5661"
+  },
+  {
+    "name": "Cao đẳng Cộng đồng Hà Tây",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5635"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Thanh Oai",
+    "province": "Hà Nội",
+    "ward": "Xã Tam Hưng",
+    "address": "Thôn Đại Định - xã Tam Hưng - Thành phố Hà Nội.",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5604"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Thường Tín",
+    "province": "Hà Nội",
+    "ward": "Thị trấn Thường Tín",
+    "address": "Thị trấn Thường Tín - Huyện Thường Tín - TP Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5671"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Phú Xuyên",
+    "province": "Hà Nội",
+    "ward": "Xã Phú Xuyên",
+    "address": "Thôn Nam Quất, xã Phú Xuyên, TP Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5607"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Ứng Hòa",
+    "province": "Hà Nội",
+    "ward": "Xã Vân Đình",
+    "address": "Xóm Thủy Nông, thôn Thanh Ấm, xã Vân Đình, Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5605"
+  },
+  {
+    "name": "Trung tâm GDNN-GDTX huyện Mỹ Đức",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Thôn Đức Thụ - Lê Thanh - Mỹ Đức - Hà Nội",
+    "level": "TT GDNN-GDTX",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5606"
+  },
+  {
+    "name": "Trường Trung cấp Thủ đô",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5574"
+  },
+  {
+    "name": "Trường Cao đẳng Kinh tế Công nghệ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5581"
+  },
+  {
+    "name": "Trường Cao đẳng Công nghiệp",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5587"
+  },
+  {
+    "name": "Trung cấp Kinh tế Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5616"
+  },
+  {
+    "name": "Trung cấp Công nghệ và Quản trị Đông Đô",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5625"
+  },
+  {
+    "name": "Trung cấp Cộng đồng Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5634"
+  },
+  {
+    "name": "Trung cấp Kinh tế Kỹ thuật Thương mại",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5651"
+  },
+  {
+    "name": "Trung cấp Nghiệp vụ và Dạy nghề Công đoàn Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5652"
+  },
+  {
+    "name": "Cao đẳng Bách Khoa",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5653"
+  },
+  {
+    "name": "Trung cấp Kỹ thuật Tin học Hà Nội (ESTIH)",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5615"
+  },
+  {
+    "name": "Cao Đẳng Nghệ Thuật Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5673"
+  },
+  {
+    "name": "Trung cấp Xây dựng Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5638"
+  },
+  {
+    "name": "Trường Trung cấp Công nghệ Bách khoa Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5579"
+  },
+  {
+    "name": "Trung cấp Quang Trung",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5640"
+  },
+  {
+    "name": "Cao đẳng Sư phạm Trung Ương",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5569"
+  },
+  {
+    "name": "Trường Cao đẳng du lịch Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5580"
+  },
+  {
+    "name": "Cao đẳng Công thương Việt Nam",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5650"
+  },
+  {
+    "name": "Cao đẳng nghề kỹ thuật và nghiệp vụ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5571"
+  },
+  {
+    "name": "Cao đẳng kinh tế công nghiệp Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5636"
+  },
+  {
+    "name": "Trung cấp nghề Du lịch Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5609"
+  },
+  {
+    "name": "Cao đẳng Cộng đồng Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5647"
+  },
+  {
+    "name": "Trung cấp nghề Nấu ăn - Nghiệp vụ Du lịch và Thời trang Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5630"
+  },
+  {
+    "name": "Cao đẳng nghề công nghiệp Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5620"
+  },
+  {
+    "name": "Cao đẳng Công nghiệp và Thương Mại",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5648"
+  },
+  {
+    "name": "Trung cấp Kinh tế - Kỹ thuật Phan Chu Trinh",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5655"
+  },
+  {
+    "name": "Trung cấp nghề Cơ khí 1 Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5613"
+  },
+  {
+    "name": "Cao đẳng nghề Việt Nam - Hàn Quốc thành phố Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5614"
+  },
+  {
+    "name": "Trung cấp nghề Cơ khí Xây dựng",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5624"
+  },
+  {
+    "name": "Cao đẳng Kỹ thuật - Mỹ nghệ Việt Nam",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5656"
+  },
+  {
+    "name": "Trung cấp nghề Giao thông công chính Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5639"
+  },
+  {
+    "name": "GDTX-Trung cấp Nghệ thuật Xiếc và Tạp Kỹ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Khu Văn Hóa Nghệ thuật",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5675"
+  },
+  {
+    "name": "Cao đẳng Cơ điện Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "Số 160 phố Mai Dịch, quận Cầu Giấy, TP Hà Nội",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5644"
+  },
+  {
+    "name": "Trường Cao đẳng Thương mại và Du lịch Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5582"
+  },
+  {
+    "name": "Trường Cao đẳng Ngoại ngữ và Công nghệ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5575"
+  },
+  {
+    "name": "Cao đẳng Việt Mỹ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5657"
+  },
+  {
+    "name": "Trường Trung cấp Kỹ thuật Đa ngành Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5585"
+  },
+  {
+    "name": "Trung cấp Công nghệ và Kinh tế đối ngoại",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5637"
+  },
+  {
+    "name": "Trường cao đẳng Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5578"
+  },
+  {
+    "name": "Trung cấp công nghệ và du lịch Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5645"
+  },
+  {
+    "name": "Trường Cao đẳng Y Dược Tuệ Tĩnh Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5573"
+  },
+  {
+    "name": "Trường Trung cấp quốc tế Việt Đức",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5583"
+  },
+  {
+    "name": "Trung cấp kinh tế - Kỹ thuật và Công nghệ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "953 đường Quang Trung",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5572"
+  },
+  {
+    "name": "Cao đẳng Kinh tế - Kỹ thuật Thương Mại",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "126 phố xốm, phú lãm, hà đông, hà nội",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5649"
+  },
+  {
+    "name": "Trung cấp Ngô Quyền Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5621"
+  },
+  {
+    "name": "Trường Trung cấp Y Dược và Công nghệ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5588"
+  },
+  {
+    "name": "Cao Đẳng Giao thông vận tải Trung ương I",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5628"
+  },
+  {
+    "name": "Trường Trung cấp Công nghệ Thăng Long",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5577"
+  },
+  {
+    "name": "Trung cấp nghề Công nghệ Tây An",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5619"
+  },
+  {
+    "name": "Trường Trung cấp Cao đẳng Ngoại ngữ-Công nghệ và Truyền thông",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5586"
+  },
+  {
+    "name": "Cao đẳng Bách nghệ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5658"
+  },
+  {
+    "name": "Trường Trung cấp Ngoại Thương",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5679"
+  },
+  {
+    "name": "Trường Trung cấp Việt Đức",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5584"
+  },
+  {
+    "name": "Cao đẳng Nông nghiệp và Phát triển nông thôn Bắc Bộ",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5646"
+  },
+  {
+    "name": "Trung cấp nghề Tổng hợp Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5629"
+  },
+  {
+    "name": "Trường Cao đẳng Ngoại ngữ Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5589"
+  },
+  {
+    "name": "Cao đẳng Truyền hình",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5622"
+  },
+  {
+    "name": "Cao đẳng Kỹ thuật - Công nghệ Bách Khoa",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5654"
+  },
+  {
+    "name": "Trung cấp nghề số 1 Hà Nội",
+    "province": "Hà Nội",
+    "ward": "",
+    "address": "",
+    "level": "Cơ sở nghề nghiệp",
+    "school_type": "Ngoài công lập",
+    "school_code": "",
+    "detail_url": "https://tsdaucap.hanoi.gov.vn/thong-tin-truong-chi-tiet/5611"
+  }
+]

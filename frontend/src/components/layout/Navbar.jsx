@@ -70,6 +70,24 @@ export default function Navbar({
     }
   }
 
+  const classNavItem = useMemo(() => {
+    if (userDetails?.role === 'TEACHER') {
+      return {
+        label: 'Quản lý lớp học',
+        path: '/classes',
+      }
+    }
+
+    if (userDetails?.role === 'STUDENT') {
+      return {
+        label: 'Lớp học',
+        path: '/classes',
+      }
+    }
+
+    return null
+  }, [userDetails?.role])
+
   const navItems = useMemo(
     () => [
       { label: 'Trang chủ', path: '/' },
@@ -77,11 +95,9 @@ export default function Navbar({
       { label: 'E-Learning', path: '/e-learning' },
       { label: 'Xếp hạng', path: '/leaderboard' },
       { label: 'Cộng đồng', path: '/forum' },
-      ...(userDetails?.role === 'TEACHER'
-        ? [{ label: 'Quản lý lớp học', path: '/classes' }]
-        : []),
+      ...(classNavItem ? [classNavItem] : []),
     ],
-    [userDetails?.role]
+    [classNavItem]
   )
 
   return (
@@ -95,7 +111,6 @@ export default function Navbar({
       <div className="mx-auto flex h-20 max-w-screen-xl items-center px-6">
         <div className="flex shrink-0 items-center">
           <Link to="/" className="flex items-center gap-3">
-
             <div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
               <img
                 src={darkMode ? darkLogo : lightLogo}
@@ -117,7 +132,6 @@ export default function Navbar({
                 THPT Platform
               </p>
             </div>
-
           </Link>
         </div>
 
@@ -127,7 +141,7 @@ export default function Navbar({
 
             return (
               <Link
-                key={item.path}
+                key={`${item.label}-${item.path}`}
                 to={item.path}
                 className={`relative whitespace-nowrap text-sm font-semibold transition-all duration-200 ${
                   isActive

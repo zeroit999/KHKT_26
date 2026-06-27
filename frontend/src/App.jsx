@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 import {
   BrowserRouter,
@@ -7,158 +7,161 @@ import {
   Routes,
   useLocation,
   useParams,
-} from 'react-router-dom'
+} from 'react-router-dom';
 
-import { AnimatePresence, motion } from 'framer-motion'
-import { Toaster } from 'react-hot-toast'
+import { AnimatePresence, motion } from 'framer-motion';
+import { Toaster } from 'react-hot-toast';
 
-import AppLayout from './components/layout/AppLayout.jsx'
-import LoadingSkeleton from './components/ui/LoadingSkeleton.jsx'
-import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx'
+import AppLayout from './components/layout/AppLayout.jsx';
+import LoadingSkeleton from './components/ui/LoadingSkeleton.jsx';
+import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx';
 
-import Home from './pages/Home.jsx'
-import Exams from './pages/exam/Exams.jsx'
-import ExamRoom from './pages/exam/ExamRoom.jsx'
-import ResultPage from './pages/exam/ResultPage.jsx'
-import Forum from './pages/forum/Forum.jsx'
-import Leaderboard from './pages/leaderboard/Leaderboard.jsx'
-import ELearning from './pages/e-learning/E-learning.jsx'
-import ELearningDetail from './pages/e-learning/E-learningDetail.jsx'
-import LearningPage from './pages/learning/LearningPage.jsx'
-import Classes from './pages/learning/Classes.jsx'
-import Setup from './pages/auth/Setup.jsx'
-import NotFound from './pages/NotFound.jsx'
-import Setting from './pages/setting/Setting.jsx'
+import Home from './pages/Home.jsx';
+import Exams from './pages/exam/Exams.jsx';
+import ExamRoom from './pages/exam/ExamRoom.jsx';
+import ResultPage from './pages/exam/ResultPage.jsx';
+import Forum from './pages/forum/Forum.jsx';
+import Leaderboard from './pages/leaderboard/Leaderboard.jsx';
+import ELearning from './pages/e-learning/E-learning.jsx';
+import ELearningDetail from './pages/e-learning/E-learningDetail.jsx';
+import LearningPage from './pages/learning/LearningPage.jsx';
+import Classes from './pages/learning/Classes.jsx';
+import Setup from './pages/setup/Setup.jsx';
+import NotFound from './pages/NotFound.jsx';
+import Setting from './pages/setting/Setting.jsx';
 
-import Login from './components/Signpage/login.jsx'
-import Register from './components/Signpage/register.jsx'
-import Profile from './components/Signpage/profile.jsx'
+import Login from './components/Signpage/login.jsx';
+import Register from './components/Signpage/register.jsx';
+import Profile from './components/Signpage/profile.jsx';
 
-import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 
 function getInitialDarkMode() {
-  if (typeof window === 'undefined') return false
+  if (typeof window === 'undefined') return false;
 
-  const savedDarkMode = window.localStorage.getItem('darkMode')
+  const savedDarkMode = window.localStorage.getItem('darkMode');
   const savedTheme =
     window.localStorage.getItem('theme') ||
-    window.localStorage.getItem('color-theme')
+    window.localStorage.getItem('color-theme');
 
-  if (savedDarkMode === 'true' || savedTheme === 'dark') return true
-  if (savedDarkMode === 'false' || savedTheme === 'light') return false
+  if (savedDarkMode === 'true' || savedTheme === 'dark') return true;
+  if (savedDarkMode === 'false' || savedTheme === 'light') return false;
 
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
 }
 
 function applyDarkModeToDocument(isDark) {
-  if (typeof document === 'undefined') return
+  if (typeof document === 'undefined') return;
 
-  document.documentElement.classList.toggle('dark', isDark)
-  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+  document.documentElement.classList.toggle('dark', isDark);
+  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 
-  const favicon = document.getElementById('favicon')
+  const favicon = document.getElementById('favicon');
   if (favicon) {
-    favicon.setAttribute('href', isDark ? '/dark-mode.png' : '/light-mode.png')
+    favicon.setAttribute('href', isDark ? '/dark-mode.png' : '/light-mode.png');
   }
 }
 
 function normalizeAppRole(role) {
-  return String(role || '').trim().replace(/[\s_-]/g, '').toUpperCase()
+  return String(role || '')
+    .trim()
+    .replace(/[\s_-]/g, '')
+    .toUpperCase();
 }
 
 function ScrollToTop() {
-  const { pathname } = useLocation()
+  const { pathname } = useLocation();
 
   useEffect(() => {
     window.scrollTo({
       top: 0,
       behavior: 'smooth',
-    })
-  }, [pathname])
+    });
+  }, [pathname]);
 
-  return null
+  return null;
 }
 
 function LoadingScreen() {
-  return <LoadingSkeleton />
+  return <LoadingSkeleton />;
 }
 
 function ProtectedRoute({ children }) {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading } = useAuth();
 
-  if (isLoading) return <LoadingScreen />
-  if (!user) return <Navigate to="/login" replace />
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  return children
+  return children;
 }
 
 function TeacherRoute({ children }) {
-  const { user, userDetails, isLoading } = useAuth()
+  const { user, userDetails, isLoading } = useAuth();
 
-  if (isLoading) return <LoadingScreen />
-  if (!user) return <Navigate to="/login" replace />
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  const normalizedRole = normalizeAppRole(userDetails?.role)
-  const allowed = normalizedRole === 'TEACHER' || normalizedRole === 'ADMINDEV'
+  const normalizedRole = normalizeAppRole(userDetails?.role);
+  const allowed = normalizedRole === 'TEACHER' || normalizedRole === 'ADMINDEV';
 
-  if (!allowed) return <Navigate to="/" replace />
+  if (!allowed) return <Navigate to="/" replace />;
 
-  return children
+  return children;
 }
 
 function AdminDevRoute({ children }) {
-  const { user, userDetails, isLoading } = useAuth()
+  const { user, userDetails, isLoading } = useAuth();
 
-  if (isLoading) return <LoadingScreen />
-  if (!user) return <Navigate to="/login" replace />
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  const allowed = normalizeAppRole(userDetails?.role) === 'ADMINDEV'
+  const allowed = normalizeAppRole(userDetails?.role) === 'ADMINDEV';
 
-  if (!allowed) return <Navigate to="/" replace />
+  if (!allowed) return <Navigate to="/" replace />;
 
-  return children
+  return children;
 }
 
 function SetupRoute() {
-  const { user, userDetails, isLoading } = useAuth()
+  const { user, userDetails, isLoading } = useAuth();
 
-  if (isLoading) return <LoadingScreen />
-  if (!user) return <Navigate to="/login" replace />
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
 
   if (userDetails?.isSetupComplete === true) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/" replace />;
   }
 
-  return <Setup />
+  return <Setup />;
 }
 
 function ProfileRoute() {
-  const { user, userDetails, isLoading } = useAuth()
+  const { user, userDetails, isLoading } = useAuth();
 
-  if (isLoading) return <LoadingScreen />
-  if (!user) return <Navigate to="/login" replace />
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
 
   if (userDetails && userDetails.isSetupComplete === false) {
-    return <Navigate to="/setup" replace />
+    return <Navigate to="/setup" replace />;
   }
 
-  return <Profile />
+  return <Profile />;
 }
 
 function LegacyCourseDetailRedirect() {
-  const { id } = useParams()
-  return <Navigate to={`/e-learning/${id}`} replace />
+  const { id } = useParams();
+  return <Navigate to={`/e-learning/${id}`} replace />;
 }
 
 function AppContent({ darkMode, onToggleDarkMode }) {
-  const location = useLocation()
-  const { user, userDetails, isLoading } = useAuth()
+  const location = useLocation();
+  const { user, userDetails, isLoading } = useAuth();
 
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
-    !location.pathname.endsWith('/result')
+    !location.pathname.endsWith('/result');
 
-  if (isLoading) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />;
 
   if (
     user &&
@@ -166,7 +169,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
     userDetails.isSetupComplete === false &&
     location.pathname !== '/setup'
   ) {
-    return <Navigate to="/setup" replace />
+    return <Navigate to="/setup" replace />;
   }
 
   if (location.pathname === '/setup') {
@@ -195,7 +198,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
           </motion.div>
         </AnimatePresence>
       </>
-    )
+    );
   }
 
   if (isExamRoomRoute) {
@@ -216,7 +219,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
           <Route path="*" element={<Navigate to="/exams" replace />} />
         </Routes>
       </>
-    )
+    );
   }
 
   return (
@@ -275,8 +278,14 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 }
               />
 
-              <Route path="/courses" element={<Navigate to="/e-learning" replace />} />
-              <Route path="/courses/:id" element={<LegacyCourseDetailRedirect />} />
+              <Route
+                path="/courses"
+                element={<Navigate to="/e-learning" replace />}
+              />
+              <Route
+                path="/courses/:id"
+                element={<LegacyCourseDetailRedirect />}
+              />
 
               <Route
                 path="/e-learning"
@@ -326,9 +335,9 @@ function AppContent({ darkMode, onToggleDarkMode }) {
               <Route
                 path="/classes"
                 element={
-                  <TeacherRoute>
+                  <ProtectedRoute>
                     <Classes />
-                  </TeacherRoute>
+                  </ProtectedRoute>
                 }
               />
 
@@ -350,24 +359,24 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         </AnimatePresence>
       </AppLayout>
     </>
-  )
+  );
 }
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
-    const initialDarkMode = getInitialDarkMode()
-    applyDarkModeToDocument(initialDarkMode)
-    return initialDarkMode
-  })
+    const initialDarkMode = getInitialDarkMode();
+    applyDarkModeToDocument(initialDarkMode);
+    return initialDarkMode;
+  });
 
   useLayoutEffect(() => {
-    applyDarkModeToDocument(darkMode)
-  }, [darkMode])
+    applyDarkModeToDocument(darkMode);
+  }, [darkMode]);
 
   useEffect(() => {
-    localStorage.setItem('darkMode', String(darkMode))
-    localStorage.setItem('theme', darkMode ? 'dark' : 'light')
-  }, [darkMode])
+    localStorage.setItem('darkMode', String(darkMode));
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   const toastOptions = useMemo(
     () => ({
@@ -397,21 +406,21 @@ function App() {
         },
       },
     }),
-    [darkMode],
-  )
+    [darkMode]
+  );
 
-  const [showInitialLoading, setShowInitialLoading] = useState(true)
+  const [showInitialLoading, setShowInitialLoading] = useState(true);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setShowInitialLoading(false)
-    }, 2500)
+      setShowInitialLoading(false);
+    }, 2500);
 
-    return () => window.clearTimeout(timer)
-  }, [])
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (showInitialLoading) {
-    return <LoadingSkeleton />
+    return <LoadingSkeleton />;
   }
 
   return (
@@ -427,7 +436,7 @@ function App() {
         <Toaster position="top-right" toastOptions={toastOptions} />
       </BrowserRouter>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

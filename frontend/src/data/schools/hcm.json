@@ -1,0 +1,2594 @@
+[
+  {
+    "name": "TT GDNN-GDTX Huyện Hóc Môn",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Xuân Thới Sơn",
+    "address": "07 Đặng Công Bỉnh, ấp 73, xã Xuân Thới Sơn",
+    "school_code": "79784901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/812"
+  },
+  {
+    "name": "TT GDNN-GDTX Huyện Củ Chi",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Tân An Hội",
+    "address": "Số 53, Đường Phạm Hữu Tâm, Ấp 6, Xã Tân An Hội, Thành phố Hồ Chí Minh",
+    "school_code": "79783901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/792"
+  },
+  {
+    "name": "TT GDNN-GDTX Quận 8",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chánh Hưng",
+    "address": "3, 5 Huỳnh Thị Phụng",
+    "school_code": "79776901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/801"
+  },
+  {
+    "name": "TT GDNN - GDTX Quận 10",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Hưng",
+    "address": "367 Cách Mạng Tháng Tám",
+    "school_code": "79771901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/699"
+  },
+  {
+    "name": "TT GDNN-GDTX Quận Phú Nhuận",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Đức Nhuận",
+    "address": "131, 133 Hồng Hà",
+    "school_code": "79768901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/813"
+  },
+  {
+    "name": "TT GDNN-GDTX Quận 12",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Trung Mỹ Tây",
+    "address": "Số 2 Bis, Đường Tô Ký, Kp 23, Phường Trung Mỹ Tây, Thành phố Hồ Chí Minh",
+    "school_code": "79761901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/793"
+  },
+  {
+    "name": "TH, THCS và THPT Quốc tế Á Châu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Định",
+    "address": "Trụ trở: 41/3, 41/4 Bis Trần Nhật Duật, Phường Tân Định, Thành phố Hồ Chí Minh.",
+    "school_code": "79760419",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/795"
+  },
+  {
+    "name": "THPT chuyên Trần Đại Nghĩa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Khánh",
+    "address": "Lô P2 Khu tái định cư 38, 4 ha, phường An Khánh, thành phố Hồ Chí Minh",
+    "school_code": "79000F02",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/675"
+  },
+  {
+    "name": "TH, THCS và THPT Mỹ Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thới Nhất",
+    "address": "95 Phan Văn Hớn, Phường Tân Thới Nhất, Quận 12.",
+    "school_code": "79000C12",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/671"
+  },
+  {
+    "name": "TH, THCS và THPT Nguyễn Tri Phương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Hội Tây",
+    "address": "112/48 Bùi Quang Là, phường An Hội Tây, Thành phố Hồ Chí Minh",
+    "school_code": "79000C09",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/669"
+  },
+  {
+    "name": "Song ngữ Quốc tế Horizon",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thạnh Mỹ Tây",
+    "address": "6, 6A, 8 đường số 44 (Trần Văn Sắc)",
+    "school_code": "79000C04",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/803"
+  },
+  {
+    "name": "THPT Phạm Phú Thứ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Tiên",
+    "address": "425, 435 đường Gia Phú, Phường Bình Tiên, Thành phố Hồ Chí Minh",
+    "school_code": "79000875",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/661"
+  },
+  {
+    "name": "TH, THCS và THPT Vinschool",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thạnh Mỹ Tây",
+    "address": "Tòa CC3, khu đô thị Vinhomes Central Park, 720A Điện Biên Phủ",
+    "school_code": "79000874",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/794"
+  },
+  {
+    "name": "THCS và THPT Hoa Lư",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thới Nhất",
+    "address": "201 Phan Văn Hớn, Phường Tân Thới Nhất, Quận 12.",
+    "school_code": "79000865",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/657"
+  },
+  {
+    "name": "THCS và THPT Sương Nguyệt Anh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Vườn Lài",
+    "address": "249 Hòa Hảo, Phường Vườn Lài, Hồ Chí Minh",
+    "school_code": "79000860",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/653"
+  },
+  {
+    "name": "THCS và THPT Lạc Hồng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Trung Mỹ Tây",
+    "address": "Cs1: 2276/5 Quốc lộ 1A, Phường Trung Mỹ Tây, Quận 12 ; ĐT: 028.6255.9109; CS2: 556/4 Lê Thị Riêng, Phường Thới An, Quận 12 . ĐT: 028.6277.9109; https://truonglachong.edu.vn/",
+    "school_code": "79000854",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/649"
+  },
+  {
+    "name": "Trung học thực hành Sài Gòn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Quán",
+    "address": "220 Trần Bình Trọng, Phường Chợ Quán",
+    "school_code": "79000853",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/648"
+  },
+  {
+    "name": "THCS và THPT Sao Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hưng",
+    "address": "650/15Q Nguyễn Hữu Thọ, KDC Him Lam, Phường Tân Hưng",
+    "school_code": "79000851",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/646"
+  },
+  {
+    "name": "TH, THCS và THPT Việt Mỹ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bảy Hiền",
+    "address": "19A Cộng Hòa, Phường Bảy Hiền, Thành phố Hồ Chí Minh.",
+    "school_code": "79000848",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/643"
+  },
+  {
+    "name": "TH, THCS và THPT Trương Vĩnh Ký",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Bình",
+    "address": "TS: 21 Trịnh Đình Trọng, Phường Hòa Bình; ĐT: 02839742324. Chi nhánh: 110 Bành Văn Trân, Phường Tân Sơn Nhất.",
+    "school_code": "79000836",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/638"
+  },
+  {
+    "name": "THCS và THPT Nguyễn Khuyến",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Bình",
+    "address": "327 Quốc lộ 13, đường số 3, Khu phố 31, Phường Hiệp Bình, Thành phố Hồ Chí Minh",
+    "school_code": "79000835",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/637"
+  },
+  {
+    "name": "THCS và THPT Nhân Văn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Sơn Nhì",
+    "address": "17 Sơn Kỳ, Phường Tân Sơn Nhì, Thành phố Hồ Chí Minh",
+    "school_code": "79000834",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/636"
+  },
+  {
+    "name": "TH, THCS và THPT Thanh Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bảy Hiền",
+    "address": "192/12 Nguyễn Thái Bình, Phường Bảy Hiền, Thành phố Hồ Chí Minh",
+    "school_code": "79000832",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/635"
+  },
+  {
+    "name": "THCS và THPT Việt Thanh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Bình",
+    "address": "261 Cộng Hòa, phường Tân Bình, Thành phố Hồ Chí Minh",
+    "school_code": "79000829",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/698"
+  },
+  {
+    "name": "TH, THCS và THPT Quốc Tế",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Nhuận",
+    "address": "305 Nguyễn Trọng Tuyển, phường Phú Nhuận, Thành phố Hồ Chí Minh",
+    "school_code": "79000828",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/632"
+  },
+  {
+    "name": "THCS và THPT Phạm Ngũ Lão",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hạnh Thông",
+    "address": "528, Phan Văn Trị, phường Hạnh Thông (Gò Vấp), Thành phố Hồ Chí Minh",
+    "school_code": "79000825",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/630"
+  },
+  {
+    "name": "THCS và THPT Bắc Sơn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Đông Hưng Thuận",
+    "address": "TS: 338/24 Nguyễn Văn Quá, Phường Đông Hưng Thuận, Thành phố Hồ Chí Minh",
+    "school_code": "79000824",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/629"
+  },
+  {
+    "name": "TH, THCS và THPT VẠN HẠNH",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Hưng",
+    "address": "781E Lê Hồng Phong nối dài, Phường Hòa Hưng, Thành phố Hồ Chí Minh",
+    "school_code": "79000818",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/626"
+  },
+  {
+    "name": "THCS và THPT Nguyễn Bỉnh Khiêm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Đông",
+    "address": "28, 30 Ngô Quyền, Phường An Đông, Thành phố Hồ Chí Minh",
+    "school_code": "79000812",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/622"
+  },
+  {
+    "name": "THCS và THPT Hồng Hà",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thông Tây Hội",
+    "address": "170 Quang Trung",
+    "school_code": "79000810",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/620"
+  },
+  {
+    "name": "THCS và THPT Đăng Khoa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Cầu Ông Lãnh",
+    "address": "TS: 571 Cô Bắc, Phường Cầu Ông Lãnh, Quận 1; ĐT: 72 Đặng Văn Ngữ, Phường 10, Quận Phú Nhuận.",
+    "school_code": "79000809",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/619"
+  },
+  {
+    "name": "THPT Lê Minh Xuân",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bình Lợi",
+    "address": "G11/1 ấp 31, Xã Bình Lợi, Tp Hồ Chí Minh.",
+    "school_code": "79000806",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/617"
+  },
+  {
+    "name": "THPT An Lạc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Lạc",
+    "address": "595 Kinh Dương Vương, Phường An Lạc, thành phố Hồ Chí Minh",
+    "school_code": "79000805",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/616"
+  },
+  {
+    "name": "THPT Phong Phú",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bình Hưng",
+    "address": "Số 2 đường số 14B, KĐC số 4, Ấp 57, Xã Bình Hưng",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/612"
+  },
+  {
+    "name": "THPT Dương Văn Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Nhà Bè",
+    "address": "39 đường số 6, KDC Phú Gia, Xã Nhà Bè, ấp 46, thành phồ Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/603"
+  },
+  {
+    "name": "THPT Vĩnh Lộc B",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Tân Vĩnh Lộc",
+    "address": "Đường số 3, KDC Vĩnh Lộc B, Xã Tân Vĩnh Lộc, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/602"
+  },
+  {
+    "name": "THCS và THPT Hai Bà Trưng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hòa",
+    "address": "51/4 Nguyễn Thị Nhỏ, Phường Tân Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/600"
+  },
+  {
+    "name": "THPT Nguyễn Văn Tăng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Long Bình",
+    "address": "Đường 9A, khu phố Phước Thiện, Phường Long Bình, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/595"
+  },
+  {
+    "name": "THCS và THPT Nam Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tây Thạnh",
+    "address": "701 Trường Chinh, Phường Tây Thạnh, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/800"
+  },
+  {
+    "name": "THPT Việt Mỹ Anh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Thới",
+    "address": "252 Lạc Long Quân, Phường Bình Thới, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/590"
+  },
+  {
+    "name": "THPT Bách Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Bình",
+    "address": "653 Quốc lộ 13, Phường Hiệp Bình, Thành phố Hồ Chí Minh .",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/589"
+  },
+  {
+    "name": "THCS và THPT Trần Cao Vân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Thạnh",
+    "address": "Trụ sở chính: Số 126 Tô Hiệu, Phường Phú Thạnh, Thành phố Hồ Chí Minh (Gần Khu du lịch Đầm Sen, ngay ngã 4 Hòa Bình & Tô Hiệu), ĐT:(028).22534444 * DĐ: 0945.071.667, 0939.196.371 Cơ sở 5: 41 Giang Cự Vọng, Phường Trung Mỹ Tây, Thành phố Hồ Chí Minh (Nằm ngay đ",
+    "school_code": "79000799",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/588"
+  },
+  {
+    "name": "THPT Nguyễn Văn Linh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Đông",
+    "address": "02 đường 3154 Phạm Thế Hiển, Phường Bình Đông, Thành phố Hồ Chí Minh",
+    "school_code": "79000794",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/583"
+  },
+  {
+    "name": "THPT Nguyễn Hữu Cảnh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Trị Đông",
+    "address": "845 Hương Lộ 2, Phường Bình Trị Đông, Thành phố Hồ Chí Minh",
+    "school_code": "79000793",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/582"
+  },
+  {
+    "name": "THCS và THPT Phùng Hưng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Phú Đông",
+    "address": "Số 27, Đường Thạnh Lộc 02, Khu phố 32, Phường An Phú Đông, Thành Phố Hồ Chí Minh",
+    "school_code": "79000791",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/581"
+  },
+  {
+    "name": "Trung học Thực hành Đại học Sư phạm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Quán",
+    "address": "280 An Dương Vương, Phường Chợ Quán, Thành phố Hồ Chí Minh",
+    "school_code": "79000775",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/570"
+  },
+  {
+    "name": "THPT Việt Nhật",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hạnh Thông",
+    "address": "785/5 Nguyễn Kiệm, Phường Hạnh Thông, Thành phố Hồ Chí Minh",
+    "school_code": "79000772",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/567"
+  },
+  {
+    "name": "THPT Trần Quang Khải",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Bình",
+    "address": "343D Lạc Long Quân, Phường Hòa Bình, Thành phố Hồ Chí Minh.",
+    "school_code": "79000768",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/564"
+  },
+  {
+    "name": "THPT Hiệp Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Bình",
+    "address": "Số 63 đường Hiệp Bình, khu phố 17, phường Hiệp Bình, Thành phố Hồ Chí Minh",
+    "school_code": "79000765",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/562"
+  },
+  {
+    "name": "THPT Nguyễn Hữu Tiến",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Đông Thạnh",
+    "address": "9A ấp 55, Xã Đông Thạnh, Thành phố Hồ Chí Minh",
+    "school_code": "79000761",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/558"
+  },
+  {
+    "name": "THPT Nguyễn Văn Cừ",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bà Điểm",
+    "address": "100A Nguyễn Văn Bứa, Ấp 51, Xã Bà Điểm, Thành phố Hồ Chí Minh",
+    "school_code": "79000760",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/557"
+  },
+  {
+    "name": "THPT Tân Thông Hội",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Tân Thông Hội",
+    "address": "đường Suối Lội, Ấp Bàu Sim, Xã Tân Thông Hội, Huyện Củ Chi.",
+    "school_code": "79000757",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/554"
+  },
+  {
+    "name": "THPT Tân Phong",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hưng",
+    "address": "19F Nguyễn Văn Linh, Phường Tân Hưng, Thành phố Hồ Chí Minh",
+    "school_code": "79000754",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/551"
+  },
+  {
+    "name": "THPT Bà Điểm",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bà Điểm",
+    "address": "07 đường Nguyễn Thị Sóc, Ấp Bắc Lân, Xã Bà Điểm, Thành phố Hồ Chí Minh.",
+    "school_code": "79000753",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/550"
+  },
+  {
+    "name": "THPT Nguyễn Trung Trực",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Hội Đông",
+    "address": "746 Đường Lê Đức Thọ, Phường An Hội Đông",
+    "school_code": "79000748",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/546"
+  },
+  {
+    "name": "THPT Nguyễn Thái Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hòa",
+    "address": "913, 915 Lý Thường Kiệt, Phường Tân Hòa",
+    "school_code": "79000747",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/545"
+  },
+  {
+    "name": "THPT Nguyễn An Ninh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Vườn Lài",
+    "address": "93 Trần Nhân Tôn, Phường Vườn Lài, Thành phố Hồ Chí Minh",
+    "school_code": "79000745",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/543"
+  },
+  {
+    "name": "THPT Trung Phú",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Phú Hòa Đông",
+    "address": "1318, Tỉnh lộ 8, Ấp 12, Xã Phú Hòa Đông, Thành phố Hồ Chí Minh.",
+    "school_code": "79000737",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/535"
+  },
+  {
+    "name": "THPT An Nhơn Tây",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã An Nhơn Tây",
+    "address": "1290 Tỉnh lộ 7, ấp Chợ Củ, xã An Nhơn Tây, Thành phố Hồ Chí Minh",
+    "school_code": "79000736",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/534"
+  },
+  {
+    "name": "THPT Củ Chi",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Tân An Hội",
+    "address": "Tỉnh lộ 8, ấp 11, Xã Tân An Hội",
+    "school_code": "79000734",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/532"
+  },
+  {
+    "name": "THPT Nguyễn Hữu Huân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thủ Đức",
+    "address": "11 Đoàn Kết, Khu phố 14, Phường Thủ Đức",
+    "school_code": "79000732",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/530"
+  },
+  {
+    "name": "THPT Thủ Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thủ Đức",
+    "address": "166/24 Đặng Văn Bi, Khu phố 16, Phường Thủ Đức, Thành phố Hồ Chí Minh",
+    "school_code": "79000731",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/529"
+  },
+  {
+    "name": "THPT Trần Phú",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Thọ Hòa",
+    "address": "18 Lê Thúc Hoạch, Phường Phú Thọ Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "79000729",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/527"
+  },
+  {
+    "name": "THPT Tân Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Sơn Nhì",
+    "address": "19 Hoa Bằng, Phường Tân Sơn Nhì, Thành phố Hồ Chí Minh",
+    "school_code": "79000727",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/525"
+  },
+  {
+    "name": "THPT Phú Nhuận",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Đức Nhuận",
+    "address": "5 Hoàng Minh Giám, Phường Đức Nhuận, Quận Phú Nhuận.",
+    "school_code": "79000726",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/524"
+  },
+  {
+    "name": "THPT Gò Vấp",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hạnh Thông",
+    "address": "90A Nguyễn Thái Sơn, Phường Hạnh Thông, Thành phố Hồ Chí MInh",
+    "school_code": "79000724",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/522"
+  },
+  {
+    "name": "THPT Phan Đăng Lưu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Lợi Trung",
+    "address": "27 Nguyễn Văn Đậu, Phường Bình Lợi Trung, Thành phố Hồ Chí Minh.",
+    "school_code": "79000723",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/521"
+  },
+  {
+    "name": "THPT Võ Thị Sáu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Gia Định",
+    "address": "95 Lê Văn DUyệt, Phường Gia Định, Thành phố Hồ Chí Minh",
+    "school_code": "79000721",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/519"
+  },
+  {
+    "name": "THPT Võ Trường Toản",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thới Hiệp",
+    "address": "482 Nguyễn Thị Đặng, Phường Tân Thới Hiệp",
+    "school_code": "79000719",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/517"
+  },
+  {
+    "name": "THPT Ngô Gia Tự",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Định",
+    "address": "360E Bến Bình Đông, Phường Phú Định",
+    "school_code": "79000713",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/511"
+  },
+  {
+    "name": "THPT Lê Thánh Tôn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hưng",
+    "address": "124 Đường 17, Phường Tân Hưng, Thành phố Hồ Chí Minh",
+    "school_code": "79000711",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/509"
+  },
+  {
+    "name": "THPT Nguyễn Trãi",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xóm Chiếu",
+    "address": "364 Nguyễn Tất Thành, Phường Xóm Chiếu, Thành phố Hồ Chí Minh.",
+    "school_code": "79000706",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/504"
+  },
+  {
+    "name": "THPT Lê Quý Đôn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xuân Hòa",
+    "address": "110 Nguyễn Thị Minh Khai, Khu phố 4, Phường Xuân Hòa, Thành phố Hồ Chí Minh.",
+    "school_code": "79000705",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/503"
+  },
+  {
+    "name": "THPT Hàm Nghi",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Tạo",
+    "address": "1242, 1242A, 1244 Lê Đức Anh, Khu phố 56, Phường Tân Tạo, Thành phố Hồ Chí Minh",
+    "school_code": "7900000005",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/811"
+  },
+  {
+    "name": "THPT Hoàng Thế Thiện",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Lạc",
+    "address": "1231 Quốc lộ 1A, phường An Lạc, Thành phố Hồ Chí Minh",
+    "school_code": "7900000003",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/798"
+  },
+  {
+    "name": "Trường THPT Chuyên Lê Quý Đôn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phước Thắng",
+    "address": "Đường Hàng Điều, Phường phước Thắng, Thành phố Hồ Chí Minh",
+    "school_code": "77000F01",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/702"
+  },
+  {
+    "name": "Tiểu học, THCS và THPT Học viện Anh Quốc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thạnh Mỹ Tây",
+    "address": "Bà Rịa",
+    "school_code": "77000826",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/722"
+  },
+  {
+    "name": "THPT Bưng Riềng",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Xuyên Mộc",
+    "address": "ấp 4, xã Xuyên Mộc, Thành phố Hồ Chí Minh",
+    "school_code": "77000824",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/755"
+  },
+  {
+    "name": "THPT Lê Hồng Phong",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Lớn",
+    "address": "74 Nguyễn Trọng Quản",
+    "school_code": "77000821",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/753"
+  },
+  {
+    "name": "Trường THPT Bà Rịa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bà Rịa",
+    "address": "đường Nguyễn Tất Thành, Kp4 Phước Nguyên, phường Bà Rịa, Thành phố Hồ Chí Minh",
+    "school_code": "77000820",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/697"
+  },
+  {
+    "name": "THPT Hòa Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Hòa Hội",
+    "address": "Tỉnh lộ 328 xã Hòa Hội, thành phố Hồ Chí Minh",
+    "school_code": "77000816",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/749"
+  },
+  {
+    "name": "Trường THPT Ngô Quyền",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Nghĩa Thành",
+    "address": "Quốc lộ 56, Ấp Quảng Phú, Xã Nghĩa Thành, Thành phố Hồ Chí Minh",
+    "school_code": "77000815",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/748"
+  },
+  {
+    "name": "THPT Trần Nguyên Hãn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tam Thắng",
+    "address": "16 đường 30 tháng 4",
+    "school_code": "77000814",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/747"
+  },
+  {
+    "name": "THPT Đinh Tiên Hoàng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Vũng Tàu",
+    "address": "16/15/2 Xô Viết Nghệ Tĩnh, Khu phố 8, Phường Vũng Tàu. Thành phố Hồ Chí Minh",
+    "school_code": "77000813",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/705"
+  },
+  {
+    "name": "Trường THPT Nguyễn Huệ - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Rạch Dừa",
+    "address": "443 Bùi Thiện Ngộ, Phường Rạch Dừa, Thành Phố Hồ Chí Minh",
+    "school_code": "77000812",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/746"
+  },
+  {
+    "name": "Trường THPT Nguyễn Khuyến - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phước Thắng",
+    "address": "C3 đường Nguyễn Gia Thiều, phường Phước Thắng, thành phố Hồ Chí Minh",
+    "school_code": "77000784",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/695"
+  },
+  {
+    "name": "THPT Minh Đạm",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Long Hải",
+    "address": "Số 02 Điện Biên Phù, ấp Phước Thọ, xã Long Hải, Thành phố Hồ Chí Minh",
+    "school_code": "77000723",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/745"
+  },
+  {
+    "name": "Trường THPT Nguyễn Văn Cừ - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Xuân Sơn",
+    "address": "Xã Xuân Sơn, Thành phố Hồ Chí Minh",
+    "school_code": "77000722",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/744"
+  },
+  {
+    "name": "THPT Long Hải - Phước Tỉnh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Long Hải",
+    "address": "Xã Long Hải, Thành Phố Hồ Chí Minh",
+    "school_code": "77000721",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/743"
+  },
+  {
+    "name": "Trường THPT Phước Bửu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Hồ Tràm",
+    "address": "Số 10, đường Lý Tự Trọng, ấp Láng Sim, xã Hồ Tràm, Thành phố Hồ Chí Minh",
+    "school_code": "77000720",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/703"
+  },
+  {
+    "name": "Trường THPT Nguyễn Trãi - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Ngãi Giao",
+    "address": "Số 20, đường Nguyễn Văn Trỗi, Xã Ngãi Giao",
+    "school_code": "77000719",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/715"
+  },
+  {
+    "name": "THPT Nguyễn Bỉnh Khiêm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tam Long",
+    "address": "78 Hoàng Hoa Thám, phường Tam Long, Thành phố Hồ Chí Minh",
+    "school_code": "77000718",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/701"
+  },
+  {
+    "name": "Trường THPT Võ Thị Sáu - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Đất Đỏ",
+    "address": "Ấp Hiệp Hòa, xã Đất Đỏ, thành phố Hồ Chí Minh",
+    "school_code": "77000711",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/741"
+  },
+  {
+    "name": "THPT Trần Văn Quan",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Long Điền",
+    "address": "82(A1) Võ Thị Sáu, Xã Long Điền, Thành phố Hồ Chí Minh",
+    "school_code": "77000710",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/693"
+  },
+  {
+    "name": "THPT Hắc Dịch",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thành",
+    "address": "Số 545 Trần Phú, khu phố 2, phường Tân Thành, Thành phố Hồ Chí Minh",
+    "school_code": "77000709",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/740"
+  },
+  {
+    "name": "Trường THPT Trần Hưng Đạo - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hải",
+    "address": "Phường Tân Hải, Thành phố Hồ Chí Minh",
+    "school_code": "77000708",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/739"
+  },
+  {
+    "name": "THPT Phú Mỹ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Mỹ",
+    "address": "Đường Trường chinh, Phường Phú Mỹ, Thành phố Hồ Chí Minh",
+    "school_code": "77000707",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/713"
+  },
+  {
+    "name": "THPT Xuyên Mộc",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Hồ Tràm",
+    "address": "161/QL55, Xã Hồ Tràm, Thành phố Hồ Chí Minh",
+    "school_code": "77000706",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/696"
+  },
+  {
+    "name": "Trường THPT Trần Phú - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Kim Long",
+    "address": "Quốc lộ 56, Xã Kim Long, Thành phố Hồ Chí Minh.",
+    "school_code": "77000704",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/694"
+  },
+  {
+    "name": "THPT Châu Thành",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bà Rịa",
+    "address": "174 Đường 27 tháng 4 phường Bà Rịa, Thành phố Hồ Chí Minh",
+    "school_code": "77000703",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/709"
+  },
+  {
+    "name": "THPT Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tam Thắng",
+    "address": "Số 9 Thi Sách",
+    "school_code": "77000702",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/712"
+  },
+  {
+    "name": "TH-THCS-THPT Khai Nguyên",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chánh Hưng",
+    "address": "Số 1 Tố Hữu",
+    "school_code": "7700004001",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/719"
+  },
+  {
+    "name": "Trường THCS và THPT Nguyễn Khuyến - Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Dương",
+    "address": "Số A26B, đường A3 (Võ Văn Tần), Khu đô thị mới, Khu liên hợp, phường Bình Dương, Thành phố Hồ Chí Minh",
+    "school_code": "74718800",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/737"
+  },
+  {
+    "name": "Trường TH-THCS-THPT Phan Chu Trinh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Dĩ An",
+    "address": "8/23, đường Nguyễn Du, Khu phố Đông Tân, Phường Dĩ An, Thành phố Hồ Chí Minh",
+    "school_code": "7400832",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/716"
+  },
+  {
+    "name": "Trung Tâm GDNN - GDTX Phú Giáo",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 2",
+    "address": "Số 13, đường Trần Quang Diệu, ấPhường 2",
+    "school_code": "74000906",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/797"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Việt Anh 3",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Lợi",
+    "address": "208, đường Phạm Ngọc Thạch, Phường Phú Lợi, Thành phố Hồ Chí Minh",
+    "school_code": "74000836",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/700"
+  },
+  {
+    "name": "Trường Tiểu học THCS và THPT Việt Anh 2",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Dĩ An",
+    "address": "Thửa đất số 563, TBĐ số 7AB2, Đường số 13, Khu phố Nhị Đồng 2, Phường Dĩ An, Thành phố Hồ Chí Minh",
+    "school_code": "74000834",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/708"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Ngô Thời Nhiệm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Dương",
+    "address": "493 (Lô M2), Lý Thái Tổ, phường Bình Dương, Thành phố Hồ Chí Minh",
+    "school_code": "74000833",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/718"
+  },
+  {
+    "name": "Trường Tiểu học, THCS và THPT Đức Trí",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thuận Giao",
+    "address": "1/555, đường 22/12, Khu phố Hoà Lân 2, Phường Thuận Giao, Thành phố Hồ Chí Minh",
+    "school_code": "74000831",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/711"
+  },
+  {
+    "name": "Trường Trung - Tiểu học Pétrus Ký",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thủ Dầu Một",
+    "address": "704 đường Cách Mạng Tháng Tám, phường Thủ Dầu Một, Thành Phố Hồ Chí Minh",
+    "school_code": "74000829",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/727"
+  },
+  {
+    "name": "Trường THPT Thanh Tuyền",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tây Nam",
+    "address": "Khu phố Chợ, phường Tây Nam, thành phố Hồ Chí Minh",
+    "school_code": "74000820",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/736"
+  },
+  {
+    "name": "Trường THPT Thường Tân",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Thường Tân",
+    "address": "Ấp Thường Tân 4, Xã Thường Tân, Thành phố Hồ Chí Minh",
+    "school_code": "74000816",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/717"
+  },
+  {
+    "name": "Trường THPT Nguyễn Thị Minh Khai - Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Đông Hiệp",
+    "address": "Khu phố Đông Thành, Phường Tân Đông Hiệp, Thành phố Hồ Chí Minh",
+    "school_code": "74000759",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/776"
+  },
+  {
+    "name": "Trường THPT Long Hòa",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Long Hòa",
+    "address": "Ấp Long Điền, Xã Long Hòa, Tp Hồ Chí Minh",
+    "school_code": "74000726",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/775"
+  },
+  {
+    "name": "Trường THPT Bàu Bàng",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bàu Bàng",
+    "address": "Ấp Đồng Sổ, Xã Bàu Bàng, Thành phố Hồ Chí Minh",
+    "school_code": "74000725",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/774"
+  },
+  {
+    "name": "Trường THPT Thái Hòa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Khánh",
+    "address": "khu phố An Thành",
+    "school_code": "74000722",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/771"
+  },
+  {
+    "name": "Trường THPT Tân Phước Khánh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Khánh",
+    "address": "Kp Khánh Hội, Phường Tân Khánh, Thành phố Hồ Chí Minh",
+    "school_code": "74000721",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/770"
+  },
+  {
+    "name": "Trung học cơ sở và Trung học phổ thông Nguyễn Huệ",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Phước Thành",
+    "address": "Số 42, đường ĐH508, xã Phước Thành, Thành phố Hồ Chí Minh",
+    "school_code": "74000719",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/735"
+  },
+  {
+    "name": "Trung học cơ sở và Trung học phổ thông Tây Sơn",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã An Long",
+    "address": "Số 107, Đường ĐT 741C, Ấp 2, Xã An Long, Thành phố Hồ Chí Minh",
+    "school_code": "74000718",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/734"
+  },
+  {
+    "name": "Trường THPT Trần Văn Ơn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thuận Giao",
+    "address": "Phường Thuận Giao, Thành phố Hồ Chí Minh",
+    "school_code": "74000717",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/768"
+  },
+  {
+    "name": "Trường THPT Bình Phú - Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chánh Hiệp",
+    "address": "Số 12/ ĐX061, Khu phố Định Hòa 8, phường Chánh Hiệp, Thành phố Hồ Chí Minh",
+    "school_code": "74000716",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/767"
+  },
+  {
+    "name": "Trường THPT Dầu Tiếng",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Dầu Tiếng",
+    "address": "Đường 13 tháng 3, Ấp Sân Bay, xã Dầu Tiếng, Thành phố Hồ Chí Minh",
+    "school_code": "74000715",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/766"
+  },
+  {
+    "name": "Trường THPT Bến Cát",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bến Cát",
+    "address": "Đường NB2A, khu phố 2, phường Bến Cát, thành phố Hồ Chí Minh",
+    "school_code": "74000714",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/707"
+  },
+  {
+    "name": "Trường THPT Phước Vĩnh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Phú Giáo",
+    "address": "Ấp 3, xã Phú Giáo, Thành phố Hồ Chí Minh",
+    "school_code": "74000713",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/765"
+  },
+  {
+    "name": "Trường THPT Huỳnh Văn Nghệ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Uyên",
+    "address": "Phường Tân Uyên, Thành phố Hồ Chí Minh",
+    "school_code": "74000712",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/764"
+  },
+  {
+    "name": "Trường THPT Nguyễn Trãi - Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Lái Thiêu",
+    "address": "Đường Nguyễn Văn Tiết, phường Lái Thiêu, thành phố Hồ Chí Minh",
+    "school_code": "74000710",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/762"
+  },
+  {
+    "name": "Trường THPT Trịnh Hoài Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thuận An",
+    "address": "An Thạnh, Thuận An, Bình Dương",
+    "school_code": "74000709",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/761"
+  },
+  {
+    "name": "Trường THPT Nguyễn Đình Chiểu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Lợi",
+    "address": "814A Đại Lộ Bình Dương, Phường Phú Lợi, Thành Phố Hồ Chí Minh",
+    "school_code": "74000708",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/710"
+  },
+  {
+    "name": "Trường THPT Chuyên Hùng Vương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Thành",
+    "address": "Số 593 đại lộ Bình Dương",
+    "school_code": "74000707",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/704"
+  },
+  {
+    "name": "Trường THPT Bình An",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Đông Hòa",
+    "address": "Khu phố Bình Thung, Phường Đông Hòa, Thành phố Hồ Chí Minh.",
+    "school_code": "74000706",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/760"
+  },
+  {
+    "name": "Trường THPT Võ Minh Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chánh Nghĩa",
+    "address": "Số 400 Đường 30/4",
+    "school_code": "74000702",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/759"
+  },
+  {
+    "name": "Trường THPT Dĩ An",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Dĩ An",
+    "address": "04 Nguyễn Du, Khu phố Đông Tân, phường Dĩ An, Thành phố Hồ Chí Minh.",
+    "school_code": "74000701",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/714"
+  },
+  {
+    "name": "Trường THPT Tân Bình - Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Vĩnh Tân",
+    "address": "khu phố Cổng Xanh, phường Vĩnh Tân, Thành phố Hồ Chí Minh",
+    "school_code": "7400004004",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/758"
+  },
+  {
+    "name": "Trường THPT Lê Lợi",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bắc Tân Uyên",
+    "address": "Đường Tân Thành 27, Ấp Tân Thành 5, Xã Bắc Tân Uyên, Tp Hồ Chí Minh",
+    "school_code": "7400004003",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/757"
+  },
+  {
+    "name": "Trường TH-THCS-THPT Marie Curie",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chánh Hiệp",
+    "address": "178 Nguyễn Chí Thanh, phường Chánh Hiệp, Thành phố Hồ Chí Minh",
+    "school_code": "7400004002",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/725"
+  },
+  {
+    "name": "THPT Trần Hữu Trang",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Lớn",
+    "address": "276 Trần Hưng Đạo B, Phường Chợ Lớn, Thành phố Hồ Chí Minh.",
+    "school_code": "79774507",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/680"
+  },
+  {
+    "name": "TH, THCS và THPT Tây Úc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xuân Hòa",
+    "address": "157 Lý Chính Thắng, Phường Xuân Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "79770601",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/679"
+  },
+  {
+    "name": "TH, THCS và THPT Hòa Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 3",
+    "address": "CS2: 152 Nguyễn Duy Dương, Phường 3, Quận 10; TS: 69 Trịnh Đình Thảo, Phường Hòa Thạnh, Quận Tân Phú.",
+    "school_code": "79767601",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/678"
+  },
+  {
+    "name": "TH, THCS và THPT Tesla",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Bình",
+    "address": "171B Hoàng Hoa Thám, Phường Tân Bình, Thành phố Hồ chí Minh",
+    "school_code": "79766514",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/677"
+  },
+  {
+    "name": "Phổ thông NK TDTT Nguyễn Thị Định",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Định",
+    "address": "215 Đường Hoàng Ngân, Phường Phú Định, Thành phố Hồ Chí Minh",
+    "school_code": "79000F03",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/676"
+  },
+  {
+    "name": "THPT chuyên Lê Hồng Phong",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 4",
+    "address": "235 Nguyễn Văn Cừ, Phường 4, Quận 5.",
+    "school_code": "79000F01",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/684"
+  },
+  {
+    "name": "TH, THCS và THPT Quốc tế Canada",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Phú",
+    "address": "Số 86, Đường 23, Phú Mỹ Hưng, Phường Tân Phú, Quận 7, Thành phố Hồ Chí Minh",
+    "school_code": "79000C05",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/667"
+  },
+  {
+    "name": "TH, THCS và THPT Trí Tuệ Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Tân",
+    "address": "Số 79 Đường số 3, khu phố 18, Phường Bình Tân",
+    "school_code": "79000877",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/663"
+  },
+  {
+    "name": "THCS và THPT Hoa Sen",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tăng Nhơn Phú",
+    "address": "TS: 674/7 Xa lộ Hà Nội, Phường Tăng Nhơn Phú, Thành phố Hồ Chí Minh; ĐT: 26 Phan Chu Trinh, Phường Tăng Nhơn Phú, Thành phố Hồ Chí Minh; ĐT: 190 Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức.",
+    "school_code": "79000873",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/687"
+  },
+  {
+    "name": "THPT Năng Khiếu TDTT",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Định",
+    "address": "Số 43 Điện Biên Phủ, Khu Phố 18, Phường Tân Định, Thành phố Hồ Chí Minh",
+    "school_code": "79000871",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/660"
+  },
+  {
+    "name": "THPT Lương Thế Vinh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bến Thành",
+    "address": "131 Cô Bắc",
+    "school_code": "79000869",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/659"
+  },
+  {
+    "name": "THCS và THPT Diên Hồng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Diên Hồng",
+    "address": "11 Thành Thái, Phường Diên Hồng",
+    "school_code": "79000861",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/654"
+  },
+  {
+    "name": "THCS và THPT Đinh Thiện Lý",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hưng",
+    "address": "Trụ sở: 80 Nguyễn Đức Cảnh, Phường Tân Hưng, Thành phố Hồ Chí Minh. Cơ sở 1: 01 Raymondienne, Phường Tân Mỹ, Thành phố Hồ Chí Minh",
+    "school_code": "79000850",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/645"
+  },
+  {
+    "name": "Trường Quốc tế Việt Nam - Phần Lan",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Phong",
+    "address": "19 Nguyễn Hữu Thọ, Phường Tân Phong, Quận 7.",
+    "school_code": "79000839",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/640"
+  },
+  {
+    "name": "THCS và THPT Thái Bình",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bảy Hiền",
+    "address": "10 Trương Hoàng Thanh, Phường Bảy Hiền, Quận Tân Bình.",
+    "school_code": "79000831",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/634"
+  },
+  {
+    "name": "THCS và THPT Trí Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Thạnh",
+    "address": "TS: Số 5 Thoại Ngọc Hầu, Phường Hòa Thạnh, Quận Tân Phú; ĐT: Số 5 đường DC6, Phường Sơn Kỳ, Quận Tân Phú.",
+    "school_code": "79000830",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/633"
+  },
+  {
+    "name": "THCS và THPT Hồng Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tây Thạnh",
+    "address": "Trụ sở chính: Số 8 Hồ Đắc Di, Phường Tây Thạnh, Quận Tân Phú; Cơ sở 2: 118 Nam Hòa, Phường Phước Long A, TP. Thủ Đức.",
+    "school_code": "79000822",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/628"
+  },
+  {
+    "name": "THPT Nam Sài Gòn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Mỹ",
+    "address": "Khu A lô P3 đô thị mới Nam Sài Gòn, Nguyễn Lương Bằng, Phường Tân Mỹ, Thành phố Hồ Chị Minh",
+    "school_code": "79000820",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/627"
+  },
+  {
+    "name": "TH, THCS và THPT Ngô Thời Nhiệm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phước Long",
+    "address": "65D Hồ Bá Phấn, phường Phước Long; , 73/8 Võ Văn Kiệt, Phường An Lạc",
+    "school_code": "79000813",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/623"
+  },
+  {
+    "name": "TH, THCS và THPT Tuệ Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 15",
+    "address": "Điểm trường THCS, THPT: 75/16 Nguyễn Sỹ Sách, Phường 15, Quận Tân Bình; Điểm trường Tiểu học: 08 Tân Thới Nhất 17, Phường Tân Thới Nhất, Quận 12.",
+    "school_code": "79000811",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/621"
+  },
+  {
+    "name": "THPT Đa Phước",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Hưng Long",
+    "address": "D14/410 đường Văn Tiến Dũng, ấp 41, Xã Hưng Long, Thành phố Hồ Chí Minh",
+    "school_code": "79000807",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/618"
+  },
+  {
+    "name": "THPT Ngô Quyền",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Mỹ",
+    "address": "1360 Huỳnh Tấn Phát, Phường Tân Mỹ, Quận 7.",
+    "school_code": "79000803",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/614"
+  },
+  {
+    "name": "THPT Thủ Thiêm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Trưng",
+    "address": "01 đường Vũ Tông Phan, Phường Bình Trưng, Thành phố Hồ Chí Minh",
+    "school_code": "79000802",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/613"
+  },
+  {
+    "name": "THPT Hồ Thị Bi",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Hóc Môn",
+    "address": "Số 32, đường Tân Hiệp 28, Xã Hóc Môn.",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/611"
+  },
+  {
+    "name": "THPT Bình Chiểu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tam Bình",
+    "address": "88B đường Lê Thị Hoa, khu phố 33, phường Tam Bình, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/610"
+  },
+  {
+    "name": "THPT Dương Văn Thì",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tăng Nhơn Phú",
+    "address": "161 Đường Lã Xuân Oai, Phường Tăng Nhơn Phú, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/609"
+  },
+  {
+    "name": "THPT Linh Trung",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Linh Xuân",
+    "address": "5 Đường số 16, KP1, phường Linh Xuân, Thành phố Hồ Chí Minh.",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/608"
+  },
+  {
+    "name": "Phổ thông Năng khiếu TDTT Bình Chánh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Lê Minh Xuân",
+    "address": "A10/3D, Mai Bá Hương, Ấp 3, Xã Lê Minh Xuân, Huyện Bình Chánh.",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/606"
+  },
+  {
+    "name": "THPT Tân Túc",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Tân Nhựt",
+    "address": "C1/3K, Bùi Thanh Khiết, ấp 59, xã Tân Nhựt, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/599"
+  },
+  {
+    "name": "THPT Đào Sơn Tây",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Linh Xuân",
+    "address": "53/5 Đường 10, Khu phố 10, Phường Linh Xuân, TP. Thủ Đức.",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/598"
+  },
+  {
+    "name": "THPT Phạm Văn Sáng",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Xuân Thới Sơn",
+    "address": "26/1C ấp 16, Xã Xuân Thới Sơn, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/597"
+  },
+  {
+    "name": "THPT Trần Văn Giàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 13",
+    "address": "203/40 đường Đặng Thuỳ Trâm, Phường 13, Quận Bình Thạnh, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/596"
+  },
+  {
+    "name": "TH, THCS và THPT Văn Lang",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Lớn",
+    "address": "84 Tân Hưng, Phường Chợ Lớn, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/591"
+  },
+  {
+    "name": "THPT Vĩnh Viễn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Sơn Nhì",
+    "address": "73/7 Lê Trọng Tấn, Phường Tân Sơn Nhì, Thành phố Hồ Chí Minh",
+    "school_code": "79000798",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/587"
+  },
+  {
+    "name": "THPT Quốc Trí",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 12",
+    "address": "313 Nguyễn Văn Luông, Phường 12, Quận 6.",
+    "school_code": "79000797",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/586"
+  },
+  {
+    "name": "THPT Nguyễn Thị Diệu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xuân Hòa",
+    "address": "12 Trần Quốc Toản, Phường Xuân Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "79000796",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/585"
+  },
+  {
+    "name": "TT GDKTTH và HN Lê Thị Hồng Gấm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xuân Hòa",
+    "address": "147 Pasteur, khu phố 5, Phường Xuân Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "79000795",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/584"
+  },
+  {
+    "name": "THPT An Nghĩa",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã An Thới Đông",
+    "address": "Ấp An Nghĩa, Xã An Thới Đông, Huyện Cần Giờ.",
+    "school_code": "79000786",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/579"
+  },
+  {
+    "name": "THPT Phước Kiển",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Nhà Bè",
+    "address": "1163 Lê Văn Lương, ấp 63, Xã Nhà Bè, Thành phố Hồ Chí Minh",
+    "school_code": "79000784",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/577"
+  },
+  {
+    "name": "THPT Đông Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Phú Đông",
+    "address": "103 Hà Huy Giáp, Phường An Phú Đông",
+    "school_code": "79000783",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/576"
+  },
+  {
+    "name": "THPT Trần Quốc Tuấn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Thới",
+    "address": "236/10, 236/12 Thái Phiên, Phường Bình Thới, Thành phố Hồ Chí Minh",
+    "school_code": "79000779",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/573"
+  },
+  {
+    "name": "TH, THCS và THPT Chu Văn An",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Hưng Hòa",
+    "address": "07 Đường số 1, Phường Bình Hưng Hòa, Quận Bình Tân.",
+    "school_code": "79000774",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/569"
+  },
+  {
+    "name": "THPT Việt Âu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thới Hiệp",
+    "address": "30/2 Quốc lộ 1A, Phường Tân Thới Hiệp, Thành phố Hồ Chí Minh",
+    "school_code": "79000771",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/566"
+  },
+  {
+    "name": "THPT Vĩnh Lộc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Tân",
+    "address": "87 Đường số 3, Phường Bình Tân, Tp.Hồ Chí Minh",
+    "school_code": "79000769",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/565"
+  },
+  {
+    "name": "THPT Trần Hưng Đạo",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Nhơn",
+    "address": "88/955E Lê Đức Thọ, Phường An Nhơn, Thành phố Hồ Chí Minh",
+    "school_code": "79000764",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/561"
+  },
+  {
+    "name": "THPT Bình Khánh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bình Khánh",
+    "address": "Số 340 đường Rừng Sác, ấp Bình An, Xã Bình Khánh, Thành phố Hồ Chí Minh",
+    "school_code": "79000762",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/559"
+  },
+  {
+    "name": "THPT Long Trường",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Long Trường",
+    "address": "309 Võ Văn Hát, Khu phố 2, Phường Long Trường, Thành phố Hồ Chí Minh.",
+    "school_code": "79000759",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/556"
+  },
+  {
+    "name": "THPT Tây Thạnh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tây Thạnh",
+    "address": "27 Đường C2, Phường Tây Thạnh, Thành phố Hồ Chí Minh.",
+    "school_code": "79000758",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/555"
+  },
+  {
+    "name": "THPT Phú Hòa",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Phú Hòa Đông",
+    "address": "Ấp Phú Lợi, Xã Phú Hòa Đông, Huyện Củ Chi.",
+    "school_code": "79000756",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/553"
+  },
+  {
+    "name": "THPT Trường Chinh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Hưng Thuận",
+    "address": "01 đường DN 11, Phường Tân Hưng Thuận, Quận 12.",
+    "school_code": "79000755",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/552"
+  },
+  {
+    "name": "THPT Phước Long",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phước Long",
+    "address": "18D Dương Đình Hội, Phường Phước Long, TP. Thủ Đức, Thành phố Hồ Chí Minh",
+    "school_code": "79000752",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/549"
+  },
+  {
+    "name": "THPT Thăng Long",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Lớn",
+    "address": "114, 116 Hải Thượng Lãn Ông",
+    "school_code": "79000751",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/686"
+  },
+  {
+    "name": "THPT Hoàng Hoa Thám",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Gia Định",
+    "address": "6 Hoàng Hoa Thám, Phường Gia Định, Thành phố Hồ Chí Minh",
+    "school_code": "79000750",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/548"
+  },
+  {
+    "name": "THPT Hàn Thuyên",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Nhuận",
+    "address": "37 Đặng Văn Ngữ, Phường Phú Nhuận.",
+    "school_code": "79000749",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/547"
+  },
+  {
+    "name": "THPT Nam Kỳ Khởi Nghĩa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Minh Phụng",
+    "address": "269/8 Nguyễn Thị Nhỏ, Phường Minh Phụng",
+    "school_code": "79000746",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/544"
+  },
+  {
+    "name": "THPT Trần Khai Nguyên",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Đông",
+    "address": "225 Nguyễn Tri Phương, Phường An Đông, Thành phố Hồ Chí Minh",
+    "school_code": "79000744",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/542"
+  },
+  {
+    "name": "THPT Marie Curie",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Võ Thị Sáu",
+    "address": "159 Nam Kỳ Khởi Nghĩa, Phường Võ Thị Sáu, Quận 3.",
+    "school_code": "79000743",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/541"
+  },
+  {
+    "name": "THPT Ten Lơ Man",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bến Thành",
+    "address": "8 Trần Hưng Đạo, Phường Bến Thành",
+    "school_code": "79000742",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/540"
+  },
+  {
+    "name": "THPT Bình Chánh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bình Chánh",
+    "address": "61 Huỳnh Văn Trí, ấp 9, Xã Bình Chánh, Huyện Bình Chánh, Thành phố Hồ Chí Minh.",
+    "school_code": "79000741",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/539"
+  },
+  {
+    "name": "THPT Lý Thường Kiệt",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Đông Thạnh",
+    "address": "35, Đường Trần Thị Bốc, Ấp 102, Xã Đông Thạnh, thành phố Hồ Chí Minh",
+    "school_code": "79000740",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/538"
+  },
+  {
+    "name": "THPT Nguyễn Hữu Cầu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Trung Chánh",
+    "address": "07 Tô Ký, Xã Trung Chánh, Huyện Hóc Môn.",
+    "school_code": "79000739",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/537"
+  },
+  {
+    "name": "THPT Trung Lập",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Trung Lập Thượng",
+    "address": "91/3 đường Trung Lập, Xã Trung Lập Thượng, Huyện Củ Chi.",
+    "school_code": "79000738",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/536"
+  },
+  {
+    "name": "THPT Quang Trung",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Thái Mỹ",
+    "address": "Tỉnh Lộ 7, Ấp Phước An, Xã Thái Mỹ, Thành phố Hồ Chí Minh",
+    "school_code": "79000735",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/533"
+  },
+  {
+    "name": "THPT Tam Phú",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tam Bình",
+    "address": "31 Phú Châu, KP55, Phường Tam Bình, Thành phố Hồ Chí Minh.",
+    "school_code": "79000733",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/531"
+  },
+  {
+    "name": "THPT Nguyễn Chí Thanh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Bình",
+    "address": "1A Nguyễn Hiến Lê, Phường Tân Bình, Thành phố Hồ Chí Minh",
+    "school_code": "79000728",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/526"
+  },
+  {
+    "name": "THPT Nguyễn Công Trứ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thông Tây Hội",
+    "address": "97 Quang Trung, Phường Thông Tây Hội, Thành phố Hồ Chí Minh.",
+    "school_code": "79000725",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/523"
+  },
+  {
+    "name": "THPT Gia Định",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Thạnh Mỹ Tây",
+    "address": "44 Võ Oanh, phường Thạnh Mỹ Tây",
+    "school_code": "79000722",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/520"
+  },
+  {
+    "name": "THPT Nguyễn Hiền",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Thới",
+    "address": "03 Dương Đình Nghệ, Phường Bình Thới Thành phố Hồ Chí Minh",
+    "school_code": "79000718",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/516"
+  },
+  {
+    "name": "THPT Nguyễn Du",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Hưng",
+    "address": "XX1 đường Đồng Nai, Phường Hòa Hưng, Thành phố Hồ Chí Minh.",
+    "school_code": "79000717",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/515"
+  },
+  {
+    "name": "THPT Nguyễn Khuyến",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Hưng",
+    "address": "50 Thành Thái, Phường Hòa Hưng",
+    "school_code": "79000716",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/514"
+  },
+  {
+    "name": "THPT Nguyễn Huệ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Long Thạnh Mỹ",
+    "address": "Nguyễn Văn Tăng, Phường Long Thạnh Mỹ, TP. Thủ Đức.",
+    "school_code": "79000715",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/513"
+  },
+  {
+    "name": "THPT Tạ Quang Bửu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Đông",
+    "address": "909 Tạ Quang Bửu, Phường Bình Đông",
+    "school_code": "79000714",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/512"
+  },
+  {
+    "name": "THPT Lương Văn Can",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 4",
+    "address": "173 Phạm Hùng, Phường 4, Quận 8.",
+    "school_code": "79000712",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/510"
+  },
+  {
+    "name": "THPT Mạc Đĩnh Chi",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú Lâm",
+    "address": "04 Tân Hòa Đông, Phường Phú Lâm, Thành phố Hồ Chí Minh",
+    "school_code": "79000709",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/507"
+  },
+  {
+    "name": "THPT Hùng Vương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Chợ Lớn",
+    "address": "124 Hồng Bàng, Phường Chợ Lớn, Thành Phố Hồ Chí Minh.",
+    "school_code": "79000708",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/506"
+  },
+  {
+    "name": "THPT Nguyễn Thị Minh Khai",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xuân Hòa",
+    "address": "275 Điện Biên Phủ, Phường Xuân Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "79000704",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/502"
+  },
+  {
+    "name": "THPT Giồng Ông Tố",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Trưng",
+    "address": "200/10 Nguyễn Thị Định, Phường Bình Trưng, Thành phố Hồ Chí Minh",
+    "school_code": "79000703",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/501"
+  },
+  {
+    "name": "THPT Bùi Thị Xuân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bến Thành",
+    "address": "73, 75 Bùi Thị Xuân, Phường Bến Thành, Thành phố Hồ Chí Minh",
+    "school_code": "79000701",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/499"
+  },
+  {
+    "name": "THCS và THPT Trần Đại Nghĩa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Sài Gòn",
+    "address": "53 Nguyễn Du, Phường Sài Gòn, Thành phố Hồ Chí Minh",
+    "school_code": "7900004036",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/682"
+  },
+  {
+    "name": "THPT Đào Duy Từ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Trung Mỹ Tây",
+    "address": "371A, 371B Nguyễn Văn Quá",
+    "school_code": "7900004035",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/498"
+  },
+  {
+    "name": "THPT Trưng Vương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Sài Gòn",
+    "address": "3 Nguyễn Bỉnh Khiêm, Phường Sài Gòn, Thành phố Hồ Chí Minh",
+    "school_code": "79000702",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/500"
+  },
+  {
+    "name": "THPT Bình Phú",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Phú",
+    "address": "102 Trần Văn Kiểu, Phường Bình Phú",
+    "school_code": "79000710",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/508"
+  },
+  {
+    "name": "THPT Thanh Đa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 26",
+    "address": "186 Nguyễn Xí, Phường 26, Quận Bình Thạnh.",
+    "school_code": "79000720",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/518"
+  },
+  {
+    "name": "THPT Nguyễn Thượng Hiền",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Sơn Nhất",
+    "address": "544 Cách Mạng Tháng 8, Phường Tân Sơn Nhất, Thành phố Hồ Chí Minh",
+    "school_code": "79000730",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/528"
+  },
+  {
+    "name": "THPT Cần Thạnh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Cần Giờ",
+    "address": "346 đường Duyên Hải, ấp Miễu Ba, xã Cần Giờ.",
+    "school_code": "79000763",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/560"
+  },
+  {
+    "name": "TH, THCS và THPT Tre Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Xuân Thới Đông",
+    "address": "TS: 26/25M, 26/25N, 26/25P Xã Xuân Thới Đông, Huyện Hóc Môn; ĐT: 13B Nguyễn Trọng Quyền, Phường Tân Thới Hòa, quận Tân Phú; ĐT: 3/5 và 007 đường TCH 01, Phường Tân Chánh Hiệp, Quận 12; ĐT: 41 ấp Chánh 16 và số 70 ấp Chánh 15, xã Tân Xuân, Hóc môn",
+    "school_code": "79000785",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/578"
+  },
+  {
+    "name": "THPT Bình Hưng Hòa",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Hưng Hòa",
+    "address": "79/19 Đường số 4, KP 7, Phường Bình Hưng Hòa, Quận Bình Tân.",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/592"
+  },
+  {
+    "name": "THPT Bình Tân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Tân",
+    "address": "117/4H Hồ Văn Long, Phường Bình Tân, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/593"
+  },
+  {
+    "name": "THPT Nguyễn Tất Thành",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Phú",
+    "address": "249C Nguyễn Văn Luông, phường Bình Phú, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/594"
+  },
+  {
+    "name": "THPT Thủ Khoa Huân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tây Thạnh",
+    "address": "1, 1B Hồ Đắc Di, Phường Tây Thạnh, Quận Tân Phú.",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/601"
+  },
+  {
+    "name": "THPT Võ Văn Kiệt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 13",
+    "address": "629 Bến Bình Đông, Phường 13, Quận 8.",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/604"
+  },
+  {
+    "name": "TH, THCS và THPT Mùa Xuân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 22",
+    "address": "Số 1 đường D4 khu dân cư Sai Gon Pearl, 92 Nguyễn Hữu Cảnh, phường 22, Quận Bình Thạnh",
+    "school_code": "",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/605"
+  },
+  {
+    "name": "THPT Lê Trọng Tấn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Sơn Nhì",
+    "address": "5 Đường D2, Phường Tân Sơn Nhì, Thành phố Hồ Chí Minh",
+    "school_code": "",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/607"
+  },
+  {
+    "name": "THPT Thạnh Lộc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Phú Đông",
+    "address": "116 Nguyễn Thị Sáu, khu phố 58, phường An Phú Đông, Thành phố Hồ Chí Minh",
+    "school_code": "79000804",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/615"
+  },
+  {
+    "name": "THPT Long Thới",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Long Thới",
+    "address": "280 Nguyễn Văn Tạo, ấp 2, Xã Long Thới, Huyện Nhà Bè.",
+    "school_code": "79786701",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/681"
+  },
+  {
+    "name": "TH, THCS và THPT Emasi Vạn Phúc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Bình Phước",
+    "address": "Số 2 đường số 5, Khu DC Vạn Phúc, Phường Hiệp Bình Phước, TP. Thủ Đức.",
+    "school_code": "79000C13",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/672"
+  },
+  {
+    "name": "TH, THCS và THPT Hoàng Gia",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Phong",
+    "address": "ĐT: 08 Đặng Đại Độ, Phường Tân Phong, Quận 7; TS: 31, 36 Ung Văn Khiêm, Phường 25, Quận Bình Thạnh; ĐT: 02 đường D2, Phường An Lạc, Quận Bình Tân.",
+    "school_code": "79000C15",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/673"
+  },
+  {
+    "name": "THCS và THPT Phan Châu Trinh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Trị Đông B",
+    "address": "12 đường 23, Phường Bình Trị Đông B, Quận Bình Tân.",
+    "school_code": "79000838",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/639"
+  },
+  {
+    "name": "THPT Nguyễn Hữu Thọ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 12",
+    "address": "Số 2 Bến Vân Đồn, Phường 12, Quận 4.",
+    "school_code": "79000842",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/642"
+  },
+  {
+    "name": "Trường THCS-THPT Minh Hòa",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Minh Thạnh",
+    "address": "DH 704, Ấp Hòa Cường, Minh Thạnh, Thành phố Hồ Chí Minh",
+    "school_code": "74000705",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/733"
+  },
+  {
+    "name": "Trường THPT Nguyễn Du - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Ngãi Giao",
+    "address": "03 Trần Hưng Đạo, Xã Ngãi Giao, Thành phố Hồ Chí Minh",
+    "school_code": "77000705",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/738"
+  },
+  {
+    "name": "THCS và THPT Khai Minh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Đông Hưng Thuận",
+    "address": "171 Đông Hưng Thuận 2, phường Đông Hưng Thuận, Thành phố Hồ Chí Minh",
+    "school_code": "79000856",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/706"
+  },
+  {
+    "name": "Trường THPT Tây Nam",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Phú An",
+    "address": "304 Đường 744, Khu phố An Thuận",
+    "school_code": "74000720",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/769"
+  },
+  {
+    "name": "Trường THPT An Mỹ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Dương",
+    "address": "112, đường An Mỹ, Phú Mỹ, khu phố Phú Mỹ 3, phường Bình Dương, thành phố Hồ Chí Minh",
+    "school_code": "74000723",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/772"
+  },
+  {
+    "name": "Trường THPT Trần Quang Khải - Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Long Hải",
+    "address": "Ấp Phước Tân",
+    "school_code": "77000818",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/751"
+  },
+  {
+    "name": "THPT Dương Bạch Mai",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Phước Hải",
+    "address": "Tỉnh lộ 44A, Ấp Tân Hội",
+    "school_code": "77000819",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/752"
+  },
+  {
+    "name": "TH, THCS và THPT Việt Anh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Hội Tây",
+    "address": "160/72 Phan Huy Ích, Phường An Hội Tây, Thành phố Hồ Chí Minh",
+    "school_code": "79000872",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/796"
+  },
+  {
+    "name": "TH, THCS và THPT Việt Úc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Diên Hồng",
+    "address": "594 Ba Tháng Hai, phường Diên Hồng, Thành phố Hồ Chí Minh",
+    "school_code": "79000C03",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/802"
+  },
+  {
+    "name": "Trung tâm GDNN - GDTX Tân Uyên",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Uyên",
+    "address": "phường Tân Uyên, thành phố Hồ Chí Minh",
+    "school_code": "74000905",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/804"
+  },
+  {
+    "name": "TT GDNN-GDTX Quận 6",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Tây",
+    "address": "",
+    "school_code": "79775901",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/810"
+  },
+  {
+    "name": "Trung tâm GDNN - GDTX Thuận An",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Hòa",
+    "address": "Khu Phố Bình Đức 1, Phường Bình Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "74000902",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/799"
+  },
+  {
+    "name": "Trường THPT Võ Thị Sáu - Côn Đảo",
+    "province": "Hồ Chí Minh",
+    "ward": "Đặc khu Côn Đảo",
+    "address": "Đường Nguyễn Thị Minh Khai, khu 5",
+    "school_code": "77000817",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/750"
+  },
+  {
+    "name": "THPT Hòa Hội",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Hòa Hội",
+    "address": "ấp 15, xã Hòa Hội, Thành phố Hồ Chí Minh",
+    "school_code": "77000716",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/742"
+  },
+  {
+    "name": "Trường THPT Nguyễn An Ninh - Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Dĩ An",
+    "address": "Đường Chu Văn An, KP Bình Đường 2, Phường Dĩ An, Thành phố Hồ Chí Minh",
+    "school_code": "74000711",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/763"
+  },
+  {
+    "name": "TRƯỜNG TH-THCS-THPT Việt Mỹ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Bình",
+    "address": "95 Lý Thường Kiệt",
+    "school_code": "77000830",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/723"
+  },
+  {
+    "name": "Tiểu học, THCS và THPT Einstein Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Tam Thắng",
+    "address": "43 đường 30/4",
+    "school_code": "77000831",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/724"
+  },
+  {
+    "name": "TH-THCS-THPT Lương Thế Vinh",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Trừ Văn Thố",
+    "address": "Ấp 4, xã Trừ Văn Thố",
+    "school_code": "74721430",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/728"
+  },
+  {
+    "name": "Trường tiểu học, THCS và THPT B.School",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Đông Hòa",
+    "address": "38 đường Thống Nhất, phường Đông Hòa, Thành phố Hồ Chí Minh",
+    "school_code": "7472402002",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/729"
+  },
+  {
+    "name": "Trường Tiểu học, Trung học cơ sở và Trung học phổ thông Hoa Sen",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Phú",
+    "address": "636 Nguyễn Thị Minh Khai, Tổ 1B, Khu Phố Đông Thành",
+    "school_code": "7472403002",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/730"
+  },
+  {
+    "name": "Trường phổ thông dân tộc nội trú Bà Rịa - Vũng Tàu",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Kim Long",
+    "address": "Quốc Lộ 56, Xã Kim Long, Thành phố Hồ Chí Minh",
+    "school_code": "77000E01",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/732"
+  },
+  {
+    "name": "THCS và THPT Đức Trí",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thuận Đông",
+    "address": "TS: 39/23 Bùi Văn Ba, Phường Tân Thuận Đông, Quận 7; ĐT: 742/10 Nguyễn Kiệm, Phường 4, Quận Phú Nhuận.",
+    "school_code": "79000849",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/644"
+  },
+  {
+    "name": "THCS và THPT Duy Tân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 15",
+    "address": "106 Nguyễn Giản Thanh, Phường 15, Quận 10.",
+    "school_code": "79000841",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/641"
+  },
+  {
+    "name": "THPT Chiến Thắng",
+    "province": "Hồ Chí Minh",
+    "ward": "Thị trấn Củ Chi",
+    "address": "83A Bùi Thị He, Thị trấn Củ Chi, Huyện Củ Chi.",
+    "school_code": "79000827",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/631"
+  },
+  {
+    "name": "TH, THCS và THPT Nam Mỹ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 5",
+    "address": "TS: 80/68 Dương Quảng Hàm, Phường 5, Quận Gò Vấp; ĐT: 45 Nguyễn Khắc Nhu, Phường Cô Giang, Quận 1 (Văn phòng tuyển sinh)",
+    "school_code": "79000852",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/647"
+  },
+  {
+    "name": "THCS và THPT Quang Trung Nguyễn Huệ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 9",
+    "address": "TS: 223 Nguyễn Tri Phương, Phường 9, Quận 5; ĐT: 780 Nguyễn Kiệm, Phường 4, Quận Phú Nhuận.",
+    "school_code": "79000855",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/650"
+  },
+  {
+    "name": "TH, THCS và THPT Tân Phú",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hòa Thạnh",
+    "address": "519 Kênh Tân Hóa, Phường Hòa Thạnh, Quận Tân Phú.",
+    "school_code": "79000858",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/651"
+  },
+  {
+    "name": "THCS và THPT Bác Ái",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 10",
+    "address": "187 Gò Cẩm Đệm, Phường 10, Quận Tân Bình.",
+    "school_code": "79000859",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/652"
+  },
+  {
+    "name": "THPT Minh Đức",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Quý",
+    "address": "277 Tân Quý, Phường Tân Quý, Quận Tân Phú.",
+    "school_code": "79000862",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/655"
+  },
+  {
+    "name": "THPT Thành Nhân",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Sơn Nhì",
+    "address": "TS: 69/12 Nguyễn Cửu Đàm, Phường Tân Sơn Nhì, Quận Tân Phú; ĐT: 34, 36, 38 Hoa Bằng, Phường Tân Sơn Nhì, Quận Tân Phú; ĐT: 313/10 Phan Huy Ích, Phường 14, Quận Gò Vấp.",
+    "school_code": "79000863",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/656"
+  },
+  {
+    "name": "THCS và THPT Đinh Tiên Hoàng",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tây Thạnh",
+    "address": "85 Chế Lan Viên, Phường Tây Thạnh, Quận Tân Phú.",
+    "school_code": "79000868",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/658"
+  },
+  {
+    "name": "TH, THCS và THPT Albert Einstein",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Phong Phú",
+    "address": "16 đường số 12, KDC 13C, Xã Phong Phú, Huyện Bình Chánh.",
+    "school_code": "79000C19",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/674"
+  },
+  {
+    "name": "TH, THCS và THPT Lê Thánh Tông",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Sơn Kỳ",
+    "address": "22 Bờ Bao Tân Thắng, Phường Sơn Kỳ, Quận Tân Phú.",
+    "school_code": "79000888",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/664"
+  },
+  {
+    "name": "THPT Sài Gòn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 12",
+    "address": "215D, E, 217 Nơ Trang Long, Phường 12, Quận Bình Thạnh.",
+    "school_code": "79000893",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/665"
+  },
+  {
+    "name": "THCS và THPT Thạnh An",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Thạnh An",
+    "address": "Xã Thạnh An, Huyện Cần Giờ.",
+    "school_code": "79000876",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/662"
+  },
+  {
+    "name": "TH - THCS - THPT QUỐC TẾ BẮC MỸ",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bình Hưng",
+    "address": "Đường số 20, KDC Him Lam, Bình Hưng, Bình Chánh.",
+    "school_code": "79000C06",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/668"
+  },
+  {
+    "name": "TH, THCS và THPT Emasi Nam Long",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thuận Đông",
+    "address": "147 đường số 8, Phường Tân Thuận Đông, Quận 7.",
+    "school_code": "79000C11",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/670"
+  },
+  {
+    "name": "Trường Quốc Tế Singapore",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Bình Hưng",
+    "address": "Số 29 đường số 3, Khu dân cư Trung Sơn",
+    "school_code": "79000S10",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/683"
+  },
+  {
+    "name": "TH, THCS và THPT Thái Bình Dương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Gia Định",
+    "address": "125 Bạch Đằng",
+    "school_code": "79000C07",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/685"
+  },
+  {
+    "name": "THCS và THPT Hàn Việt",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Tân Thới Hiệp",
+    "address": "70 Đường Tân Thới Nhất 8, Tân Thới Nhất, Quận 12, Thành phố Hồ Chí Minh, Việt Nam",
+    "school_code": "7900003003",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/690"
+  },
+  {
+    "name": "THCS và THPT Ngôi Sao",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Trị Đông B",
+    "address": "Đường số 18, Phường Bình Trị Đông B, Quận Bình Tân.",
+    "school_code": "79000815",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/624"
+  },
+  {
+    "name": "THCS-THPT Phan Bội Châu",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Tây",
+    "address": "",
+    "school_code": "79000816",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/625"
+  },
+  {
+    "name": "THPT Phú Lâm",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường An Lạc",
+    "address": "721 Kinh Dương Vương, Phường An Lạc, Quận Bình Tân.",
+    "school_code": "79000788",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/580"
+  },
+  {
+    "name": "THPT An Dương Vương",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Trường Thọ",
+    "address": "ĐT: Đường số 3, Phường Trường Thọ, TP. Thủ Đức; TS: 51/4 Hòa Bình, Phường Tân Thới Hòa, Quận Tân Phú.",
+    "school_code": "79000780",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/574"
+  },
+  {
+    "name": "THPT Trần Nhân Tông",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Trị Đông",
+    "address": "200 Tân Hòa Đông, Phường Bình Trị Đông, Quận Bình Tân.",
+    "school_code": "79000781",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/575"
+  },
+  {
+    "name": "PHỔ THÔNG NĂNG KHIẾU - ĐHQG TPHCM",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 9",
+    "address": "TS: 153 Nguyễn Chí Thanh, Phường 9, Quận 5 ĐT: Khu Đô Thị Đại Học Quốc Gia, Khu Phố 6, Linh Trung, TP. Thủ Đức.",
+    "school_code": "79000776",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/571"
+  },
+  {
+    "name": "THPT Lý Thái Tổ",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 6",
+    "address": "TS: 1/22/2A Nguyễn Oanh, Phường 6, Quận Gò Vấp; ĐT: 54/5C Phạm Văn Chiêu, Phường 14, Quận Gò Vấp.",
+    "school_code": "79000777",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/572"
+  },
+  {
+    "name": "THPT Hưng Đạo",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường 4",
+    "address": "120/29/24 Thích Quảng Đức, Phường 4, Quận Phú Nhuận.",
+    "school_code": "79000773",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/568"
+  },
+  {
+    "name": "TH, THCS và THPT Nam Úc",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Hiệp Tân",
+    "address": "TS: 300 Hòa Bình, Phường Hiệp Tân, Quận Tân Phú; ĐT: 5 Trương Quốc Dung, Phường 8, Quận Phú Nhuận.",
+    "school_code": "79000767",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/563"
+  },
+  {
+    "name": "Phổ thông Năng khiếu thể thao Olympic",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Linh Trung",
+    "address": "Đại học Thể dục thể thao Thành phố Hồ Chí Minh Khu phố 6, phường Linh Trung, Quận Thủ Đức, Thành phố Hồ Chí Minh",
+    "school_code": "79000707",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/505"
+  },
+  {
+    "name": "TH, THCS và THPT Sài Gòn Gia Định",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Lợi Trung",
+    "address": "514 Lê Quang Định",
+    "school_code": "7900004003",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/495"
+  },
+  {
+    "name": "Trung cấp Nghề Bình Thạnh",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Bình Lợi Trung",
+    "address": "",
+    "school_code": "7900004004",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/496"
+  },
+  {
+    "name": "TH, THCS và THPT Khải Hoàn - Nam Sài Gòn",
+    "province": "Hồ Chí Minh",
+    "ward": "Xã Nhà Bè",
+    "address": "803A Đ. Nguyễn Hữu Thọ, Phước Kiển, Nhà Bè, Thành phố Hồ Chí Minh",
+    "school_code": "7900004034",
+    "school_type": "Ngoài công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/497"
+  },
+  {
+    "name": "TT GDTX Lê Quý Đôn",
+    "province": "Hồ Chí Minh",
+    "ward": "Phường Xuân Hòa",
+    "address": "92 Nguyễn Đình Chiểu",
+    "school_code": "79000902",
+    "school_type": "Công lập",
+    "detail_url": "https://ts10.hcm.edu.vn/thong-tin-truong-chi-tiet/689"
+  }
+]
