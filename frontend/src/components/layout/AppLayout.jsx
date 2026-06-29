@@ -7,10 +7,13 @@ function AppLayout({
   children,
   darkMode,
   onToggleDarkMode,
+  mainClassName = 'pt-20',
+  showFooter = true,
+    lockPageScroll = false,
+
 }) {
   return (
     <div className="min-h-screen text-slate-900 transition-colors dark:text-slate-100">
-
       <AnimatedBackground />
 
       <Navbar
@@ -18,12 +21,11 @@ function AppLayout({
         onToggleDarkMode={onToggleDarkMode}
       />
 
-      <main className="pt-20">
-        {children}
-      </main>
+      <main className={`${mainClassName} ${lockPageScroll ? 'overflow-hidden' : ''}`}>
+  {children}
+</main>
 
-      <Footer darkMode={darkMode} />
-
+      {showFooter && <Footer darkMode={darkMode} />}
     </div>
   )
 }
