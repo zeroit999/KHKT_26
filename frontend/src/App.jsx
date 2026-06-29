@@ -157,9 +157,8 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   const location = useLocation();
   const { user, userDetails, isLoading } = useAuth();
 
-  const location = useLocation()
-  const { user, userDetails, isLoading } = useAuth()
-const isForumRoute = location.pathname.toLowerCase() === '/forum'
+  const isForumRoute = location.pathname.toLowerCase() === '/forum';
+
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
     !location.pathname.endsWith('/result');
@@ -229,15 +228,15 @@ const isForumRoute = location.pathname.toLowerCase() === '/forum'
     <>
       <ScrollToTop />
 
-<AppLayout
-  darkMode={darkMode}
-  onToggleDarkMode={onToggleDarkMode}
-  mainClassName={isForumRoute ? 'pt-0' : 'pt-20'}
-  showFooter={!isForumRoute}
-  showNavbar={!isForumRoute}
-  lockPageScroll={isForumRoute}
->
-          <AnimatePresence mode="wait">
+      <AppLayout
+        darkMode={darkMode}
+        onToggleDarkMode={onToggleDarkMode}
+        mainClassName={isForumRoute ? 'pt-0' : 'pt-20'}
+        showFooter={!isForumRoute}
+        showNavbar={!isForumRoute}
+        lockPageScroll={isForumRoute}
+      >
+        <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 16 }}
@@ -292,6 +291,7 @@ const isForumRoute = location.pathname.toLowerCase() === '/forum'
                 path="/courses"
                 element={<Navigate to="/e-learning" replace />}
               />
+
               <Route
                 path="/courses/:id"
                 element={<LegacyCourseDetailRedirect />}
