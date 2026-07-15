@@ -55,24 +55,78 @@ function Setup() {
     handleFinish,
   } = useSetupForm();
 
-  const [darkMode, setDarkMode] = useState(
-    document.documentElement.classList.contains("dark")
-  );
+  // Trang Setup luôn sử dụng giao diện sáng.
+  const darkMode = false;
 
   const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false);
   const schoolBoxRef = useRef(null);
 
   useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setDarkMode(document.documentElement.classList.contains("dark"));
-    });
+    const html = document.documentElement;
+    const body = document.body;
 
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
+    const previousHtmlDark = html.classList.contains("dark");
+    const previousBodyDark = body.classList.contains("dark");
+    const previousHtmlTheme = html.getAttribute("data-theme");
+    const previousBodyTheme = body.getAttribute("data-theme");
+    const previousColorScheme = html.style.colorScheme;
+    const favicon =
+      document.getElementById("favicon") ||
+      document.querySelector('link[rel~="icon"]');
+    const previousFaviconHref = favicon?.getAttribute("href") || null;
 
-    return () => observer.disconnect();
+    // Ép toàn bộ giao diện toàn cục về Light khi ở Setup.
+    // Nhờ đó ChatbotWidget và nút AI nổi cũng nhận giao diện sáng
+    // nếu chúng đọc class dark hoặc data-theme từ document.
+    html.classList.remove("dark");
+    body.classList.remove("dark");
+    html.setAttribute("data-theme", "light");
+    body.setAttribute("data-theme", "light");
+    html.style.colorScheme = "light";
+
+    // Favicon của trang Setup luôn dùng phiên bản Light.
+    if (favicon) {
+      favicon.setAttribute("href", "/light-mode.png");
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("themechange", {
+        detail: { theme: "light", source: "setup" },
+      })
+    );
+
+    return () => {
+      if (previousHtmlDark) html.classList.add("dark");
+      else html.classList.remove("dark");
+
+      if (previousBodyDark) body.classList.add("dark");
+      else body.classList.remove("dark");
+
+      if (previousHtmlTheme === null) html.removeAttribute("data-theme");
+      else html.setAttribute("data-theme", previousHtmlTheme);
+
+      if (previousBodyTheme === null) body.removeAttribute("data-theme");
+      else body.setAttribute("data-theme", previousBodyTheme);
+
+      html.style.colorScheme = previousColorScheme;
+
+      if (favicon) {
+        if (previousFaviconHref === null) {
+          favicon.removeAttribute("href");
+        } else {
+          favicon.setAttribute("href", previousFaviconHref);
+        }
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("themechange", {
+          detail: {
+            theme: previousHtmlDark ? "dark" : "light",
+            source: "setup-cleanup",
+          },
+        })
+      );
+    };
   }, []);
 
   useEffect(() => {

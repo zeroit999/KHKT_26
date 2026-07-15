@@ -86,6 +86,16 @@ function LoadingScreen() {
   return <LoadingSkeleton />;
 }
 
+function RouteAwareChatbot() {
+  const { pathname } = useLocation();
+
+  if (pathname.toLowerCase() === '/setup') {
+    return null;
+  }
+
+  return <ChatbotWidget />;
+}
+
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
 
@@ -441,7 +451,7 @@ function App() {
           onToggleDarkMode={() => setDarkMode((prev) => !prev)}
         />
 
-        <ChatbotWidget />
+        <RouteAwareChatbot />
 
         <Toaster position="top-right" toastOptions={toastOptions} />
       </BrowserRouter>
