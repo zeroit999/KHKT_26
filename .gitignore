@@ -55,5 +55,4 @@ backend/users.db
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?backend/config/firehase-admin-key.json
 backend/config/firebase-admin-key.json
