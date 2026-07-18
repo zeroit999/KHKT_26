@@ -61,7 +61,7 @@ function Login() {
 
   const navigate = useNavigate()
 
-  const { user, isLoading, loginWithDemoAccount } =
+  const { user, isLoading } =
     useAuth()
 
   // =========================
@@ -108,12 +108,6 @@ function Login() {
       setLoading(true)
 
       try {
-        if (LOCAL_DEV_MODE) {
-          await loginWithDemoAccount(email, password)
-          navigate('/')
-          return
-        }
-
         console.log(
           '🔄 Logging in with Firebase...'
         )

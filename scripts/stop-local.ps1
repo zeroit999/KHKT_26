@@ -13,7 +13,7 @@ function Stop-ProcessTree {
     Stop-Process -Id $RootProcessId -ErrorAction SilentlyContinue
 }
 
-foreach ($name in @("backend", "frontend")) {
+foreach ($name in @("frontend", "backend", "emulators")) {
     $pidFile = Join-Path $projectRoot ".local-$name.pid"
 
     if (Test-Path -LiteralPath $pidFile) {

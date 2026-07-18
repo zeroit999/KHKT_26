@@ -20,30 +20,22 @@ import {
   auth,
   db,
 } from '../components/firebase'
-import {
-  getLocalDemoSession,
-  signInLocalDemo,
-  signOutLocalDemo,
-} from '../utils/localAuth'
-
 const AuthContext =
   createContext()
-
-const LOCAL_DEV_MODE = import.meta.env.VITE_LOCAL_DEV_MODE === 'true'
 
 export function AuthProvider({
   children,
 }) {
   const [user, setUser] =
-    useState(() => LOCAL_DEV_MODE ? getLocalDemoSession()?.user || null : null)
+    useState(null)
 
   const [
     userDetails,
     setUserDetails,
-  ] = useState(() => LOCAL_DEV_MODE ? getLocalDemoSession()?.userDetails || null : null)
+  ] = useState(null)
 
   const [isLoading, setIsLoading] =
-    useState(!LOCAL_DEV_MODE)
+    useState(true)
 
   // =========================
   // REFRESH USER DATA
@@ -51,7 +43,6 @@ export function AuthProvider({
   const refreshUserData =
     async (currentUser = user) => {
       try {
-        if (LOCAL_DEV_MODE) return userDetails
         if (!currentUser) return
 
         const userRef = doc(
@@ -96,10 +87,6 @@ export function AuthProvider({
   // AUTH LISTENER
   // =========================
   useEffect(() => {
-    if (LOCAL_DEV_MODE) {
-      return undefined
-    }
-
     console.log(
       'AuthContext: Setting up auth listener'
     )
@@ -259,27 +246,9 @@ export function AuthProvider({
   // =========================
   // LOGOUT
   // =========================
-  const loginWithDemoAccount = async (email, password) => {
-    if (!LOCAL_DEV_MODE) {
-      throw new Error('Demo login chỉ khả dụng trong local mode')
-    }
-
-    const session = signInLocalDemo(email, password)
-    setUser(session.user)
-    setUserDetails(session.userDetails)
-    return session
-  }
-
   const logout =
     async () => {
       try {
-        if (LOCAL_DEV_MODE) {
-          signOutLocalDemo()
-          setUser(null)
-          setUserDetails(null)
-          return
-        }
-
         await signOut(
           auth
         )
@@ -325,7 +294,6 @@ export function AuthProvider({
         userDetails,
         setUserDetails,
         refreshUserData,
-        loginWithDemoAccount,
         logout,
         isLoading,
         normalizedRole,

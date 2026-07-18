@@ -72,9 +72,6 @@ def configure_cors(app):
 
 
 def register_blueprints(app):
-    if Config.LOCAL_DEV_MODE:
-        return
-
     from auth.auth_routes import auth_bp
     from exams.exam_routes import exam_bp
 
