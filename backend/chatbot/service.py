@@ -3,7 +3,14 @@ import os
 import requests
 from google import genai
 
-from chatbot.knowledge import DEFAULT_ACTIONS, FEATURES, find_relevant_features
+from chatbot.knowledge import (
+    DEFAULT_ACTIONS,
+    FEATURES,
+    PAGE_PROFILES,
+    filter_actions_for_role,
+    find_relevant_features,
+    get_page_profile,
+)
 
 
 class ChatbotError(Exception):
@@ -15,6 +22,8 @@ Luôn trả lời bằng tiếng Việt, xưng "Tôi" và gọi người dùng l
 Chỉ khẳng định thông tin chức năng khi có trong ngữ cảnh được cung cấp.
 Nếu thiếu thông tin, nói rõ giới hạn thay vì bịa ra.
 Trả lời ngắn gọn, thực dụng; không hướng dẫn gian lận trong bài thi.
+Ưu tiên trả lời về trang hiện tại và dùng đúng dữ liệu giao diện được cung cấp.
+Không yêu cầu mật khẩu, mã xác thực, khóa API hoặc dữ liệu nhạy cảm.
 """
 
 
@@ -44,7 +53,9 @@ def get_capabilities():
         "provider": provider,
         "model": model,
         "actions": True,
-        "knowledgeItems": len(FEATURES),
+        "knowledgeItems": len(FEATURES) + len(PAGE_PROFILES),
+        "pageAware": True,
+        "safePageActions": True,
     }
 
 
@@ -63,14 +74,52 @@ def _sanitize_history(history):
     return cleaned
 
 
+def _sanitize_visible_context(page_context, allow_visible_context=True):
+    if not allow_visible_context:
+        return {"headings": [], "controls": [], "stats": []}
+
+    visible = (page_context or {}).get("visible", {})
+    if not isinstance(visible, dict):
+        return {"headings": [], "controls": [], "stats": []}
+
+    cleaned = {}
+    for key in ("headings", "controls", "stats"):
+        values = visible.get(key, [])
+        if not isinstance(values, list):
+            values = []
+        cleaned[key] = [
+            str(value).strip()[:160]
+            for value in values[:12]
+            if str(value or "").strip()
+        ]
+    return cleaned
+
+
 def _build_context(message, page_context):
     relevant = find_relevant_features(message)
-    if not relevant:
-        relevant = FEATURES[:3]
-
-    knowledge = "\n".join(f"- {item['content']}" for item in relevant)
     path = str((page_context or {}).get("path", "/"))[:200]
-    return relevant, f"Trang hiện tại: {path}\nKiến thức liên quan:\n{knowledge}"
+    role = str((page_context or {}).get("role", "guest"))[:40]
+    profile = get_page_profile(path)
+    visible = _sanitize_visible_context(
+        page_context,
+        profile.get("allow_visible_context", True),
+    )
+    knowledge = "\n".join(f"- {item['content']}" for item in relevant)
+    signals = "\n".join(
+        f"- {key}: {', '.join(values)}"
+        for key, values in visible.items()
+        if values
+    )
+    context_text = (
+        f"Trang hiện tại: {path}\n"
+        f"Khu vực: {profile['title']}\n"
+        f"Vai trò: {role}\n"
+        f"Mục đích trang: {profile['summary']}\n"
+        f"Quy tắc riêng: {profile['instructions']}\n"
+        f"Tín hiệu giao diện an toàn:\n{signals or '- Không có'}\n"
+        f"Kiến thức liên quan:\n{knowledge or '- Chỉ dùng kiến thức của trang hiện tại'}"
+    )
+    return relevant, profile, visible, context_text
 
 
 def _extract_output_text(payload):
@@ -144,40 +193,90 @@ def _gemini_reply(message, history, context_text):
     return reply
 
 
-def _mock_reply(message, relevant):
+def _mock_reply(message, relevant, profile, visible):
+    normalized = str(message or "").lower()
+    page_title = profile["title"]
+
+    if profile["id"] == "exam-room":
+        return (
+            "Tôi đang ở chế độ hỗ trợ Phòng thi. Tôi có thể giúp Bạn xử lý sự cố, "
+            "toàn màn hình, đồng hồ và nộp bài; tôi không thể giải hoặc gợi ý đáp án."
+        )
+
+    if any(term in normalized for term in ("trang này", "làm gì", "chức năng")):
+        return f"Bạn đang ở {page_title}. {profile['summary']} {profile['instructions']}"
+
+    if any(term in normalized for term in ("tìm", "search", "ở đâu")):
+        return (
+            f"Tại {page_title}, tôi đã chuẩn bị hành động phù hợp ngay bên dưới. "
+            "Bấm nút để tôi đưa con trỏ tới đúng khu vực thay vì Bạn phải tự tìm."
+        )
+
+    if visible.get("headings"):
+        visible_items = ", ".join(visible["headings"][:3])
+        return (
+            f"Tôi đang hỗ trợ riêng cho {page_title} và nhận thấy các mục: {visible_items}. "
+            f"{profile['summary']} Bạn muốn tôi hướng dẫn thao tác hay phân tích mục nào?"
+        )
+
     if relevant:
         details = " ".join(item["content"] for item in relevant)
-        return f"Tôi có thể hỗ trợ Bạn về chức năng này. {details} Bạn có thể dùng nút gợi ý bên dưới để mở nhanh trang liên quan."
-    return (
-        "Tôi đang chạy ở chế độ local mock. Tôi có thể hướng dẫn Bạn về "
-        "khóa học, luyện thi, diễn đàn, hồ sơ và bảng xếp hạng."
-    )
+        return f"Từ {page_title}, tôi có thể hỗ trợ yêu cầu này. {details}"
+
+    return f"Tôi đang hỗ trợ riêng cho {page_title}. {profile['summary']}"
+
+
+def _merge_actions(primary, secondary, limit=4):
+    merged = []
+    seen = set()
+    for action in [*primary, *secondary]:
+        action_id = action.get("id")
+        if not action_id or action_id in seen:
+            continue
+        seen.add(action_id)
+        merged.append({key: value for key, value in action.items() if key != "roles"})
+        if len(merged) >= limit:
+            break
+    return merged
 
 
 def create_chat_response(message, history=None, page_context=None):
     provider = _resolve_provider()
-    relevant, context_text = _build_context(message, page_context or {})
+    page_context = page_context or {}
+    relevant, profile, visible, context_text = _build_context(message, page_context)
 
     if provider == "openai":
         reply = _openai_reply(message, history or [], context_text)
     elif provider == "gemini":
         reply = _gemini_reply(message, history or [], context_text)
     elif provider == "mock":
-        reply = _mock_reply(message, relevant)
+        reply = _mock_reply(message, relevant, profile, visible)
     elif provider == "unavailable":
         raise ChatbotError("Backend chưa cấu hình OPENAI_API_KEY hoặc GEMINI_API_KEY.")
     else:
         raise ChatbotError(f"CHATBOT_PROVIDER không hợp lệ: {provider}")
 
-    actions = []
+    role = page_context.get("role", "")
+    page_actions = filter_actions_for_role(profile.get("actions", []), role)
+    feature_actions = []
     for item in relevant:
-        actions.extend(item.get("actions", []))
+        if item["id"] != profile["id"]:
+            feature_actions.extend(item.get("actions", []))
+    if feature_actions:
+        actions = _merge_actions(feature_actions, page_actions)
+    else:
+        actions = _merge_actions(page_actions, [])
     if not actions:
-        actions = DEFAULT_ACTIONS
+        actions = DEFAULT_ACTIONS[:3]
 
     return {
         "reply": reply,
-        "actions": actions[:3],
+        "actions": actions,
         "provider": provider,
         "sources": [{"id": item["id"], "label": item["id"]} for item in relevant],
+        "page": {
+            "id": profile["id"],
+            "title": profile["title"],
+            "suggestions": profile["suggestions"],
+        },
     }

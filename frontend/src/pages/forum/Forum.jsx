@@ -2662,7 +2662,7 @@ function HallHero({ stats, onCompose }) {
         <h2 className="text-3xl font-black tracking-tight md:text-5xl">Cộng đồng ZUNY 🌍</h2>
         <p className="mt-4 max-w-lg text-sm font-semibold leading-7 text-white/75">Nơi học sinh và giáo viên cùng chia sẻ, hỏi đáp, đăng tài liệu và trò chuyện theo thời gian thực.</p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={onCompose} className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5">
+          <button data-zuny-ai-action="create-post" type="button" onClick={onCompose} className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5">
             <Plus className="h-4 w-4" />
             Đăng bài mới
           </button>

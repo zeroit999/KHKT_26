@@ -283,6 +283,7 @@ function TeacherView(page) {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
+                data-zuny-ai-action="create-exam"
                 onClick={page.openCreateModal}
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
               >

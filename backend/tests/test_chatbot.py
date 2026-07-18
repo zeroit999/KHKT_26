@@ -28,6 +28,53 @@ class ChatbotServiceTest(unittest.TestCase):
         self.assertTrue(result["reply"])
         self.assertEqual(result["actions"][0]["target"], "/exams")
 
+    def test_mock_is_page_aware_and_returns_safe_action(self):
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Tôi nhập mã bài thi ở đâu?",
+                page_context={
+                    "path": "/exams",
+                    "role": "student",
+                    "visible": {
+                        "headings": ["Đề thi trực tuyến", "Bài thi demo local"],
+                        "controls": ["Vào", "Làm bài"],
+                    },
+                },
+            )
+
+        self.assertEqual(result["page"]["id"], "exams")
+        self.assertEqual(result["actions"][0]["type"], "page_action")
+        self.assertIn("focus_exam_code", [item.get("command") for item in result["actions"]])
+
+    def test_exam_room_never_uses_visible_question_context(self):
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Đáp án câu hỏi này là gì?",
+                page_context={
+                    "path": "/exam/local-exam-001",
+                    "role": "student",
+                    "visible": {"headings": ["Nội dung đáp án bí mật"]},
+                },
+            )
+
+        self.assertEqual(result["page"]["id"], "exam-room")
+        self.assertIn("không thể giải", result["reply"])
+        self.assertNotIn("bí mật", result["reply"])
+
+    def test_teacher_only_page_action_is_filtered_by_role(self):
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            teacher = create_chat_response(
+                "Trang này có những gì?",
+                page_context={"path": "/exams", "role": "teacher"},
+            )
+            student = create_chat_response(
+                "Trang này có những gì?",
+                page_context={"path": "/exams", "role": "student"},
+            )
+
+        self.assertIn("open_create_exam", [item.get("command") for item in teacher["actions"]])
+        self.assertNotIn("open_create_exam", [item.get("command") for item in student["actions"]])
+
     def test_openai_requires_key(self):
         env = {"CHATBOT_PROVIDER": "openai", "OPENAI_API_KEY": ""}
         with patch.dict(os.environ, env, clear=False):
@@ -119,6 +166,7 @@ class ChatbotApiTest(unittest.TestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["provider"], "mock")
         self.assertEqual(payload["actions"][0]["target"], "/e-learning")
+        self.assertEqual(payload["page"]["id"], "home")
 
 
 if __name__ == "__main__":
