@@ -20,6 +20,11 @@ import {
   auth,
   db,
 } from '../components/firebase'
+import {
+  getLocalDemoSession,
+  signInLocalDemo,
+  signOutLocalDemo,
+} from '../utils/localAuth'
 
 const AuthContext =
   createContext()
@@ -30,12 +35,12 @@ export function AuthProvider({
   children,
 }) {
   const [user, setUser] =
-    useState(null)
+    useState(() => LOCAL_DEV_MODE ? getLocalDemoSession()?.user || null : null)
 
   const [
     userDetails,
     setUserDetails,
-  ] = useState(null)
+  ] = useState(() => LOCAL_DEV_MODE ? getLocalDemoSession()?.userDetails || null : null)
 
   const [isLoading, setIsLoading] =
     useState(!LOCAL_DEV_MODE)
@@ -46,6 +51,7 @@ export function AuthProvider({
   const refreshUserData =
     async (currentUser = user) => {
       try {
+        if (LOCAL_DEV_MODE) return userDetails
         if (!currentUser) return
 
         const userRef = doc(
@@ -253,10 +259,22 @@ export function AuthProvider({
   // =========================
   // LOGOUT
   // =========================
+  const loginWithDemoAccount = async (email, password) => {
+    if (!LOCAL_DEV_MODE) {
+      throw new Error('Demo login chỉ khả dụng trong local mode')
+    }
+
+    const session = signInLocalDemo(email, password)
+    setUser(session.user)
+    setUserDetails(session.userDetails)
+    return session
+  }
+
   const logout =
     async () => {
       try {
         if (LOCAL_DEV_MODE) {
+          signOutLocalDemo()
           setUser(null)
           setUserDetails(null)
           return
@@ -307,6 +325,7 @@ export function AuthProvider({
         userDetails,
         setUserDetails,
         refreshUserData,
+        loginWithDemoAccount,
         logout,
         isLoading,
         normalizedRole,
@@ -322,6 +341,8 @@ export function AuthProvider({
   )
 }
 
+// Hook và provider cùng file để giữ API hiện tại của dự án.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(
     AuthContext

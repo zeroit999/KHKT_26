@@ -12,6 +12,14 @@ vì vậy có thể test giao diện chatbot mà không cần Firebase productio
 
 Mở `http://127.0.0.1:5173`. Dừng các tiến trình local bằng:
 
+Tài khoản demo local:
+
+- Học sinh: `student@zuny.local`
+- Giáo viên: `teacher@zuny.local`
+- Mật khẩu chung: `Zuny@123`
+
+Các tài khoản này chỉ được kích hoạt khi `VITE_LOCAL_DEV_MODE=true`.
+
 ```powershell
 ./scripts/stop-local.ps1
 ```
