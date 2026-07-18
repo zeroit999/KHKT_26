@@ -24,6 +24,8 @@ import {
 const AuthContext =
   createContext()
 
+const LOCAL_DEV_MODE = import.meta.env.VITE_LOCAL_DEV_MODE === 'true'
+
 export function AuthProvider({
   children,
 }) {
@@ -36,7 +38,7 @@ export function AuthProvider({
   ] = useState(null)
 
   const [isLoading, setIsLoading] =
-    useState(true)
+    useState(!LOCAL_DEV_MODE)
 
   // =========================
   // REFRESH USER DATA
@@ -88,6 +90,10 @@ export function AuthProvider({
   // AUTH LISTENER
   // =========================
   useEffect(() => {
+    if (LOCAL_DEV_MODE) {
+      return undefined
+    }
+
     console.log(
       'AuthContext: Setting up auth listener'
     )
@@ -250,6 +256,12 @@ export function AuthProvider({
   const logout =
     async () => {
       try {
+        if (LOCAL_DEV_MODE) {
+          setUser(null)
+          setUserDetails(null)
+          return
+        }
+
         await signOut(
           auth
         )

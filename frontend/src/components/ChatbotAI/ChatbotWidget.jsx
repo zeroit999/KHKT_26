@@ -1,29 +1,25 @@
 import { Send, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.VITE_LOCAL_DEV_MODE === 'true' ? 'http://127.0.0.1:5000' : '')
+).replace(/\/$/, '')
 
 if (!API_BASE_URL) {
   throw new Error('Missing environment variable: VITE_API_BASE_URL')
 }
 
 function normalizeReply(text) {
-  if (!text) return ''
-
-  return text
-    .replaceAll('Anh ', 'Tôi ')
-    .replaceAll('anh ', 'tôi ')
-    .replaceAll('Em ', 'Bạn ')
-    .replaceAll('em ', 'bạn ')
-    .replaceAll('Chị ', 'Tôi ')
-    .replaceAll('chị ', 'tôi ')
-    .replaceAll('Mình ', 'Tôi ')
-    .replaceAll('mình ', 'tôi ')
+  return String(text || '').trim()
 }
 
 export default function ChatbotWidget() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -70,7 +66,12 @@ export default function ChatbotWidget() {
           id: Date.now(),
           role: 'assistant',
           content:
-            'Xin chào 👋 Tôi là ZUNY AI Assistant.\n\nTôi có thể hỗ trợ học tập, luyện thi THPT và giải đáp các câu hỏi của bạn.\n\nBạn cần tôi giúp gì hôm nay?',
+            'Xin chào 👋 Tôi là ZUNY AI Assistant.\n\nTôi có thể hướng dẫn Bạn sử dụng các chức năng của ZUNY và mở nhanh trang phù hợp.',
+          actions: [
+            { id: 'courses', label: 'Khóa học', type: 'navigate', target: '/e-learning' },
+            { id: 'exams', label: 'Luyện thi', type: 'navigate', target: '/exams' },
+            { id: 'forum', label: 'Diễn đàn', type: 'navigate', target: '/Forum' },
+          ],
         },
       ])
     }
@@ -103,6 +104,8 @@ export default function ChatbotWidget() {
         },
         body: JSON.stringify({
           message: trimmedInput,
+          history: messages.slice(-8).map(({ role, content }) => ({ role, content })),
+          context: { path: location.pathname },
         }),
       })
 
@@ -120,9 +123,11 @@ export default function ChatbotWidget() {
           content: normalizeReply(
             data.reply || 'Xin lỗi, tôi chưa có câu trả lời cho câu hỏi này.',
           ),
+          actions: Array.isArray(data.actions) ? data.actions : [],
+          provider: data.provider,
         },
       ])
-    } catch (error) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -134,6 +139,12 @@ export default function ChatbotWidget() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAction = (action) => {
+    if (action?.type !== 'navigate' || !String(action.target || '').startsWith('/')) return
+    navigate(action.target)
+    setOpen(false)
   }
 
   const renderBotAvatar = (size = 'small') => {
@@ -252,8 +263,9 @@ export default function ChatbotWidget() {
                 >
                   {message.role === 'assistant' && renderBotAvatar()}
 
-                  <div
-                    className={`max-w-[70%] break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                  <div className="max-w-[76%]">
+                    <div
+                    className={`break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                       message.role === 'user'
                         ? isDark
                           ? 'rounded-br-md bg-violet-500 text-white'
@@ -264,6 +276,29 @@ export default function ChatbotWidget() {
                     }`}
                   >
                     {message.content}
+                    {message.provider === 'mock' && (
+                      <div className="mt-2 text-[10px] font-bold uppercase tracking-wide opacity-60">Local mock</div>
+                    )}
+                    </div>
+
+                    {message.role === 'assistant' && message.actions?.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {message.actions.map((action) => (
+                          <button
+                            key={action.id || `${action.type}-${action.target}`}
+                            type="button"
+                            onClick={() => handleAction(action)}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                              isDark
+                                ? 'border-violet-400/30 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20'
+                                : 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
+                            }`}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {message.role === 'user' && renderUserAvatar()}

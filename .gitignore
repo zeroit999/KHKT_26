@@ -26,6 +26,9 @@ frontend/.env
 
 # Firebase Admin secret
 backend/config/firebase-admin-key.json
+
+# Local process files
+.local-*.pid
 firebase-admin-key.json
 
 # Python
@@ -34,6 +37,7 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+venv*/
 env/
 ENV/
 backend/__pycache__/
