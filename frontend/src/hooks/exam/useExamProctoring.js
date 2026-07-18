@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ref as storageRef, uploadBytes } from 'firebase/storage'
 import toast from 'react-hot-toast'
 
 import { logExamProctoringEventApi } from '../../api/examApi.js'
+import { auth, storage } from '../../components/firebase.js'
 import { normalizeProctoringConfig } from '../../utils/proctoringConfig.js'
 
 const createId = () => {
@@ -12,11 +14,56 @@ const createId = () => {
 const isTrackActive = (stream) =>
   Boolean(stream?.getTracks().some((track) => track.readyState === 'live'))
 
+const isKindActive = (stream, kind) =>
+  Boolean(stream?.getTracks().some(
+    (track) => track.kind === kind && track.readyState === 'live',
+  ))
+
+const captureFrame = async (stream) => {
+  const track = stream?.getVideoTracks()[0]
+  if (!track || track.readyState !== 'live') return null
+
+  const video = document.createElement('video')
+  video.muted = true
+  video.playsInline = true
+  video.srcObject = new MediaStream([track])
+  await video.play()
+
+  if (!video.videoWidth || !video.videoHeight) {
+    await new Promise((resolve) => {
+      const timer = window.setTimeout(resolve, 1200)
+      video.addEventListener('loadeddata', () => {
+        window.clearTimeout(timer)
+        resolve()
+      }, { once: true })
+    })
+  }
+
+  const sourceWidth = video.videoWidth || track.getSettings?.().width || 640
+  const sourceHeight = video.videoHeight || track.getSettings?.().height || 480
+  const maxWidth = 1280
+  const scale = Math.min(1, maxWidth / sourceWidth)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale))
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale))
+  canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+  video.pause()
+  video.srcObject = null
+
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, 'image/webp', 0.72)
+  })
+}
+
 export default function useExamProctoring({ exam, active, disabled = false }) {
   const config = useMemo(() => normalizeProctoringConfig(exam || {}), [exam])
   const sessionIdRef = useRef(createId())
   const cameraStreamRef = useRef(null)
+  const microphoneStreamRef = useRef(null)
   const screenStreamRef = useRef(null)
+  const audioContextRef = useRef(null)
+  const evidenceQueueRef = useRef(Promise.resolve())
+  const lastEvidenceAtRef = useRef(0)
   const stoppingRef = useRef(false)
   const activeRef = useRef(active)
   const startedAtRef = useRef('')
@@ -27,13 +74,16 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
   const lastAttentionLossRef = useRef(0)
 
   const needsDevicePermission = Boolean(
-    config.enabled && (config.requireCamera || config.requireScreenShare),
+    config.enabled && (
+      config.requireCamera || config.requireMicrophone || config.requireScreenShare
+    ),
   )
 
   const [preparing, setPreparing] = useState(false)
   const [permissionError, setPermissionError] = useState('')
   const [preparedExamId, setPreparedExamId] = useState('')
   const [cameraActive, setCameraActive] = useState(false)
+  const [microphoneActive, setMicrophoneActive] = useState(false)
   const [screenActive, setScreenActive] = useState(false)
   const [cameraStream, setCameraStream] = useState(null)
   const [monitoringBlocked, setMonitoringBlocked] = useState(false)
@@ -49,8 +99,8 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
   const ready = !needsDevicePermission || preparedExamId === exam?.id
 
   const persistEvent = useCallback((event) => {
-    if (!exam?.id || disabled || !config.enabled) return
-    logExamProctoringEventApi(exam.id, {
+    if (!exam?.id || disabled || !config.enabled) return Promise.resolve()
+    return logExamProctoringEventApi(exam.id, {
       sessionId: sessionIdRef.current,
       event,
     }).catch((error) => {
@@ -58,7 +108,7 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     })
   }, [exam, disabled, config.enabled])
 
-  const appendEvent = useCallback((type, severity, message, metadata = {}) => {
+  const appendEvent = useCallback((type, severity, message, metadata = {}, persist = true) => {
     const event = {
       id: createId(),
       type,
@@ -82,9 +132,71 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
       setViolationCount(violationsRef.current)
     }
 
-    persistEvent(event)
+    if (persist) persistEvent(event)
     return event
   }, [persistEvent])
+
+  const captureViolationEvidence = useCallback((event, initialPersist = Promise.resolve()) => {
+    const now = Date.now()
+    if (now - lastEvidenceAtRef.current < 10000) return
+    if (!config.captureCameraEvidence && !config.captureScreenEvidence) return
+    lastEvidenceAtRef.current = now
+
+    evidenceQueueRef.current = evidenceQueueRef.current.then(async () => {
+      await initialPersist
+      const uid = auth.currentUser?.uid
+      if (!uid || !event?.id || !exam?.id) return
+
+      const sources = [
+        config.captureCameraEvidence && ['camera', cameraStreamRef.current],
+        config.captureScreenEvidence && ['screen', screenStreamRef.current],
+      ].filter(Boolean)
+      const evidenceMetadata = {}
+
+      for (const [source, stream] of sources) {
+        try {
+          const blob = await captureFrame(stream)
+          if (!blob) continue
+          const path = [
+            'exam-proctoring',
+            exam.id,
+            uid,
+            sessionIdRef.current,
+            `${event.id}-${source}.webp`,
+          ].join('/')
+          await uploadBytes(storageRef(storage, path), blob, {
+            contentType: 'image/webp',
+            customMetadata: {
+              examId: String(exam.id),
+              sessionId: sessionIdRef.current,
+              eventId: event.id,
+              source,
+            },
+          })
+          evidenceMetadata[`evidence${source === 'camera' ? 'Camera' : 'Screen'}Path`] = path
+        } catch (error) {
+          console.warn(`Không thể chụp ảnh ${source}:`, error)
+        }
+      }
+
+      if (!Object.keys(evidenceMetadata).length) return
+      const updatedEvent = {
+        ...event,
+        metadata: {
+          ...event.metadata,
+          ...evidenceMetadata,
+          evidenceCapturedAt: new Date().toISOString(),
+        },
+      }
+      eventsRef.current = eventsRef.current.map((item) => (
+        item.id === event.id ? updatedEvent : item
+      ))
+      setEvents(eventsRef.current)
+      await persistEvent(updatedEvent)
+    }).catch((error) => {
+      console.warn('Không thể lưu ảnh bằng chứng:', error)
+    })
+  }, [config.captureCameraEvidence, config.captureScreenEvidence, exam, persistEvent])
 
   const reportViolation = useCallback((type, message, metadata = {}, dedupeMs = 1000) => {
     if (!activeRef.current || stoppingRef.current) return null
@@ -93,17 +205,20 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     if (now - lastAt < dedupeMs) return null
     lastViolationRef.current.set(type, now)
 
-    const event = appendEvent(type, 'violation', message, metadata)
+    const event = appendEvent(type, 'violation', message, metadata, false)
+    captureViolationEvidence(event, persistEvent(event))
     toast.error(`${message} (${violationsRef.current}/${config.maxViolations})`)
     return event
-  }, [appendEvent, config.maxViolations])
+  }, [appendEvent, captureViolationEvidence, config.maxViolations, persistEvent])
 
   const stopStream = useCallback((stream) => {
     stream?.getTracks().forEach((track) => track.stop())
   }, [])
 
   const registerTrackEnded = useCallback((stream, source) => {
-    const track = stream?.getVideoTracks()[0]
+    const track = source === 'microphone'
+      ? stream?.getAudioTracks()[0]
+      : stream?.getVideoTracks()[0]
     if (!track) return
 
     track.addEventListener('ended', () => {
@@ -115,6 +230,11 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
         cameraStreamRef.current = null
         setBlockingReason('Camera đã bị tắt. Hãy cấp lại quyền để tiếp tục.')
         reportViolation('camera_stopped', 'Camera đã bị tắt')
+      } else if (source === 'microphone') {
+        setMicrophoneActive(false)
+        microphoneStreamRef.current = null
+        setBlockingReason('Microphone đã bị tắt. Hãy cấp lại quyền để tiếp tục.')
+        reportViolation('microphone_stopped', 'Microphone đã bị tắt')
       } else {
         setScreenActive(false)
         screenStreamRef.current = null
@@ -149,6 +269,20 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
         registerTrackEnded(stream, 'camera')
       }
 
+      if (config.requireMicrophone && !isKindActive(microphoneStreamRef.current, 'audio')) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        })
+        microphoneStreamRef.current = stream
+        setMicrophoneActive(true)
+        registerTrackEnded(stream, 'microphone')
+      }
+
       if (config.requireScreenShare && !isTrackActive(screenStreamRef.current)) {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: { displaySurface: 'monitor' },
@@ -172,6 +306,7 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
       setBlockingReason('')
       appendEvent('permissions_granted', 'info', 'Đã cấp đủ quyền giám sát', {
         camera: config.requireCamera,
+        microphone: config.requireMicrophone,
         screen: config.requireScreenShare,
         displaySurface: screenStreamRef.current?.getVideoTracks()[0]?.getSettings?.().displaySurface || '',
       })
@@ -182,6 +317,9 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
       setPreparedExamId('')
       if (config.requireCamera && !isTrackActive(cameraStreamRef.current)) {
         setCameraActive(false)
+      }
+      if (config.requireMicrophone && !isKindActive(microphoneStreamRef.current, 'audio')) {
+        setMicrophoneActive(false)
       }
       if (config.requireScreenShare && !isTrackActive(screenStreamRef.current)) {
         setScreenActive(false)
@@ -208,13 +346,20 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
 
     stoppingRef.current = true
     stopStream(cameraStreamRef.current)
+    stopStream(microphoneStreamRef.current)
     stopStream(screenStreamRef.current)
     cameraStreamRef.current = null
+    microphoneStreamRef.current = null
     screenStreamRef.current = null
     setCameraStream(null)
     setCameraActive(false)
+    setMicrophoneActive(false)
     setScreenActive(false)
   }, [appendEvent, stopStream])
+
+  const flushEvidence = useCallback(async () => {
+    await evidenceQueueRef.current
+  }, [])
 
   useEffect(() => {
     if (!active || disabled || !config.enabled) return undefined
@@ -223,6 +368,7 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     if (!startedAtRef.current) startedAtRef.current = new Date().toISOString()
     appendEvent('session_started', 'info', 'Bắt đầu phiên giám sát nghiêm ngặt', {
       camera: config.requireCamera,
+      microphone: config.requireMicrophone,
       screen: config.requireScreenShare,
       fullscreen: config.requireFullscreen,
     })
@@ -291,6 +437,7 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     const heartbeat = window.setInterval(() => {
       appendEvent('heartbeat', 'info', 'Thiết bị giám sát đang hoạt động', {
         cameraActive: isTrackActive(cameraStreamRef.current),
+        microphoneActive: isKindActive(microphoneStreamRef.current, 'audio'),
         screenActive: isTrackActive(screenStreamRef.current),
         fullscreenActive: Boolean(document.fullscreenElement),
       })
@@ -309,9 +456,62 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     }
   }, [active, appendEvent, config, disabled, reportViolation])
 
+  useEffect(() => {
+    if (!active || disabled || !config.enabled || !config.detectVoiceActivity) {
+      return undefined
+    }
+    const stream = microphoneStreamRef.current
+    if (!isKindActive(stream, 'audio')) return undefined
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return undefined
+    const audioContext = new AudioContextClass()
+    audioContextRef.current = audioContext
+    const analyser = audioContext.createAnalyser()
+    analyser.fftSize = 512
+    analyser.smoothingTimeConstant = 0.75
+    const source = audioContext.createMediaStreamSource(stream)
+    source.connect(analyser)
+    const samples = new Uint8Array(analyser.fftSize)
+    let voiceStartedAt = 0
+
+    const interval = window.setInterval(() => {
+      analyser.getByteTimeDomainData(samples)
+      let energy = 0
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128
+        energy += normalized * normalized
+      }
+      const rms = Math.sqrt(energy / samples.length)
+      if (rms >= 0.075) {
+        if (!voiceStartedAt) voiceStartedAt = Date.now()
+        if (Date.now() - voiceStartedAt >= 2500) {
+          reportViolation(
+            'voice_activity_suspected',
+            'Nghi vấn có trao đổi bằng giọng nói',
+            { level: Number(rms.toFixed(3)), durationMs: Date.now() - voiceStartedAt },
+            30000,
+          )
+          voiceStartedAt = 0
+        }
+      } else {
+        voiceStartedAt = 0
+      }
+    }, 250)
+
+    return () => {
+      window.clearInterval(interval)
+      source.disconnect()
+      analyser.disconnect()
+      audioContext.close().catch(() => {})
+      if (audioContextRef.current === audioContext) audioContextRef.current = null
+    }
+  }, [active, config.detectVoiceActivity, config.enabled, disabled, reportViolation])
+
   useEffect(() => () => {
     stoppingRef.current = true
     stopStream(cameraStreamRef.current)
+    stopStream(microphoneStreamRef.current)
     stopStream(screenStreamRef.current)
   }, [stopStream])
 
@@ -321,12 +521,14 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     counts: countsRef.current,
     totalViolations: violationsRef.current,
     cameraRequired: config.requireCamera,
+    microphoneRequired: config.requireMicrophone,
     screenRequired: config.requireScreenShare,
     cameraActiveAtSubmit: isTrackActive(cameraStreamRef.current),
+    microphoneActiveAtSubmit: isKindActive(microphoneStreamRef.current, 'audio'),
     screenActiveAtSubmit: isTrackActive(screenStreamRef.current),
     startedAt: startedAtRef.current,
     submittedAt: new Date().toISOString(),
-  }), [config.requireCamera, config.requireScreenShare])
+  }), [config.requireCamera, config.requireMicrophone, config.requireScreenShare])
 
   return {
     config,
@@ -335,6 +537,7 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     permissionError,
     ready,
     cameraActive,
+    microphoneActive,
     screenActive,
     cameraStream,
     monitoringBlocked,
@@ -345,6 +548,7 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     acquireRequiredStreams,
     restoreMonitoring,
     stopMonitoring,
+    flushEvidence,
     getReport,
   }
 }

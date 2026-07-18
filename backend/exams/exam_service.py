@@ -18,6 +18,8 @@ PROCTORING_EVENT_TYPES = {
     "context_menu_blocked",
     "shortcut_blocked",
     "camera_stopped",
+    "microphone_stopped",
+    "voice_activity_suspected",
     "screen_stopped",
     "monitoring_restored",
     "submitted",
@@ -51,8 +53,21 @@ def normalize_proctoring_config(exam_data):
         "blockContextMenu": flag("blockContextMenu", False),
         "blockShortcuts": flag("blockShortcuts", True),
         "requireCamera": flag("requireCamera", False),
+        "requireMicrophone": flag("requireMicrophone", False),
+        "detectVoiceActivity": (
+            flag("detectVoiceActivity", False)
+            and flag("requireMicrophone", False)
+        ),
         "requireScreenShare": flag("requireScreenShare", False),
         "requireEntireScreen": flag("requireEntireScreen", False),
+        "captureCameraEvidence": (
+            flag("captureCameraEvidence", False)
+            and flag("requireCamera", False)
+        ),
+        "captureScreenEvidence": (
+            flag("captureScreenEvidence", False)
+            and flag("requireScreenShare", False)
+        ),
         "autoSubmit": flag("autoSubmit", True),
         "maxViolations": max(1, min(max_violations, 20)),
         "heartbeatSeconds": max(15, min(heartbeat_seconds, 120)),
@@ -77,7 +92,7 @@ def sanitize_proctoring_event(event):
         if isinstance(value, (bool, int, float)) or value is None:
             safe_metadata[safe_key] = value
         else:
-            safe_metadata[safe_key] = str(value)[:160]
+            safe_metadata[safe_key] = str(value)[:320]
 
     return {
         "id": re.sub(r"[^a-zA-Z0-9_-]", "", str(event.get("id", "")))[:80],
@@ -127,12 +142,29 @@ def sanitize_proctoring_report(report):
             1 for event in events if event.get("severity") == "violation"
         ),
         "cameraRequired": bool(report.get("cameraRequired")),
+        "microphoneRequired": bool(report.get("microphoneRequired")),
         "screenRequired": bool(report.get("screenRequired")),
         "cameraActiveAtSubmit": bool(report.get("cameraActiveAtSubmit")),
+        "microphoneActiveAtSubmit": bool(report.get("microphoneActiveAtSubmit")),
         "screenActiveAtSubmit": bool(report.get("screenActiveAtSubmit")),
         "startedAt": str(report.get("startedAt", ""))[:80],
         "submittedAt": str(report.get("submittedAt", ""))[:80],
     }
+
+
+def restrict_evidence_paths(events, exam_id, student_id, session_id):
+    expected_prefix = (
+        f"exam-proctoring/{exam_id}/{student_id}/{session_id}/"
+        if exam_id and student_id and session_id
+        else ""
+    )
+    for event in events:
+        metadata = event.get("metadata", {})
+        for key in ("evidenceCameraPath", "evidenceScreenPath"):
+            path = str(metadata.get(key, ""))
+            if path and (not expected_prefix or not path.startswith(expected_prefix)):
+                metadata.pop(key, None)
+    return events
 
 
 def normalize_role(user):
@@ -672,6 +704,12 @@ def log_proctoring_event(current_user, exam_id, payload):
         raise Exception("Thiếu mã phiên giám sát")
 
     event = sanitize_proctoring_event(payload.get("event"))
+    restrict_evidence_paths(
+        [event],
+        exam_id,
+        current_user.get("uid"),
+        session_id,
+    )
     session_ref = exam_ref.collection("proctoringSessions").document(session_id)
     session_ref.set({
         "sessionId": session_id,
@@ -689,13 +727,18 @@ def log_proctoring_event(current_user, exam_id, payload):
         if event["id"]
         else session_ref.collection("events").document()
     )
+    evidence_update = any(
+        key in event.get("metadata", {})
+        for key in ("evidenceCameraPath", "evidenceScreenPath")
+    )
+    event_already_exists = evidence_update and event_ref.get().exists
     event_ref.set({
         **event,
         "id": event_ref.id,
         "serverAt": firestore.SERVER_TIMESTAMP,
     })
 
-    if event["severity"] == "violation":
+    if event["severity"] == "violation" and not event_already_exists:
         session_ref.set({
             "violationCount": firestore.Increment(1),
         }, merge=True)
@@ -727,6 +770,12 @@ def submit_exam(current_user, exam_id, payload):
     text_answers = payload.get("textAnswers", {})
     fullscreen_violations = int(payload.get("fullscreenViolations", 0) or 0)
     proctoring_report = sanitize_proctoring_report(payload.get("proctoringReport"))
+    restrict_evidence_paths(
+        proctoring_report["events"],
+        exam_id,
+        current_user.get("uid"),
+        proctoring_report["sessionId"],
+    )
 
     questions = get_exam_questions(exam_id)
     scoring = exam_data.get("scoring", get_default_scoring())

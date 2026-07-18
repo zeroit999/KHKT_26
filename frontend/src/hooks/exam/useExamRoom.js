@@ -38,6 +38,7 @@ export default function useExamRoom() {
     permissionError: proctoringError,
     ready: proctoringReady,
     cameraActive,
+    microphoneActive,
     screenActive,
     cameraStream,
     monitoringBlocked,
@@ -46,6 +47,7 @@ export default function useExamRoom() {
     acquireRequiredStreams,
     restoreMonitoring: restoreRequiredStreams,
     stopMonitoring,
+    flushEvidence,
     getReport: getProctoringReport,
   } = useExamProctoring({
     exam,
@@ -125,7 +127,7 @@ export default function useExamRoom() {
 
   const startExam = async () => {
     if (needsDevicePermission && !proctoringReady) {
-      toast.error('Hãy cấp đủ quyền camera và màn hình trước khi bắt đầu')
+      toast.error('Hãy cấp đủ quyền thiết bị giám sát trước khi bắt đầu')
       return
     }
 
@@ -243,6 +245,7 @@ export default function useExamRoom() {
         setSubmitting(true)
 
         if (!preview && !isTeacher) {
+          await flushEvidence()
           const proctoringReport = getProctoringReport()
           await submitExamApi(exam.id, {
             answers,
@@ -288,6 +291,7 @@ export default function useExamRoom() {
       violations,
       navigate,
       getProctoringReport,
+      flushEvidence,
       stopMonitoring,
     ],
   )
@@ -349,6 +353,7 @@ export default function useExamRoom() {
     proctoringError,
     proctoringReady,
     cameraActive,
+    microphoneActive,
     screenActive,
     cameraStream,
 

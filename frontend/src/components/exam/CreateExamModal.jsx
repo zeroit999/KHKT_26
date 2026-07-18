@@ -336,13 +336,26 @@ function CreateExamModal({
   }
 
   const updateProctoring = (key, value) => {
-    setForm((prev) => ({
-      ...prev,
-      proctoring: {
+    setForm((prev) => {
+      const nextProctoring = {
         ...prev.proctoring,
         [key]: value,
-      },
-    }))
+      }
+      if (key === 'requireCamera' && !value) {
+        nextProctoring.captureCameraEvidence = false
+      }
+      if (key === 'requireMicrophone' && !value) {
+        nextProctoring.detectVoiceActivity = false
+      }
+      if (key === 'requireScreenShare' && !value) {
+        nextProctoring.requireEntireScreen = false
+        nextProctoring.captureScreenEvidence = false
+      }
+      return {
+        ...prev,
+        proctoring: nextProctoring,
+      }
+    })
   }
 
   const updateQuestion = (questionIndex, key, value) => {
@@ -1411,7 +1424,7 @@ function CreateExamModal({
                   Giám sát phòng thi nghiêm ngặt
                 </h3>
                 <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-                  Mỗi đề có cấu hình riêng. Camera và chia sẻ màn hình luôn yêu cầu học sinh đồng ý trước khi bắt đầu.
+                  Mỗi đề có cấu hình riêng. Camera, microphone và chia sẻ màn hình luôn yêu cầu học sinh đồng ý trước khi bắt đầu.
                 </p>
               </div>
             </div>
@@ -1439,7 +1452,10 @@ function CreateExamModal({
                 description={description}
                 checked={Boolean(form.proctoring?.[settingKey])}
                 disabled={!form.proctoring?.enabled || (
-                  settingKey === 'requireEntireScreen' && !form.proctoring?.requireScreenShare
+                  (settingKey === 'requireEntireScreen' && !form.proctoring?.requireScreenShare) ||
+                  (settingKey === 'detectVoiceActivity' && !form.proctoring?.requireMicrophone) ||
+                  (settingKey === 'captureCameraEvidence' && !form.proctoring?.requireCamera) ||
+                  (settingKey === 'captureScreenEvidence' && !form.proctoring?.requireScreenShare)
                 )}
                 onChange={(value) => updateProctoring(settingKey, value)}
               />

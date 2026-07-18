@@ -9,6 +9,7 @@ from app import create_app
 from chatbot.service import ChatbotError, _resolve_provider, create_chat_response
 from exams.exam_service import (
     normalize_proctoring_config,
+    restrict_evidence_paths,
     sanitize_proctoring_event,
     sanitize_proctoring_report,
 )
@@ -20,20 +21,65 @@ class ProctoringConfigTest(unittest.TestCase):
             "proctoring": {
                 "enabled": True,
                 "requireCamera": True,
+                "requireMicrophone": True,
+                "detectVoiceActivity": True,
                 "requireScreenShare": True,
+                "captureCameraEvidence": True,
                 "maxViolations": 999,
                 "heartbeatSeconds": 1,
             },
         })
 
         self.assertTrue(config["requireCamera"])
+        self.assertTrue(config["requireMicrophone"])
+        self.assertTrue(config["detectVoiceActivity"])
         self.assertTrue(config["requireScreenShare"])
+        self.assertTrue(config["captureCameraEvidence"])
         self.assertEqual(config["maxViolations"], 20)
         self.assertEqual(config["heartbeatSeconds"], 15)
 
     def test_rejects_unknown_proctoring_event(self):
         with self.assertRaises(Exception):
             sanitize_proctoring_event({"type": "execute_arbitrary_code"})
+
+    def test_evidence_and_voice_features_require_their_devices(self):
+        config = normalize_proctoring_config({
+            "proctoring": {
+                "requireCamera": False,
+                "captureCameraEvidence": True,
+                "requireMicrophone": False,
+                "detectVoiceActivity": True,
+                "requireScreenShare": False,
+                "captureScreenEvidence": True,
+            },
+        })
+
+        self.assertFalse(config["captureCameraEvidence"])
+        self.assertFalse(config["detectVoiceActivity"])
+        self.assertFalse(config["captureScreenEvidence"])
+
+    def test_sanitizes_voice_event_evidence_path(self):
+        path = "exam-proctoring/exam/student/session/event-camera.webp"
+        event = sanitize_proctoring_event({
+            "id": "voice-event",
+            "type": "voice_activity_suspected",
+            "severity": "violation",
+            "metadata": {"evidenceCameraPath": path},
+        })
+
+        self.assertEqual(event["metadata"]["evidenceCameraPath"], path)
+
+    def test_rejects_evidence_from_another_student_path(self):
+        events = [{
+            "metadata": {
+                "evidenceCameraPath": "exam-proctoring/exam/other/session/file.webp",
+                "evidenceScreenPath": "exam-proctoring/exam/student/session/file.webp",
+            },
+        }]
+
+        restrict_evidence_paths(events, "exam", "student", "session")
+        self.assertNotIn("evidenceCameraPath", events[0]["metadata"])
+        self.assertIn("evidenceScreenPath", events[0]["metadata"])
 
     def test_sanitize_report_counts_only_valid_violations(self):
         report = sanitize_proctoring_report({

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Camera, Clock3, MonitorUp, ShieldAlert, X } from 'lucide-react'
+import { Camera, Clock3, ImageIcon, Mic, MonitorUp, ShieldAlert, X } from 'lucide-react'
+import { getDownloadURL, ref as storageRef } from 'firebase/storage'
 import toast from 'react-hot-toast'
 
 import StudentAnswers from './StudentAnswers.jsx'
 import { getStudentDisplayName } from '../../utils/examHelpers'
 import { getExamDetailApi, getExamResultsApi } from '../../api/examApi'
+import { storage } from '../firebase.js'
 
 const eventLabels = {
   session_started: 'Bắt đầu giám sát',
@@ -17,9 +19,42 @@ const eventLabels = {
   context_menu_blocked: 'Chuột phải bị chặn',
   shortcut_blocked: 'Phím tắt bị chặn',
   camera_stopped: 'Camera bị tắt',
+  microphone_stopped: 'Microphone bị tắt',
+  voice_activity_suspected: 'Nghi vấn trao đổi bằng giọng nói',
   screen_stopped: 'Chia sẻ màn hình dừng',
   monitoring_restored: 'Khôi phục giám sát',
   submitted: 'Kết thúc và nộp bài',
+}
+
+function EvidenceThumbnail({ path, label }) {
+  const [url, setUrl] = useState('')
+
+  useEffect(() => {
+    let active = true
+    getDownloadURL(storageRef(storage, path))
+      .then((value) => {
+        if (active) setUrl(value)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [path])
+
+  if (!url) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-500 dark:bg-white/10 dark:text-slate-300">
+        <ImageIcon className="h-3.5 w-3.5" /> Đang tải {label}
+      </span>
+    )
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="group block overflow-hidden rounded-xl border border-red-200 bg-slate-950">
+      <img src={url} alt={`Bằng chứng ${label}`} className="h-28 w-full object-cover transition group-hover:scale-105" />
+      <span className="block px-2 py-1 text-center text-[11px] font-black text-white">{label}</span>
+    </a>
+  )
 }
 
 function ProctoringReport({ result }) {
@@ -56,6 +91,11 @@ function ProctoringReport({ result }) {
               <MonitorUp className="mr-1 inline h-3.5 w-3.5" /> Màn hình
             </span>
           )}
+          {report.microphoneRequired && (
+            <span className={`rounded-full px-3 py-1.5 ${report.microphoneActiveAtSubmit ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              <Mic className="mr-1 inline h-3.5 w-3.5" /> Microphone
+            </span>
+          )}
         </div>
       </div>
 
@@ -73,6 +113,16 @@ function ProctoringReport({ result }) {
             <div className="min-w-0 flex-1">
               <p className="font-black">{eventLabels[event.type] || event.type}</p>
               <p className="mt-0.5 text-xs font-semibold opacity-80">{event.message}</p>
+              {(event.metadata?.evidenceCameraPath || event.metadata?.evidenceScreenPath) && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {event.metadata?.evidenceCameraPath && (
+                    <EvidenceThumbnail path={event.metadata.evidenceCameraPath} label="Ảnh camera" />
+                  )}
+                  {event.metadata?.evidenceScreenPath && (
+                    <EvidenceThumbnail path={event.metadata.evidenceScreenPath} label="Ảnh màn hình" />
+                  )}
+                </div>
+              )}
             </div>
             <time className="shrink-0 text-[11px] font-bold opacity-70">
               {event.clientAt || event.at

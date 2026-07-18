@@ -5,6 +5,7 @@ import {
   Clock3,
   LockKeyhole,
   Maximize2,
+  Mic,
   MonitorUp,
   ShieldAlert,
 } from 'lucide-react'
@@ -46,6 +47,7 @@ function ExamRoom() {
     proctoringError,
     proctoringReady,
     cameraActive,
+    microphoneActive,
     screenActive,
     cameraStream,
 
@@ -119,7 +121,9 @@ function ExamRoom() {
             {[
               [proctoringConfig.requireFullscreen, 'Toàn màn hình', Maximize2],
               [proctoringConfig.requireCamera, 'Camera', Camera],
+              [proctoringConfig.requireMicrophone, 'Microphone (không ghi âm)', Mic],
               [proctoringConfig.requireScreenShare, 'Chia sẻ màn hình', MonitorUp],
+              [proctoringConfig.captureCameraEvidence || proctoringConfig.captureScreenEvidence, 'Ảnh khi có vi phạm', Camera],
               [proctoringConfig.detectTabSwitch, 'Phát hiện rời tab', ShieldAlert],
               [proctoringConfig.blockClipboard, 'Chặn copy/paste', LockKeyhole],
               [proctoringConfig.blockShortcuts, 'Chặn phím tắt rủi ro', LockKeyhole],
@@ -170,7 +174,7 @@ function ExamRoom() {
           )}
 
           <p className="mt-4 text-xs font-semibold leading-5 text-slate-400">
-            Camera và màn hình chỉ được truy cập sau khi Bạn chủ động cấp quyền. Nhật ký vi phạm được gửi cho giáo viên phụ trách đề thi.
+            Camera, microphone và màn hình chỉ được truy cập sau khi Bạn chủ động cấp quyền. Microphone chỉ phân tích mức âm thanh, không ghi âm. Ảnh chỉ được chụp khi có dấu hiệu vi phạm.
           </p>
         </div>
       </section>
@@ -251,6 +255,13 @@ function ExamRoom() {
               <div className={`rounded-2xl px-4 py-3 text-sm font-black ${screenActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                 <MonitorUp className="mr-2 inline h-4 w-4" />
                 Screen {screenActive ? 'ON' : 'OFF'}
+              </div>
+            )}
+
+            {proctoringConfig.requireMicrophone && (
+              <div className={`rounded-2xl px-4 py-3 text-sm font-black ${microphoneActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                <Mic className="mr-2 inline h-4 w-4" />
+                Mic {microphoneActive ? 'ON' : 'OFF'}
               </div>
             )}
 
