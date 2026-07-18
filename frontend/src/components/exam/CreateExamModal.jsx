@@ -2,11 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   BookOpenCheck,
+  Camera,
   CalendarClock,
+  ClipboardX,
   FileText,
   GraduationCap,
   Loader2,
+  MonitorUp,
+  MousePointer2,
   Plus,
+  ScanEye,
+  ShieldAlert,
   ShieldCheck,
   Trash2,
   Upload,
@@ -19,6 +25,12 @@ import RichEditor from './RichEditor.jsx'
 import DarkModeSelect from './DarkModeSelect.jsx'
 
 import { parseWordExamApi } from '../../api/examApi'
+import {
+  LEGACY_PROCTORING_CONFIG,
+  PROCTORING_SETTING_ITEMS,
+  STRICT_PROCTORING_CONFIG,
+  normalizeProctoringConfig,
+} from '../../utils/proctoringConfig.js'
 
 import {
   addMinutesToDateTime,
@@ -49,6 +61,51 @@ const defaultScoring = {
   part3: {
     perQuestion: '',
   },
+}
+
+const proctoringIcons = {
+  requireFullscreen: MonitorUp,
+  detectTabSwitch: ScanEye,
+  detectWindowBlur: ScanEye,
+  blockClipboard: ClipboardX,
+  blockContextMenu: MousePointer2,
+  blockShortcuts: ShieldAlert,
+  requireCamera: Camera,
+  requireScreenShare: MonitorUp,
+  requireEntireScreen: MonitorUp,
+  autoSubmit: ShieldAlert,
+}
+
+function ProctoringToggle({ settingKey, title, description, checked, onChange, disabled }) {
+  const Icon = proctoringIcons[settingKey] || ShieldCheck
+
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`flex w-full items-start justify-between gap-4 rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked
+          ? 'border-red-300 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10'
+          : 'border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900'
+      }`}
+    >
+      <span className="flex min-w-0 items-start gap-3">
+        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-white/10'}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <span>
+          <span className="block text-sm font-black text-slate-900 dark:text-white">{title}</span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{description}</span>
+        </span>
+      </span>
+
+      <span className={`mt-1 flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition ${checked ? 'bg-red-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+        <span className={`h-4 w-4 rounded-full bg-white shadow transition ${checked ? 'translate-x-5' : ''}`} />
+      </span>
+    </button>
+  )
 }
 
 function CreateExamModal({
@@ -114,6 +171,7 @@ function CreateExamModal({
     scoring: defaultScoring,
     wordFileName: '',
     maxFullscreenViolations: 2,
+    proctoring: { ...STRICT_PROCTORING_CONFIG },
     questions: [createQuestionWithSection('part1')],
   })
 
@@ -226,6 +284,10 @@ function CreateExamModal({
         },
         wordFileName: editingExam.wordFileName ?? '',
         maxFullscreenViolations: Number(editingExam.maxFullscreenViolations ?? 2),
+        proctoring: normalizeProctoringConfig(
+          editingExam,
+          LEGACY_PROCTORING_CONFIG,
+        ),
         questions: existingQuestions,
       })
     } else {
@@ -248,6 +310,7 @@ function CreateExamModal({
         scoring: defaultScoring,
         wordFileName: '',
         maxFullscreenViolations: 2,
+        proctoring: { ...STRICT_PROCTORING_CONFIG },
         questions: [createQuestionWithSection('part1')],
       })
     }
@@ -268,6 +331,16 @@ function CreateExamModal({
           ...prev.scoring[part],
           [key]: value,
         },
+      },
+    }))
+  }
+
+  const updateProctoring = (key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      proctoring: {
+        ...prev.proctoring,
+        [key]: value,
       },
     }))
   }
@@ -554,7 +627,11 @@ function CreateExamModal({
           perQuestion: Number(form.scoring.part3.perQuestion || 0),
         },
       },
-      maxFullscreenViolations: Number(form.maxFullscreenViolations ?? 2),
+      maxFullscreenViolations: Number(form.proctoring?.maxViolations ?? 2),
+      proctoring: normalizeProctoringConfig(
+        form.proctoring,
+        STRICT_PROCTORING_CONFIG,
+      ),
     })
   }
 
@@ -1307,16 +1384,96 @@ function CreateExamModal({
 
             <div>
               <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Số lần được thoát toàn màn hình
+                Ngưỡng tổng vi phạm
               </label>
               <input
                 type="number"
-                min={0}
-                value={form.maxFullscreenViolations ?? 2}
+                min={1}
+                max={20}
+                value={form.proctoring?.maxViolations ?? 3}
                 onChange={(event) =>
-                  updateForm('maxFullscreenViolations', Number(event.target.value || 0))
+                  updateProctoring('maxViolations', Number(event.target.value || 1))
                 }
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 to-orange-50 p-5 dark:border-red-500/20 dark:from-red-500/10 dark:to-orange-500/5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-600 text-white shadow-lg shadow-red-500/20">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-950 dark:text-white">
+                  Giám sát phòng thi nghiêm ngặt
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+                  Mỗi đề có cấu hình riêng. Camera và chia sẻ màn hình luôn yêu cầu học sinh đồng ý trước khi bắt đầu.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              aria-pressed={Boolean(form.proctoring?.enabled)}
+              onClick={() => updateProctoring('enabled', !form.proctoring?.enabled)}
+              className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+                form.proctoring?.enabled
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-500/20'
+                  : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+              }`}
+            >
+              {form.proctoring?.enabled ? 'Đang bật giám sát' : 'Đã tắt giám sát'}
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {PROCTORING_SETTING_ITEMS.map(([settingKey, title, description]) => (
+              <ProctoringToggle
+                key={settingKey}
+                settingKey={settingKey}
+                title={title}
+                description={description}
+                checked={Boolean(form.proctoring?.[settingKey])}
+                disabled={!form.proctoring?.enabled || (
+                  settingKey === 'requireEntireScreen' && !form.proctoring?.requireScreenShare
+                )}
+                onChange={(value) => updateProctoring(settingKey, value)}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4 rounded-2xl border border-red-200 bg-white/80 p-4 sm:grid-cols-2 dark:border-red-500/20 dark:bg-slate-950/50">
+            <div>
+              <label className="text-sm font-black text-slate-800 dark:text-slate-100">
+                Tự nộp sau số vi phạm
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                disabled={!form.proctoring?.enabled}
+                value={form.proctoring?.maxViolations ?? 3}
+                onChange={(event) => updateProctoring('maxViolations', Number(event.target.value || 1))}
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-800 outline-none focus:border-red-500 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-black text-slate-800 dark:text-slate-100">
+                Chu kỳ kiểm tra thiết bị
+              </label>
+              <DarkModeSelect
+                value={String(form.proctoring?.heartbeatSeconds ?? 30)}
+                onChange={(value) => updateProctoring('heartbeatSeconds', Number(value))}
+                options={[
+                  { value: '15', label: '15 giây (rất nghiêm)' },
+                  { value: '30', label: '30 giây' },
+                  { value: '60', label: '60 giây' },
+                ]}
               />
             </div>
           </div>
@@ -1469,4 +1626,4 @@ function CreateExamModal({
   )
 }
 
-export default CreateExamModal  
+export default CreateExamModal

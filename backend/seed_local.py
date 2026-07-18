@@ -126,6 +126,22 @@ def seed():
         "totalScore": 10,
         "shuffleQuestions": False,
         "shuffleAnswers": False,
+        "proctoring": {
+            "enabled": True,
+            "requireFullscreen": True,
+            "detectTabSwitch": True,
+            "detectWindowBlur": True,
+            "blockClipboard": True,
+            "blockContextMenu": True,
+            "blockShortcuts": True,
+            "requireCamera": True,
+            "requireScreenShare": True,
+            "requireEntireScreen": True,
+            "autoSubmit": True,
+            "maxViolations": 3,
+            "heartbeatSeconds": 30,
+        },
+        "maxFullscreenViolations": 3,
         "isLocalDemo": True,
     }, merge=True)
     exam_ref.collection("questions").document("local-q-001").set({

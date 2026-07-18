@@ -7,6 +7,47 @@ os.environ.setdefault("CHATBOT_PROVIDER", "mock")
 
 from app import create_app
 from chatbot.service import ChatbotError, _resolve_provider, create_chat_response
+from exams.exam_service import (
+    normalize_proctoring_config,
+    sanitize_proctoring_event,
+    sanitize_proctoring_report,
+)
+
+
+class ProctoringConfigTest(unittest.TestCase):
+    def test_normalize_proctoring_config_clamps_limits(self):
+        config = normalize_proctoring_config({
+            "proctoring": {
+                "enabled": True,
+                "requireCamera": True,
+                "requireScreenShare": True,
+                "maxViolations": 999,
+                "heartbeatSeconds": 1,
+            },
+        })
+
+        self.assertTrue(config["requireCamera"])
+        self.assertTrue(config["requireScreenShare"])
+        self.assertEqual(config["maxViolations"], 20)
+        self.assertEqual(config["heartbeatSeconds"], 15)
+
+    def test_rejects_unknown_proctoring_event(self):
+        with self.assertRaises(Exception):
+            sanitize_proctoring_event({"type": "execute_arbitrary_code"})
+
+    def test_sanitize_report_counts_only_valid_violations(self):
+        report = sanitize_proctoring_report({
+            "sessionId": "session/unsafe",
+            "events": [
+                {"id": "1", "type": "window_blur", "severity": "violation"},
+                {"id": "2", "type": "heartbeat", "severity": "info"},
+                {"id": "3", "type": "unknown", "severity": "violation"},
+            ],
+        })
+
+        self.assertEqual(report["sessionId"], "sessionunsafe")
+        self.assertEqual(report["totalViolations"], 1)
+        self.assertEqual(len(report["events"]), 2)
 
 
 class ChatbotServiceTest(unittest.TestCase):

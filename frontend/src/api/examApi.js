@@ -18,6 +18,9 @@ export const deleteExamApi = (examId) =>
 export const submitExamApi = (examId, payload) =>
   apiClient.post(`/exams/${examId}/submit`, payload)
 
+export const logExamProctoringEventApi = (examId, payload) =>
+  apiClient.post(`/exams/${examId}/proctoring/events`, payload)
+
 export const getMyExamResultApi = (examId) =>
   apiClient.get(`/exams/${examId}/my-result`)
 

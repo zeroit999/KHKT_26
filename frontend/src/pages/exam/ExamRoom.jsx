@@ -1,10 +1,14 @@
 import {
   AlertTriangle,
+  Camera,
   CheckCircle2,
   Clock3,
   LockKeyhole,
   Maximize2,
+  MonitorUp,
+  ShieldAlert,
 } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 
 import useExamRoom from '../../hooks/exam/useExamRoom'
 
@@ -35,6 +39,15 @@ function ExamRoom() {
     isTeacher,
     hasStarted,
     fullscreenBlocked,
+    blockingReason,
+    proctoringConfig,
+    needsDevicePermission,
+    preparingProctoring,
+    proctoringError,
+    proctoringReady,
+    cameraActive,
+    screenActive,
+    cameraStream,
 
     answers,
     textAnswers,
@@ -46,12 +59,21 @@ function ExamRoom() {
     formatTime,
 
     startExam,
+    prepareExamMonitoring,
     restoreFullscreen,
     handleAnswer,
     handleTrueFalseAnswer,
     handleTextAnswer,
     handleSubmit,
   } = useExamRoom()
+
+  const cameraPreviewRef = useRef(null)
+
+  useEffect(() => {
+    if (cameraPreviewRef.current) {
+      cameraPreviewRef.current.srcObject = cameraStream || null
+    }
+  }, [cameraStream])
 
   const lockedByFullscreen = fullscreenBlocked && !preview && !isTeacher
 
@@ -79,8 +101,8 @@ function ExamRoom() {
     return (
       <section className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
         <div className="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-xl">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-600 text-white shadow-lg shadow-blue-500/25">
-            <Maximize2 className="h-10 w-10" />
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-red-600 text-white shadow-lg shadow-red-500/25">
+            <ShieldAlert className="h-10 w-10" />
           </div>
 
           <h1 className="mt-6 text-3xl font-black text-slate-950">
@@ -88,23 +110,68 @@ function ExamRoom() {
           </h1>
 
           <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
-            Bài thi yêu cầu chế độ toàn màn hình. Khi bắt đầu, hệ thống sẽ ghi
-            nhận số lần thoát toàn màn hình.
+            {proctoringConfig.enabled
+              ? 'Bài thi sử dụng giám sát theo cấu hình của giáo viên. Bạn phải hoàn tất kiểm tra thiết bị trước khi bắt đầu.'
+              : 'Bài thi này không bật hệ thống giám sát nâng cao.'}
           </p>
 
-          <div className="mt-6 rounded-2xl bg-orange-50 p-4 text-left text-sm font-bold text-orange-700">
-            <p>• Không thoát khỏi chế độ toàn màn hình</p>
-            <p>• Quá số lần thoát cho phép sẽ tự động nộp bài</p>
-            <p>• Hệ thống tự động nộp khi hết giờ</p>
+          <div className="mt-6 grid gap-3 text-left sm:grid-cols-2">
+            {[
+              [proctoringConfig.requireFullscreen, 'Toàn màn hình', Maximize2],
+              [proctoringConfig.requireCamera, 'Camera', Camera],
+              [proctoringConfig.requireScreenShare, 'Chia sẻ màn hình', MonitorUp],
+              [proctoringConfig.detectTabSwitch, 'Phát hiện rời tab', ShieldAlert],
+              [proctoringConfig.blockClipboard, 'Chặn copy/paste', LockKeyhole],
+              [proctoringConfig.blockShortcuts, 'Chặn phím tắt rủi ro', LockKeyhole],
+            ].filter(([enabled]) => enabled).map(([, label, Icon]) => (
+              <div key={label} className="flex items-center gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
+                <Icon className="h-5 w-5" />
+                {label}
+              </div>
+            ))}
           </div>
 
-          <button
-            type="button"
-            onClick={startExam}
-            className="mt-7 w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700"
-          >
-            Bắt đầu làm bài
-          </button>
+          {cameraActive && (
+            <div className="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-slate-950 p-2">
+              <video
+                ref={cameraPreviewRef}
+                autoPlay
+                muted
+                playsInline
+                className="mx-auto aspect-video max-h-48 w-full rounded-xl object-cover"
+              />
+              <p className="mt-2 text-xs font-black text-emerald-300">Camera đang hoạt động</p>
+            </div>
+          )}
+
+          {proctoringError && (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+              {proctoringError}
+            </div>
+          )}
+
+          {needsDevicePermission && !proctoringReady ? (
+            <button
+              type="button"
+              onClick={prepareExamMonitoring}
+              disabled={preparingProctoring}
+              className="mt-7 w-full rounded-2xl bg-red-600 px-6 py-4 text-lg font-black text-white shadow-lg shadow-red-500/25 transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+            >
+              {preparingProctoring ? 'Đang kiểm tra thiết bị...' : 'Cấp quyền và kiểm tra thiết bị'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startExam}
+              className="mt-7 w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700"
+            >
+              Bắt đầu làm bài
+            </button>
+          )}
+
+          <p className="mt-4 text-xs font-semibold leading-5 text-slate-400">
+            Camera và màn hình chỉ được truy cập sau khi Bạn chủ động cấp quyền. Nhật ký vi phạm được gửi cho giáo viên phụ trách đề thi.
+          </p>
         </div>
       </section>
     )
@@ -120,16 +187,15 @@ function ExamRoom() {
             </div>
 
             <h2 className="mt-6 text-3xl font-black text-slate-950">
-              Bạn đã thoát toàn màn hình
+              Giám sát phòng thi bị gián đoạn
             </h2>
 
             <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
-              Hệ thống đã ghi nhận vi phạm. Bạn phải quay lại toàn màn hình mới
-              được tiếp tục làm bài.
+              {blockingReason || 'Hệ thống đã ghi nhận vi phạm. Bạn phải khôi phục giám sát mới được tiếp tục làm bài.'}
             </p>
 
             <div className="mt-6 rounded-2xl bg-red-50 p-4 text-sm font-black text-red-700">
-              Vi phạm: {violations}/{exam.maxFullscreenViolations ?? 2}
+              Vi phạm: {violations}/{proctoringConfig.maxViolations}
             </div>
 
             <button
@@ -137,7 +203,7 @@ function ExamRoom() {
               onClick={restoreFullscreen}
               className="mt-7 w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-700"
             >
-              Quay lại toàn màn hình
+              Khôi phục giám sát
             </button>
           </div>
         </div>
@@ -171,8 +237,22 @@ function ExamRoom() {
             </div>
 
             <div className="rounded-2xl bg-red-100 px-5 py-3 font-black text-red-600">
-              Vi phạm: {violations}/{exam.maxFullscreenViolations ?? 2}
+              Vi phạm: {violations}/{proctoringConfig.maxViolations}
             </div>
+
+            {proctoringConfig.requireCamera && (
+              <div className={`rounded-2xl px-4 py-3 text-sm font-black ${cameraActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                <Camera className="mr-2 inline h-4 w-4" />
+                Camera {cameraActive ? 'ON' : 'OFF'}
+              </div>
+            )}
+
+            {proctoringConfig.requireScreenShare && (
+              <div className={`rounded-2xl px-4 py-3 text-sm font-black ${screenActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                <MonitorUp className="mr-2 inline h-4 w-4" />
+                Screen {screenActive ? 'ON' : 'OFF'}
+              </div>
+            )}
 
             {!preview && !isTeacher && (
               <button
@@ -347,8 +427,11 @@ function ExamRoom() {
                 </h3>
 
                 <ul className="mt-4 space-y-2 text-lg font-semibold text-orange-600">
-                  <li>• Không thoát khỏi chế độ toàn màn hình</li>
-                  <li>• Quá số lần thoát cho phép sẽ tự động nộp bài</li>
+                  {proctoringConfig.requireFullscreen && <li>• Không thoát khỏi chế độ toàn màn hình</li>}
+                  {proctoringConfig.detectTabSwitch && <li>• Không chuyển tab, thu nhỏ hoặc Alt-Tab</li>}
+                  {proctoringConfig.blockClipboard && <li>• Copy, cut và paste bị chặn và ghi log</li>}
+                  {(proctoringConfig.requireCamera || proctoringConfig.requireScreenShare) && <li>• Không tắt camera hoặc dừng chia sẻ màn hình</li>}
+                  <li>• Ngưỡng vi phạm: {proctoringConfig.maxViolations}</li>
                   <li>• Hệ thống sẽ tự động nộp khi hết giờ</li>
                   <li>• Kiểm tra kỹ trước khi nộp bài</li>
                 </ul>

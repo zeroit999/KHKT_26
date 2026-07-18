@@ -314,7 +314,10 @@ export default function useExams() {
       scorePerQuestion,
       scoring: exam.scoring ?? {},
       wordFileName: exam.wordFileName ?? '',
-      maxFullscreenViolations: Number(exam.maxFullscreenViolations ?? 2),
+      maxFullscreenViolations: Number(
+        exam.proctoring?.maxViolations ?? exam.maxFullscreenViolations ?? 2,
+      ),
+      proctoring: exam.proctoring ?? {},
       questions,
     }
   }

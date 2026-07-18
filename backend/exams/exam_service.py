@@ -1,8 +1,138 @@
+import re
+
 from firebase_admin import firestore
 
 from exams.exam_scoring import calculate_exam_score
 
 db = firestore.client()
+
+
+PROCTORING_EVENT_TYPES = {
+    "session_started",
+    "heartbeat",
+    "permissions_granted",
+    "visibility_hidden",
+    "window_blur",
+    "fullscreen_exit",
+    "clipboard_blocked",
+    "context_menu_blocked",
+    "shortcut_blocked",
+    "camera_stopped",
+    "screen_stopped",
+    "monitoring_restored",
+    "submitted",
+}
+
+
+def normalize_proctoring_config(exam_data):
+    source = exam_data.get("proctoring") or {}
+    legacy_limit = exam_data.get("maxFullscreenViolations", 2)
+
+    def flag(name, default):
+        value = source.get(name)
+        return default if value is None else bool(value)
+
+    try:
+        max_violations = int(source.get("maxViolations", legacy_limit) or 2)
+    except (TypeError, ValueError):
+        max_violations = 2
+
+    try:
+        heartbeat_seconds = int(source.get("heartbeatSeconds", 30) or 30)
+    except (TypeError, ValueError):
+        heartbeat_seconds = 30
+
+    return {
+        "enabled": flag("enabled", True),
+        "requireFullscreen": flag("requireFullscreen", True),
+        "detectTabSwitch": flag("detectTabSwitch", False),
+        "detectWindowBlur": flag("detectWindowBlur", False),
+        "blockClipboard": flag("blockClipboard", False),
+        "blockContextMenu": flag("blockContextMenu", False),
+        "blockShortcuts": flag("blockShortcuts", True),
+        "requireCamera": flag("requireCamera", False),
+        "requireScreenShare": flag("requireScreenShare", False),
+        "requireEntireScreen": flag("requireEntireScreen", False),
+        "autoSubmit": flag("autoSubmit", True),
+        "maxViolations": max(1, min(max_violations, 20)),
+        "heartbeatSeconds": max(15, min(heartbeat_seconds, 120)),
+    }
+
+
+def sanitize_proctoring_event(event):
+    event = event if isinstance(event, dict) else {}
+    event_type = str(event.get("type", ""))[:50]
+    if event_type not in PROCTORING_EVENT_TYPES:
+        raise Exception("Loại sự kiện giám sát không hợp lệ")
+
+    metadata = event.get("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    safe_metadata = {}
+    for key, value in list(metadata.items())[:12]:
+        safe_key = re.sub(r"[^a-zA-Z0-9_-]", "", str(key))[:40]
+        if not safe_key:
+            continue
+        if isinstance(value, (bool, int, float)) or value is None:
+            safe_metadata[safe_key] = value
+        else:
+            safe_metadata[safe_key] = str(value)[:160]
+
+    return {
+        "id": re.sub(r"[^a-zA-Z0-9_-]", "", str(event.get("id", "")))[:80],
+        "type": event_type,
+        "severity": "violation" if event.get("severity") == "violation" else "info",
+        "message": str(event.get("message", ""))[:300],
+        "clientAt": str(event.get("at", ""))[:80],
+        "metadata": safe_metadata,
+    }
+
+
+def sanitize_proctoring_report(report):
+    report = report if isinstance(report, dict) else {}
+    events = []
+    raw_events = report.get("events", [])
+    if not isinstance(raw_events, list):
+        raw_events = []
+    for event in raw_events[:250]:
+        try:
+            events.append(sanitize_proctoring_event(event))
+        except Exception:
+            continue
+
+    counts = report.get("counts", {})
+    if not isinstance(counts, dict):
+        counts = {}
+
+    safe_counts = {}
+    for key, value in list(counts.items())[:20]:
+        safe_key = re.sub(r"[^a-zA-Z0-9_-]", "", str(key))[:40]
+        try:
+            safe_counts[safe_key] = max(0, int(value))
+        except (TypeError, ValueError):
+            continue
+
+    session_id = re.sub(
+        r"[^a-zA-Z0-9_-]",
+        "",
+        str(report.get("sessionId", "")),
+    )[:80]
+
+    return {
+        "sessionId": session_id,
+        "events": events,
+        "counts": safe_counts,
+        "totalViolations": sum(
+            1 for event in events if event.get("severity") == "violation"
+        ),
+        "cameraRequired": bool(report.get("cameraRequired")),
+        "screenRequired": bool(report.get("screenRequired")),
+        "cameraActiveAtSubmit": bool(report.get("cameraActiveAtSubmit")),
+        "screenActiveAtSubmit": bool(report.get("screenActiveAtSubmit")),
+        "startedAt": str(report.get("startedAt", ""))[:80],
+        "submittedAt": str(report.get("submittedAt", ""))[:80],
+    }
 
 
 def normalize_role(user):
@@ -382,6 +512,8 @@ def create_exam(current_user, payload):
 
     questions = payload.pop("questions", [])
     scoring = payload.get("scoring", get_default_scoring())
+    payload["proctoring"] = normalize_proctoring_config(payload)
+    payload["maxFullscreenViolations"] = payload["proctoring"]["maxViolations"]
 
     exam_data = {
         **payload,
@@ -438,6 +570,9 @@ def update_exam(current_user, exam_id, payload):
     assert_exam_owner_or_admin(current_user, exam_data)
 
     questions = payload.pop("questions", None)
+    if "proctoring" in payload or "maxFullscreenViolations" in payload:
+        payload["proctoring"] = normalize_proctoring_config(payload)
+        payload["maxFullscreenViolations"] = payload["proctoring"]["maxViolations"]
 
     exam_update_data = {
         **payload,
@@ -510,6 +645,67 @@ def delete_exam(current_user, exam_id):
     }
 
 
+def log_proctoring_event(current_user, exam_id, payload):
+    current_user = hydrate_current_user(current_user)
+    if not is_student(current_user):
+        raise Exception("Chỉ học sinh mới gửi được sự kiện giám sát")
+
+    exam_ref = db.collection("exams").document(exam_id)
+    exam_doc = exam_ref.get()
+    if not exam_doc.exists:
+        raise Exception("Không tìm thấy bài thi")
+
+    exam_data = exam_doc.to_dict() or {}
+    if not can_student_view_exam(current_user, exam_data):
+        raise Exception("Bạn không có quyền làm bài thi này")
+
+    config = normalize_proctoring_config(exam_data)
+    if not config["enabled"]:
+        raise Exception("Đề thi này không bật giám sát")
+
+    session_id = re.sub(
+        r"[^a-zA-Z0-9_-]",
+        "",
+        str(payload.get("sessionId", "")),
+    )[:80]
+    if not session_id:
+        raise Exception("Thiếu mã phiên giám sát")
+
+    event = sanitize_proctoring_event(payload.get("event"))
+    session_ref = exam_ref.collection("proctoringSessions").document(session_id)
+    session_ref.set({
+        "sessionId": session_id,
+        "studentId": current_user.get("uid"),
+        "studentEmail": current_user.get("email"),
+        "studentName": current_user.get("name") or current_user.get("fullName"),
+        "status": "active",
+        "config": config,
+        "lastSeenAt": firestore.SERVER_TIMESTAMP,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }, merge=True)
+
+    event_ref = (
+        session_ref.collection("events").document(event["id"])
+        if event["id"]
+        else session_ref.collection("events").document()
+    )
+    event_ref.set({
+        **event,
+        "id": event_ref.id,
+        "serverAt": firestore.SERVER_TIMESTAMP,
+    })
+
+    if event["severity"] == "violation":
+        session_ref.set({
+            "violationCount": firestore.Increment(1),
+        }, merge=True)
+
+    return {
+        "success": True,
+        "eventId": event_ref.id,
+    }
+
+
 def submit_exam(current_user, exam_id, payload):
     current_user = hydrate_current_user(current_user)
 
@@ -530,6 +726,7 @@ def submit_exam(current_user, exam_id, payload):
     answers = payload.get("answers", {})
     text_answers = payload.get("textAnswers", {})
     fullscreen_violations = int(payload.get("fullscreenViolations", 0) or 0)
+    proctoring_report = sanitize_proctoring_report(payload.get("proctoringReport"))
 
     questions = get_exam_questions(exam_id)
     scoring = exam_data.get("scoring", get_default_scoring())
@@ -567,12 +764,24 @@ def submit_exam(current_user, exam_id, payload):
         "answers": answers,
         "textAnswers": text_answers,
         "fullscreenViolations": fullscreen_violations,
+        "proctoringViolations": proctoring_report["totalViolations"],
+        "proctoringReport": proctoring_report,
         "scoring": scoring,
         **score_data,
         "createdAt": firestore.SERVER_TIMESTAMP,
     }
 
     result_ref.set(result_data)
+
+    if proctoring_report["sessionId"]:
+        exam_ref.collection("proctoringSessions").document(
+            proctoring_report["sessionId"]
+        ).set({
+            "status": "submitted",
+            "resultId": result_ref.id,
+            "submittedAt": firestore.SERVER_TIMESTAMP,
+            "violationCount": proctoring_report["totalViolations"],
+        }, merge=True)
 
     attempt_ref.set({
         "studentId": current_user.get("uid"),
