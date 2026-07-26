@@ -20,7 +20,6 @@ import {
   auth,
   db,
 } from '../components/firebase'
-
 const AuthContext =
   createContext()
 
@@ -310,6 +309,8 @@ export function AuthProvider({
   )
 }
 
+// Hook và provider cùng file để giữ API hiện tại của dự án.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(
     AuthContext

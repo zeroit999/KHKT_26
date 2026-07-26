@@ -2,10 +2,12 @@ import jwt
 import json
 import datetime
 import logging
+import os
 from functools import wraps
 
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials, firestore
+from google.auth.credentials import AnonymousCredentials
 from flask import request, jsonify
 
 try:
@@ -30,9 +32,25 @@ except ImportError:
 # FIREBASE ADMIN INIT
 # =========================
 
-if not firebase_admin._apps:
+class EmulatorCredential(credentials.Base):
+    def get_credential(self):
+        return AnonymousCredentials()
 
-    if Config.FIREBASE_SERVICE_ACCOUNT:
+
+if not firebase_admin._apps:
+    if Config.LOCAL_DEV_MODE:
+        firebase_admin.initialize_app(EmulatorCredential(), options={
+            "projectId": os.environ.get("FIREBASE_PROJECT_ID", "zuny-local"),
+            "storageBucket": os.environ.get(
+                "FIREBASE_STORAGE_BUCKET",
+                "zuny-local.appspot.com",
+            ),
+            "databaseURL": os.environ.get(
+                "FIREBASE_DATABASE_URL",
+                "http://127.0.0.1:9000?ns=zuny-local",
+            ),
+        })
+    elif Config.FIREBASE_SERVICE_ACCOUNT:
         cred_dict = json.loads(
             Config.FIREBASE_SERVICE_ACCOUNT
         )
@@ -46,7 +64,8 @@ if not firebase_admin._apps:
             Config.FIREBASE_ADMIN_KEY_PATH
         )
 
-    firebase_admin.initialize_app(cred)
+    if not Config.LOCAL_DEV_MODE:
+        firebase_admin.initialize_app(cred)
 
 
 db = firestore.client()

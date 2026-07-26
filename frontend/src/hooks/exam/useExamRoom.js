@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 import { getExamDetailApi, submitExamApi } from '../../api/examApi'
+import useExamProctoring from './useExamProctoring.js'
 
 export default function useExamRoom() {
   const navigate = useNavigate()
@@ -24,19 +25,35 @@ export default function useExamRoom() {
   const [submitting, setSubmitting] = useState(false)
 
   const [hasStarted, setHasStarted] = useState(false)
-  const [fullscreenBlocked, setFullscreenBlocked] = useState(false)
 
   const [answers, setAnswers] = useState({})
   const [textAnswers, setTextAnswers] = useState({})
   const [timeLeft, setTimeLeft] = useState(0)
-  const [violations, setViolations] = useState(0)
-
   const submittedRef = useRef(false)
-  const violationsRef = useRef(0)
 
-  useEffect(() => {
-    violationsRef.current = violations
-  }, [violations])
+  const {
+    config: proctoringConfig,
+    needsDevicePermission,
+    preparing: preparingProctoring,
+    permissionError: proctoringError,
+    ready: proctoringReady,
+    cameraActive,
+    microphoneActive,
+    screenActive,
+    cameraStream,
+    monitoringBlocked,
+    blockingReason,
+    violationCount: violations,
+    acquireRequiredStreams,
+    restoreMonitoring: restoreRequiredStreams,
+    stopMonitoring,
+    flushEvidence,
+    getReport: getProctoringReport,
+  } = useExamProctoring({
+    exam,
+    active: hasStarted && !preview && !isTeacher,
+    disabled: preview || isTeacher,
+  })
 
   useEffect(() => {
     const loadExam = async () => {
@@ -76,6 +93,7 @@ export default function useExamRoom() {
 
   const requestExamFullscreen = useCallback(async () => {
     if (preview || isTeacher) return true
+    if (!proctoringConfig.enabled || !proctoringConfig.requireFullscreen) return true
 
     if (!document.fullscreenEnabled) {
       toast.error('Trình duyệt không cho phép bật toàn màn hình')
@@ -94,16 +112,25 @@ export default function useExamRoom() {
         return false
       }
 
-      setFullscreenBlocked(false)
       return true
     } catch (error) {
       console.error(error)
       toast.error('Bạn cần cho phép toàn màn hình để làm bài')
       return false
     }
-  }, [preview, isTeacher])
+  }, [preview, isTeacher, proctoringConfig.enabled, proctoringConfig.requireFullscreen])
+
+  const prepareExamMonitoring = async () => {
+    const prepared = await acquireRequiredStreams()
+    if (prepared) toast.success('Đã cấp đủ quyền giám sát. Bạn có thể bắt đầu thi.')
+  }
 
   const startExam = async () => {
+    if (needsDevicePermission && !proctoringReady) {
+      toast.error('Hãy cấp đủ quyền thiết bị giám sát trước khi bắt đầu')
+      return
+    }
+
     const canStart = await requestExamFullscreen()
 
     if (!canStart) return
@@ -112,16 +139,18 @@ export default function useExamRoom() {
   }
 
   const restoreFullscreen = async () => {
+    const devicesRestored = await restoreRequiredStreams()
+    if (!devicesRestored) return
+
     const restored = await requestExamFullscreen()
 
     if (restored) {
-      setFullscreenBlocked(false)
       toast.success('Đã quay lại toàn màn hình')
     }
   }
 
   const handleAnswer = (questionId, answerIndex) => {
-    if (fullscreenBlocked && !preview && !isTeacher) return
+    if (monitoringBlocked && !preview && !isTeacher) return
 
     setAnswers((prev) => ({
       ...prev,
@@ -130,7 +159,7 @@ export default function useExamRoom() {
   }
 
   const handleTrueFalseAnswer = (questionId, answerIndex, value) => {
-    if (fullscreenBlocked && !preview && !isTeacher) return
+    if (monitoringBlocked && !preview && !isTeacher) return
 
     setAnswers((prev) => ({
       ...prev,
@@ -142,7 +171,7 @@ export default function useExamRoom() {
   }
 
   const handleTextAnswer = (questionId, value) => {
-    if (fullscreenBlocked && !preview && !isTeacher) return
+    if (monitoringBlocked && !preview && !isTeacher) return
 
     setTextAnswers((prev) => ({
       ...prev,
@@ -209,18 +238,22 @@ export default function useExamRoom() {
       submittedRef.current = true
 
       const submitViolations = Number(
-        overrideViolations ?? violationsRef.current ?? violations ?? 0,
+        overrideViolations ?? violations ?? 0,
       )
 
       try {
         setSubmitting(true)
 
         if (!preview && !isTeacher) {
+          await flushEvidence()
+          const proctoringReport = getProctoringReport()
           await submitExamApi(exam.id, {
             answers,
             textAnswers: normalizedTextAnswers,
             fullscreenViolations: submitViolations,
+            proctoringReport,
           })
+          stopMonitoring('submitted')
         }
 
         if (document.fullscreenElement) {
@@ -257,6 +290,9 @@ export default function useExamRoom() {
       normalizedTextAnswers,
       violations,
       navigate,
+      getProctoringReport,
+      flushEvidence,
+      stopMonitoring,
     ],
   )
 
@@ -279,55 +315,28 @@ export default function useExamRoom() {
   }, [exam, preview, isTeacher, hasStarted, handleSubmit])
 
   useEffect(() => {
-    if (!exam || preview || isTeacher || !hasStarted) return undefined
+    if (
+      !exam ||
+      preview ||
+      isTeacher ||
+      !hasStarted ||
+      !proctoringConfig.enabled ||
+      !proctoringConfig.autoSubmit ||
+      violations < proctoringConfig.maxViolations ||
+      submittedRef.current
+    ) return
 
-    const handleFullscreenChange = () => {
-      if (submittedRef.current) return
-
-      if (document.fullscreenElement) {
-        setFullscreenBlocked(false)
-        return
-      }
-
-      setFullscreenBlocked(true)
-
-      setViolations((prev) => {
-        const next = prev + 1
-        const max = Number(exam.maxFullscreenViolations ?? 2)
-
-        violationsRef.current = next
-        toast.error(`Bạn đã thoát toàn màn hình (${next}/${max})`)
-
-        if (next >= max) {
-          setTimeout(() => handleSubmit(true, next), 0)
-        }
-
-        return next
-      })
-    }
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-    }
-  }, [exam, preview, isTeacher, hasStarted, handleSubmit])
-
-  useEffect(() => {
-    if (!exam || preview || isTeacher || !hasStarted) return undefined
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape' || event.key === 'F11') {
-        event.preventDefault()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown, true)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true)
-    }
-  }, [exam, preview, isTeacher, hasStarted])
+    const timer = window.setTimeout(() => handleSubmit(true, violations), 0)
+    return () => window.clearTimeout(timer)
+  }, [
+    exam,
+    preview,
+    isTeacher,
+    hasStarted,
+    proctoringConfig,
+    violations,
+    handleSubmit,
+  ])
 
   return {
     exam,
@@ -336,7 +345,17 @@ export default function useExamRoom() {
     preview,
     isTeacher,
     hasStarted,
-    fullscreenBlocked,
+    fullscreenBlocked: monitoringBlocked,
+    blockingReason,
+    proctoringConfig,
+    needsDevicePermission,
+    preparingProctoring,
+    proctoringError,
+    proctoringReady,
+    cameraActive,
+    microphoneActive,
+    screenActive,
+    cameraStream,
 
     answers,
     textAnswers,
@@ -348,6 +367,7 @@ export default function useExamRoom() {
     formatTime,
 
     startExam,
+    prepareExamMonitoring,
     restoreFullscreen,
     handleAnswer,
     handleTrueFalseAnswer,

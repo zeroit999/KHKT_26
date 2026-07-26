@@ -1,5 +1,43 @@
 # Chạy Frontend
 
+## Chạy local an toàn (không kết nối production)
+
+Repository có sẵn hai file mẫu `frontend/.env.example` và `backend/.env.example`.
+Thiết lập mặc định dùng `VITE_LOCAL_DEV_MODE=true` và `CHATBOT_PROVIDER=mock`,
+vì vậy có thể test giao diện chatbot mà không cần Firebase production hoặc tốn OpenAI API.
+
+```powershell
+./scripts/start-local.ps1
+```
+
+Mở `http://127.0.0.1:5173`. Dừng các tiến trình local bằng:
+
+Tài khoản demo local:
+
+- Học sinh: `student@zuny.local`
+- Giáo viên: `teacher@zuny.local`
+- Mật khẩu chung: `Zuny@123`
+
+Các tài khoản này chỉ được kích hoạt khi `VITE_LOCAL_DEV_MODE=true`.
+
+```powershell
+./scripts/stop-local.ps1
+```
+
+Để test OpenAI thật, sửa `backend/.env`:
+
+```env
+CHATBOT_PROVIDER=openai
+OPENAI_API_KEY=your_key
+OPENAI_MODEL=gpt-5.6-sol
+```
+
+API key chỉ được đặt ở backend, không được thêm vào biến `VITE_*`.
+Nếu production chưa đổi sang OpenAI, backend tự động tiếp tục dùng
+`GEMINI_API_KEY` hiện có khi `CHATBOT_PROVIDER` không được khai báo.
+
+---
+
 ## Di chuyển vào thư mục frontend
 
 ```bash

@@ -8,6 +8,8 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 class Config:
+    LOCAL_DEV_MODE = os.getenv("LOCAL_DEV_MODE", "0") == "1"
+
     FIREBASE_ADMIN_KEY_PATH = os.getenv(
         "FIREBASE_ADMIN_KEY_PATH",
         os.path.join(CONFIG_DIR, "firebase-admin-key.json")

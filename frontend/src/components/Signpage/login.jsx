@@ -1,4 +1,4 @@
-import React, {
+import {
   useState,
   useEffect,
 } from 'react'
@@ -25,7 +25,6 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Sparkles,
 } from 'lucide-react'
 
 import {
@@ -37,6 +36,10 @@ import { db } from '../firebase.js'
 
 import lightLogo from '../../assets/favicon-light-mode.png'
 import darkLogo from '../../assets/favicon-dark-mode.png'
+import { LOCAL_DEMO_ACCOUNTS } from '../../utils/localAuth.js'
+
+const LOCAL_DEV_MODE = import.meta.env.VITE_LOCAL_DEV_MODE === 'true'
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
 
 function Login() {
   const [email, setEmail] =
@@ -310,6 +313,36 @@ function Login() {
             onSubmit={handleSubmit}
             className="space-y-5"
           >
+            {LOCAL_DEV_MODE && (
+              <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-4 text-sm">
+                <p className={`font-bold ${darkMode ? 'text-cyan-200' : 'text-cyan-800'}`}>
+                  Tài khoản demo local
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {LOCAL_DEMO_ACCOUNTS.map((account) => (
+                    <button
+                      key={account.uid}
+                      type="button"
+                      onClick={() => {
+                        setEmail(account.email)
+                        setPassword(DEMO_PASSWORD)
+                      }}
+                      className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                        darkMode
+                          ? 'border-cyan-300/20 text-cyan-100 hover:bg-cyan-400/10'
+                          : 'border-cyan-200 text-cyan-800 hover:bg-cyan-100'
+                      }`}
+                    >
+                      {account.role === 'TEACHER' ? 'Giáo viên' : 'Học sinh'}
+                    </button>
+                  ))}
+                </div>
+                <p className={`mt-3 text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  Mật khẩu chung: <code>{DEMO_PASSWORD}</code>
+                </p>
+              </div>
+            )}
+
             {/* EMAIL */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-cyan-400">
@@ -438,7 +471,7 @@ function Login() {
               </div>
             </div>
 
-            <SignWithGoogle />
+            {!LOCAL_DEV_MODE && <SignWithGoogle />}
 
             <p
               className={`text-center ${

@@ -1,29 +1,40 @@
-import { Send, X } from 'lucide-react'
+import { ArrowUpRight, Send, Sparkles, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
+import {
+  collectSafePageContext,
+  executeSafePageAction,
+  getPageAssistantProfile,
+  normalizeAssistantRole,
+} from './pageAssistant.js'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.VITE_LOCAL_DEV_MODE === 'true' ? 'http://127.0.0.1:5000' : '')
+).replace(/\/$/, '')
 
 if (!API_BASE_URL) {
   throw new Error('Missing environment variable: VITE_API_BASE_URL')
 }
 
 function normalizeReply(text) {
-  if (!text) return ''
+  return String(text || '').trim()
+}
 
-  return text
-    .replaceAll('Anh ', 'Tôi ')
-    .replaceAll('anh ', 'tôi ')
-    .replaceAll('Em ', 'Bạn ')
-    .replaceAll('em ', 'bạn ')
-    .replaceAll('Chị ', 'Tôi ')
-    .replaceAll('chị ', 'tôi ')
-    .replaceAll('Mình ', 'Tôi ')
-    .replaceAll('mình ', 'tôi ')
+function buildPageWelcome(profile) {
+  return {
+    id: `${profile.id}-${Date.now()}`,
+    role: 'assistant',
+    content: `${profile.description}\n\nTôi đã chuyển sang chế độ hỗ trợ riêng cho trang này. Bạn có thể hỏi bằng câu tự nhiên hoặc chọn một gợi ý nhanh.`,
+    contextIntro: true,
+  }
 }
 
 export default function ChatbotWidget() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -31,7 +42,15 @@ export default function ChatbotWidget() {
 
   const isDark = useSyncedDarkMode()
   const messagesEndRef = useRef(null)
+  const activeContextRef = useRef('')
   const { user, userDetails } = useAuth()
+
+  const pageProfile = useMemo(
+    () => getPageAssistantProfile(location.pathname),
+    [location.pathname],
+  )
+
+  const userRole = normalizeAssistantRole(userDetails?.role)
 
   const botLogo = isDark
     ? '/logo_chatbot-darkmode.png'
@@ -63,23 +82,19 @@ export default function ChatbotWidget() {
     })
   }, [messages, loading])
 
-  const handleToggle = () => {
-    if (!open && messages.length === 0) {
-      setMessages([
-        {
-          id: Date.now(),
-          role: 'assistant',
-          content:
-            'Xin chào 👋 Tôi là ZUNY AI Assistant.\n\nTôi có thể hỗ trợ học tập, luyện thi THPT và giải đáp các câu hỏi của bạn.\n\nBạn cần tôi giúp gì hôm nay?',
-        },
-      ])
-    }
+  useEffect(() => {
+    if (!open || activeContextRef.current === pageProfile.id) return
 
+    activeContextRef.current = pageProfile.id
+    setMessages((prev) => [...prev, buildPageWelcome(pageProfile)])
+  }, [open, pageProfile])
+
+  const handleToggle = () => {
     setOpen((prev) => !prev)
   }
 
-  const handleSend = async () => {
-    const trimmedInput = input.trim()
+  const handleSend = async (suggestedMessage = '') => {
+    const trimmedInput = String(suggestedMessage || input).trim()
 
     if (!trimmedInput || loading) return
 
@@ -103,6 +118,13 @@ export default function ChatbotWidget() {
         },
         body: JSON.stringify({
           message: trimmedInput,
+          history: messages.slice(-8).map(({ role, content }) => ({ role, content })),
+          context: {
+            path: location.pathname,
+            pageId: pageProfile.id,
+            role: userRole,
+            visible: collectSafePageContext(pageProfile),
+          },
         }),
       })
 
@@ -120,9 +142,12 @@ export default function ChatbotWidget() {
           content: normalizeReply(
             data.reply || 'Xin lỗi, tôi chưa có câu trả lời cho câu hỏi này.',
           ),
+          actions: Array.isArray(data.actions) ? data.actions : [],
+          provider: data.provider,
+          page: data.page,
         },
       ])
-    } catch (error) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -133,6 +158,31 @@ export default function ChatbotWidget() {
       ])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAction = async (action) => {
+    if (action?.type === 'navigate' && String(action.target || '').startsWith('/')) {
+      navigate(action.target)
+      return
+    }
+
+    if (action?.type === 'prompt' && action.prompt) {
+      await handleSend(action.prompt)
+      return
+    }
+
+    if (action?.type === 'page_action' && action.command) {
+      const result = executeSafePageAction(action.command)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: 'assistant',
+          content: result.success ? `✓ ${result.message}` : result.message,
+          actionResult: true,
+        },
+      ])
     }
   }
 
@@ -175,13 +225,15 @@ export default function ChatbotWidget() {
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end">
       {open && (
         <div
-          className={`mb-3 w-[320px] overflow-hidden rounded-[24px] border shadow-2xl transition-all duration-500 ${
+          role="dialog"
+          aria-label={pageProfile.title}
+          className={`mb-3 w-[min(390px,calc(100vw-2rem))] overflow-hidden rounded-[28px] border shadow-2xl transition-all duration-500 ${
             isDark
               ? 'border-violet-400/30 bg-[#080808] shadow-violet-500/20'
               : 'border-cyan-200 bg-white shadow-cyan-500/20'
           }`}
         >
-          <div className="relative flex h-[430px] max-h-[calc(100vh-7rem)] flex-col overflow-hidden">
+          <div className="relative flex h-[580px] max-h-[calc(100vh-7rem)] flex-col overflow-hidden">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div
                 className={`absolute -right-16 top-8 h-14 w-40 rounded-full border ${
@@ -213,8 +265,8 @@ export default function ChatbotWidget() {
                 {renderBotAvatar('large')}
 
                 <div>
-                  <h2 className="text-sm font-black leading-none">
-                    ZUNY AI
+                  <h2 className="max-w-[230px] truncate text-sm font-black leading-none">
+                    {pageProfile.title}
                   </h2>
 
                   <p
@@ -223,7 +275,7 @@ export default function ChatbotWidget() {
                     }`}
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    Trợ lý học tập
+                    {pageProfile.eyebrow}
                   </p>
                 </div>
               </div>
@@ -242,6 +294,39 @@ export default function ChatbotWidget() {
               </button>
             </div>
 
+            <div
+              className={`relative z-10 shrink-0 border-b px-4 py-3 ${
+                isDark
+                  ? 'border-violet-400/15 bg-violet-500/5'
+                  : 'border-cyan-100 bg-gradient-to-r from-cyan-50 to-violet-50'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Sparkles className={`mt-0.5 h-4 w-4 shrink-0 ${isDark ? 'text-violet-300' : 'text-cyan-600'}`} />
+                <p className={`text-xs font-semibold leading-5 ${isDark ? 'text-violet-100/75' : 'text-slate-600'}`}>
+                  {pageProfile.description}
+                </p>
+              </div>
+
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                {pageProfile.suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => handleSend(suggestion)}
+                    disabled={loading}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50 ${
+                      isDark
+                        ? 'border-violet-400/25 bg-black/30 text-violet-200 hover:bg-violet-500/15'
+                        : 'border-cyan-200 bg-white text-cyan-700 hover:border-cyan-300'
+                    }`}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 overscroll-contain">
               {messages.map((message) => (
                 <div
@@ -252,8 +337,9 @@ export default function ChatbotWidget() {
                 >
                   {message.role === 'assistant' && renderBotAvatar()}
 
-                  <div
-                    className={`max-w-[70%] break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                  <div className="max-w-[76%]">
+                    <div
+                    className={`break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                       message.role === 'user'
                         ? isDark
                           ? 'rounded-br-md bg-violet-500 text-white'
@@ -264,6 +350,32 @@ export default function ChatbotWidget() {
                     }`}
                   >
                     {message.content}
+                    {message.provider === 'mock' && (
+                      <div className="mt-2 text-[10px] font-bold uppercase tracking-wide opacity-60">Local mock</div>
+                    )}
+                    </div>
+
+                    {message.role === 'assistant' && message.actions?.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {message.actions.map((action) => (
+                          <button
+                            key={action.id || `${action.type}-${action.target}`}
+                            type="button"
+                            onClick={() => handleAction(action)}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                              isDark
+                                ? 'border-violet-400/30 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20'
+                                : 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
+                            }`}
+                          >
+                            {action.label}
+                            {action.type === 'navigate' && (
+                              <ArrowUpRight className="ml-1 inline h-3 w-3" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {message.role === 'user' && renderUserAvatar()}
@@ -319,13 +431,13 @@ export default function ChatbotWidget() {
                       : 'text-slate-900 placeholder:text-cyan-700/40'
                   }`}
                   placeholder={
-                    loading ? 'ZUNY AI đang trả lời...' : 'Nhập câu hỏi...'
+                    loading ? 'ZUNY AI đang trả lời...' : `Hỏi về ${pageProfile.title}...`
                   }
                 />
 
                 <button
                   type="button"
-                  onClick={handleSend}
+                  onClick={() => handleSend()}
                   disabled={loading || !input.trim()}
                   className={`flex h-10 w-10 items-center justify-center rounded-xl text-white disabled:cursor-not-allowed disabled:opacity-60 ${
                     isDark

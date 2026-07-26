@@ -8,6 +8,7 @@ from exams.exam_service import (
     create_exam,
     update_exam,
     delete_exam,
+    log_proctoring_event,
     submit_exam,
     get_my_result,
     get_exam_results,
@@ -129,6 +130,20 @@ def submit_exam_route(exam_id):
         payload = request.get_json() or {}
         data = submit_exam(request.current_user, exam_id, payload)
         return jsonify(data), 200
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "message": str(error),
+        }), 400
+
+
+@exam_bp.post("/<exam_id>/proctoring/events")
+@firebase_required
+def log_proctoring_event_route(exam_id):
+    try:
+        payload = request.get_json() or {}
+        data = log_proctoring_event(request.current_user, exam_id, payload)
+        return jsonify(data), 201
     except Exception as error:
         return jsonify({
             "success": False,
