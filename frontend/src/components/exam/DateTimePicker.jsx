@@ -42,8 +42,8 @@ const DateTimeInput = forwardRef(function DateTimeInput(
       onClick={onClick}
       className={`flex min-h-[48px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-black outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
         hasError
-          ? 'border-red-500 bg-slate-950 text-white focus:border-red-500'
-          : 'border-slate-700 bg-slate-950 text-white hover:border-blue-500 focus:border-blue-500'
+          ? 'border-red-500 bg-white text-slate-900 focus:border-red-500 dark:bg-slate-950 dark:text-white'
+          : 'border-slate-300 bg-white text-slate-900 hover:border-blue-500 focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white'
       }`}
     >
       <span className="inline-flex min-w-0 items-center gap-2">
@@ -169,9 +169,9 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
         .zuny-datepicker-popper[data-placement^='bottom'] .react-datepicker__triangle {
           left: 52px !important;
           transform: none !important;
-          fill: #111827 !important;
-          color: #111827 !important;
-          stroke: #334155 !important;
+          fill: #ffffff !important;
+          color: #0f172a !important;
+          stroke: #cbd5e1 !important;
         }
 
         .zuny-datepicker-calendar.react-datepicker {
@@ -179,27 +179,27 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
           display: grid !important;
           grid-template-columns: 1fr 108px !important;
           overflow: hidden !important;
-          border: 1px solid rgba(51, 65, 85, 0.95) !important;
+          border: 1px solid #e2e8f0 !important;
           border-radius: 22px !important;
-          background: #111827 !important;
-          color: #ffffff !important;
+          background: #ffffff !important;
+          color: #0f172a !important;
           font-family: inherit !important;
-          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38) !important;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18) !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__month-container {
           width: 322px !important;
-          background: #111827 !important;
+          background: #ffffff !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__header {
-          border-bottom: 1px solid rgba(51, 65, 85, 0.95) !important;
-          background: #111827 !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          background: #ffffff !important;
           padding: 14px 14px 8px !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__current-month {
-          color: #ffffff !important;
+          color: #0f172a !important;
           font-size: 15px !important;
           font-weight: 900 !important;
           line-height: 28px !important;
@@ -215,7 +215,7 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
         }
 
         .zuny-datepicker-calendar .react-datepicker__navigation:hover {
-          background: rgba(255, 255, 255, 0.08) !important;
+          background: #eff6ff !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__navigation--previous {
@@ -227,7 +227,7 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
         }
 
         .zuny-datepicker-calendar .react-datepicker__navigation-icon::before {
-          border-color: #cbd5e1 !important;
+          border-color: #94a3b8 !important;
           border-width: 2px 2px 0 0 !important;
           width: 8px !important;
           height: 8px !important;
@@ -259,7 +259,7 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
           align-items: center !important;
           justify-content: center !important;
           border-radius: 12px !important;
-          color: #dbeafe !important;
+          color: #334155 !important;
           font-size: 14px !important;
           font-weight: 900 !important;
           line-height: 1 !important;
@@ -267,18 +267,18 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
 
         .zuny-datepicker-calendar .react-datepicker__day-name {
           height: 28px !important;
-          color: #93c5fd !important;
+          color: #64748b !important;
           font-size: 13px !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__day:hover {
-          background: rgba(37, 99, 235, 0.28) !important;
-          color: #ffffff !important;
+          background: #dbeafe !important;
+          color: #1d4ed8 !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__day--outside-month,
         .zuny-datepicker-calendar .react-datepicker__day--disabled {
-          color: #475569 !important;
+          color: #94a3b8 !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__day--selected,
@@ -289,8 +289,8 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
 
         .zuny-datepicker-calendar .react-datepicker__time-container {
           width: 108px !important;
-          border-left: 1px solid rgba(51, 65, 85, 0.95) !important;
-          background: #0f172a !important;
+          border-left: 1px solid #e2e8f0 !important;
+          background: #f8fafc !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__header--time {
@@ -298,13 +298,13 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          border-bottom: 1px solid rgba(51, 65, 85, 0.95) !important;
-          background: #111827 !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          background: #ffffff !important;
           padding: 0 !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker-time__header {
-          color: #ffffff !important;
+          color: #0f172a !important;
           font-size: 15px !important;
           font-weight: 900 !important;
         }
@@ -312,16 +312,16 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
         .zuny-datepicker-calendar .react-datepicker__time,
         .zuny-datepicker-calendar .react-datepicker__time-box {
           width: 108px !important;
-          background: #0f172a !important;
+          background: #f8fafc !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__time-list {
           height: 236px !important;
           padding: 8px 0 !important;
           overflow-y: auto !important;
-          background: #0f172a !important;
+          background: #f8fafc !important;
           scrollbar-width: thin;
-          scrollbar-color: #3b82f6 #0f172a;
+          scrollbar-color: #3b82f6 #f8fafc;
         }
 
         .zuny-datepicker-calendar .react-datepicker__time-list::-webkit-scrollbar {
@@ -329,7 +329,7 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
         }
 
         .zuny-datepicker-calendar .react-datepicker__time-list::-webkit-scrollbar-track {
-          background: #0f172a;
+          background: #f8fafc;
         }
 
         .zuny-datepicker-calendar .react-datepicker__time-list::-webkit-scrollbar-thumb {
@@ -345,20 +345,85 @@ function DateTimePicker({ value, onChange, min, disabled = false, hasError = fal
           align-items: center !important;
           justify-content: center !important;
           border-radius: 10px !important;
-          color: #dbeafe !important;
+          color: #334155 !important;
           font-size: 14px !important;
           font-weight: 900 !important;
           transition: background 0.15s ease !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__time-list-item:hover {
-          background: rgba(37, 99, 235, 0.28) !important;
-          color: #ffffff !important;
+          background: #dbeafe !important;
+          color: #1d4ed8 !important;
         }
 
         .zuny-datepicker-calendar .react-datepicker__time-list-item--selected {
           background: #2563eb !important;
           color: #ffffff !important;
+        }
+
+
+        .dark .zuny-datepicker-popper[data-placement^='bottom'] .react-datepicker__triangle {
+          fill: #111827 !important;
+          color: #111827 !important;
+          stroke: #334155 !important;
+        }
+
+        .dark .zuny-datepicker-calendar.react-datepicker,
+        .dark .zuny-datepicker-calendar .react-datepicker__month-container,
+        .dark .zuny-datepicker-calendar .react-datepicker__header,
+        .dark .zuny-datepicker-calendar .react-datepicker__header--time {
+          border-color: rgba(51, 65, 85, 0.95) !important;
+          background: #111827 !important;
+          color: #ffffff !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__current-month,
+        .dark .zuny-datepicker-calendar .react-datepicker-time__header {
+          color: #ffffff !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__navigation:hover {
+          background: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__navigation-icon::before {
+          border-color: #cbd5e1 !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__day,
+        .dark .zuny-datepicker-calendar .react-datepicker__time-list-item {
+          color: #dbeafe !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__day-name {
+          color: #93c5fd !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__day:hover,
+        .dark .zuny-datepicker-calendar .react-datepicker__time-list-item:hover {
+          background: rgba(37, 99, 235, 0.28) !important;
+          color: #ffffff !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__day--outside-month,
+        .dark .zuny-datepicker-calendar .react-datepicker__day--disabled {
+          color: #475569 !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__time-container,
+        .dark .zuny-datepicker-calendar .react-datepicker__time,
+        .dark .zuny-datepicker-calendar .react-datepicker__time-box,
+        .dark .zuny-datepicker-calendar .react-datepicker__time-list {
+          border-color: rgba(51, 65, 85, 0.95) !important;
+          background: #0f172a !important;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__time-list {
+          scrollbar-color: #3b82f6 #0f172a;
+        }
+
+        .dark .zuny-datepicker-calendar .react-datepicker__time-list::-webkit-scrollbar-track {
+          background: #0f172a;
         }
       `}</style>
     </div>

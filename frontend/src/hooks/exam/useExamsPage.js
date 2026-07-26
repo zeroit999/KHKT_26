@@ -1,24 +1,25 @@
-import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Clock3, FileText, Globe2, LockKeyhole } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Clock3, FileText, Globe2, LockKeyhole } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-import useExams from './useExams'
-import { getExamDetailApi } from '../../api/examApi'
+import useExams from './useExams';
+import { getExamDetailApi } from '../../api/examApi';
 import {
   canManageExams,
   isStudentRole,
   normalizeSubject,
   teacherSubjects,
-} from '../../utils/examHelpers'
-
+} from '../../utils/examHelpers';
 
 const calculateLeaderboardPoints = (score, maxScore = 10) => {
-  const safeMaxScore = Math.max(1, Number(maxScore || 10))
-  const safeScore = Math.max(0, Number(score || 0))
+  const safeMaxScore = Math.max(1, Number(maxScore || 10));
+  const safeScore = Math.max(0, Number(score || 0));
 
-  return Number(((Math.min(safeScore, safeMaxScore) / safeMaxScore) * 1.05).toFixed(2))
-}
+  return Number(
+    ((Math.min(safeScore, safeMaxScore) / safeMaxScore) * 1.05).toFixed(2)
+  );
+};
 
 const getResultStudentKey = (result = {}) =>
   String(
@@ -29,8 +30,8 @@ const getResultStudentKey = (result = {}) =>
       result.email ||
       result.studentName ||
       result.name ||
-      'unknown',
-  )
+      'unknown'
+  );
 
 const getResultStudentName = (result = {}) =>
   String(
@@ -41,12 +42,12 @@ const getResultStudentName = (result = {}) =>
       result.name ||
       result.studentEmail ||
       result.email ||
-      'Tên học sinh',
-  ).trim()
+      'Tên học sinh'
+  ).trim();
 
 export default function useExamsPage() {
-  const navigate = useNavigate()
-  const state = useExams()
+  const navigate = useNavigate();
+  const state = useExams();
 
   const {
     role,
@@ -61,57 +62,56 @@ export default function useExamsPage() {
     setDeleteConfirmExam,
     deleteConfirmExam,
     deleteExam,
-  } = state
+  } = state;
 
-  const isStudent = isStudentRole(role)
-  const canManage = canManageExams(role)
+  const isStudent = isStudentRole(role);
+  const canManage = canManageExams(role);
 
   const availableSubjects = useMemo(() => {
     const examSubjects = visibleExams
       .map((exam) => normalizeSubject(exam.subject))
-      .filter(Boolean)
+      .filter(Boolean);
 
-    return Array.from(new Set([...teacherSubjects, ...examSubjects]))
-  }, [visibleExams])
+    return Array.from(new Set([...teacherSubjects, ...examSubjects]));
+  }, [visibleExams]);
 
   const completedExams = useMemo(() => {
     return visibleExams.filter((exam) =>
-      exam.studentResults?.some((result) => result.studentId === currentUserId),
-    )
-  }, [visibleExams, currentUserId])
+      exam.studentResults?.some((result) => result.studentId === currentUserId)
+    );
+  }, [visibleExams, currentUserId]);
 
-  const pendingExams = Math.max(0, visibleExams.length - completedExams.length)
+  const pendingExams = Math.max(0, visibleExams.length - completedExams.length);
 
   const studentAverageScore = useMemo(() => {
     const scores = visibleExams
       .flatMap((exam) => exam.studentResults ?? [])
       .filter((result) => result.studentId === currentUserId)
-      .map((result) => Number(result.score || 0))
+      .map((result) => Number(result.score || 0));
 
     return scores.length
       ? (
           scores.reduce((total, score) => total + score, 0) / scores.length
         ).toFixed(1)
-      : '0.0'
-  }, [visibleExams, currentUserId])
-
+      : '0.0';
+  }, [visibleExams, currentUserId]);
 
   const leaderboard = useMemo(() => {
-    const students = new Map()
+    const students = new Map();
 
     visibleExams.forEach((exam) => {
-      const bestByStudentInExam = new Map()
-      const maxScore = Number(exam.totalScore || 10) || 10
+      const bestByStudentInExam = new Map();
+      const maxScore = Number(exam.totalScore || 10) || 10;
 
-      ;(exam.studentResults ?? []).forEach((result) => {
-        const studentKey = getResultStudentKey(result)
-        const score = Number(result.score || 0)
-        const currentBest = bestByStudentInExam.get(studentKey)
+      (exam.studentResults ?? []).forEach((result) => {
+        const studentKey = getResultStudentKey(result);
+        const score = Number(result.score || 0);
+        const currentBest = bestByStudentInExam.get(studentKey);
 
         if (!currentBest || score > Number(currentBest.score || 0)) {
-          bestByStudentInExam.set(studentKey, result)
+          bestByStudentInExam.set(studentKey, result);
         }
-      })
+      });
 
       bestByStudentInExam.forEach((result, studentKey) => {
         const previous = students.get(studentKey) ?? {
@@ -121,21 +121,24 @@ export default function useExamsPage() {
           totalScore: 0,
           completedExams: 0,
           bestScore: 0,
-        }
+        };
 
-        const score = Number(result.score || 0)
-        const points = calculateLeaderboardPoints(score, maxScore)
+        const score = Number(result.score || 0);
+        const points = calculateLeaderboardPoints(score, maxScore);
 
         students.set(studentKey, {
           ...previous,
-          name: previous.name === 'Tên học sinh' ? getResultStudentName(result) : previous.name,
+          name:
+            previous.name === 'Tên học sinh'
+              ? getResultStudentName(result)
+              : previous.name,
           points: Number((previous.points + points).toFixed(2)),
           totalScore: previous.totalScore + score,
           completedExams: previous.completedExams + 1,
           bestScore: Math.max(previous.bestScore, score),
-        })
-      })
-    })
+        });
+      });
+    });
 
     return Array.from(students.values())
       .map((student) => ({
@@ -144,20 +147,21 @@ export default function useExamsPage() {
           ? Number((student.totalScore / student.completedExams).toFixed(1))
           : 0,
       }))
-      .sort((a, b) =>
-        b.points - a.points ||
-        b.averageScore - a.averageScore ||
-        b.bestScore - a.bestScore ||
-        a.name.localeCompare(b.name, 'vi'),
+      .sort(
+        (a, b) =>
+          b.points - a.points ||
+          b.averageScore - a.averageScore ||
+          b.bestScore - a.bestScore ||
+          a.name.localeCompare(b.name, 'vi')
       )
-      .map((student, index) => ({ ...student, rank: index + 1 }))
-  }, [visibleExams])
+      .map((student, index) => ({ ...student, rank: index + 1 }));
+  }, [visibleExams]);
 
   const currentStudentRank = useMemo(() => {
-    if (!currentUserId) return null
+    if (!currentUserId) return null;
 
-    return leaderboard.find((student) => student.id === currentUserId) ?? null
-  }, [leaderboard, currentUserId])
+    return leaderboard.find((student) => student.id === currentUserId) ?? null;
+  }, [leaderboard, currentUserId]);
 
   const studentStatCards = [
     {
@@ -184,7 +188,7 @@ export default function useExamsPage() {
       Icon: FileText,
       iconClass: 'bg-violet-100 text-violet-600',
     },
-  ]
+  ];
 
   const teacherStatCards = [
     {
@@ -207,132 +211,137 @@ export default function useExamsPage() {
     },
     {
       label: 'Hoạt động',
-      value: visibleExams.filter((exam) => exam.availabilityStatus === 'published').length,
+      value: visibleExams.filter(
+        (exam) => exam.availabilityStatus === 'published'
+      ).length,
       Icon: FileText,
       iconClass: 'bg-green-100 text-green-600',
     },
     {
       label: 'Chưa mở',
-      value: visibleExams.filter((exam) => exam.availabilityStatus === 'draft').length,
+      value: visibleExams.filter((exam) => exam.availabilityStatus === 'draft')
+        .length,
       Icon: FileText,
       iconClass: 'bg-amber-100 text-amber-600',
     },
     {
       label: 'Đã kết thúc',
-      value: visibleExams.filter((exam) => exam.availabilityStatus === 'ended').length,
+      value: visibleExams.filter((exam) => exam.availabilityStatus === 'ended')
+        .length,
       Icon: FileText,
       iconClass: 'bg-red-100 text-red-600',
     },
-  ]
+  ];
 
   const openByCode = () => {
     const exam = visibleExams.find(
-      (item) => item.code?.toLowerCase() === codeSearch.trim().toLowerCase(),
-    )
+      (item) => item.code?.toLowerCase() === codeSearch.trim().toLowerCase()
+    );
 
     if (!exam) {
-      toast.error('Không tìm thấy mã bài thi')
-      return
+      toast.error('Không tìm thấy mã bài thi');
+      return;
     }
 
-    navigate(`/exam/${exam.id}`, { state: { role } })
-  }
+    navigate(`/exam/${exam.id}`, { state: { role } });
+  };
 
   const copyExamLink = async (exam) => {
     try {
-      const examUrl = `${window.location.origin}/exam/${exam.id}`
+      const examUrl = `${window.location.origin}/exam/${exam.id}`;
 
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(examUrl)
+        await navigator.clipboard.writeText(examUrl);
       } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = examUrl
-        textarea.setAttribute('readonly', '')
-        textarea.style.position = 'fixed'
-        textarea.style.left = '-9999px'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
+        const textarea = document.createElement('textarea');
+        textarea.value = examUrl;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
       }
 
-      toast.success('Đã sao chép link bài thi cho học sinh')
+      toast.success('Đã sao chép link bài thi cho học sinh');
     } catch (error) {
-      console.error(error)
-      toast.error('Không thể sao chép link bài thi')
+      console.error(error);
+      toast.error('Không thể sao chép link bài thi');
     }
-  }
+  };
 
   const previewExam = (exam) => {
-    navigate(`/exam/${exam.id}`, { state: { role, preview: true } })
-  }
+    navigate(`/exam/${exam.id}`, { state: { role, preview: true } });
+  };
 
   const getStudentAttemptCount = (exam) => {
-    if (!currentUserId) return 0
+    if (!currentUserId) return 0;
 
     const attempt = exam.attempts?.find(
-      (item) => item.id === currentUserId || item.studentId === currentUserId,
-    )
+      (item) => item.id === currentUserId || item.studentId === currentUserId
+    );
 
-    if (attempt) return Number(attempt.count || 0)
+    if (attempt) return Number(attempt.count || 0);
 
     return (
-      exam.studentResults?.filter((result) => result.studentId === currentUserId)
-        .length ?? 0
-    )
-  }
+      exam.studentResults?.filter(
+        (result) => result.studentId === currentUserId
+      ).length ?? 0
+    );
+  };
 
   const getExamMaxAttempts = (exam) =>
     exam.attemptMode === 'multiple'
       ? Math.max(1, Number(exam.maxAttempts || 1))
-      : 1
+      : 1;
 
   const getExamAudienceText = (exam) =>
     exam.status === 'public'
       ? 'Công khai cho tất cả học sinh'
       : exam.selectedClasses?.length
         ? exam.selectedClasses.join(', ')
-        : 'Chưa chọn lớp'
+        : 'Chưa chọn lớp';
 
   const handleOutOfAttempts = () => {
-    toast.error('Bạn đã hết số lượt làm bài thi này')
-  }
+    toast.error('Bạn đã hết số lượt làm bài thi này');
+  };
 
   const openCreateModal = () => {
-    setEditingExam(null)
-    setCreateOpen(true)
-  }
+    setEditingExam(null);
+    navigate('/exams/create');
+  };
 
   const openEditModal = async (exam) => {
     try {
-      const response = await getExamDetailApi(exam.id)
-      const fullExam = response.data?.exam ?? exam
+      const response = await getExamDetailApi(exam.id);
+      const fullExam = response.data?.exam ?? exam;
 
-      setEditingExam(fullExam)
-      setCreateOpen(true)
+      setEditingExam(fullExam);
+      setCreateOpen(true);
     } catch (error) {
-      console.error(error)
+      console.error(error);
       toast.error(
         error?.response?.data?.message ||
           error.message ||
-          'Không thể tải chi tiết đề thi',
-      )
+          'Không thể tải chi tiết đề thi'
+      );
     }
-  }
+  };
 
   const closeCreateModal = () => {
-    setCreateOpen(false)
-    setEditingExam(null)
-  }
+    setCreateOpen(false);
+    setEditingExam(null);
+  };
 
   const closeDeleteConfirm = () => {
-    setDeleteConfirmExam(null)
-  }
+    setDeleteConfirmExam(null);
+  };
 
   const confirmDeleteExam = () => {
-    if (!deleteConfirmExam?.id) return
-    deleteExam(deleteConfirmExam.id)
-  }
+    if (!deleteConfirmExam?.id) return;
+    deleteExam(deleteConfirmExam.id);
+  };
 
   return {
     ...state,
@@ -358,5 +367,5 @@ export default function useExamsPage() {
     confirmDeleteExam,
     closeResultsModal: () => setResultsExam(null),
     openStatsModal: () => setStatsOpen(true),
-  }
+  };
 }

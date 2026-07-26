@@ -1,0 +1,5 @@
+export { default as DashboardHero } from './DashboardHero.jsx'
+export { default as DashboardStatCard } from './DashboardStatCard.jsx'
+export { default as PerformancePanel } from './PerformancePanel.jsx'
+export { default as RecentExamsPanel } from './RecentExamsPanel.jsx'
+export { default as TeacherOverviewPanel } from './TeacherOverviewPanel.jsx'

@@ -14,10 +14,15 @@ import { Toaster } from 'react-hot-toast';
 
 import AppLayout from './components/layout/AppLayout.jsx';
 import LoadingSkeleton from './components/ui/LoadingSkeleton.jsx';
+import MaintenanceState from './components/ui/MaintenanceState.jsx';
 import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx';
 
 import Home from './pages/Home.jsx';
+import ExamDashboard from './pages/exam/ExamDashboard.jsx';
+import ExamBuilder from './pages/exam/ExamBuilder.jsx';
 import Exams from './pages/exam/Exams.jsx';
+import QuestionBank from './pages/exam/QuestionBank.jsx';
+import StudentSubmissions from './pages/exam/StudentSubmissions.jsx';
 import ExamRoom from './pages/exam/ExamRoom.jsx';
 import ResultPage from './pages/exam/ResultPage.jsx';
 import Forum from './pages/forum/Forum.jsx';
@@ -167,7 +172,9 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   const location = useLocation();
   const { user, userDetails, isLoading } = useAuth();
 
-  const isForumRoute = location.pathname.toLowerCase() === '/forum';
+  const normalizedPath = location.pathname.toLowerCase();
+  const isForumRoute = normalizedPath === '/forum';
+  const isExamAreaRoute = normalizedPath === '/exams' || normalizedPath.startsWith('/exams/');
 
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
@@ -242,7 +249,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
         mainClassName={isForumRoute ? 'pt-0' : 'pt-20'}
-        showFooter={!isForumRoute}
+        showFooter={!isForumRoute && !isExamAreaRoute}
         showNavbar={!isForumRoute}
         lockPageScroll={isForumRoute}
       >
@@ -338,7 +345,67 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 path="/exams"
                 element={
                   <ProtectedRoute>
+                    <ExamDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/exams/library"
+                element={
+                  <ProtectedRoute>
                     <Exams />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/exams/create"
+                element={
+                  <TeacherRoute>
+                    <ExamBuilder />
+                  </TeacherRoute>
+                }
+              />
+
+              <Route
+                path="/exams/question-bank"
+                element={
+                  <TeacherRoute>
+                    <QuestionBank />
+                  </TeacherRoute>
+                }
+              />
+
+              <Route
+                path="/exams/submissions"
+                element={
+                  <TeacherRoute>
+                    <StudentSubmissions mode="submissions" />
+                  </TeacherRoute>
+                }
+              />
+
+              <Route
+                path="/exams/essay-grading"
+                element={
+                  <TeacherRoute>
+                    <StudentSubmissions mode="grading" />
+                  </TeacherRoute>
+                }
+              />
+
+
+              <Route
+                path="/exams/*"
+                element={
+                  <ProtectedRoute>
+                    <MaintenanceState
+                      badge="Khu vực đề thi"
+                      title="Đang bảo trì"
+                      subtitle="Tính năng đang được phát triển"
+                      description="Khu vực này chưa hoàn thiện. Vui lòng quay lại Tổng quan hoặc Kho đề thi."
+                    />
                   </ProtectedRoute>
                 }
               />

@@ -11,6 +11,7 @@ from exams.exam_service import (
     submit_exam,
     get_my_result,
     get_exam_results,
+    grade_exam_result,
 )
 
 from exams.word_parser import parse_docx_exam
@@ -154,6 +155,20 @@ def get_my_result_route(exam_id):
 def get_exam_results_route(exam_id):
     try:
         data = get_exam_results(request.current_user, exam_id)
+        return jsonify(data), 200
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "message": str(error),
+        }), 400
+
+
+@exam_bp.post("/<exam_id>/results/<result_id>/grade")
+@firebase_required
+def grade_exam_result_route(exam_id, result_id):
+    try:
+        payload = request.get_json() or {}
+        data = grade_exam_result(request.current_user, exam_id, result_id, payload)
         return jsonify(data), 200
     except Exception as error:
         return jsonify({

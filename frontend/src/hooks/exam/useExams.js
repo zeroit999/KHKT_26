@@ -10,6 +10,9 @@ import {
   deleteExamApi,
   getExamsApi,
   updateExamApi,
+  getDeletedExamsApi,
+  restoreExamApi,
+  permanentDeleteExamApi,
 } from '../../api/examApi'
 
 import {
@@ -19,8 +22,6 @@ import {
   normalizeSubject,
   subjectCodes,
   getExamCode,
-  getTeacherNameAbbreviation,
-  canManageExams,
 } from '../../utils/examHelpers'
 
 const normalizeGradeValue = (value = '') => {
@@ -51,6 +52,8 @@ export default function useExams() {
   const [publishFilter, setPublishFilter] = useState('all')
 
   const [exams, setExams] = useState([])
+  const [trashExams, setTrashExams] = useState([])
+  const [trashLoading, setTrashLoading] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [roleLoading, setRoleLoading] = useState(true)
@@ -222,6 +225,19 @@ export default function useExams() {
       .filter((exam) => {
         if (roleLoading) return false
 
+        const normalizedRole = String(role || '').trim().toUpperCase()
+        const isTeacher = normalizedRole === 'TEACHER'
+
+        if (isTeacher) {
+          const ownerIds = [exam.teacherId, exam.ownerId, exam.createdBy]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+
+          if (!currentUserId || !ownerIds.includes(String(currentUserId))) {
+            return false
+          }
+        }
+
         if (isStudentRole(role)) {
           const normalizedStudentGrade = normalizeGradeValue(
             studentGrade || studentClass || studentClasses[0],
@@ -264,6 +280,7 @@ export default function useExams() {
     exams,
     role,
     roleLoading,
+    currentUserId,
     studentClass,
     studentClasses,
     studentGrade,
@@ -315,6 +332,7 @@ export default function useExams() {
       scoring: exam.scoring ?? {},
       wordFileName: exam.wordFileName ?? '',
       maxFullscreenViolations: Number(exam.maxFullscreenViolations ?? 2),
+      leaderboardBonusPoints: Number(exam.leaderboardBonusPoints ?? 0),
       questions,
     }
   }
@@ -334,6 +352,7 @@ export default function useExams() {
       setEditingExam(null)
       setCreateOpen(false)
       await loadExams()
+      return true
     } catch (error) {
       console.error(error)
       toast.error(
@@ -341,13 +360,14 @@ export default function useExams() {
           error.message ||
           'Lưu bài thi thất bại',
       )
+      return false
     }
   }
 
   const deleteExam = async (examId) => {
     try {
       await deleteExamApi(examId)
-      toast.success('Đã xóa đề thi')
+      toast.success('Đã chuyển đề thi vào thùng rác')
       setDeleteConfirmExam(null)
       await loadExams()
     } catch (error) {
@@ -357,6 +377,43 @@ export default function useExams() {
           error.message ||
           'Xóa đề thi thất bại',
       )
+    }
+  }
+
+
+  const loadTrashExams = async () => {
+    try {
+      setTrashLoading(true)
+      const response = await getDeletedExamsApi()
+      setTrashExams(response.data?.exams ?? [])
+    } catch (error) {
+      console.error(error)
+      toast.error(error?.response?.data?.message || error.message || 'Không thể tải thùng rác')
+      setTrashExams([])
+    } finally {
+      setTrashLoading(false)
+    }
+  }
+
+  const restoreExam = async (examId) => {
+    try {
+      await restoreExamApi(examId)
+      toast.success('Đã khôi phục đề thi')
+      await Promise.all([loadExams(), loadTrashExams()])
+    } catch (error) {
+      console.error(error)
+      toast.error(error?.response?.data?.message || error.message || 'Khôi phục đề thi thất bại')
+    }
+  }
+
+  const permanentDeleteExam = async (examId) => {
+    try {
+      await permanentDeleteExamApi(examId)
+      toast.success('Đã xóa vĩnh viễn đề thi')
+      await loadTrashExams()
+    } catch (error) {
+      console.error(error)
+      toast.error(error?.response?.data?.message || error.message || 'Xóa vĩnh viễn thất bại')
     }
   }
 
@@ -410,6 +467,8 @@ export default function useExams() {
     setPublishFilter,
     exams,
     visibleExams,
+    trashExams,
+    trashLoading,
     studentResults,
     averageScore,
     loading,
@@ -427,6 +486,9 @@ export default function useExams() {
     loadExams,
     saveExam,
     deleteExam,
+    loadTrashExams,
+    restoreExam,
+    permanentDeleteExam,
     duplicateExam,
   }
 }

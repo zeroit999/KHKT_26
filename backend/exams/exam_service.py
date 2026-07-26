@@ -24,6 +24,37 @@ def is_student(user):
     return role == "STUDENT"
 
 
+def is_teacher(user):
+    return normalize_role(user) == "TEACHER"
+
+
+def is_exam_owned_by_user(current_user, exam_data):
+    """Chỉ cho giáo viên nhìn thấy đề do chính tài khoản đó tạo.
+
+    Ưu tiên đối chiếu UID. Email chỉ là phương án tương thích cho dữ liệu cũ
+    chưa có teacherId/ownerId/createdBy.
+    """
+    current_uid = str(current_user.get("uid") or "").strip()
+    current_email = str(current_user.get("email") or "").strip().lower()
+
+    owner_ids = {
+        str(exam_data.get("teacherId") or "").strip(),
+        str(exam_data.get("ownerId") or "").strip(),
+        str(exam_data.get("createdBy") or "").strip(),
+    }
+    owner_ids.discard("")
+
+    if current_uid and current_uid in owner_ids:
+        return True
+
+    # Chỉ dùng email cho các đề cũ hoàn toàn chưa có trường định danh chủ sở hữu.
+    if not owner_ids and current_email:
+        teacher_email = str(exam_data.get("teacherEmail") or "").strip().lower()
+        return bool(teacher_email and teacher_email == current_email)
+
+    return False
+
+
 def serialize_firestore_value(value):
     if hasattr(value, "isoformat"):
         return value.isoformat()
@@ -335,6 +366,11 @@ def get_exams(current_user):
         if role == "STUDENT" and not can_student_view_exam(current_user, exam_data):
             continue
 
+        # Giáo viên chỉ được nhận danh sách đề do chính mình sở hữu.
+        # Quản trị viên vẫn được phép xem toàn bộ để thực hiện nhiệm vụ quản trị.
+        if is_teacher(current_user) and not is_exam_owned_by_user(current_user, exam_data):
+            continue
+
         exams.append(build_exam_summary(current_user, exam_id, exam_data))
 
     exams.sort(
@@ -557,6 +593,9 @@ def submit_exam(current_user, exam_id, payload):
         scoring=scoring,
     )
 
+    configured_bonus_points = float(exam_data.get("leaderboardBonusPoints", 0) or 0)
+    leaderboard_bonus_awarded = configured_bonus_points if attempt_count == 0 else 0
+
     result_ref = exam_ref.collection("results").document()
 
     result_data = {
@@ -568,6 +607,8 @@ def submit_exam(current_user, exam_id, payload):
         "textAnswers": text_answers,
         "fullscreenViolations": fullscreen_violations,
         "scoring": scoring,
+        "leaderboardBonusPoints": configured_bonus_points,
+        "leaderboardBonusAwarded": leaderboard_bonus_awarded,
         **score_data,
         "createdAt": firestore.SERVER_TIMESTAMP,
     }
@@ -631,4 +672,67 @@ def get_exam_results(current_user, exam_id):
     return {
         "success": True,
         "results": results,
+    }
+
+
+def grade_exam_result(current_user, exam_id, result_id, payload):
+    if not is_teacher_or_admin(current_user):
+        raise Exception("Bạn không có quyền chấm bài thi")
+
+    exam_ref = db.collection("exams").document(exam_id)
+    exam_doc = exam_ref.get()
+
+    if not exam_doc.exists:
+        raise Exception("Không tìm thấy bài thi")
+
+    exam_data = exam_doc.to_dict() or {}
+    assert_exam_owner_or_admin(current_user, exam_data)
+
+    result_ref = exam_ref.collection("results").document(result_id)
+    result_doc = result_ref.get()
+
+    if not result_doc.exists:
+        raise Exception("Không tìm thấy bài làm")
+
+    current_result = serialize_doc_data(result_doc.to_dict() or {})
+    score_value = payload.get("score", payload.get("manualScore"))
+    teacher_note = str(payload.get("teacherNote", "") or "").strip()
+
+    update_data = {
+        "teacherNote": teacher_note,
+        "gradedBy": current_user.get("uid"),
+        "gradedByName": (
+            current_user.get("name")
+            or current_user.get("displayName")
+            or current_user.get("fullName")
+            or current_user.get("email")
+        ),
+        "gradedAt": firestore.SERVER_TIMESTAMP,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+    }
+
+    if score_value is not None and str(score_value).strip() != "":
+        numeric_score = round(float(score_value), 2)
+
+        if "originalScore" not in current_result:
+            update_data["originalScore"] = float(current_result.get("score", 0) or 0)
+
+        update_data["score"] = numeric_score
+        update_data["manualScore"] = numeric_score
+
+    result_ref.update({
+        key: value
+        for key, value in update_data.items()
+        if value is not None
+    })
+
+    updated_doc = result_ref.get()
+
+    return {
+        "success": True,
+        "message": "Đã lưu chấm bài",
+        "result": {
+            "id": result_id,
+            **serialize_doc_data(updated_doc.to_dict() or {}),
+        },
     }

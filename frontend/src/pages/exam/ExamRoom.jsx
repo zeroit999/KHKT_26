@@ -14,7 +14,7 @@ const renderRichContent = (content = '') => {
   const html = rawContent
     .replace(
       /<img\s+/g,
-      '<img class="my-5 max-h-[420px] max-w-full rounded-2xl border border-slate-200 object-contain shadow-sm" ',
+      '<img class="my-5 max-h-105 max-w-full rounded-2xl border border-slate-200 object-contain shadow-sm" ',
     )
     .replace(/\n/g, '<br />')
 
@@ -78,7 +78,7 @@ function ExamRoom() {
   if (!preview && !isTeacher && !hasStarted) {
     return (
       <section className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-        <div className="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-xl">
+        <div className="w-full max-w-xl rounded-4xl border border-slate-200 bg-white p-8 text-center shadow-xl">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-600 text-white shadow-lg shadow-blue-500/25">
             <Maximize2 className="h-10 w-10" />
           </div>
@@ -113,8 +113,8 @@ function ExamRoom() {
   return (
     <section className="min-h-screen bg-slate-100">
       {lockedByFullscreen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-[32px] border border-red-200 bg-white p-8 text-center shadow-2xl">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-4xl border border-red-200 bg-white p-8 text-center shadow-2xl">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-red-600 text-white shadow-lg shadow-red-500/25">
               <LockKeyhole className="h-10 w-10" />
             </div>
@@ -193,8 +193,10 @@ function ExamRoom() {
           {exam.questions?.map((question, index) => (
             <div
               key={question.id}
-              className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-sm"
+              className="relative pb-8 last:pb-0"
             >
+              <div className="absolute inset-x-0 bottom-0 border-b border-slate-200 last:border-b-0" />
+
               <div className="flex items-start gap-5">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-black text-white">
                   {index + 1}

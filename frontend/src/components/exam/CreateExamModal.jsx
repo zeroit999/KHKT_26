@@ -1,22 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  Award,
   BookOpenCheck,
   CalendarClock,
   FileText,
   GraduationCap,
   Loader2,
-  Plus,
+  ShieldAlert,
   ShieldCheck,
   Trash2,
   Upload,
   UsersRound,
   X,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ListChecks,
+  Settings2,
+  WandSparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import RichEditor from './RichEditor.jsx'
 import DarkModeSelect from './DarkModeSelect.jsx'
+import DateTimePicker from './DateTimePicker.jsx'
 
 import { parseWordExamApi } from '../../api/examApi'
 
@@ -59,6 +67,7 @@ function CreateExamModal({
   teacherSubject = 'Toán',
   teacherName = 'GiaoVien',
   availableClasses = [],
+  presentation = 'modal',
 }) {
   const fixedTeacherSubject = normalizeSubject(teacherSubject)
 
@@ -94,6 +103,7 @@ function CreateExamModal({
     }))
 
   const [parsingWord, setParsingWord] = useState(false)
+  const [activeStep, setActiveStep] = useState(0)
 
   const [form, setForm] = useState({
     title: '',
@@ -114,6 +124,7 @@ function CreateExamModal({
     scoring: defaultScoring,
     wordFileName: '',
     maxFullscreenViolations: 2,
+    leaderboardBonusPoints: 0,
     questions: [createQuestionWithSection('part1')],
   })
 
@@ -181,6 +192,8 @@ function CreateExamModal({
   useEffect(() => {
     if (!open) return
 
+    setActiveStep(0)
+
     if (editingExam) {
       const existingQuestions =
         editingExam.questions?.length > 0
@@ -226,6 +239,7 @@ function CreateExamModal({
         },
         wordFileName: editingExam.wordFileName ?? '',
         maxFullscreenViolations: Number(editingExam.maxFullscreenViolations ?? 2),
+        leaderboardBonusPoints: Number(editingExam.leaderboardBonusPoints ?? 0),
         questions: existingQuestions,
       })
     } else {
@@ -248,6 +262,7 @@ function CreateExamModal({
         scoring: defaultScoring,
         wordFileName: '',
         maxFullscreenViolations: 2,
+        leaderboardBonusPoints: 0,
         questions: [createQuestionWithSection('part1')],
       })
     }
@@ -478,47 +493,57 @@ function CreateExamModal({
 
   const handleSubmit = () => {
     if (!form.title.trim()) {
-      alert('Vui lòng nhập tên bài thi')
+      toast.error('Vui lòng nhập tên bài thi')
       return
     }
 
     if (!form.questions.length) {
-      alert('Vui lòng thêm ít nhất 1 câu hỏi')
+      toast.error('Vui lòng thêm ít nhất 1 câu hỏi')
       return
     }
 
     if (form.status === 'public' && !(form.selectedGrades ?? []).length) {
-      alert('Bài thi công khai bắt buộc phải chọn ít nhất 1 khối')
+      toast.error('Bài thi công khai bắt buộc phải chọn ít nhất 1 khối')
       return
     }
 
     if (form.status === 'private' && !(form.selectedClasses ?? []).length) {
-      alert('Bài thi riêng tư bắt buộc phải chọn ít nhất 1 lớp')
+      toast.error('Bài thi riêng tư bắt buộc phải chọn ít nhất 1 lớp')
       return
     }
 
     if (!form.openDate) {
-      alert('Vui lòng chọn thời gian mở bài thi')
+      toast.error('Vui lòng chọn thời gian mở bài thi')
       return
     }
 
     if (!form.closeDate) {
-      alert('Vui lòng chọn thời gian đóng bài thi')
+      toast.error('Vui lòng chọn thời gian đóng bài thi')
       return
     }
 
     if (invalidCloseDate) {
-      alert('Thời gian đóng phải sau thời gian mở')
+      toast.error('Thời gian đóng phải sau thời gian mở')
       return
     }
 
     if (computedTotalScore <= 0) {
-      alert('Vui lòng nhập điểm cho từng phần')
+      toast.error('Vui lòng nhập điểm cho từng phần')
       return
     }
 
     if (scoreOverLimit) {
-      alert('Tổng điểm đang vượt quá 10. Vui lòng điều chỉnh điểm từng phần.')
+      toast.error('Tổng điểm đang vượt quá 10. Vui lòng điều chỉnh điểm từng phần.')
+      return
+    }
+
+    if (Number(form.maxFullscreenViolations) < 0) {
+      toast.error('Số lần được phép vi phạm không được nhỏ hơn 0')
+      return
+    }
+
+    if (Number(form.leaderboardBonusPoints) < 0) {
+      toast.error('Điểm cộng xếp hạng không được nhỏ hơn 0')
       return
     }
 
@@ -555,11 +580,12 @@ function CreateExamModal({
         },
       },
       maxFullscreenViolations: Number(form.maxFullscreenViolations ?? 2),
+      leaderboardBonusPoints: Number(form.leaderboardBonusPoints ?? 0),
     })
   }
 
   const renderScoreSettings = () => (
-    <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
+    <div id="exam-score-settings" className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
@@ -569,10 +595,10 @@ function CreateExamModal({
 
             <div>
               <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                Cấu hình chấm điểm theo cấu trúc đề
+                Điểm thành phần và cấu hình chấm điểm
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Thiết lập điểm cho từng phần; phần tự luận nhập điểm riêng từng câu.
+                Thiết lập rõ điểm từng phần. Tổng điểm đề thi được kiểm soát tối đa 10 điểm.
               </p>
             </div>
           </div>
@@ -932,541 +958,394 @@ function CreateExamModal({
     )
   }
 
+  const isPage = presentation === 'page'
+  const steps = [
+    { id: 'information', label: 'Thông tin đề thi', Icon: FileText },
+    { id: 'configuration', label: 'Cấu hình và điểm', Icon: Settings2 },
+    { id: 'questions', label: 'Nội dung câu hỏi', Icon: ListChecks },
+  ]
+
+  const goToNextStep = () => {
+    if (activeStep === 0) {
+      if (!form.title.trim()) {
+        toast.error('Vui lòng nhập tên bài thi')
+        return
+      }
+
+      if (form.status === 'public' && !(form.selectedGrades ?? []).length) {
+        toast.error('Vui lòng chọn ít nhất một khối học sinh')
+        return
+      }
+
+      if (form.status === 'private' && !(form.selectedClasses ?? []).length) {
+        toast.error('Vui lòng chọn ít nhất một lớp học')
+        return
+      }
+    }
+
+    if (activeStep === 1) {
+      if (!form.openDate || !form.closeDate) {
+        toast.error('Vui lòng thiết lập đầy đủ thời gian mở và đóng đề')
+        return
+      }
+
+      if (invalidCloseDate) {
+        toast.error('Thời gian đóng phải sau thời gian mở')
+        return
+      }
+
+      if (computedTotalScore <= 0 || scoreOverLimit) {
+        toast.error('Vui lòng hoàn thiện cấu hình điểm thành phần')
+        return
+      }
+    }
+
+    setActiveStep((current) => Math.min(current + 1, steps.length - 1))
+  }
+
+  const shellClass = isPage
+    ? 'relative w-full overflow-visible rounded-[32px] border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-950'
+    : 'relative max-h-[94vh] w-full max-w-7xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950'
+
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
-      onMouseDown={onClose}
+      className={
+        isPage
+          ? 'w-full'
+          : 'fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md'
+      }
+      onMouseDown={isPage ? undefined : onClose}
     >
-      <div
-        className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-950"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
-              {editingExam ? 'Cập nhật bài thi' : 'Tạo bài thi'}
-            </p>
+      <div className={shellClass} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-700 px-6 py-7 text-white sm:px-8">
+          <div className="absolute -right-20 -top-28 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl" />
 
-            <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
-              {editingExam ? 'Sửa bài thi' : 'Tạo bài thi mới'}
-            </h2>
+          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/15 shadow-lg backdrop-blur">
+                <WandSparkles className="h-7 w-7" />
+              </div>
 
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
-              Giáo viên: {teacherName}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-200">
-              <FileText className="h-5 w-5" />
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-100">
+                  {editingExam ? 'Cập nhật đề thi' : 'Tạo đề thi mới'}
+                </p>
+                <h2 className="mt-2 text-2xl font-black sm:text-3xl">
+                  Thiết lập đề thi trực tuyến
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-blue-100">
+                  Hoàn thiện thông tin, cấu hình điểm và xây dựng nội dung theo từng bước rõ ràng.
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                Thông tin định danh bài thi
-              </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Nhập tên bài, chủ đề và mã đề theo đúng quy ước hệ thống.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Tên bài thi
-              </label>
-              <input
-                value={form.title}
-                onChange={(event) => updateForm('title', event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-                placeholder="Nhập tên bài thi..."
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Môn thi theo chuyên môn giáo viên
-              </label>
-              <input
-                value={fixedTeacherSubject}
-                disabled
-                className="w-full cursor-not-allowed rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 outline-none dark:border-white/10 dark:bg-white/10 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Mã đề do giáo viên nhập
-              </label>
-              <input
-                value={form.codeNumber}
-                onChange={(event) => updateForm('codeNumber', event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-                placeholder="Ví dụ: 001"
-              />
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                Mã bài thi hoàn chỉnh:{' '}
-                <span className="font-black text-blue-600">{examCodePreview}</span>
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Chủ đề
-              </label>
-              <input
-                value={form.topic}
-                onChange={(event) => updateForm('topic', event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-                placeholder="Nhập chủ đề..."
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-[11px] font-black uppercase tracking-wider text-blue-100">Giáo viên</p>
+                <p className="mt-1 text-sm font-black">{teacherName}</p>
+              </div>
+              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-[11px] font-black uppercase tracking-wider text-blue-100">Môn học</p>
+                <p className="mt-1 text-sm font-black">{fixedTeacherSubject}</p>
+              </div>
+              {!isPage ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-2xl border border-white/20 bg-white/10 p-3 transition hover:bg-white/20"
+                  aria-label="Đóng"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
+        <div className="border-b border-slate-200 bg-white px-6 py-5 dark:border-white/10 dark:bg-slate-950 sm:px-8">
+          <div className="grid gap-3 md:grid-cols-3">
+            {steps.map((step, index) => {
+              const completed = index < activeStep
+              const selected = index === activeStep
+              const StepIcon = step.Icon
 
-            <div>
-              <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                1. Phạm vi hiển thị bài thi
-              </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Chọn cách mở bài thi trước, sau đó chọn khối hoặc lớp được phép nhìn thấy bài thi.
-              </p>
-            </div>
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => setActiveStep(index)}
+                  className={`group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                    selected
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm dark:border-blue-400/50 dark:bg-blue-500/15 dark:text-blue-100'
+                      : completed
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+                        : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-400'
+                  }`}
+                >
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-blue-600 text-white' : completed ? 'bg-emerald-600 text-white' : 'bg-white text-slate-400 dark:bg-white/10'}`}>
+                    {completed ? <CheckCircle2 className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
+                  </span>
+                  <span>
+                    <span className="block text-[11px] font-black uppercase tracking-wider opacity-70">Bước {index + 1}</span>
+                    <span className="mt-0.5 block text-sm font-black">{step.label}</span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
+        </div>
 
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Chế độ hiển thị
-              </label>
-              <DarkModeSelect
-                value={form.status}
-                onChange={(value) => updateForm('status', value)}
-                options={[
-                  { value: 'public', label: 'Công khai theo khối' },
-                  { value: 'private', label: 'Riêng tư theo lớp' },
-                ]}
-              />
-              <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Công khai: học sinh cùng khối sẽ thấy bài thi. Riêng tư: chỉ lớp được chọn thấy bài thi.
-              </p>
-            </div>
+        <div className={`${isPage ? '' : 'max-h-[calc(94vh-260px)] overflow-y-auto'} bg-white px-6 py-6 dark:bg-slate-950 sm:px-8 sm:py-8`}>
+          {activeStep === 0 ? (
+            <div className="mx-auto max-w-6xl space-y-6">
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-950">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-950 dark:text-white">Thông tin cơ bản</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Tên đề, chủ đề, mã đề và phạm vi hiển thị.</p>
+                  </div>
+                </div>
 
-            <div className="rounded-2xl bg-white p-4 dark:bg-slate-900">
-              <p className="text-sm font-black text-slate-900 dark:text-white">
-                Tóm tắt phạm vi
-              </p>
-              <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-300">
-                {form.status === 'public'
-                  ? `Đã chọn ${(form.selectedGrades ?? []).length} khối`
-                  : `Đã chọn ${(form.selectedClasses ?? []).length} lớp`}
-              </p>
-            </div>
-          </div>
-
-          {form.status === 'public' && (
-            <div className="mt-5 rounded-3xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-500/20 dark:bg-blue-500/10">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20">
-                    <GraduationCap className="h-5 w-5" />
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="lg:col-span-2">
+                    <label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Tên bài thi</label>
+                    <input
+                      value={form.title}
+                      onChange={(event) => updateForm('title', event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      placeholder="Ví dụ: Kiểm tra giữa học kì I"
+                    />
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-black text-slate-950 dark:text-white">
-                      Chọn khối học sinh
-                    </h4>
-                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
-                      Bắt buộc chọn ít nhất 1 khối để học sinh nhìn thấy bài thi công khai.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
-                  Đã chọn: {(form.selectedGrades ?? []).length} khối
-                </div>
-              </div>
-
-              {!(form.selectedGrades ?? []).length && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                  Bài thi công khai chưa chọn khối nên học sinh sẽ không thấy bài thi.
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-wrap gap-3">
-                {['10', '11', '12'].map((grade) => {
-                  const selected = (form.selectedGrades ?? []).includes(grade)
-
-                  return (
-                    <button
-                      key={grade}
-                      type="button"
-                      onClick={() => toggleGrade(grade)}
-                      className={`rounded-2xl border px-6 py-3 text-sm font-black transition-all ${
-                        selected
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                          : 'border-slate-300 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:bg-white/10'
-                      }`}
-                    >
-                      Khối {grade}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {form.status === 'private' && (
-            <div className="mt-5 rounded-3xl border border-violet-100 bg-violet-50 p-5 dark:border-violet-500/20 dark:bg-violet-500/10">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/20">
-                    <UsersRound className="h-5 w-5" />
+                    <label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Chủ đề</label>
+                    <input
+                      value={form.topic}
+                      onChange={(event) => updateForm('topic', event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      placeholder="Nhập chủ đề kiến thức"
+                    />
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-black text-slate-950 dark:text-white">
-                      Chọn lớp làm bài
-                    </h4>
-                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
-                      Dữ liệu lớp lấy từ Quản lý lớp học. Bắt buộc chọn ít nhất 1 lớp.
-                    </p>
+                    <label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Mã đề</label>
+                    <input
+                      value={form.codeNumber}
+                      onChange={(event) => updateForm('codeNumber', event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      placeholder="0001"
+                    />
+                    <p className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-300">Mã hoàn chỉnh: {examCodePreview}</p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Chế độ hiển thị</label>
+                    <DarkModeSelect
+                      value={form.status}
+                      onChange={(value) => updateForm('status', value)}
+                      options={[
+                        { value: 'public', label: 'Công khai theo khối' },
+                        { value: 'private', label: 'Riêng tư theo lớp' },
+                      ]}
+                      buttonClassName="rounded-2xl bg-slate-50 px-4 py-3.5 dark:bg-white/5"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Số lượt làm</label>
+                    <DarkModeSelect
+                      value={form.attemptMode}
+                      onChange={(value) => updateForm('attemptMode', value)}
+                      options={[
+                        { value: 'once', label: 'Chỉ một lần' },
+                        { value: 'multiple', label: 'Nhiều lần' },
+                      ]}
+                      buttonClassName="rounded-2xl bg-slate-50 px-4 py-3.5 dark:bg-white/5"
+                    />
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-black text-white">
-                  Đã chọn: {(form.selectedClasses ?? []).length} lớp
+                {form.attemptMode === 'multiple' ? (
+                  <div className="mt-5 max-w-sm">
+                    <label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Số lượt tối đa</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.maxAttempts}
+                      onChange={(event) => updateForm('maxAttempts', event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    />
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-950">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200">
+                    {form.status === 'public' ? <GraduationCap className="h-6 w-6" /> : <UsersRound className="h-6 w-6" />}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-950 dark:text-white">Đối tượng làm bài</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Chọn đúng khối hoặc lớp được phép truy cập đề.</p>
+                  </div>
                 </div>
-              </div>
 
-              {!(form.selectedClasses ?? []).length && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                  Bài thi riêng tư chưa chọn lớp nên học sinh sẽ không thấy bài thi.
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-wrap gap-3">
-                {availableClasses.length > 0 ? (
-                  availableClasses.map((classItem) => {
-                    const className =
-                      typeof classItem === 'string'
-                        ? classItem
-                        : classItem.name ||
-                          classItem.className ||
-                          classItem.title ||
-                          classItem.id ||
-                          'Lớp'
-
-                    const selected = (form.selectedClasses ?? []).includes(className)
-
-                    return (
-                      <button
-                        key={className}
-                        type="button"
-                        onClick={() => toggleClass(className)}
-                        className={`rounded-2xl border px-5 py-3 text-sm font-black transition-all ${
-                          selected
-                            ? 'border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-500/20'
-                            : 'border-slate-300 bg-white text-slate-700 hover:border-violet-400 hover:bg-violet-50 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:bg-white/10'
-                        }`}
-                      >
-                        {className}
-                      </button>
-                    )
-                  })
+                {form.status === 'public' ? (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {['10', '11', '12'].map((grade) => {
+                      const selected = (form.selectedGrades ?? []).includes(grade)
+                      return (
+                        <button key={grade} type="button" onClick={() => toggleGrade(grade)} className={`rounded-2xl border px-5 py-4 text-sm font-black transition ${selected ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white'}`}>
+                          Khối {grade}
+                        </button>
+                      )
+                    })}
+                  </div>
                 ) : (
-                  <div className="w-full rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-bold text-slate-500 dark:border-white/10 dark:bg-slate-900 dark:text-slate-400">
-                    Chưa có lớp học nào trong hệ thống
+                  <div className="flex flex-wrap gap-3">
+                    {availableClasses.length ? availableClasses.map((classItem) => {
+                      const className = typeof classItem === 'string' ? classItem : classItem.name || classItem.className || classItem.title || classItem.id || 'Lớp'
+                      const selected = (form.selectedClasses ?? []).includes(className)
+                      return (
+                        <button key={className} type="button" onClick={() => toggleClass(className)} className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${selected ? 'border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-500/20' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white'}`}>
+                          {className}
+                        </button>
+                      )
+                    }) : <p className="w-full rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm font-bold text-slate-500 dark:border-white/10">Chưa có lớp học trong hệ thống.</p>}
                   </div>
                 )}
-              </div>
+              </section>
             </div>
-          )}
+          ) : null}
+
+          {activeStep === 1 ? (
+            <div className="mx-auto max-w-6xl space-y-6">
+              <section className="grid gap-5 xl:grid-cols-3">
+                <div className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm dark:border-orange-500/20 dark:from-orange-500/10 dark:to-amber-500/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-500/25"><ShieldAlert className="h-6 w-6" /></div>
+                  <h3 className="mt-5 text-lg font-black text-slate-950 dark:text-white">Số lần được phép vi phạm</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">Giới hạn số lần học sinh được thoát chế độ toàn màn hình.</p>
+                  <div className="mt-5 flex items-center gap-3">
+                    <button type="button" onClick={() => updateForm('maxFullscreenViolations', Math.max(0, Number(form.maxFullscreenViolations || 0) - 1))} className="h-12 w-12 rounded-2xl border border-orange-200 bg-white text-xl font-black text-orange-600 dark:border-orange-500/30 dark:bg-white/10">−</button>
+                    <input type="number" min="0" value={form.maxFullscreenViolations} onChange={(event) => updateForm('maxFullscreenViolations', event.target.value)} className="h-12 min-w-0 flex-1 rounded-2xl border border-orange-200 bg-white text-center text-xl font-black text-slate-950 outline-none focus:border-orange-500 dark:border-orange-500/30 dark:bg-white/10 dark:text-white" />
+                    <button type="button" onClick={() => updateForm('maxFullscreenViolations', Number(form.maxFullscreenViolations || 0) + 1)} className="h-12 w-12 rounded-2xl bg-orange-500 text-xl font-black text-white shadow-lg shadow-orange-500/20">+</button>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-6 shadow-sm dark:border-violet-500/20 dark:from-violet-500/10 dark:to-fuchsia-500/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/25"><Award className="h-6 w-6" /></div>
+                  <h3 className="mt-5 text-lg font-black text-slate-950 dark:text-white">Điểm cộng xếp hạng</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">Điểm được cộng vào bảng xếp hạng toàn hệ thống sau khi hoàn thành.</p>
+                  <div className="relative mt-5">
+                    <input type="number" min="0" step="0.1" value={form.leaderboardBonusPoints} onChange={(event) => updateForm('leaderboardBonusPoints', event.target.value)} className="h-12 w-full rounded-2xl border border-violet-200 bg-white px-4 pr-16 text-xl font-black text-slate-950 outline-none focus:border-violet-500 dark:border-violet-500/30 dark:bg-white/10 dark:text-white" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-violet-600 dark:text-violet-300">điểm</span>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-6 shadow-sm dark:border-blue-500/20 dark:from-blue-500/10 dark:to-cyan-500/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/25"><CalendarClock className="h-6 w-6" /></div>
+                  <h3 className="mt-5 text-lg font-black text-slate-950 dark:text-white">Thời lượng làm bài</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">Thời gian đếm ngược của mỗi lượt làm bài.</p>
+                  <div className="relative mt-5">
+                    <input type="number" min="1" value={form.duration} onChange={(event) => updateForm('duration', event.target.value)} className="h-12 w-full rounded-2xl border border-blue-200 bg-white px-4 pr-16 text-xl font-black text-slate-950 outline-none focus:border-blue-500 dark:border-blue-500/30 dark:bg-white/10 dark:text-white" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-blue-600 dark:text-blue-300">phút</span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-950">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-200"><CalendarClock className="h-6 w-6" /></div>
+                  <div><h3 className="text-xl font-black text-slate-950 dark:text-white">Lịch mở và đóng đề</h3><p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Thiết lập khoảng thời gian học sinh được truy cập.</p></div>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div><label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Thời gian mở</label><DateTimePicker value={form.openDate} onChange={(value) => { updateForm('openDate', value); updateForm('closeDate', addMinutesToDateTime(value, form.duration)) }} /></div>
+                  <div><label className="mb-2 block text-sm font-black text-slate-700 dark:text-slate-200">Thời gian đóng</label><DateTimePicker value={form.closeDate} min={form.openDate || undefined} onChange={(value) => updateForm('closeDate', value)} hasError={invalidCloseDate} /></div>
+                </div>
+              </section>
+
+              {renderScoreSettings()}
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-950">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div><h3 className="text-xl font-black text-slate-950 dark:text-white">Tùy chọn trộn đề</h3><p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Tạo trải nghiệm làm bài khác nhau giữa học sinh.</p></div>
+                  <div className="flex flex-wrap gap-3">
+                    {[['shuffleQuestions', 'Trộn câu hỏi'], ['shuffleAnswers', 'Trộn đáp án']].map(([key, label]) => (
+                      <button key={key} type="button" onClick={() => updateForm(key, !form[key])} className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${form[key] ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-white'}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {activeStep === 2 ? (
+            <div className="mx-auto max-w-6xl space-y-6">
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-950">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200"><Upload className="h-6 w-6" /></div>
+                    <div><h3 className="text-xl font-black text-slate-950 dark:text-white">Nhập đề từ Word</h3><p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Tải tệp .docx theo đúng định dạng hệ thống.</p></div>
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700">
+                    {parsingWord ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {parsingWord ? 'Đang xử lý...' : 'Chọn tệp Word'}
+                    <input type="file" accept=".docx" onChange={handleWordFileChange} className="hidden" disabled={parsingWord} />
+                  </label>
+                </div>
+                {form.wordFileName ? <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">Đã chọn: {form.wordFileName}</p> : null}
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-950">
+                <div className="sticky top-0 z-20 flex flex-col gap-4 border-b border-slate-200 bg-white/95 p-5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 lg:flex-row lg:items-center lg:justify-between">
+                  <div><h3 className="text-xl font-black text-slate-950 dark:text-white">Danh sách câu hỏi</h3><p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{form.questions.length} câu • Tổng điểm hiện tại: {computedTotalScore}/10</p></div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => addQuestion('part1')} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white">+ Phần 1</button>
+                    <button type="button" onClick={() => addQuestion('part2')} className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white">+ Phần 2</button>
+                    <button type="button" onClick={() => addQuestion('part3')} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white">+ Phần 3</button>
+                    <button type="button" onClick={() => addQuestion('part4')} className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-black text-white">+ Phần 4</button>
+                  </div>
+                </div>
+                <div className="space-y-5 p-5">{form.questions.map(renderQuestion)}</div>
+              </section>
+            </div>
+          ) : null}
         </div>
 
-        <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-200">
-              <CalendarClock className="h-5 w-5" />
-            </div>
+        <div
+          className={`flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 px-6 py-5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:flex-row sm:items-center sm:justify-between sm:px-8 ${
+            isPage
+              ? 'sticky bottom-4 z-40 mx-4 mb-4 rounded-3xl border border-slate-200 shadow-[0_-12px_40px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_-12px_40px_rgba(0,0,0,0.35)]'
+              : ''
+          }`}
+        >
+          <button type="button" onClick={onClose} className="rounded-2xl px-5 py-3 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">Hủy</button>
 
-            <div>
-              <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                2. Thời gian và quy định làm bài
-              </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Thiết lập lịch mở, lịch đóng, thời lượng, số lượt làm và giới hạn thoát toàn màn hình.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Thời gian mở
-              </label>
-              <input
-                type="datetime-local"
-                value={form.openDate}
-                onChange={(event) => {
-                  const openDate = event.target.value
-                  updateForm('openDate', openDate)
-                  updateForm('closeDate', addMinutesToDateTime(openDate, form.duration))
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Thời gian đóng
-              </label>
-              <input
-                type="datetime-local"
-                value={form.closeDate}
-                min={form.openDate || undefined}
-                onChange={(event) => updateForm('closeDate', event.target.value)}
-                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:bg-slate-900 dark:text-white ${
-                  invalidCloseDate
-                    ? 'border-red-400 focus:border-red-500 dark:border-red-400'
-                    : 'border-slate-300 dark:border-white/10'
-                }`}
-              />
-              {invalidCloseDate && (
-                <p className="mt-2 text-xs font-black text-red-600 dark:text-red-300">
-                  Thời gian đóng phải sau thời gian mở.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Thời lượng phút
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={form.duration}
-                onChange={(event) => {
-                  const duration = Number(event.target.value || 45)
-                  updateForm('duration', duration)
-
-                  if (form.openDate) {
-                    updateForm('closeDate', addMinutesToDateTime(form.openDate, duration))
-                  }
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Số lượt làm
-              </label>
-              <DarkModeSelect
-                value={form.attemptMode}
-                onChange={(value) => {
-                  updateForm('attemptMode', value)
-                  if (value === 'once') updateForm('maxAttempts', 1)
-                }}
-                options={[
-                  { value: 'once', label: 'Chỉ 1 lần' },
-                  { value: 'multiple', label: 'Nhiều lần' },
-                ]}
-              />
-
-              {form.attemptMode === 'multiple' && (
-                <input
-                  type="number"
-                  min={1}
-                  value={form.maxAttempts}
-                  onChange={(event) =>
-                    updateForm('maxAttempts', Number(event.target.value || 1))
-                  }
-                  className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-                />
-              )}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                Số lần được thoát toàn màn hình
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={form.maxFullscreenViolations ?? 2}
-                onChange={(event) =>
-                  updateForm('maxFullscreenViolations', Number(event.target.value || 0))
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200">
-              <Upload className="h-5 w-5" />
-            </div>
-
-            <div>
-              <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                3. Tệp đề thi và định dạng nhập liệu
-              </h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Có thể nhập câu hỏi thủ công hoặc tải file Word theo mẫu.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto]">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                File Word đề thi
-              </label>
-
-              <label
-                className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed px-4 py-3 text-sm font-black transition ${
-                  parsingWord
-                    ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
-                    : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200'
-                }`}
-              >
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  {parsingWord ? (
-                    <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
-                  ) : (
-                    <Upload className="h-5 w-5 shrink-0" />
-                  )}
-
-                  <span className="truncate">
-                    {parsingWord
-                      ? 'Đang đọc file Word...'
-                      : form.wordFileName || 'Chọn file .docx'}
-                  </span>
-                </span>
-
-                <input
-                  type="file"
-                  accept=".docx"
-                  onChange={handleWordFileChange}
-                  className="hidden"
-                  disabled={parsingWord}
-                />
-              </label>
-
-              {form.wordFileName && (
-                <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  <FileText className="h-4 w-4" />
-                  {form.wordFileName}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-end">
-              <a
-                href="/De Mau Trac Nghiem Online - DoanVan.docx"
-                download
-                className="inline-flex h-[48px] items-center justify-center gap-2 rounded-xl bg-slate-100 px-5 text-sm font-black text-slate-700 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-              >
-                <FileText className="h-4 w-4" />
-                Format đề thi
-              </a>
-            </div>
-          </div>
-        </div>
-        {renderScoreSettings()}
-
-        <div className="mt-6 space-y-5">
-          <div className="sticky top-0 z-20 -mx-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-slate-950/95">
-            <div>
-              <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                Câu hỏi
-              </h3>
-
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                {form.questions.length} câu • Tổng điểm: {computedTotalScore}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => addQuestion('part1')}
-                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white"
-              >
-                + Phần 1
+          <div className="flex flex-col-reverse gap-3 sm:flex-row">
+            {activeStep > 0 ? (
+              <button type="button" onClick={() => setActiveStep((current) => Math.max(0, current - 1))} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white">
+                <ChevronLeft className="h-4 w-4" /> Quay lại
               </button>
+            ) : null}
 
-              <button
-                type="button"
-                onClick={() => addQuestion('part2')}
-                className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-black text-white"
-              >
-                + Phần 2
+            {activeStep < steps.length - 1 ? (
+              <button type="button" onClick={goToNextStep} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700">
+                Tiếp tục <ChevronRight className="h-4 w-4" />
               </button>
-
-              <button
-                type="button"
-                onClick={() => addQuestion('part3')}
-                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white"
-              >
-                + Phần 3
+            ) : (
+              <button type="button" onClick={handleSubmit} disabled={parsingWord || scoreOverLimit || invalidCloseDate} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                <CheckCircle2 className="h-4 w-4" /> {editingExam ? 'Lưu thay đổi' : 'Tạo đề thi'}
               </button>
-
-              <button
-                type="button"
-                onClick={() => addQuestion('part4')}
-                className="rounded-xl bg-orange-600 px-4 py-3 text-sm font-black text-white"
-              >
-                + Phần 4
-              </button>
-            </div>
+            )}
           </div>
-
-          {form.questions.map(renderQuestion)}
-        </div>
-
-        <div className="sticky bottom-0 z-30 -mx-6 mt-6 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 px-6 py-5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
-          >
-            Hủy
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={parsingWord || scoreOverLimit || invalidCloseDate}
-            className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {editingExam ? 'Cập nhật bài thi' : 'Tạo bài thi'}
-          </button>
         </div>
       </div>
     </div>
   )
 }
 
-export default CreateExamModal  
+export default CreateExamModal
