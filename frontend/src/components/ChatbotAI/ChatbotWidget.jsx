@@ -392,7 +392,16 @@ export default function ChatbotWidget() {
               </div>
 
               <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold ${isDark ? 'text-violet-200/60' : 'text-slate-500'}`}>
-                <span className="inline-flex items-center gap-1"><Database className="h-3 w-3" />{grounding?.authenticated ? `Đã đọc ${grounding.courseCount} khóa học, ${grounding.lessonCount} bài giảng` : 'Đăng nhập để AI đọc dữ liệu học tập'}</span>
+                <span className="inline-flex items-center gap-1">
+                  <Database className="h-3 w-3" />
+                  {grounding?.authenticated
+                    ? grounding.restricted
+                      ? 'Dữ liệu bị giới hạn an toàn trong phòng thi'
+                      : `Đã đọc ${grounding.courseCount || 0} khóa học · ${grounding.examCount || 0} bài thi · ${grounding.classCount || 0} lớp · ${grounding.forumPostCount || 0} bài viết`
+                    : user
+                      ? 'AI sẵn sàng đọc dữ liệu theo câu hỏi và quyền của Bạn'
+                      : 'Đăng nhập để AI đọc dữ liệu được cấp quyền'}
+                </span>
                 {user && <span>Nhớ {memoryCount} tin nhắn</span>}
               </div>
 

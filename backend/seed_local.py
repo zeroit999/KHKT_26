@@ -94,6 +94,43 @@ def seed():
         "studentIds": ["local-student-001"],
         "isLocalDemo": True,
     }, merge=True)
+    class_ref = database.collection("classes").document("12A1")
+    class_ref.collection("students").document("local-student-001").set({
+        "studentId": "local-student-001",
+        "studentCode": "HS001",
+        "name": "Học sinh Demo",
+        "status": "active",
+        "isLocalDemo": True,
+    }, merge=True)
+    subject_ref = class_ref.collection("subjects").document("math")
+    subject_ref.set({"name": "Toán", "order": 1, "isLocalDemo": True}, merge=True)
+    subject_ref.collection("tests").document("test-15m-001").set({
+        "name": "Kiểm tra 15 phút số 1",
+        "code": "KT15-01",
+        "order": 1,
+        "isLocalDemo": True,
+    }, merge=True)
+    subject_ref.collection("scores").document("local-student-001").set({
+        "studentId": "local-student-001",
+        "scores": {"test-15m-001": 8.5},
+        "average": 8.5,
+        "isLocalDemo": True,
+    }, merge=True)
+
+    database.collection("learningStats").document("local-student-001").set({
+        "watchedLessons": 1,
+        "watchedCourses": 1,
+        "watchedCourseIds": ["local-course-001"],
+        "watchedDates": ["2026-07-27"],
+        "streak": 1,
+        "isLocalDemo": True,
+    }, merge=True)
+    database.collection("learningStats").document("local-student-001").collection("courses").document("local-course-001").set({
+        "courseId": "local-course-001",
+        "progress": 50,
+        "watchedSeconds": 420,
+        "isLocalDemo": True,
+    }, merge=True)
 
     database.collection("courses").document("local-course-001").set({
         "title": "Khóa học demo local",
@@ -170,6 +207,34 @@ def seed():
         "correctAnswer": 1,
         "score": 10,
         "order": 1,
+    }, merge=True)
+    exam_ref.collection("results").document("local-result-001").set({
+        "studentId": "local-student-001",
+        "score": 8,
+        "totalScore": 10,
+        "correctCount": 1,
+        "wrongCount": 0,
+        "answeredCount": 1,
+        "totalViolations": 1,
+        "isLocalDemo": True,
+    }, merge=True)
+    exam_ref.collection("attempts").document("local-student-001").set({
+        "studentId": "local-student-001",
+        "attemptCount": 1,
+        "isLocalDemo": True,
+    }, merge=True)
+
+    database.collection("forumPosts").document("local-forum-post-001").set({
+        "title": "Cùng ôn tập trước kỳ thi",
+        "content": "Chia sẻ cách hệ thống hóa kiến thức và lên lịch ôn tập hiệu quả.",
+        "type": "discussion",
+        "tags": ["ôn tập", "lớp 12"],
+        "scope": "hall",
+        "status": "approved",
+        "authorId": "local-teacher-001",
+        "authorName": "Giáo viên Demo",
+        "commentsCount": 2,
+        "isLocalDemo": True,
     }, merge=True)
 
     print("Local Firebase data seeded successfully.")

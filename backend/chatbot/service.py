@@ -27,7 +27,8 @@ Chỉ khẳng định thông tin chức năng khi có trong ngữ cảnh đượ
 Nếu thiếu thông tin, nói rõ giới hạn thay vì bịa ra.
 Trả lời ngắn gọn, thực dụng; không hướng dẫn gian lận trong bài thi.
 Ưu tiên trả lời về trang hiện tại và dùng đúng dữ liệu giao diện được cung cấp.
-Khi có DỮ LIỆU NỀN TẢNG, phải dựa vào đúng tên khóa học, bài giảng, tiến độ và hồ sơ đó.
+Khi có DỮ LIỆU NỀN TẢNG, phải dựa vào đúng khóa học, bài giảng, tiến độ, bài thi, kết quả, lớp, điểm, diễn đàn và hồ sơ đó.
+Dữ liệu nền tảng chỉ để đọc và đã được giới hạn theo quyền. Không suy đoán bản ghi ẩn, không tiết lộ bí mật hoặc kết quả cá nhân của học sinh khác.
 Nếu người dùng hỏi tiếp, phải sử dụng lịch sử hội thoại để giữ ngữ cảnh, tránh hỏi lại thông tin đã có.
 Không yêu cầu mật khẩu, mã xác thực, khóa API hoặc dữ liệu nhạy cảm.
 """
@@ -204,12 +205,43 @@ def _mock_reply(message, relevant, profile, visible, data_context=None):
     normalized = str(message or "").lower()
     page_title = profile["title"]
     courses = (data_context or {}).get("courses") or []
+    exams = (data_context or {}).get("exams") or []
+    classes = (data_context or {}).get("classes") or []
+    forum_posts = (data_context or {}).get("forumPosts") or []
 
     if profile["id"] == "exam-room":
         return (
             "Tôi đang ở chế độ hỗ trợ Phòng thi. Tôi có thể giúp Bạn xử lý sự cố, "
             "toàn màn hình, đồng hồ và nộp bài; tôi không thể giải hoặc gợi ý đáp án."
         )
+
+    if any(term in normalized for term in ("database", "cơ sở dữ liệu", "phân tích toàn bộ", "tổng quan của tôi")):
+        learning = (data_context or {}).get("learning") or {}
+        return (
+            "Tôi đã đọc dữ liệu được cấp quyền của Bạn: "
+            f"{len(courses)} khóa học, {len(exams)} bài thi, {len(classes)} lớp học và {len(forum_posts)} bài viết diễn đàn. "
+            f"Tiến độ ghi nhận {learning.get('watchedCourses', 0)} khóa đã học"
+            + (f", kết quả gần nhất {exams[0]['results'][0].get('score', 0)}/{exams[0]['results'][0].get('totalScore', 10)} điểm" if exams and exams[0].get("results") else "")
+            + ". Các nút bên dưới mở đúng dữ liệu tương ứng."
+        )
+
+    asks_exam = any(term in normalized for term in ("bài thi", "đề thi", "kết quả", "điểm thi", "exam"))
+    asks_class = any(term in normalized for term in ("lớp học", "bảng điểm", "môn học", "class"))
+    if exams and classes and asks_exam and asks_class:
+        exam, class_item = exams[0], classes[0]
+        result = (exam.get("results") or [None])[0]
+        subject = (class_item.get("subjects") or [None])[0]
+        exam_text = (
+            f"bài “{exam['title']}” đạt {result.get('score', 0)}/{result.get('totalScore', exam.get('totalScore', 10))} điểm"
+            if result else f"bài “{exam['title']}” chưa có kết quả cá nhân"
+        )
+        class_text = ""
+        if subject:
+            class_text = (
+                f"; tại lớp “{class_item['name']}”, môn {subject['name']} có điểm trung bình "
+                f"{subject.get('average') if subject.get('average') is not None else 'chưa cập nhật'}"
+            )
+        return f"Tôi đã đối chiếu dữ liệu được cấp quyền: {exam_text}{class_text}. Tôi không đọc điểm cá nhân của học sinh khác."
 
     if courses and any(term in normalized for term in ("khóa học", "bài học", "bài giảng", "học gì", "học nào")):
         course = courses[0]
@@ -223,6 +255,35 @@ def _mock_reply(message, relevant, profile, visible, data_context=None):
             f"{f' với các bài: {lesson_names}' if lesson_names else ''}. "
             f"Tiến độ hiện tại là {course.get('progress', 0)}%. Bạn có thể mở khóa học bằng nút bên dưới."
         )
+
+    if exams and asks_exam:
+        exam = exams[0]
+        result = (exam.get("results") or [None])[0]
+        aggregate = exam.get("aggregate") or {}
+        if result:
+            return (
+                f"Tôi đã đọc kết quả được cấp quyền của Bạn cho “{exam['title']}”: "
+                f"{result.get('score', 0)}/{result.get('totalScore', exam.get('totalScore', 10))} điểm, "
+                f"ghi nhận {result.get('violationCount', 0)} vi phạm giám sát. Bạn có thể mở trang kết quả bên dưới."
+            )
+        if aggregate:
+            return (
+                f"Bài “{exam['title']}” có {aggregate.get('submissionCount', 0)} lượt nộp, "
+                f"điểm trung bình {aggregate.get('averageScore', 0)} và cao nhất {aggregate.get('highestScore', 0)}."
+            )
+        return f"Tôi tìm thấy bài thi “{exam['title']}”, thời lượng {exam.get('duration', 0)} phút."
+
+    if classes and asks_class:
+        class_item = classes[0]
+        subject_names = ", ".join(item.get("name", "") for item in class_item.get("subjects", []))
+        return (
+            f"Tôi đã đọc lớp “{class_item['name']}” được cấp quyền, sĩ số {class_item.get('studentCount', 0)}"
+            f"{f', gồm các môn: {subject_names}' if subject_names else ''}. Tôi không hiển thị dữ liệu cá nhân của học sinh khác."
+        )
+
+    if forum_posts and any(term in normalized for term in ("diễn đàn", "bài viết", "thảo luận", "forum")):
+        post = forum_posts[0]
+        return f"Bài viết phù hợp trên diễn đàn là “{post['title']}”: {post.get('content', '')}"
 
     if any(term in normalized for term in ("trang này", "làm gì", "chức năng")):
         return f"Bạn đang ở {page_title}. {profile['summary']} {profile['instructions']}"
@@ -307,6 +368,11 @@ def create_chat_response(message, history=None, page_context=None, data_context=
             "authenticated": bool((data_context or {}).get("authenticated")),
             "courseCount": int((data_context or {}).get("courseCount") or 0),
             "lessonCount": int((data_context or {}).get("lessonCount") or 0),
+            "examCount": int((data_context or {}).get("examCount") or 0),
+            "resultCount": int((data_context or {}).get("resultCount") or 0),
+            "classCount": int((data_context or {}).get("classCount") or 0),
+            "forumPostCount": int((data_context or {}).get("forumPostCount") or 0),
+            "loadedDomains": (data_context or {}).get("loadedDomains") or [],
             "restricted": bool((data_context or {}).get("restricted")),
         },
     }

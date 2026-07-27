@@ -205,7 +205,7 @@ def create_app():
             current_user = get_optional_chat_user()
             stored_history = load_chat_memory(current_user.get("uid")) if current_user else []
             effective_history = stored_history or history
-            data_context = build_platform_context(current_user, page_context)
+            data_context = build_platform_context(current_user, page_context, message)
             result = create_chat_response(
                 message=message,
                 history=effective_history,
