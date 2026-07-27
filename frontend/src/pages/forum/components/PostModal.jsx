@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKey, displayName, initials }) {
+function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKey, displayName, initials, avatarUrl = '' }) {
   const initialForm = {
     title: '',
     content: '',
@@ -177,7 +177,13 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
 
         <div className="max-h-[68vh] overflow-y-auto px-6 py-6">
           <div className="mb-5 flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">{initials}</div>
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white shadow-lg shadow-violet-500/20">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName || 'Người dùng ZUNY'} className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full w-full place-items-center">{initials}</span>
+              )}
+            </div>
             <div className="min-w-0">
               <p className="font-black text-slate-950 dark:text-white">{displayName || 'Người dùng ZUNY'}</p>
               <p className="text-xs font-bold text-slate-400">Chọn loại bài, nhập nội dung và thiết lập phần riêng bên dưới.</p>

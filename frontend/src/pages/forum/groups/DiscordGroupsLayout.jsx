@@ -660,7 +660,12 @@ function ImageLightbox({ image, onClose }) {
 }
 
 
-export default function DiscordGroupsLayout({ groups, currentUser, displayName, initials, roleKey, userClass = '', initialActiveGroupId = '', onJoin, onDelete, onCreate, groupReports = [], onReportGroup = () => {}, onAdminJoinReportedGroup = () => {} }) {  const [activeGroupId, setActiveGroupId] = useState(null)
+export default function DiscordGroupsLayout({ groups, currentUser, displayName, initials, roleKey, userClass = '', initialActiveGroupId = '', onJoin, onDelete, onCreate, groupReports = [], onReportGroup = () => {}, onAdminJoinReportedGroup = () => {}, onChannelViewChange = () => {} }) {  const [activeGroupId, setActiveGroupId] = useState(null)
+
+  useEffect(() => {
+    onChannelViewChange(Boolean(activeGroupId))
+    return () => onChannelViewChange(false)
+  }, [activeGroupId, onChannelViewChange])
   const [optimisticJoinedGroupIds, setOptimisticJoinedGroupIds] = useState([])
 
 useEffect(() => {

@@ -57,11 +57,14 @@ import {
   Trash2,
   TrendingUp,
   Users,
+  UserX,
+  ShieldBan,
   X,
   Zap,
   ChevronDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
 
 import { auth, db } from '../../components/firebase'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode'
@@ -366,6 +369,35 @@ const showSharePopup = (link) => {
 }
 
 
+function RestrictionNoticeModal({ modal, onClose }) {
+  if (!modal) return null
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="relative w-[min(92vw,440px)] rounded-3xl border border-rose-200 bg-white p-6 shadow-2xl dark:border-rose-400/20 dark:bg-slate-900" onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Đóng">
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-200">
+          <ShieldBan className="h-7 w-7" />
+        </div>
+        <h3 className="mt-5 pr-10 text-xl font-black text-slate-950 dark:text-white">{modal.title || 'Tài khoản đã bị giới hạn'}</h3>
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{modal.message}</p>
+        {modal.reason && (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-400/20 dark:bg-rose-500/10">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-rose-500 dark:text-rose-300">Lý do</p>
+            <p className="mt-1 text-sm font-bold leading-6 text-rose-700 dark:text-rose-100">{modal.reason}</p>
+          </div>
+        )}
+        <button type="button" onClick={onClose} className="mt-6 w-full rounded-2xl bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-700">
+          Tôi đã hiểu
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function CenterConfirmModal({ modal, onClose }) {
   if (!modal) return null
 
@@ -550,12 +582,15 @@ const showGroupCreatedPopup = ({ groupCode = '', inviteCode = '', onEnter = () =
   ), { id: 'forum-group-created', duration: Infinity })
 }
 
-function Forum() {
+function Forum({ onChannelViewChange = () => {} }) {
+  const navigate = useNavigate()
   const syncedDark = useSyncedDarkMode()
   const [manualDark, setManualDark] = useState(null)
   const dark = manualDark ?? syncedDark
   const [currentUser, setCurrentUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [userProfiles, setUserProfiles] = useState({})
+  const [profilePopup, setProfilePopup] = useState(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const [posts, setPosts] = useState([])
   const [groups, setGroups] = useState([])
@@ -577,12 +612,14 @@ function Forum() {
   const [createdGroupPopup, setCreatedGroupPopup] = useState(null)
   const [notificationModal, setNotificationModal] = useState(null)
   const [adminReasonModal, setAdminReasonModal] = useState(null)
+  const [restrictionModal, setRestrictionModal] = useState(null)
   const [likingPostIds, setLikingPostIds] = useState([])
   const [viewingPostIds, setViewingPostIds] = useState([])
   const [reports, setReports] = useState([])
   const [groupReports, setGroupReports] = useState([])
   const [adminMainMode, setAdminMainMode] = useState('posts')
   const [adminReviewMode, setAdminReviewMode] = useState('pending')
+  const [personalAdminSearch, setPersonalAdminSearch] = useState('')
   const [groupAdminMode, setGroupAdminMode] = useState('stats')
   const [reportModal, setReportModal] = useState(null)
   const [highlightedCommentId, setHighlightedCommentId] = useState('')
@@ -593,7 +630,9 @@ function Forum() {
   const roleKey = getRoleKey(profile?.role || profile?.userRole || profile?.type)
   const displayName = profile?.fullName || profile?.displayName || profile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Người dùng ZUNY'
   const initials = getInitials(displayName, currentUser?.email)
+  const avatarUrl = profile?.photoURL || profile?.avatarUrl || profile?.avatarURL || profile?.avatar || profile?.profileImage || currentUser?.photoURL || ''
   const userClass = profile?.className || profile?.class || profile?.lop || profile?.studentClass || ''
+  const currentForumRestrictions = userProfiles[currentUser?.uid]?.forumRestrictions || profile?.forumRestrictions || {}
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -618,6 +657,35 @@ function Forum() {
 
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const usersQuery = query(collection(db, 'users'), limit(500))
+    const unsubscribe = onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const nextProfiles = {}
+        snapshot.docs.forEach((item) => {
+          nextProfiles[item.id] = { id: item.id, ...item.data() }
+        })
+        setUserProfiles(nextProfiles)
+      },
+      (error) => console.warn('Không thể đồng bộ avatar người dùng:', error),
+    )
+    return () => unsubscribe()
+  }, [])
+
+  const openUserProfile = (user = {}) => {
+    if (!user?.uid || user.isAnonymous) return
+    const firebaseProfile = userProfiles[user.uid] || {}
+    setProfilePopup({
+      uid: user.uid,
+      name: firebaseProfile.fullName || firebaseProfile.displayName || firebaseProfile.name || user.name || 'Người dùng ZUNY',
+      role: getRoleKey(firebaseProfile.role || firebaseProfile.userRole || user.role),
+      className: firebaseProfile.className || firebaseProfile.class || firebaseProfile.lop || '',
+      avatarUrl: firebaseProfile.photoURL || firebaseProfile.avatarUrl || firebaseProfile.avatarURL || firebaseProfile.avatar || firebaseProfile.profileImage || user.avatarUrl || '',
+      initials: getInitials(firebaseProfile.fullName || firebaseProfile.displayName || firebaseProfile.name || user.name),
+    })
+  }
 
   useEffect(() => {
     const postsQuery = query(collection(db, 'forumPosts'), orderBy('createdAt', 'desc'), limit(120))
@@ -1163,8 +1231,45 @@ const filteredNotifications = useMemo(() => {
     return false
   }
 
+  const showRestrictionPopup = (type) => {
+    const isPost = type === 'post'
+    const blocked = isPost
+      ? currentForumRestrictions.blockCommunityPosting
+      : currentForumRestrictions.blockGroupCreation
+
+    if (!blocked) return false
+
+    setRestrictionModal({
+      title: isPost ? 'Bạn đã bị chặn đăng bài' : 'Bạn đã bị chặn tạo nhóm',
+      message: isPost
+        ? 'Tài khoản của bạn hiện không được phép tạo bài đăng mới trong cộng đồng ZUNY.'
+        : 'Tài khoản của bạn hiện không được phép tạo nhóm học mới trong cộng đồng ZUNY.',
+      reason: isPost
+        ? currentForumRestrictions.postBlockReason
+        : currentForumRestrictions.groupBlockReason,
+    })
+    return true
+  }
+
+  const openComposer = () => {
+    if (!requireLogin()) return
+    if (showRestrictionPopup('post')) return
+    setComposerOpen(true)
+  }
+
+  const openGroupCreator = () => {
+    if (!requireLogin()) return
+    if (showRestrictionPopup('group')) return
+    setGroupOpen(true)
+  }
+
   const createPost = async (form) => {
     if (!requireLogin()) return
+
+    if (showRestrictionPopup('post')) {
+      setComposerOpen(false)
+      return
+    }
 
     if (form.scope === 'group' && form.groupId) {
       const targetGroup = groups.find((item) => item.id === form.groupId)
@@ -1208,6 +1313,7 @@ const filteredNotifications = useMemo(() => {
         authorName: form.isAnonymous ? 'Ẩn danh' : displayName,
         authorEmail: form.isAnonymous ? '' : currentUser.email || '',
         authorInitials: form.isAnonymous ? 'AD' : initials,
+        authorPhotoURL: form.isAnonymous ? '' : avatarUrl,
         authorRole: roleKey,
         likesCount: 0,
         reactionsCount: 0,
@@ -1950,8 +2056,62 @@ toast.success('Đã duyệt bài viết')
     })
   }
 
+  const updateUserForumRestriction = async (targetUser, key, blocked) => {
+    if (roleKey !== 'admin_dev' || !targetUser?.id) return
+    if (targetUser.id === currentUser?.uid) {
+      toast.error('Không thể tự chặn tài khoản quản trị hiện tại')
+      return
+    }
+
+    const targetRole = getRoleKey(targetUser.role || targetUser.userRole || targetUser.type)
+    if (targetRole === 'admin_dev') {
+      toast.error('Không thể chặn tài khoản Admin_dev khác')
+      return
+    }
+
+    const fieldLabel = key === 'blockCommunityPosting' ? 'đăng bài ở cộng đồng' : 'tạo nhóm học'
+    const reasonField = key === 'blockCommunityPosting' ? 'postBlockReason' : 'groupBlockReason'
+
+    try {
+      await setDoc(doc(db, 'users', targetUser.id), {
+        forumRestrictions: {
+          ...(targetUser.forumRestrictions || {}),
+          [key]: blocked,
+          [reasonField]: blocked ? `Quản trị viên đã chặn quyền ${fieldLabel}` : '',
+          updatedAt: serverTimestamp(),
+          updatedBy: currentUser.uid,
+        },
+      }, { merge: true })
+
+      await addDoc(collection(db, 'forumNotifications'), {
+        toUserId: targetUser.id,
+        fromUserId: currentUser.uid,
+        fromName: displayName,
+        type: blocked ? 'forum-user-restricted' : 'forum-user-restored',
+        category: 'admin',
+        scope: 'hall',
+        title: blocked ? 'Quyền cộng đồng đã bị giới hạn' : 'Quyền cộng đồng đã được khôi phục',
+        text: blocked
+          ? `Quản trị viên đã chặn quyền ${fieldLabel} của tài khoản bạn.`
+          : `Quản trị viên đã khôi phục quyền ${fieldLabel} của tài khoản bạn.`,
+        read: false,
+        createdAt: serverTimestamp(),
+      })
+
+      toast.success(blocked ? `Đã chặn quyền ${fieldLabel}` : `Đã mở lại quyền ${fieldLabel}`)
+    } catch (error) {
+      console.error('Không thể cập nhật quyền cộng đồng:', error)
+      toast.error('Không thể cập nhật quyền người dùng')
+    }
+  }
+
   const createGroup = async (form) => {
     if (!requireLogin()) return
+
+    if (showRestrictionPopup('group')) {
+      setGroupOpen(false)
+      return
+    }
 
     const ownedGroupsCount = groups.filter((group) => !group.isSample && group.ownerId === currentUser.uid).length
     if (ownedGroupsCount >= MAX_GROUPS_PER_USER) {
@@ -2205,12 +2365,12 @@ setCreatedGroupPopup({
   }
 
   return (
-    <div className={`${dark ? 'dark' : ''} h-full [&_button]:cursor-pointer [&_select]:cursor-pointer [&_label]:cursor-pointer`}>
-<main className="h-full overflow-hidden bg-slate-50 text-slate-950 transition dark:bg-[#020617] dark:text-white">
-    <div className="relative flex h-full overflow-hidden">
+    <div className={`${dark ? 'dark' : ''} min-h-full [&_button]:cursor-pointer [&_select]:cursor-pointer [&_label]:cursor-pointer`}>
+<main className="min-h-full bg-slate-50 text-slate-950 transition dark:bg-[#020617] dark:text-white">
+    <div className="relative flex min-h-full">
               <Sidebar activeSection={activeSection} roleKey={roleKey} unreadNotificationsCount={unreadNotificationsCount} pendingReviewCount={pendingReviewCount} collapsed={activeSection === SECTIONS.GROUPS ? true : sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} onChange={(section) => { setActiveSection(section); setFilter('all'); setMobileMenuOpen(false) }} dark={dark} onToggleDark={() => setManualDark((value) => !(value ?? syncedDark))} mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
-        <div className={`h-full min-w-0 flex-1 transition-[margin] duration-300 ${activeSection === SECTIONS.GROUPS || sidebarCollapsed ? 'lg:ml-24' : 'lg:ml-72'}`}>
+        <div className={`min-h-full min-w-0 flex-1 transition-[margin] duration-300 ${activeSection === SECTIONS.GROUPS || sidebarCollapsed ? 'lg:ml-24' : 'lg:ml-72'}`}>
         {activeSection === SECTIONS.GROUPS ? (
 <DiscordGroupsLayout
   groups={groups}
@@ -2222,17 +2382,18 @@ setCreatedGroupPopup({
   userClass={userClass}
   onJoin={toggleJoinGroup}
   onDelete={deleteGroup}
-  onCreate={() => setGroupOpen(true)}
+  onCreate={openGroupCreator}
   groupReports={groupReports}
   onReportGroup={submitGroupReport}
   onAdminJoinReportedGroup={adminJoinReportedGroup}
+  onChannelViewChange={onChannelViewChange}
 />
               ) : (
-<section className="h-full min-w-0 flex-1 overflow-y-auto">            
+<section className="min-h-full min-w-0 flex-1 overflow-visible pb-24 lg:pb-8">            
 
-            <div className={`mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:px-6 ${activeSection === SECTIONS.HALL ? "lg:grid-cols-[minmax(0,1fr)_320px]" : "lg:grid-cols-1"}`}>
+            <div className={`mx-auto grid w-full max-w-7xl gap-4 px-3 py-3 sm:px-4 sm:py-4 lg:px-6 ${activeSection === SECTIONS.HALL ? "xl:grid-cols-[minmax(0,1fr)_300px]" : "grid-cols-1"}`}>
               <div className="min-w-0">
-                {activeSection === SECTIONS.HALL && <HallHero stats={stats} onCompose={() => setComposerOpen(true)} />}
+                {activeSection === SECTIONS.HALL && <HallHero stats={stats} onCompose={openComposer} />}
                 {activeSection === SECTIONS.GROUPS && null}
                 {activeSection === SECTIONS.MY_POSTS && <SimpleHero icon="📝" title="Bài viết của tôi" subtitle="Quản lý các bài bạn đã đăng trong cộng đồng." />}
                 {activeSection === SECTIONS.MY_POSTS && (
@@ -2250,7 +2411,7 @@ setCreatedGroupPopup({
                 {activeSection === SECTIONS.NOTIFICATIONS && <SimpleHero icon="🔔" title="Thông báo" subtitle="Tương tác mới từ bạn bè, giáo viên và nhóm học tập." />}
                 {activeSection === SECTIONS.ADMIN_REVIEW && <SimpleHero icon="🛡️" title="Quản lý" subtitle="Quản trị bài viết, báo cáo và nhóm học trong cộng đồng ZUNY." />}
 
-                {activeSection === SECTIONS.HALL && <ComposerBar onOpen={() => setComposerOpen(true)} initials={initials} name={displayName} />}
+                {activeSection === SECTIONS.HALL && <ComposerBar onOpen={openComposer} onAvatarClick={() => openUserProfile({ uid: currentUser?.uid, name: displayName, role: roleKey, avatarUrl })} initials={initials} avatarUrl={avatarUrl} name={displayName} />}
 
                 {activeSection === SECTIONS.ADMIN_REVIEW ? (
                   <>
@@ -2258,8 +2419,9 @@ setCreatedGroupPopup({
                       value={adminMainMode}
                       onChange={setAdminMainMode}
                       options={[
-                        { value: 'posts', label: 'Quản lý' },
+                        { value: 'posts', label: 'Quản lý bài đăng' },
                         { value: 'groups', label: 'Quản lý nhóm' },
+                        { value: 'personal', label: 'Quản lý cá nhân' },
                       ]}
                     />
 
@@ -2292,7 +2454,7 @@ setCreatedGroupPopup({
                           }}
                         />
                       </>
-                    ) : (
+                    ) : adminMainMode === 'groups' ? (
                       <>
                         <StatusFilterBar
                           value={groupAdminMode}
@@ -2312,6 +2474,14 @@ setCreatedGroupPopup({
                           onResolveGroupReport={markGroupReportResolved}
                         />
                       </>
+                    ) : (
+                      <PersonalAdminPanel
+                        users={Object.values(userProfiles)}
+                        currentUserId={currentUser?.uid}
+                        search={personalAdminSearch}
+                        onSearchChange={setPersonalAdminSearch}
+                        onToggleRestriction={updateUserForumRestriction}
+                      />
                     )}
                   </>
                 ) : activeSection === SECTIONS.NOTIFICATIONS ? (
@@ -2356,6 +2526,8 @@ setCreatedGroupPopup({
   posts={filteredPosts}
   currentUserId={currentUser?.uid}
   roleKey={roleKey}
+  userProfiles={userProfiles}
+  onOpenUserProfile={openUserProfile}
   likingPostIds={likingPostIds}
   showStatusBadge={activeSection === SECTIONS.MY_POSTS}
   onOpen={openPost}
@@ -2387,12 +2559,19 @@ setCreatedGroupPopup({
         </div>
         </div>
 
-        <MobileNav activeSection={activeSection} unreadNotificationsCount={unreadNotificationsCount} onChange={(section) => { setActiveSection(section); setFilter('all') }} onCompose={() => setComposerOpen(true)} />
+        <MobileNav activeSection={activeSection} unreadNotificationsCount={unreadNotificationsCount} onChange={(section) => { setActiveSection(section); setFilter('all') }} onCompose={openComposer} />
       </main>
 
-      <PostModal open={composerOpen} onClose={() => setComposerOpen(false)} onSubmit={createPost} groups={groups} roleKey={roleKey} displayName={displayName} initials={initials} />
+      <UserProfilePopup
+        user={profilePopup}
+        onClose={() => setProfilePopup(null)}
+        onOpenLibrary={(uid) => navigate(`/e-learning?section=account&user=${encodeURIComponent(uid)}`)}
+        onOpenLeaderboard={(uid) => navigate(`/leaderboard?user=${encodeURIComponent(uid)}&highlight=1`)}
+      />
+      <PostModal open={composerOpen} onClose={() => setComposerOpen(false)} onSubmit={createPost} groups={groups} roleKey={roleKey} displayName={displayName} initials={initials} avatarUrl={avatarUrl} />
       <GroupModal open={groupOpen} onClose={() => setGroupOpen(false)} onSubmit={createGroup} existingGroups={groups} />
       <PostDetailModal post={selectedPost} highlightedCommentId={highlightedCommentId} currentUser={currentUser} displayName={displayName} initials={initials} roleKey={roleKey} likingPostIds={likingPostIds} onClose={closeSelectedPost} onLike={toggleLike} onReport={setReportModal} onSave={toggleSave} onDelete={deletePost} onShare={openShareModal} onVote={votePoll} onEventInterest={toggleEventInterest} />
+      <RestrictionNoticeModal modal={restrictionModal} onClose={() => setRestrictionModal(null)} />
       <CenterConfirmModal modal={confirmModal} onClose={() => setConfirmModal(null)} />
       <AdminReasonConfirmModal modal={adminReasonModal} onClose={() => setAdminReasonModal(null)} />
       <CenterShareModal link={shareModal} onClose={() => setShareModal(null)} />
@@ -2705,13 +2884,15 @@ function SimpleHero({ icon, title, subtitle, gradient = 'from-slate-900 via-indi
   return <section className={`mb-5 rounded-[2rem] bg-gradient-to-br ${gradient} p-7 text-white shadow-xl`}><div className="text-4xl">{icon}</div><h2 className="mt-3 text-3xl font-black">{title}</h2><p className="mt-3 max-w-xl text-sm font-semibold leading-7 text-white/75">{subtitle}</p></section>
 }
 
-function ComposerBar({ onOpen, initials, name }) {
+function ComposerBar({ onOpen, onAvatarClick, initials, avatarUrl, name }) {
   return (
-    <button type="button" onClick={onOpen} className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-violet-300 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:hover:border-violet-400/50">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">{initials}</div>
-      <div className="min-w-0 flex-1 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">{name ? `${name} ơi, bạn muốn chia sẻ gì?` : 'Bạn muốn chia sẻ gì?'}</div>
+    <div className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-violet-300 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:hover:border-violet-400/50 sm:p-4">
+      <button type="button" onClick={onAvatarClick} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-400" aria-label="Mở hồ sơ người dùng">
+        <ProfileAvatar src={avatarUrl} initials={initials} className="h-10 w-10 sm:h-11 sm:w-11" />
+      </button>
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 rounded-2xl bg-slate-100 px-3 py-3 text-left text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300 sm:px-4 sm:text-sm">{name ? `${name} ơi, bạn muốn chia sẻ gì?` : 'Bạn muốn chia sẻ gì?'}</button>
       <ImagePlus className="hidden h-5 w-5 text-slate-400 sm:block" />
-    </button>
+    </div>
   )
 }
 
@@ -2877,6 +3058,8 @@ function PostList({
   posts,
   currentUserId,
   roleKey,
+  userProfiles = {},
+  onOpenUserProfile = () => {},
   likingPostIds = [],
   showStatusBadge = false,
   onOpen,
@@ -2891,13 +3074,15 @@ function PostList({
 }) {
     if (loading) return <div className="space-y-4">{[1, 2, 3].map((item) => <div key={item} className="h-52 animate-pulse rounded-3xl bg-white dark:bg-white/5" />)}</div>
   if (!posts.length) return <EmptyState icon="🔍" title="Không tìm thấy bài viết" description="Thử đổi bộ lọc hoặc từ khóa tìm kiếm." actionLabel="Khởi động lại" onAction={onClear} />
-  return <div className="space-y-4">{posts.map((post) => <PostCard key={post.id} post={post} currentUserId={currentUserId} roleKey={roleKey} liking={likingPostIds.includes(post.id)} showStatusBadge={showStatusBadge} onOpen={onOpen} onLike={onLike} onReport={onReport} onSave={onSave} onDelete={onDelete} onShare={onShare} onVote={onVote} onEventInterest={onEventInterest} />)}</div>
+  return <div className="space-y-4">{posts.map((post) => <PostCard key={post.id} post={post} currentUserId={currentUserId} roleKey={roleKey} authorProfile={userProfiles[post.authorId] || {}} onOpenUserProfile={onOpenUserProfile} liking={likingPostIds.includes(post.id)} showStatusBadge={showStatusBadge} onOpen={onOpen} onLike={onLike} onReport={onReport} onSave={onSave} onDelete={onDelete} onShare={onShare} onVote={onVote} onEventInterest={onEventInterest} />)}</div>
 }
 
 function PostCard({
   post,
   currentUserId,
   roleKey,
+  authorProfile = {},
+  onOpenUserProfile = () => {},
   liking = false,
   showStatusBadge = false,
   onOpen,
@@ -2939,16 +3124,16 @@ function PostCard({
         }}
         className="block w-full p-5 text-left"
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">{post.authorInitials || getInitials(post.authorName)}</div>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onOpenUserProfile({ uid: post.authorId, name: post.authorName, role: post.authorRole, avatarUrl: post.authorPhotoURL, isAnonymous: post.isAnonymous }) }} disabled={post.isAnonymous || !post.authorId} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:cursor-default" aria-label="Mở hồ sơ tác giả"><ProfileAvatar src={authorProfile.photoURL || authorProfile.avatarUrl || authorProfile.avatarURL || authorProfile.avatar || authorProfile.profileImage || post.authorPhotoURL} initials={post.authorInitials || getInitials(post.authorName)} className="h-11 w-11 sm:h-12 sm:w-12" /></button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-black text-slate-950 dark:text-white">{post.authorName || 'Người dùng ZUNY'}</h3>
                 <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black ${
                   adminPost
                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
-                    : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'
                 }`}><ShieldCheck className="h-3 w-3" />{roleText[post.authorRole] || 'Thành viên'}</span>
                 {adminPost && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-[11px] font-black text-white shadow-lg shadow-amber-500/20">
@@ -3071,7 +3256,7 @@ function PostCard({
         {post.tags?.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{post.tags.map((tag) => <span key={tag} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 dark:bg-white/10 dark:text-slate-300">#{tag}</span>)}</div>}
       </div>
 
-      <div className="flex items-center gap-1 border-t border-slate-200 px-4 py-3 dark:border-white/10">
+      <div className="flex flex-wrap items-center gap-1 border-t border-slate-200 px-3 py-3 sm:px-4 dark:border-white/10">
         <ReactionButton reaction={userReaction} summary={reactionSummary} disabled={liking} onReact={(reaction) => onLike(post, reaction)} />
         <ActionButton onClick={() => onOpen(post)} icon={MessageCircle} label={Number(post.commentsCount || 0)} />
         <ActionButton icon={Eye} label={Number(post.viewsCount || 0)} />
@@ -3431,6 +3616,103 @@ function getGroupTypeKey(group = {}) {
   if (groupType === 'invite_only' || groupType === 'invite') return 'invite_only'
   if (groupType === 'private' || group.isPrivate) return 'private'
   return 'public'
+}
+
+function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSearchChange = () => {}, onToggleRestriction = () => {} }) {
+  const keyword = normalizeText(search.trim())
+  const visibleUsers = users
+    .filter((user) => user.id !== currentUserId)
+    .filter((user) => {
+      if (!keyword) return true
+      return [user.fullName, user.displayName, user.name, user.email, user.className, user.class, user.lop]
+        .some((value) => normalizeText(value).includes(keyword))
+    })
+    .sort((a, b) => normalizeText(a.fullName || a.displayName || a.name || a.email).localeCompare(normalizeText(b.fullName || b.displayName || b.name || b.email)))
+
+  const blockedPostingCount = users.filter((user) => user.forumRestrictions?.blockCommunityPosting).length
+  const blockedGroupCount = users.filter((user) => user.forumRestrictions?.blockGroupCreation).length
+
+  return (
+    <div className="space-y-4 text-slate-950 dark:text-white">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-white/10 dark:bg-slate-900/70 dark:shadow-black/20">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Tổng tài khoản</p>
+          <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{users.length}</p>
+        </div>
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-sm transition-colors dark:border-rose-400/25 dark:bg-rose-500/10 dark:shadow-black/20">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-400">Chặn đăng bài</p>
+          <p className="mt-2 text-3xl font-black text-rose-600 dark:text-rose-200">{blockedPostingCount}</p>
+        </div>
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition-colors dark:border-amber-400/25 dark:bg-amber-500/10 dark:shadow-black/20">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-500">Chặn tạo nhóm</p>
+          <p className="mt-2 text-3xl font-black text-amber-600 dark:text-amber-200">{blockedGroupCount}</p>
+        </div>
+      </div>
+
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-white/10 dark:bg-slate-900/70 dark:shadow-black/20">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
+              <UserX className="h-4 w-4" /> Quản lý cá nhân
+            </div>
+            <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">Quyền hoạt động cộng đồng</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">Danh sách được đồng bộ trực tiếp từ Firebase.</p>
+          </div>
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Tìm tên, email, lớp..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400/70 dark:focus:bg-slate-950" />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {visibleUsers.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm font-bold text-slate-400 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-500">Không tìm thấy người dùng phù hợp.</div>
+          ) : visibleUsers.map((user) => {
+            const name = user.fullName || user.displayName || user.name || user.email?.split('@')[0] || 'Người dùng ZUNY'
+            const role = getRoleKey(user.role || user.userRole || user.type)
+            const restrictions = user.forumRestrictions || {}
+            const avatar = user.photoURL || user.avatarUrl || user.avatarURL || user.avatar || user.profileImage || ''
+            const protectedAdmin = role === 'admin_dev'
+            return (
+              <div key={user.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-violet-200 hover:bg-white dark:border-white/10 dark:bg-slate-950/50 dark:hover:border-violet-400/30 dark:hover:bg-slate-900/90">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">
+                      {avatar ? <img src={avatar} alt={name} className="h-full w-full object-cover" /> : <span className="grid h-full w-full place-items-center">{getInitials(name, user.email)}</span>}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-black text-slate-950 dark:text-white">{name}</p>
+                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">{roleText[role] || 'Thành viên'}</span>
+                      </div>
+                      <p className="mt-1 truncate text-xs font-semibold text-slate-400">{user.email || 'Không có email'}{user.className || user.class || user.lop ? ` • ${user.className || user.class || user.lop}` : ''}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[520px]">
+                    <RestrictionToggle icon={ShieldBan} label="Chặn đăng ở cộng đồng" description="Không thể tạo bài viết mới" active={Boolean(restrictions.blockCommunityPosting)} disabled={protectedAdmin} onChange={(blocked) => onToggleRestriction(user, 'blockCommunityPosting', blocked)} />
+                    <RestrictionToggle icon={Users} label="Chặn tạo nhóm" description="Không thể tạo nhóm học mới" active={Boolean(restrictions.blockGroupCreation)} disabled={protectedAdmin} onChange={(blocked) => onToggleRestriction(user, 'blockGroupCreation', blocked)} />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RestrictionToggle({ icon: Icon, label, description, active, disabled, onChange }) {
+  return (
+    <button type="button" disabled={disabled} onClick={() => onChange(!active)} className={`flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition-colors ${active ? 'border-rose-300 bg-rose-50 text-rose-950 hover:bg-rose-100 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-white dark:hover:bg-rose-500/15' : 'border-slate-200 bg-white text-slate-900 hover:border-violet-300 hover:bg-violet-50 dark:border-white/10 dark:bg-slate-900/80 dark:text-white dark:hover:border-violet-400/30 dark:hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-50`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${active ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}><Icon className="h-4 w-4" /></span>
+        <span className="min-w-0"><span className="block text-xs font-black text-slate-800 dark:text-white">{label}</span><span className="mt-0.5 block text-[10px] font-bold text-slate-400">{disabled ? 'Tài khoản được bảo vệ' : description}</span></span>
+      </div>
+      <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${active ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-700'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${active ? 'left-6' : 'left-1'}`} /></span>
+    </button>
+  )
 }
 
 function GroupAdminPanel({ mode = 'stats', groups = [], reports = [], onJoinReportedGroup, onDeleteGroup, onWarnOwner, onResolveGroupReport }) {
@@ -3861,7 +4143,7 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
   const visibleEvents = upcomingEvents.slice(0, eventsVisible)
 
   return (
-    <aside className="hidden w-[280px] space-y-4 lg:block">
+    <aside className="hidden w-[300px] space-y-4 xl:block">
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900/80">
         <h3 className="mb-4 flex items-center gap-2 font-black text-slate-950 dark:text-white">
           <span>🔥</span>
@@ -3933,14 +4215,36 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
         )}
       </div>
 
-      <div className="cursor-pointer rounded-3xl border border-violet-200 bg-white p-5 text-slate-900 shadow-sm transition hover:border-violet-300 hover:shadow-lg dark:border-violet-500/30 dark:bg-gradient-to-br dark:from-violet-950/90 dark:to-slate-900 dark:text-white">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-xl dark:bg-violet-500/15">💡</div>
-        <h3 className="mt-4 font-black text-slate-950 dark:text-white">Mẹo học hôm nay</h3>
-        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-          "Chia nhỏ bài toán khó thành các bước nhỏ hơn — mỗi bước giải quyết được là một chiến thắng nhỏ."
-        </p>
-      </div>
     </aside>
+  )
+}
+
+function ProfileAvatar({ src, initials, className = 'h-12 w-12' }) {
+  const [failed, setFailed] = useState(false)
+  if (src && !failed) {
+    return <img src={src} alt="Ảnh đại diện" onError={() => setFailed(true)} className={`${className} rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-white/10`} />
+  }
+  return <span className={`${className} flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white`}>{initials || 'U'}</span>
+}
+
+function UserProfilePopup({ user, onClose, onOpenLibrary, onOpenLeaderboard }) {
+  if (!user) return null
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="w-full max-w-sm rounded-[2rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:p-6" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <ProfileAvatar src={user.avatarUrl} initials={user.initials} className="h-16 w-16" />
+            <div className="min-w-0"><h3 className="truncate text-xl font-black text-slate-950 dark:text-white">{user.name}</h3><p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">{roleText[user.role] || 'Thành viên'}{user.className ? ` • ${user.className}` : ''}</p></div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="mt-6 grid gap-3">
+          <button type="button" onClick={() => onOpenLibrary(user.uid)} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700">Tài khoản trong Thư viện</button>
+          <button type="button" onClick={() => onOpenLeaderboard(user.uid)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-cyan-500/10">Vị trí trong Bảng xếp hạng</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -3954,7 +4258,7 @@ function MobileNav({ activeSection, unreadNotificationsCount = 0, onChange, onCo
   return <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 lg:hidden">{items.map((item) => { const Icon = item.icon; const active = activeSection === item.id; return <button key={item.id} type="button" onClick={() => onChange(item.id)} className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-black ${active ? 'text-violet-600 dark:text-violet-200' : 'text-slate-400'}`}><span className="relative"><Icon className="h-5 w-5" />{item.badge > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-black text-white">{item.badge > 999 ? '999+' : item.badge}</span>}</span>{item.label}</button> })}<button type="button" onClick={onCompose} className="flex flex-col items-center gap-1 rounded-2xl bg-violet-600 px-3 py-2 text-[11px] font-black text-white"><Plus className="h-5 w-5" />Đăng</button></div>
 }
 
-function PostModal({ open, onClose, onSubmit, groups, roleKey, displayName, initials }) {
+function PostModal({ open, onClose, onSubmit, groups, roleKey, displayName, initials, avatarUrl = '' }) {
   const initialForm = {
     title: '',
     content: '',
@@ -4183,7 +4487,13 @@ function PostModal({ open, onClose, onSubmit, groups, roleKey, displayName, init
 
         <div className="max-h-[68vh] overflow-y-auto px-6 py-6">
           <div className="mb-5 flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">{initials}</div>
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white shadow-lg shadow-violet-500/20">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName || 'Người dùng ZUNY'} className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full w-full place-items-center">{initials}</span>
+              )}
+            </div>
             <div className="min-w-0">
               <p className="font-black text-slate-950 dark:text-white">{displayName || 'Người dùng ZUNY'}</p>
               <p className="text-xs font-bold text-slate-400">Chọn loại bài, nhập nội dung và thiết lập phần riêng bên dưới.</p>

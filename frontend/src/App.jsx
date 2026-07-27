@@ -136,9 +136,17 @@ function LegacyCourseDetailRedirect() {
 
 function AppContent({ darkMode, onToggleDarkMode }) {
   const location = useLocation();
+  const [isForumChannelOpen, setIsForumChannelOpen] = useState(false);
   const { user, userDetails, isLoading } = useAuth();
 
-  const isForumRoute = location.pathname.toLowerCase() === '/forum';
+  const normalizedPath = location.pathname.toLowerCase();
+  const isForumRoute = normalizedPath === '/forum';
+  const isELearningLibraryRoute = normalizedPath === '/e-learning';
+  const isELearningDetailRoute = normalizedPath.startsWith('/e-learning/');
+
+  useEffect(() => {
+    if (!isForumRoute) setIsForumChannelOpen(false);
+  }, [isForumRoute]);
 
   const isExamsRoute = location.pathname.toLowerCase() === '/exams';
 
@@ -232,6 +240,14 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         showFooter={!isForumRoute && !isExamsRoute && !isProfileRoute}
         showNavbar={!isForumRoute}
         lockPageScroll={isForumRoute || isProfileRoute}
+        mainClassName={
+          isForumRoute
+            ? (isForumChannelOpen ? 'h-screen pt-0' : 'min-h-[calc(100vh-80px)] pt-0')
+            : (isELearningDetailRoute ? 'pt-0' : 'pt-20')
+        }
+        showFooter={!isForumRoute && !isELearningLibraryRoute && !isELearningDetailRoute}
+        showNavbar={!(isELearningDetailRoute || (isForumRoute && isForumChannelOpen))}
+        lockPageScroll={isForumRoute && isForumChannelOpen}
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -284,7 +300,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 path="/Forum"
                 element={
                   <ProtectedRoute>
-                    <Forum />
+                    <Forum onChannelViewChange={setIsForumChannelOpen} />
                   </ProtectedRoute>
                 }
               />

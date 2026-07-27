@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   doc,
   getDoc,
   getDocs,
   increment,
+  onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -14,6 +19,8 @@ import {
 } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, db } from '../../components/firebase'
+import { CourseGateState, DetailHeader, DescriptionBox, MainLearningViewer, DetailSidebar, PlaylistPanel, OverviewList, CBTStudyPanel, LessonDetailBlock, EmptyLearningState, CourseFileViewer, CourseCodeViewer, CourseRichDocumentViewer, NotesPanel, MiniQuizPanel, RatingStars, QAPanel, NextCoursePanel, CompletionModal, HonestyWarningModal } from './e-learning-detail/components/DetailComponents'
+import { useDarkMode, isCourseLocked, canAccessCourseByClass, getUserClassName, isTeacherRole, getRatingAverage, normalizeTextList, normalizeChecklist, normalizeQuiz, getYoutubeVideoId, markAllChecklistDone, getLocalDateKey, canTrackLearningProgress, isStudentRole, getOpenAtMs, normalizeText, formatOpenAt, stripHtml } from './e-learning-detail/utils/detailUtils'
 
 function CourseDetail() {
   const { id: courseId } = useParams()
@@ -28,12 +35,88 @@ function CourseDetail() {
   const [selectedRating, setSelectedRating] = useState(0)
   const [ratingBurst, setRatingBurst] = useState(false)
   const [submittingRating, setSubmittingRating] = useState(false)
-  const [skipWarningOpen, setSkipWarningOpen] = useState(false)
+  const [skipWarning, setSkipWarning] = useState(null)
+  const [learningRecord, setLearningRecord] = useState({})
+  const [noteDraft, setNoteDraft] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [noteColor, setNoteColor] = useState('#000000')
+  const [quizAnswers, setQuizAnswers] = useState({})
+  const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [completionOpen, setCompletionOpen] = useState(false)
+  const [nextCourse, setNextCourse] = useState(null)
+  const [activeDetailTab, setActiveDetailTab] = useState('overview')
+  const [selectedLessonIndex, setSelectedLessonIndex] = useState(0)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [shareNotice, setShareNotice] = useState(false)
+  const [playlistOpen, setPlaylistOpen] = useState(false)
+  const [playlistCollapsed, setPlaylistCollapsed] = useState(false)
+  const [detailSidebarCollapsed, setDetailSidebarCollapsed] = useState(false)
+  const [mobileDetailSidebarOpen, setMobileDetailSidebarOpen] = useState(false)
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(true)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportReason, setReportReason] = useState('Nội dung không phù hợp')
+  const [reportDetail, setReportDetail] = useState('')
+  const [reportSubmitting, setReportSubmitting] = useState(false)
+  const [ratingItems, setRatingItems] = useState([])
+  const [selfRatingNotice, setSelfRatingNotice] = useState(false)
+  const [focusedQuestionId, setFocusedQuestionId] = useState('')
+  const [focusedReplyId, setFocusedReplyId] = useState('')
+  const [savedLists, setSavedLists] = useState([])
+  const [savePickerOpen, setSavePickerOpen] = useState(false)
+  const [savingDestination, setSavingDestination] = useState('')
+  const [saveNotice, setSaveNotice] = useState(null)
+  const [playlistCourses, setPlaylistCourses] = useState([])
   const isDarkMode = useDarkMode()
+  const playlistParams = new URLSearchParams(window.location.search)
+  const playlistCourseIds = String(playlistParams.get('playlist') || '').split(',').map((item) => item.trim()).filter(Boolean)
+  const playlistIndex = Math.max(0, Number(playlistParams.get('playlistIndex') || 0))
+  const playlistAutoplay = playlistParams.get('autoplay') === '1'
 
   useEffect(() => {
-    function handleYoutubeSkipWarning() {
-      setSkipWarningOpen(true)
+    let cancelled = false
+    if (!playlistCourseIds.length) {
+      setPlaylistCourses([])
+      return undefined
+    }
+
+    async function loadPlaylistCourses() {
+      try {
+        const items = await Promise.all(playlistCourseIds.map(async (id) => {
+          const snapshot = await getDoc(doc(db, 'courses', id))
+          if (!snapshot.exists()) return null
+          const data = { id: snapshot.id, ...snapshot.data() }
+          const status = String(data.status || data.moderationStatus || 'approved').toLowerCase()
+          return status === 'deleted' ? null : data
+        }))
+        if (!cancelled) setPlaylistCourses(items.filter(Boolean))
+      } catch (error) {
+        console.warn('Không thể tải danh sách phát trong trang chi tiết:', error)
+        if (!cancelled) setPlaylistCourses([])
+      }
+    }
+
+    loadPlaylistCourses()
+    return () => { cancelled = true }
+  }, [courseId, window.location.search])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('tab') !== 'qa') return
+    setActiveDetailTab('qa')
+    setFocusedQuestionId(String(params.get('questionId') || ''))
+    setFocusedReplyId(String(params.get('replyId') || ''))
+    window.setTimeout(() => document.getElementById('detail-qa')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }, [courseId])
+
+  useEffect(() => {
+    if (!learningRecord?.noteColor) {
+      setNoteColor(isDarkMode ? '#ffffff' : '#000000')
+    }
+  }, [isDarkMode, learningRecord?.noteColor])
+
+  useEffect(() => {
+    function handleYoutubeSkipWarning(event) {
+      setSkipWarning(event.detail || {})
     }
 
     window.addEventListener('youtube-skip-warning', handleYoutubeSkipWarning)
@@ -70,6 +153,31 @@ function CourseDetail() {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setSavedLists([])
+      return undefined
+    }
+
+    const unsubscribe = onSnapshot(
+      collection(db, 'courseSavedLists'),
+      (snapshot) => {
+        const items = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .filter((item) => String(item.ownerId || '') === String(currentUser.uid))
+          .sort((a, b) => {
+            const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?.seconds * 1000 || a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0
+            const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?.seconds * 1000 || b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0
+            return bTime - aTime
+          })
+        setSavedLists(items)
+      },
+      (error) => console.warn('Không thể đồng bộ danh sách lưu:', error),
+    )
+
+    return () => unsubscribe()
+  }, [currentUser?.uid])
+
   async function fetchCourseTeacherProfile(courseData) {
     try {
       const teacherId =
@@ -94,6 +202,52 @@ function CourseDetail() {
     }
   }
 
+  async function fetchNextCourseSuggestion(courseData, currentId) {
+    try {
+      const [courseSnapshot, progressSnapshot] = await Promise.all([
+        getDocs(collection(db, 'courses')),
+        currentUser?.uid
+          ? getDocs(collection(db, 'learningStats', currentUser.uid, 'courses'))
+          : Promise.resolve({ docs: [] }),
+      ])
+
+      const completedCourseIds = new Set(
+        progressSnapshot.docs
+          .filter((item) => {
+            const data = item.data() || {}
+            return Number(data.progress || data.percent || data.completion || 0) >= 100 || Boolean(data.completedAt)
+          })
+          .map((item) => String(item.id)),
+      )
+
+      completedCourseIds.add(String(currentId))
+
+      const studentClass = getUserClassName(userProfile)
+      const teacherCanViewAll = isTeacherRole(currentRole)
+      const eligibleCourses = courseSnapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .filter((item) => {
+          const status = String(item.status || item.moderationStatus || 'approved').toLowerCase()
+          if (status !== 'approved' || status === 'deleted') return false
+          if (completedCourseIds.has(String(item.id))) return false
+          if (isCourseLocked(item)) return false
+          if (!teacherCanViewAll && !canAccessCourseByClass(item, studentClass)) return false
+          return true
+        })
+
+      if (!eligibleCourses.length) {
+        setNextCourse(null)
+        return
+      }
+
+      const randomIndex = Math.floor(Math.random() * eligibleCourses.length)
+      setNextCourse(eligibleCourses[randomIndex])
+    } catch (error) {
+      console.warn('Không thể lấy bài học tiếp theo:', error)
+      setNextCourse(null)
+    }
+  }
+
   useEffect(() => {
     async function fetchCourseDetail() {
       try {
@@ -104,6 +258,7 @@ function CourseDetail() {
           setRealCourseId(courseSnap.id)
           setCourse(courseData)
           await fetchCourseTeacherProfile(courseData)
+          await fetchNextCourseSuggestion(courseData, courseSnap.id)
           return
         }
         const titleQuery = query(collection(db, 'courses'), where('title', '==', decodeURIComponent(courseId)))
@@ -114,6 +269,7 @@ function CourseDetail() {
           setRealCourseId(firstCourse.id)
           setCourse(courseData)
           await fetchCourseTeacherProfile(courseData)
+          await fetchNextCourseSuggestion(courseData, firstCourse.id)
           return
         }
         setCourse(null)
@@ -126,6 +282,57 @@ function CourseDetail() {
     }
     fetchCourseDetail()
   }, [courseId])
+
+
+  useEffect(() => {
+    if (!course?.id) return
+    fetchNextCourseSuggestion(course, course.id)
+  }, [course?.id, currentUser?.uid, currentRole, userProfile?.className, userProfile?.class, userProfile?.lop, userProfile?.studentClass])
+
+  useEffect(() => {
+    if (!realCourseId) return undefined
+
+    const courseRef = doc(db, 'courses', realCourseId)
+    const unsubscribe = onSnapshot(
+      courseRef,
+      (snapshot) => {
+        if (!snapshot.exists()) return
+        setCourse((previous) => ({ ...(previous || {}), id: snapshot.id, ...snapshot.data() }))
+      },
+      (error) => console.warn('Không thể đồng bộ lượt xem và đánh giá realtime:', error),
+    )
+
+    return () => unsubscribe()
+  }, [realCourseId])
+
+  useEffect(() => {
+    if (!realCourseId) return undefined
+    const unsubscribe = onSnapshot(
+      collection(db, 'courses', realCourseId, 'ratings'),
+      (snapshot) => setRatingItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
+      (error) => console.warn('Không thể đồng bộ danh sách đánh giá realtime:', error),
+    )
+    return () => unsubscribe()
+  }, [realCourseId])
+
+  useEffect(() => {
+    if (!currentUser || !realCourseId || !canTrackLearningProgress(currentRole)) return
+    async function loadLearningRecord() {
+      try {
+        const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
+        const progressSnap = await getDoc(progressRef)
+        const data = progressSnap.exists() ? progressSnap.data() : {}
+        setLearningRecord(data)
+        setNoteDraft(data.notes || '')
+        setNoteColor(data.noteColor || (isDarkMode ? '#ffffff' : '#000000'))
+        setQuizSubmitted(Boolean(data.quizResult))
+      } catch (error) {
+        console.warn('Không thể tải dữ liệu học cá nhân:', error)
+        setLearningRecord({})
+      }
+    }
+    loadLearningRecord()
+  }, [currentUser, realCourseId, currentRole, isDarkMode])
 
   useEffect(() => {
     if (!currentUser || !realCourseId || !course || !canTrackLearningProgress(currentRole)) return
@@ -174,9 +381,29 @@ function CourseDetail() {
           { merge: true },
         )
         try {
-          await updateDoc(doc(db, 'courses', realCourseId), { views: increment(1) })
+          const courseRef = doc(db, 'courses', realCourseId)
+          const uniqueViewRef = doc(db, 'courseViews', realCourseId, 'users', currentUser.uid)
+          let countedNewView = false
+
+          await runTransaction(db, async (transaction) => {
+            const uniqueViewSnap = await transaction.get(uniqueViewRef)
+            if (uniqueViewSnap.exists()) return
+
+            transaction.set(uniqueViewRef, {
+              courseId: realCourseId,
+              userId: currentUser.uid,
+              userEmail: currentUser.email || '',
+              firstViewedAt: serverTimestamp(),
+            })
+            transaction.update(courseRef, { views: increment(1) })
+            countedNewView = true
+          })
+
+          if (countedNewView) {
+            setCourse((previous) => previous ? { ...previous, views: Number(previous.views || 0) + 1 } : previous)
+          }
         } catch (error) {
-          console.warn('Không thể cập nhật lượt xem:', error)
+          console.warn('Không thể ghi nhận lượt xem duy nhất:', error)
         }
       } catch (error) {
         console.error('Lỗi khi lưu tiến độ học:', error)
@@ -185,845 +412,507 @@ function CourseDetail() {
     saveLearningProgress()
   }, [currentUser, realCourseId, course, currentRole, userProfile])
 
+  async function updateLearningRecord(partial) {
+    if (!currentUser || !realCourseId || !canTrackLearningProgress(currentRole)) return
+    try {
+      const today = getLocalDateKey()
+      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
+      const statsRef = doc(db, 'learningStats', currentUser.uid)
+      await setDoc(
+        progressRef,
+        {
+          courseId: realCourseId,
+          ...partial,
+          watchedDate: today,
+          lastViewedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+      setLearningRecord((prev) => ({ ...prev, ...partial }))
+
+      const statsSnap = await getDoc(statsRef)
+      const statsData = statsSnap.exists() ? statsSnap.data() : {}
+      const oldDates = Array.isArray(statsData.watchedDates) ? statsData.watchedDates : []
+      const oldCourseIds = Array.isArray(statsData.watchedCourseIds) ? statsData.watchedCourseIds : []
+      await setDoc(
+        statsRef,
+        {
+          watchedDates: oldDates.includes(today) ? oldDates : [...oldDates, today],
+          watchedCourseIds: oldCourseIds.includes(realCourseId) ? oldCourseIds : [...oldCourseIds, realCourseId],
+          watchedLessons: oldCourseIds.includes(realCourseId) ? oldCourseIds.length : oldCourseIds.length + 1,
+          watchedCourses: oldCourseIds.includes(realCourseId) ? oldCourseIds.length : oldCourseIds.length + 1,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+    } catch (error) {
+      console.error('Không thể cập nhật tiến độ CBT:', error)
+    }
+  }
+
+  function handleToggleChecklist(itemId) {
+    const currentChecklist = learningRecord.completedChecklist || {}
+    const nextChecklist = { ...currentChecklist, [itemId]: !currentChecklist[itemId] }
+    const checklistItems = normalizeChecklist(course?.checklist)
+    const completedCount = checklistItems.filter((item) => nextChecklist[item.id]).length
+    const checklistProgress = checklistItems.length ? Math.round((completedCount / checklistItems.length) * 100) : 0
+    const nextProgress = Math.max(Number(learningRecord.progress || 0), checklistProgress)
+    updateLearningRecord({ completedChecklist: nextChecklist, progress: nextProgress })
+    if (checklistItems.length && completedCount === checklistItems.length) setCompletionOpen(true)
+  }
+
+  async function handleSaveNotes() {
+    setSavingNote(true)
+    await updateLearningRecord({ notes: noteDraft, noteColor })
+    setSavingNote(false)
+  }
+
+  async function handleToggleBookmark() {
+    if (!currentUser?.uid) {
+      alert('Bạn cần đăng nhập để lưu bài học.')
+      return
+    }
+    if (!learningRecord.bookmarked) {
+      setSavePickerOpen(true)
+      return
+    }
+    if (savingDestination) return
+    try {
+      setSavingDestination('remove')
+      await setDoc(doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId), {
+        courseId: realCourseId,
+        bookmarked: false,
+        unsavedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+
+      const containingLists = savedLists.filter((list) =>
+        Array.isArray(list.courseIds) && list.courseIds.map(String).includes(String(realCourseId)),
+      )
+      await Promise.all(containingLists.map((list) => updateDoc(doc(db, 'courseSavedLists', list.id), {
+        courseIds: arrayRemove(realCourseId),
+        updatedAt: serverTimestamp(),
+      })))
+
+      setLearningRecord((current) => ({ ...current, bookmarked: false }))
+      setSaveNotice({ removed: true })
+      window.setTimeout(() => setSaveNotice(null), 2600)
+    } catch (error) {
+      console.error('Không thể hủy lưu bài học:', error)
+      alert('Không thể hủy lưu bài học. Vui lòng thử lại.')
+    } finally {
+      setSavingDestination('')
+    }
+  }
+
+  async function saveCourseToDestination(savedList = null) {
+    if (!currentUser?.uid || !realCourseId || savingDestination) return
+    const destinationId = savedList?.id || 'private'
+    try {
+      setSavingDestination(destinationId)
+      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
+      await setDoc(progressRef, {
+        courseId: realCourseId,
+        bookmarked: true,
+        savedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+
+      if (savedList?.id) {
+        await updateDoc(doc(db, 'courseSavedLists', savedList.id), {
+          courseIds: arrayUnion(realCourseId),
+          updatedAt: serverTimestamp(),
+        })
+      }
+
+      setLearningRecord((current) => ({ ...current, bookmarked: true }))
+      setSavePickerOpen(false)
+      setSaveNotice({ destination: savedList?.title || 'Đã lưu riêng' })
+      window.setTimeout(() => setSaveNotice(null), 2600)
+    } catch (error) {
+      console.error('Không thể lưu bài học:', error)
+      alert('Không thể lưu bài học. Vui lòng thử lại.')
+    } finally {
+      setSavingDestination('')
+    }
+  }
+
+  function handleQuizAnswer(questionIndex, optionIndex, statementIndex = null) {
+    if (quizSubmitted) return
+    setQuizAnswers((prev) => {
+      if (statementIndex === null) return { ...prev, [questionIndex]: optionIndex }
+      const currentStatements = prev[questionIndex] && typeof prev[questionIndex] === 'object'
+        ? prev[questionIndex]
+        : {}
+      return {
+        ...prev,
+        [questionIndex]: {
+          ...currentStatements,
+          [statementIndex]: Boolean(optionIndex),
+        },
+      }
+    })
+  }
+
+  async function handleSubmitQuiz(quiz) {
+    const safeQuiz = normalizeQuiz(quiz)
+    const correct = safeQuiz.reduce((sum, item, index) => {
+      if (item.sourceType === 'true_false') {
+        const answerMap = quizAnswers[index] && typeof quizAnswers[index] === 'object' ? quizAnswers[index] : {}
+        const allCorrect = item.statements.every((statement, statementIndex) =>
+          Boolean(answerMap[statementIndex]) === Boolean(statement.correct),
+        )
+        return sum + (allCorrect ? 1 : 0)
+      }
+      return sum + (Number(quizAnswers[index]) === Number(item.correctAnswer) ? 1 : 0)
+    }, 0)
+    const result = { correct, total: safeQuiz.length, completedAt: new Date().toISOString() }
+    setQuizSubmitted(true)
+    await updateLearningRecord({ quizResult: result, progress: Math.max(Number(learningRecord.progress || 0), safeQuiz.length ? 100 : 0), completedChecklist: { ...(learningRecord.completedChecklist || {}), quiz: true } })
+    setCompletionOpen(true)
+  }
+
+  function handleManualComplete() {
+    updateLearningRecord({ progress: 100, completedAt: new Date().toISOString(), completedChecklist: markAllChecklistDone(course?.checklist) })
+    setCompletionOpen(true)
+  }
+
+
+  async function createCourseOwnerNotification(notificationId, payload = {}) {
+    const ownerId = String(teacherId || '')
+    if (!ownerId || !notificationId) return
+    try {
+      const dismissalRef = doc(db, 'users', ownerId, 'elearningNotificationDismissals', notificationId)
+      const dismissalSnap = await getDoc(dismissalRef)
+      if (dismissalSnap.exists()) return
+      await setDoc(doc(db, 'users', ownerId, 'elearningNotifications', notificationId), {
+        title: payload.title || 'Thông báo bài học',
+        message: payload.message || '',
+        type: payload.type || 'course_activity',
+        courseId: realCourseId,
+        actorId: currentUser?.uid || '',
+        read: false,
+        createdAt: serverTimestamp(),
+      }, { merge: true })
+    } catch (error) {
+      console.warn('Không thể tạo thông báo cho chủ bài học:', error)
+    }
+  }
+
   async function handleRating(value) {
     if (!currentUser) {
       alert('Bạn cần đăng nhập để đánh giá bài học.')
       return
     }
-    if (!isStudentRole(currentRole)) {
-      alert('Chỉ học sinh mới được đánh giá bài học.')
+    if (!course || submittingRating) return
+
+    const ownerIds = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]
+      .filter(Boolean)
+      .map(String)
+
+    if (ownerIds.includes(String(currentUser.uid))) {
+      setSelfRatingNotice(true)
       return
     }
-    if (!course || submittingRating) return
+
     try {
       setSubmittingRating(true)
       setSelectedRating(value)
       setRatingBurst(true)
+
+      const courseRef = doc(db, 'courses', realCourseId)
       const ratingRef = doc(db, 'courses', realCourseId, 'ratings', currentUser.uid)
-      const ratingSnap = await getDoc(ratingRef)
-      if (ratingSnap.exists()) {
-        const oldRating = Number(ratingSnap.data().rating || 0)
-        const nextTotal = Number(course.ratingTotal || 0) - oldRating + value
-        const nextCount = Number(course.ratingCount || 0) || 1
-        const nextAverage = nextTotal / nextCount
-        await setDoc(ratingRef, { rating: value, updatedAt: serverTimestamp() }, { merge: true })
-        await updateDoc(doc(db, 'courses', realCourseId), { ratingTotal: nextTotal, ratingCount: nextCount, rating: nextAverage, updatedAt: serverTimestamp() })
-        setCourse({ ...course, ratingTotal: nextTotal, ratingCount: nextCount, rating: nextAverage })
-      } else {
-        const nextTotal = Number(course.ratingTotal || 0) + value
-        const nextCount = Number(course.ratingCount || 0) + 1
-        const nextAverage = nextTotal / nextCount
-        await setDoc(ratingRef, { userId: currentUser.uid, rating: value, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
-        await updateDoc(doc(db, 'courses', realCourseId), { ratingTotal: nextTotal, ratingCount: nextCount, rating: nextAverage, updatedAt: serverTimestamp() })
-        setCourse({ ...course, ratingTotal: nextTotal, ratingCount: nextCount, rating: nextAverage })
-      }
-      setTimeout(() => setRatingBurst(false), 650)
+      let wasExistingRating = false
+
+      await runTransaction(db, async (transaction) => {
+        const [courseSnap, ratingSnap] = await Promise.all([
+          transaction.get(courseRef),
+          transaction.get(ratingRef),
+        ])
+
+        if (!courseSnap.exists()) throw new Error('Bài học không còn tồn tại.')
+
+        const courseData = courseSnap.data()
+        wasExistingRating = ratingSnap.exists()
+        const oldRating = ratingSnap.exists() ? Number(ratingSnap.data().rating || 0) : 0
+        const currentTotal = Number(courseData.ratingTotal || 0)
+        const currentCount = Number(courseData.ratingCount || 0)
+        const nextTotal = currentTotal - oldRating + Number(value)
+        const nextCount = ratingSnap.exists() ? Math.max(1, currentCount) : currentCount + 1
+        const nextAverage = nextCount > 0 ? nextTotal / nextCount : 0
+
+        transaction.set(
+          ratingRef,
+          {
+            userId: currentUser.uid,
+            rating: Number(value),
+            ...(ratingSnap.exists() ? {} : { createdAt: serverTimestamp() }),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        )
+        transaction.update(courseRef, {
+          ratingTotal: nextTotal,
+          ratingCount: nextCount,
+          rating: nextAverage,
+          updatedAt: serverTimestamp(),
+        })
+      })
+
+      const reviewerName = userProfile?.fullName || userProfile?.name || userProfile?.displayName || currentUser.displayName || currentUser.email || 'Một người dùng'
+      await createCourseOwnerNotification(`course_rating_${realCourseId}_${currentUser.uid}`, {
+        type: 'course_rating',
+        title: wasExistingRating ? 'Đánh giá bài học đã được cập nhật' : 'Bài học có đánh giá mới',
+        message: `${reviewerName} ${wasExistingRating ? 'đã cập nhật đánh giá thành' : 'đã đánh giá'} ${Number(value)} sao cho “${stripHtml(course.title) || 'bài học của bạn'}”.`,
+      })
+
+      window.setTimeout(() => setRatingBurst(false), 650)
     } catch (error) {
       console.error('Lỗi khi đánh giá:', error)
-      alert('Không thể gửi đánh giá. Vui lòng thử lại.')
+      alert(error?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.')
     } finally {
       setSubmittingRating(false)
     }
   }
 
   if (loading) {
-    return <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 dark:bg-[#020617] dark:text-white sm:px-6 lg:px-8`}><div className="mx-auto max-w-6xl"><div className="h-96 animate-pulse rounded-[2rem] bg-slate-200 dark:bg-white/[0.06]" /></div></main>
+    return (
+      <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-white px-3 py-5 text-slate-950 dark:bg-[#0f0f0f] dark:text-white sm:px-5 lg:px-7`}>
+        <div className="mx-auto max-w-[1720px] animate-pulse">
+          <div className="aspect-video w-full max-w-[1180px] rounded-2xl bg-slate-200 dark:bg-white/10" />
+          <div className="mt-5 h-8 w-3/4 rounded-lg bg-slate-200 dark:bg-white/10" />
+          <div className="mt-4 flex gap-3"><div className="h-11 w-11 rounded-full bg-slate-200 dark:bg-white/10" /><div className="h-11 w-48 rounded-xl bg-slate-200 dark:bg-white/10" /></div>
+          <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_390px]"><div className="h-72 rounded-2xl bg-slate-200 dark:bg-white/10" /><div className="h-[520px] rounded-2xl bg-slate-200 dark:bg-white/10" /></div>
+        </div>
+      </main>
+    )
   }
   if (!course) {
-    return <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 dark:bg-[#020617] dark:text-white sm:px-6 lg:px-8`}><div className="mx-auto max-w-4xl rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-[#0f1324]/90 p-10 text-center"><div className="text-5xl">🔎</div><h1 className="mt-4 text-2xl font-bold text-slate-950 dark:text-white">Không tìm thấy bài học</h1><p className="mt-2 text-slate-500 dark:text-slate-400">Bài học này có thể đã bị xóa hoặc đường dẫn không đúng.</p><button type="button" onClick={() => navigate('/courses')} className="mt-6 rounded-2xl bg-sky-400 px-6 py-3 font-bold text-slate-950">Quay lại danh sách</button></div></main>
+    return <CourseGateState icon="🔎" title="Không tìm thấy bài học" description="Bài học này có thể đã bị xóa hoặc đường dẫn không đúng." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} />
   }
 
+  const normalizedCurrentRole = String(currentRole || '').trim().replace(/[\s_-]/g, '').toUpperCase()
+  const isAdminDev = normalizedCurrentRole === 'ADMINDEV' || normalizedCurrentRole === 'ADMIN'
+  const isCourseOwner = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]
+    .filter(Boolean)
+    .map(String)
+    .includes(String(currentUser?.uid || ''))
+  const moderationStatus = String(course.status || course.moderationStatus || 'approved').toLowerCase()
+  const deletedCourse = moderationStatus === 'deleted'
+  const deniedByModeration = moderationStatus !== 'approved' && !isAdminDev && !isCourseOwner
   const isTeacherOrAdmin = isTeacherRole(currentRole)
   const locked = !isTeacherOrAdmin && isCourseLocked(course)
   const deniedByPrivateClass = !isTeacherOrAdmin && !canAccessCourseByClass(course, getUserClassName(userProfile))
 
+  if (deletedCourse) {
+    return <CourseGateState icon="🗑️" title="Bài học đã bị xóa" description="Nội dung này không còn được hiển thị trong thư viện." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
+  }
+
+  if (deniedByModeration) {
+    return <CourseGateState icon="🕒" title="Bài học đang chờ duyệt" description="Nội dung này chưa được quản trị viên phê duyệt để hiển thị công khai." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="warning" />
+  }
+
   if (deniedByPrivateClass) {
-    return (
-      <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 dark:bg-[#020617] dark:text-white sm:px-6 lg:px-8`}>
-        <div className="mx-auto max-w-4xl rounded-[2rem] border border-red-300/40 bg-white p-10 text-center dark:border-red-300/20 dark:bg-[#0f1324]/90">
-          <div className="text-5xl">🚫</div>
-          <h1 className="mt-4 text-2xl font-bold text-slate-950 dark:text-white">Bạn không thuộc lớp được xem bài này</h1>
-          <p className="mt-2 text-slate-500 dark:text-slate-400">
-            Bài học này chỉ dành cho lớp {course.className || 'được giáo viên chỉ định'}.
-          </p>
-          <button type="button" onClick={() => navigate('/courses')} className="mt-6 rounded-2xl bg-sky-400 px-6 py-3 font-bold text-slate-950">Quay lại danh sách</button>
-        </div>
-      </main>
-    )
+    return <CourseGateState icon="🚫" title="Bạn không thuộc lớp được xem bài này" description={`Bài học này chỉ dành cho lớp ${course.className || 'được giáo viên chỉ định'}.`} onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
   }
 
   if (locked) {
-    return (
-      <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 dark:bg-[#020617] dark:text-white sm:px-6 lg:px-8`}>
-        <div className="mx-auto max-w-4xl rounded-[2rem] border border-amber-300/40 bg-white dark:border-amber-300/20 dark:bg-[#0f1324]/90 p-10 text-center">
-          <div className="text-5xl">🔒</div>
-          <h1 className="mt-4 text-2xl font-bold text-slate-950 dark:text-white">Bài học chưa mở</h1>
-          <p className="mt-2 text-slate-500 dark:text-slate-400">Bài học sẽ mở vào {formatOpenAt(course.openAt)}.</p>
-          <button type="button" onClick={() => navigate('/courses')} className="mt-6 rounded-2xl bg-sky-400 px-6 py-3 font-bold text-slate-950">Quay lại danh sách</button>
-        </div>
-      </main>
-    )
+    return <CourseGateState icon="🔒" title="Bài học chưa mở" description={`Bài học sẽ mở vào ${formatOpenAt(course.openAt)}.`} onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="warning" />
   }
 
   const ratingAverage = getRatingAverage(course)
-  const lessonCount = Array.isArray(course.lessons) ? course.lessons.length : course.lessonCount || 1
+  const lessons = Array.isArray(course.lessons) && course.lessons.length ? course.lessons : []
+  const legacyMainVideo = !lessons.length && (course.youtubeUrl || course.lumiUrl || course.mp4FileUrl) ? {
+    title: course.title || 'Video chính',
+    content: course.content || '',
+    attachMode: course.lumiUrl ? 'lumi' : course.mp4FileUrl ? 'mp4' : 'youtube',
+    youtubeUrl: course.youtubeUrl || '',
+    lumiUrl: course.lumiUrl || '',
+    mp4FileUrl: course.mp4FileUrl || '',
+    mp4FileName: course.mp4FileName || '',
+    duration: course.duration || '---',
+    topicId: '',
+  } : null
+  const lessonTopicMap = new Map((Array.isArray(course.lessonTopics) ? course.lessonTopics : []).map((topic) => [String(topic.id), topic.title || 'Chủ đề']))
+  const orderedLessons = (lessons.length ? lessons : legacyMainVideo ? [legacyMainVideo] : []).map((lesson) => ({ ...lesson, topicTitle: lessonTopicMap.get(String(lesson.topicId || '')) || '' }))
+  const lessonCount = orderedLessons.length || course.lessonCount || 1
+  const learningObjectives = normalizeTextList(course.learningObjectives)
+  const prerequisites = normalizeTextList(course.prerequisites)
+  const checklist = normalizeChecklist(course.checklist)
+  const quiz = normalizeQuiz(course.quiz)
+  const completedChecklist = learningRecord.completedChecklist || {}
+  const visibleProgress = Math.max(0, Math.min(100, Number(learningRecord.progress || 0)))
+  const selectedLesson = selectedLessonIndex >= 0 ? orderedLessons[selectedLessonIndex] || null : null
+  const mainVideoLesson = selectedLesson
+  const detailTabs = [
+    { id: 'overview', label: 'Tổng quan' },
+    { id: 'notes', label: 'Ghi chú' },
+    { id: 'quiz', label: `Quiz${quiz.length ? ` (${quiz.length})` : ''}` },
+    { id: 'rating', label: 'Đánh giá' },
+    { id: 'qa', label: 'Hỏi đáp' },
+  ]
+
+  function handleSelectPlaylistCourse(targetCourseId) {
+    const targetIndex = playlistCourseIds.findIndex((id) => String(id) === String(targetCourseId))
+    if (targetIndex < 0) return
+    const params = new URLSearchParams({
+      playlist: playlistCourseIds.join(','),
+      playlistIndex: String(targetIndex),
+      autoplay: playlistAutoplay ? '1' : '0',
+    })
+    navigate(`/e-learning/${encodeURIComponent(targetCourseId)}?${params.toString()}`)
+  }
+
+  function handleSelectLesson(index) {
+    setSelectedLessonIndex(index)
+    setActiveDetailTab('content')
+    window.setTimeout(() => document.getElementById(`lesson-block-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
+
+  async function handleShareCourse() {
+    try {
+      await navigator.clipboard?.writeText(window.location.href)
+      setShareNotice(true)
+      window.setTimeout(() => setShareNotice(false), 1800)
+    } catch (error) {
+      console.warn('Không thể sao chép liên kết:', error)
+    }
+  }
+
+  const teacherName =
+    courseTeacherProfile?.fullName ||
+    courseTeacherProfile?.name ||
+    courseTeacherProfile?.displayName ||
+    course.teacherName ||
+    course.teacherEmail ||
+    'Đang cập nhật'
+  const teacherAvatar =
+    courseTeacherProfile?.photoURL ||
+    courseTeacherProfile?.avatar ||
+    courseTeacherProfile?.avatarUrl ||
+    course.teacherAvatar ||
+    ''
+  const normalizedTeacherRole = String(course.createdByRole || courseTeacherProfile?.role || '')
+    .trim()
+    .replace(/[\s_-]/g, '')
+    .toUpperCase()
+  const isOfficialTeacher = ['ADMIN', 'ADMINDEV'].includes(normalizedTeacherRole)
+  const isVerifiedTeacher = isOfficialTeacher || Boolean(courseTeacherProfile?.elearningVerified)
+  const completedLessonCount = Object.values(learningRecord.lessonProgress || {}).filter((value) => Number(value || 0) >= 100).length
+  const currentLessonTitle = selectedLesson?.title || course.title
+  const previousLessonIndex = selectedLessonIndex > 0 ? selectedLessonIndex - 1 : null
+  const nextLessonIndex = selectedLessonIndex < orderedLessons.length - 1 ? selectedLessonIndex + 1 : null
+
+  const ratingDistribution = [5, 4, 3, 2, 1].map((star) => ({ star, count: ratingItems.filter((item) => Number(item.rating) === star).length }))
+  const teacherId = course.teacherId || course.createdByUid || course.createdBy || course.ownerId || course.userId || course.uid || ''
+
+  function openNextPlaylistCourse() {
+    if (!playlistAutoplay || !playlistCourseIds.length) return false
+    const nextIndex = playlistIndex + 1
+    const nextCourseId = playlistCourseIds[nextIndex]
+    if (!nextCourseId) return false
+    const params = new URLSearchParams({
+      playlist: playlistCourseIds.join(','),
+      playlistIndex: String(nextIndex),
+      autoplay: '1',
+    })
+    navigate(`/e-learning/${encodeURIComponent(nextCourseId)}?${params.toString()}`)
+    return true
+  }
+
+  function handleAutoAdvance() {
+    if (!autoPlayEnabled) return
+    if (nextLessonIndex !== null) {
+      handleSelectLesson(nextLessonIndex)
+      return
+    }
+    if (!openNextPlaylistCourse()) handleManualComplete()
+  }
+
+  async function submitDetailReport(event) {
+    event?.preventDefault?.()
+    if (!currentUser) { alert('Bạn cần đăng nhập để gửi báo cáo.'); return }
+    if (!reportReason) return
+    try {
+      setReportSubmitting(true)
+      const existing = await getDocs(query(collection(db, 'learningReports'), where('courseId', '==', realCourseId)))
+      const duplicated = existing.docs.some((item) => String(item.data()?.reporterId || item.data()?.userId || '') === String(currentUser.uid))
+      if (duplicated) { alert('Bạn đã báo cáo bài học này rồi. Quản trị viên đang xem xét nhé!'); setReportOpen(false); return }
+      const createdReportRef = await addDoc(collection(db, 'learningReports'), {
+        reportType: 'course',
+        courseId: realCourseId, courseTitle: stripHtml(course.title), courseOwnerId: teacherId,
+        reporterId: currentUser.uid, reporterName: userProfile?.fullName || userProfile?.name || currentUser.displayName || currentUser.email || 'Người dùng ZUNY',
+        reporterEmail: currentUser.email || '', userId: currentUser.uid, userEmail: currentUser.email || '',
+        reason: reportReason, detail: reportDetail.trim(), status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      })
+      await setDoc(doc(db, 'users', currentUser.uid, 'elearningNotifications', `report_submitted_${createdReportRef.id}`), {
+        title: 'Đã gửi báo cáo tới quản trị viên',
+        message: `Báo cáo về bài học “${stripHtml(course.title) || 'Bài học'}” đã được tiếp nhận và đang chờ xử lý.`,
+        type: 'report_submitted',
+        courseId: realCourseId,
+        reportId: createdReportRef.id,
+        actorId: currentUser.uid,
+        read: false,
+        createdAt: serverTimestamp(),
+      })
+      setReportOpen(false); setReportDetail(''); alert('Đã gửi báo cáo tới quản trị viên. Bạn sẽ nhận thông báo khi báo cáo được giải quyết.')
+    } catch (error) { console.error('Không thể gửi báo cáo:', error); alert('Chưa gửi được báo cáo. Vui lòng thử lại.') } finally { setReportSubmitting(false) }
+  }
+
 
   return (
-    <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-slate-50 px-4 py-8 text-slate-950 dark:bg-[#020617] dark:text-white sm:px-6 lg:px-8`}>
-      <div className="mx-auto max-w-6xl">
-        {skipWarningOpen && (
-          <HonestyWarningModal
-            onClose={() => setSkipWarningOpen(false)}
-            isDarkMode={isDarkMode}
-          />
-        )}
+    <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-[#f6f8fc] pb-24 text-slate-950 dark:bg-[#07111f] dark:text-white [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_label]:cursor-pointer`}>
+      {completionOpen && <CompletionModal onClose={() => setCompletionOpen(false)} nextCourse={nextCourse} onNext={(item) => navigate(`/e-learning/${item.id}`)} isDarkMode={isDarkMode} />}
+      {skipWarning && <HonestyWarningModal warning={skipWarning} onClose={() => setSkipWarning(null)} isDarkMode={isDarkMode} />}
+      {shareNotice && <div className="fixed bottom-24 left-1/2 z-[1000] -translate-x-1/2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-2xl dark:bg-white dark:text-slate-950">Đã sao chép liên kết bài học</div>}
+      {selfRatingNotice && <div className="fixed inset-0 z-[1100] grid place-items-center bg-slate-950/60 px-4 backdrop-blur-sm"><div className="w-full max-w-sm rounded-[28px] border border-pink-200 bg-white p-6 text-center shadow-2xl dark:border-pink-400/20 dark:bg-[#10203a]"><div className="text-6xl">🙈</div><h2 className="mt-4 text-xl font-black">Úi, không được tự chấm mình đâu nha!</h2><p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">Hãy để mọi người đánh giá bài học của bạn thật công bằng nhé ✨</p><button type="button" onClick={() => setSelfRatingNotice(false)} className="mt-5 rounded-full bg-pink-500 px-6 py-3 text-sm font-black text-white hover:bg-pink-600">Mình hiểu rồi</button></div></div>}
+      {reportOpen && <div className="fixed inset-0 z-[1050] grid place-items-center bg-slate-950/65 px-4 backdrop-blur-sm"><form onSubmit={submitDetailReport} className="w-full max-w-lg rounded-[26px] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-[#10203a]"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-rose-500">Báo cáo nội dung</p><h2 className="mt-1 text-xl font-black">Điều gì chưa phù hợp?</h2></div><button type="button" onClick={() => setReportOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-xl dark:bg-white/10">×</button></div><div className="mt-5 grid gap-2">{['Nội dung không phù hợp','Thông tin sai lệch','Vi phạm bản quyền','Nội dung nguy hiểm','Spam hoặc quảng cáo','Lý do khác'].map((reason)=><button key={reason} type="button" onClick={() => setReportReason(reason)} className={`rounded-xl border px-4 py-3 text-left text-sm font-bold transition ${reportReason===reason?'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300':'border-slate-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5'}`}>{reason}</button>)}</div><textarea value={reportDetail} onChange={(event)=>setReportDetail(event.target.value)} rows="4" placeholder="Mô tả thêm để quản trị viên dễ kiểm tra..." className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-rose-500 dark:border-white/10 dark:bg-white/5"/><button disabled={reportSubmitting} className="mt-4 w-full rounded-xl bg-rose-600 px-5 py-3 text-sm font-black text-white hover:bg-rose-700 disabled:opacity-50">{reportSubmitting?'Đang gửi...':'Gửi báo cáo'}</button></form></div>}
 
-        <button type="button" onClick={() => navigate('/courses')} className="mb-6 cursor-pointer rounded-full border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white">← Quay lại thư viện</button>
-        <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-[#0f1324]/90 shadow-2xl shadow-slate-200/80 dark:shadow-sky-950/30">
-          <div className="relative h-72 overflow-hidden">
-            <img src={course.thumbnail || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=1400&auto=format&fit=crop'} alt={stripHtml(course.title)} className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0f1324] via-[#0f1324]/50 to-transparent" />
-            <div className="absolute bottom-6 left-6 right-6">
-              <div className="mb-4 flex flex-wrap gap-2"><span className="rounded-full bg-sky-400 px-4 py-2 text-sm font-bold text-slate-950">{course.category || 'Science'}</span>{course.courseCode && <span className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white backdrop-blur">{course.courseCode}</span>}</div>
-              <h1 className="max-w-4xl text-3xl font-black tracking-tight text-white sm:text-5xl" dangerouslySetInnerHTML={{ __html: course.title }} />
+      <div className="w-full">
+        <div className={`grid min-h-0 grid-cols-1 transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${detailSidebarCollapsed ? 'xl:grid-cols-[76px_minmax(0,1fr)]' : 'xl:grid-cols-[3fr_10fr]'}`}>
+          <button type="button" aria-label="Đóng left sidebar" onClick={()=>setMobileDetailSidebarOpen(false)} className={`fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[2px] transition-opacity duration-300 xl:hidden ${mobileDetailSidebarOpen?'pointer-events-auto opacity-100':'pointer-events-none opacity-0'}`}/>
+          <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,360px)] min-h-0 flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-sm transition-[transform,width,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-white/10 dark:bg-[#0a1728]/95 ${mobileDetailSidebarOpen?'translate-x-0':'-translate-x-full pointer-events-none'} xl:sticky xl:top-0 xl:z-20 xl:h-dvh xl:w-auto xl:translate-x-0 xl:pointer-events-auto xl:shadow-[12px_0_32px_-24px_rgba(15,23,42,0.75)] xl:dark:shadow-[12px_0_34px_-22px_rgba(0,0,0,0.95)]`}>
+            <div className={`flex items-center px-4 pb-3 pt-4 ${detailSidebarCollapsed?'xl:justify-center':'justify-between'}`}>
+              <button type="button" onClick={()=>setDetailSidebarCollapsed((value)=>!value)} className="hidden h-10 w-10 place-items-center rounded-xl bg-slate-100 text-lg transition duration-300 hover:scale-105 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 xl:grid" aria-label={detailSidebarCollapsed?'Mở left sidebar':'Ẩn left sidebar'}>☰</button>
+              <span className={`text-sm font-black transition-all duration-300 ${detailSidebarCollapsed?'xl:w-0 xl:translate-x-2 xl:opacity-0':'opacity-100'}`}>Học tập</span>
+              <button type="button" onClick={()=>setMobileDetailSidebarOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-xl transition hover:rotate-90 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 xl:hidden" aria-label="Đóng left sidebar">×</button>
             </div>
-          </div>
-          <div className="p-6 md:p-8">
-            <p className="max-w-4xl text-base leading-8 text-slate-600 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: course.description }} />
-            {(course.topic || course.courseCode || course.visibility || course.openAt) && <div className="mt-5 grid gap-3 md:grid-cols-2">{course.topic && <InfoPanel label="Chủ đề" value={stripHtml(course.topic)} />}{course.courseCode && <InfoPanel label="Mã bài" value={course.courseCode} />}{course.visibility && <InfoPanel label="Chế độ" value={course.visibility === 'private' ? 'Riêng tư' : 'Công khai'} />}{course.openAt && <InfoPanel label="Thời gian mở" value={formatOpenAt(course.openAt)} />}{course.className && <InfoPanel label="Lớp được xem" value={course.className} />}</div>}
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Giáo viên" value={getCurrentCourseTeacherName(course, courseTeacherProfile)} /><Metric label="Thời lượng" value={course.youtubeUrl ? course.duration || '---' : '---'} /><Metric label="Bài học" value={lessonCount} /><Metric label="Ngày tạo" value={formatFullDateTime(course.createdAt)} /><Metric label="Đánh giá" value={`★ ${ratingAverage}`} /></div>
-            <RatingStars selectedRating={selectedRating} ratingAverage={ratingAverage} ratingCount={course.ratingCount || 0} ratingBurst={ratingBurst} onRate={handleRating} />
-            {Array.isArray(course.lessons) && course.lessons.length > 0 && (
-              <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]">
-                <div className="text-sm font-bold uppercase tracking-[0.3em] text-sky-600 dark:text-sky-300">Danh sách bài nhỏ</div>
-                <div className="mt-5 grid gap-4">
-                  {course.lessons.map((lesson, index) => (
-                    <LessonDetailBlock
-                      key={index}
-                      lesson={lesson}
-                      index={index}
-                      courseId={realCourseId}
-                      currentUser={currentUser}
-                      currentRole={currentRole}
-                      totalLessons={lessonCount}
-                      onSkipWarning={() => setSkipWarningOpen(true)}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-            {getYoutubeVideoId(course.youtubeUrl) && (
-              <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]">
-                <div className="text-sm font-bold uppercase tracking-[0.3em] text-red-300">Video bài học</div>
-                <h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">Xem video e-learning</h2>
-                <YoutubeProgressPlayer
-                  youtubeUrl={course.youtubeUrl}
-                  title={stripHtml(course.title)}
-                  courseId={realCourseId}
-                  currentUser={currentUser}
-                  currentRole={currentRole}
-                  lessonIndex={0}
-                  totalLessons={lessonCount}
-                  onSkipWarning={() => setSkipWarningOpen(true)}
-                />
-              </section>
-            )}
-            {course.wordFileUrl && <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]"><div className="text-sm font-bold uppercase tracking-[0.3em] text-sky-600 dark:text-sky-300">File Word / PDF</div><h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">Tài liệu giáo viên đã tải lên</h2>{isPdfFile(course.wordFileName, course.wordFileUrl) && <iframe src={course.wordFileUrl} title={course.wordFileName || 'PDF'} className="mt-5 h-[600px] w-full rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-950" />}<a href={course.wordFileUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-3 rounded-2xl bg-sky-400 px-5 py-3 font-bold text-slate-950 transition hover:bg-sky-300"><span>📄</span>Mở file {course.wordFileName || 'tài liệu'}</a></section>}
-            <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]"><div className="text-sm font-bold uppercase tracking-[0.3em] text-sky-600 dark:text-sky-300">Nội dung bài học</div><h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">Bắt đầu học</h2><div className="mt-5 whitespace-pre-line rounded-2xl bg-slate-50 p-5 text-base leading-8 text-slate-700 dark:bg-slate-950/50 dark:text-slate-200">{course.content || 'Giáo viên chưa thêm nội dung chi tiết cho bài học này.'}</div></section>
-            {course.codeContent && <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]"><div className="text-sm font-bold uppercase tracking-[0.3em] text-emerald-300">Code</div><h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">Nội dung code của bài học</h2><div className="mt-5 grid gap-4 lg:grid-cols-2"><pre className="min-h-72 overflow-auto rounded-2xl border border-emerald-400/20 bg-black p-5 font-mono text-sm leading-7 text-emerald-300">{course.codeContent}</pre><CodeRunner code={course.codeContent} /></div></section>}
-            {course.richDocument && <section className="mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]"><div className="text-sm font-bold uppercase tracking-[0.3em] text-emerald-300">Tài liệu</div><h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">Tài liệu dạng Word</h2><div className="prose mt-5 max-w-none rounded-2xl bg-slate-50 p-5 text-base leading-8 text-slate-700 dark:prose-invert dark:bg-slate-950/50 dark:text-slate-200 [&_ol]:ml-6 [&_ol]:list-decimal [&_ul]:ml-6 [&_ul]:list-disc" dangerouslySetInnerHTML={{ __html: course.richDocument }} /></section>}
-          </div>
-        </section>
+            <div className={`min-h-0 flex-1 overflow-y-auto px-4 pb-6 transition-all duration-300 [scrollbar-color:#64748b_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/70 [&::-webkit-scrollbar-track]:bg-transparent xl:pb-24 ${detailSidebarCollapsed?'xl:pointer-events-none xl:translate-x-3 xl:opacity-0':'translate-x-0 opacity-100'}`}><div className="mb-3 rounded-2xl border border-slate-200 p-4 dark:border-white/10"><div className="flex items-center gap-3">{teacherAvatar?<img src={teacherAvatar} alt={teacherName} className="h-12 w-12 rounded-full object-cover"/>:<div className="grid h-12 w-12 place-items-center rounded-full bg-blue-600 font-black text-white">{teacherName.slice(0,2).toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-black">{teacherName}</p><p className="text-xs text-slate-500">Giáo viên {course.category || 'ZUNY'}</p></div></div><button type="button" onClick={()=>navigate(`/e-learning?channel=${encodeURIComponent(teacherId)}`)} className="mt-3 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-bold hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">Xem trang cá nhân</button></div><PlaylistPanel lessons={orderedLessons} selectedLessonIndex={selectedLessonIndex} learningRecord={learningRecord} onSelectLesson={handleSelectLesson} playlistCourses={playlistCourses} currentCourseId={realCourseId} currentPlaylistIndex={playlistIndex} onSelectPlaylistCourse={handleSelectPlaylistCourse} collapsed={playlistCollapsed} onToggleCollapsed={()=>setPlaylistCollapsed((value)=>!value)} autoPlayEnabled={autoPlayEnabled} onToggleAutoPlay={()=>setAutoPlayEnabled((value)=>!value)}/></div>
+          </aside>
+
+          <section className="relative z-0 min-w-0 px-3 py-4 sm:px-5 xl:px-6 xl:pb-28">
+            <header className="mb-5">
+              <div className="relative flex min-h-12 min-w-0 items-start justify-center px-12 sm:px-24">
+                <button type="button" onClick={() => setMobileDetailSidebarOpen(true)} className="absolute left-0 top-0 grid h-11 w-11 place-items-center rounded-xl border border-slate-300 bg-slate-200 text-lg font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 xl:hidden" aria-label="Mở left sidebar" aria-expanded={mobileDetailSidebarOpen}>☰</button>
+                <h1 className="w-full min-w-0 max-w-4xl max-h-[3.75em] overflow-y-auto whitespace-normal break-words pr-1 text-center text-xl font-black leading-tight [overflow-wrap:anywhere] [word-break:break-word] sm:text-3xl lg:text-[34px]">{stripHtml(course.title)}</h1>
+                <button type="button" onClick={() => navigate('/e-learning')} className="absolute right-0 top-0 inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-slate-200 px-3 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 sm:px-4" aria-label="Quay lại thư viện">
+                  <span aria-hidden="true">←</span>
+                  <span className="hidden sm:inline">Quay lại</span>
+                </button>
+              </div>
+            </header><div className="overflow-visible rounded-2xl border border-slate-200 bg-black shadow-xl shadow-slate-950/15 dark:border-white/10 dark:shadow-black/40"><MainLearningViewer course={course} mainVideoLesson={mainVideoLesson} selectedLessonIndex={selectedLessonIndex} realCourseId={realCourseId} currentUser={currentUser} currentRole={currentRole} lessonCount={lessonCount} onSkipWarning={(warning)=>setSkipWarning(warning || {})} autoPlay={autoPlayEnabled} onEnded={handleAutoAdvance}/></div><div className="mt-3 flex items-center gap-2 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-md shadow-slate-900/5 backdrop-blur-sm [scrollbar-width:none] dark:border-white/10 dark:bg-[#0c1a2f]/90 dark:shadow-black/25 [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-end sm:p-2.5"><button type="button" disabled={Boolean(savingDestination)} onClick={handleToggleBookmark} className={`group relative h-10 cursor-pointer overflow-hidden rounded-full border px-4 text-xs font-black transition-all duration-300 active:scale-95 disabled:cursor-wait disabled:opacity-70 ${learningRecord.bookmarked?'border-emerald-500 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25':'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white'}`}><span className="mr-2">{savingDestination==='remove'?'◌':learningRecord.bookmarked?'★':'☆'}</span>{savingDestination==='remove'?'Đang hủy lưu...':learningRecord.bookmarked?'Đang lưu':'Lưu bài học'}</button><button type="button" onClick={handleShareCourse} className="h-10 rounded-full border border-slate-300 bg-white px-4 text-xs font-black shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-md dark:border-slate-600 dark:bg-slate-800">↗ Chia sẻ</button><button type="button" onClick={()=>setReportOpen(true)} className="h-10 rounded-full border border-rose-200 bg-white px-4 text-xs font-black text-rose-600 hover:bg-rose-50 dark:border-rose-400/20 dark:bg-white/5 dark:hover:bg-rose-500/10">⚑ Báo cáo</button></div>
+
+            <div className="mt-4 space-y-4">
+              <div className="sticky top-0 z-30 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 px-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#0c1a2f]/95 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div className="flex min-w-max gap-1">{detailTabs.map((tab)=><button key={tab.id} type="button" onClick={()=>setActiveDetailTab(tab.id)} className={`shrink-0 rounded-xl px-4 py-4 text-sm font-bold transition ${activeDetailTab===tab.id?'bg-blue-600 text-white shadow':'text-slate-600 hover:text-blue-700 dark:text-slate-300 dark:hover:text-sky-300'}`}>{tab.label}</button>)}</div></div>
+
+              {activeDetailTab==='overview' && <section id="detail-overview" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><h2 className="text-xl font-black">Tổng quát</h2><div className="mt-5 space-y-5"><section className="min-w-0"><h3 className="text-lg font-black">Mô tả bài học</h3><div className={`mt-3 w-full min-w-0 max-w-[900px] whitespace-normal break-words text-sm leading-7 text-slate-600 [overflow-wrap:anywhere] [&_*]:max-w-full [&_*]:whitespace-normal [&_*]:break-words dark:text-slate-300 ${descriptionExpanded?'':'line-clamp-3'}`} dangerouslySetInnerHTML={{__html:course.description||course.content||'Giáo viên chưa thêm mô tả bài học.'}}/><button type="button" onClick={()=>setDescriptionExpanded((value)=>!value)} className="mt-2 cursor-pointer text-sm font-bold text-blue-600">{descriptionExpanded?'Thu gọn':'Xem thêm'}</button></section><section className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><div className="grid min-w-0 gap-4 md:grid-cols-2"><OverviewList title="Bạn sẽ học được" items={learningObjectives} empty="Giáo viên chưa thêm mục tiêu học tập."/><OverviewList title="Kiến thức cần có" items={prerequisites} empty="Bài học này chưa yêu cầu kiến thức nền cụ thể."/></div><div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-4 text-sm dark:border-white/10"><div><p className="text-xs text-slate-500">Cấp lớp</p><b>{course.className||'Tất cả'}</b></div><div><p className="text-xs text-slate-500">Môn học</p><b>{course.category||'---'}</b></div><div className="min-w-0"><p className="text-xs text-slate-500">Chủ đề</p><b className="block w-full min-w-0 max-w-[220px] whitespace-normal break-words [overflow-wrap:anywhere]">{stripHtml(course.topic)||'---'}</b></div><div><p className="text-xs text-slate-500">Thời lượng</p><b>{course.duration||course.estimatedMinutes||'---'}</b></div><div><p className="text-xs text-slate-500">Lượt xem</p><b>{Number(course.views||0).toLocaleString('vi-VN')}</b></div><div><p className="text-xs text-slate-500">Mã thẻ bài học</p><b className="break-all">{course.courseCode||realCourseId||'---'}</b></div><div><p className="text-xs text-slate-500">Cập nhật</p><b>{course.updatedAt?'Gần đây':'---'}</b></div></div></section>{(course.wordFileUrl||course.codeContent||course.richDocument)&&<section><h3 className="text-lg font-black">Tài liệu đính kèm</h3>{course.wordFileUrl&&<CourseFileViewer course={course}/>} {course.codeContent&&<CourseCodeViewer course={course}/>} {course.richDocument&&<CourseRichDocumentViewer course={course}/>}</section>}<section className="rounded-2xl border border-slate-200 p-5 dark:border-white/10"><h3 className="font-black">Đánh giá từ học viên</h3><div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center"><div><div className="text-4xl font-black">{ratingAverage}</div><div className="text-amber-400">★★★★★</div><p className="mt-1 text-xs text-slate-500">({course.ratingCount||0} đánh giá realtime)</p></div><div className="flex-1 space-y-2">{ratingDistribution.map(({star,count})=><div key={star} className="flex items-center gap-2 text-xs"><span>{star}★</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-amber-400" style={{width:`${ratingItems.length?Math.round(count/ratingItems.length*100):0}%`}}/></div><span className="w-8 text-right">{count}</span></div>)}</div></div></section></div></section>}
+              {activeDetailTab==='notes' && <section id="detail-notes" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><NotesPanel noteDraft={noteDraft} setNoteDraft={setNoteDraft} noteColor={noteColor} setNoteColor={setNoteColor} savingNote={savingNote} onSave={handleSaveNotes}/></section>}
+              {activeDetailTab==='quiz' && <section id="detail-quiz" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6">{quiz.length?<MiniQuizPanel quiz={quiz} answers={quizAnswers} submitted={quizSubmitted} savedResult={learningRecord.quizResult} onAnswer={handleQuizAnswer} onSubmit={()=>handleSubmitQuiz(quiz)}/>:<EmptyLearningState text="Bài học này chưa có quiz."/>}</section>}
+              {activeDetailTab==='rating' && <section id="detail-rating" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><RatingStars selectedRating={selectedRating} ratingAverage={ratingAverage} ratingCount={course.ratingCount||0} ratingBurst={ratingBurst} onRate={handleRating}/></section>}
+              {activeDetailTab==='qa' && <section id="detail-qa" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><QAPanel courseId={realCourseId} currentUser={currentUser} userProfile={userProfile} currentRole={currentRole} courseOwnerId={teacherId} focusQuestionId={focusedQuestionId} focusReplyId={focusedReplyId} onOpenUser={(userId)=>navigate(`/e-learning?channel=${encodeURIComponent(userId)}`)}/></section>}
+            </div>
+          </section>
+        </div>
       </div>
+
+      {savePickerOpen && <div className="fixed inset-0 z-[160] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-sm"><button type="button" aria-label="Đóng hộp lưu bài học" onClick={()=>setSavePickerOpen(false)} className="absolute inset-0 cursor-pointer"/><section className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#0c1a2f]"><div className="border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-emerald-50 p-5 dark:border-white/10 dark:from-blue-500/10 dark:via-transparent dark:to-emerald-500/10"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">Lưu bài học</p><h2 className="mt-1 text-xl font-black">Chọn nơi bạn muốn lưu</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Danh sách được đồng bộ trực tiếp với Tài khoản chính.</p></div><button type="button" onClick={()=>setSavePickerOpen(false)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-lg shadow-sm transition hover:rotate-90 dark:bg-white/10">×</button></div></div><div className="max-h-[60vh] overflow-y-auto p-4 sm:p-5"><button type="button" disabled={Boolean(savingDestination)} onClick={()=>saveCourseToDestination(null)} className="group flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg disabled:cursor-wait disabled:opacity-60 dark:border-blue-400/20 dark:bg-blue-500/10"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-600 text-2xl text-white shadow-lg shadow-blue-500/25">★</span><span className="min-w-0 flex-1"><span className="block font-black text-blue-800 dark:text-blue-200">Lưu riêng</span><span className="mt-1 block text-xs leading-5 text-blue-600/80 dark:text-blue-300/80">Chỉ xuất hiện trong mục bài đã lưu của bạn.</span></span><span className="text-xl text-blue-600">{savingDestination==='private'?'…':'›'}</span></button><div className="my-4 flex items-center gap-3"><span className="h-px flex-1 bg-slate-200 dark:bg-white/10"/><span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Danh sách lưu đã tạo</span><span className="h-px flex-1 bg-slate-200 dark:bg-white/10"/></div>{savedLists.length?<div className="grid gap-2">{savedLists.map((list)=>{const alreadySaved=Array.isArray(list.courseIds)&&list.courseIds.map(String).includes(String(realCourseId)); return <button key={list.id} type="button" disabled={Boolean(savingDestination)} onClick={()=>saveCourseToDestination(list)} className={`flex w-full cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-wait disabled:opacity-60 ${alreadySaved?'border-emerald-300 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-500/10':'border-slate-200 bg-slate-50 hover:border-blue-300 dark:border-white/10 dark:bg-white/[0.04]'}`}><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-lg ${alreadySaved?'bg-emerald-500 text-white':'bg-slate-200 dark:bg-white/10'}`}>{alreadySaved?'✓':'▣'}</span><span className="min-w-0 flex-1"><span className="block truncate font-black">{list.title||'Danh sách chưa đặt tên'}</span><span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-400">{alreadySaved?'Bài học đã có trong danh sách':list.description||`${(list.courseIds||[]).length} bài học`}</span></span><span className="text-lg text-slate-400">{savingDestination===list.id?'…':'›'}</span></button>})}</div>:<div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center dark:border-white/15"><div className="text-3xl">📚</div><p className="mt-2 font-black">Chưa có danh sách lưu</p><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Bạn có thể tạo danh sách mới trong Tài khoản chính, sau đó danh sách sẽ tự xuất hiện tại đây.</p></div>}</div></section></div>}
+
+      {saveNotice && <div className={`fixed left-1/2 top-5 z-[180] -translate-x-1/2 animate-[fadeIn_.25s_ease-out] rounded-2xl border bg-white px-5 py-3 shadow-2xl dark:bg-[#0c1a2f] ${saveNotice.removed?'border-rose-300 dark:border-rose-400/30':'border-emerald-300 dark:border-emerald-400/30'}`}><div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-full text-lg text-white shadow-lg ${saveNotice.removed?'bg-rose-500 shadow-rose-500/30':'bg-emerald-500 shadow-emerald-500/30'}`}>{saveNotice.removed?'☆':'✓'}</span><div><p className={`font-black ${saveNotice.removed?'text-rose-700 dark:text-rose-300':'text-emerald-700 dark:text-emerald-300'}`}>{saveNotice.removed?'Đã hủy lưu bài học':'Đã lưu bài học'}</p><p className="text-xs text-slate-500 dark:text-slate-400">{saveNotice.removed?'Bài học đã được gỡ khỏi mục Đã lưu và các danh sách lưu.':`Đã thêm vào ${saveNotice.destination}.`}</p></div></div></div>}
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-[#081528]/95 sm:px-3 sm:py-3"><div className="grid grid-cols-3 items-center gap-2 sm:flex sm:justify-between sm:gap-3"><button type="button" disabled={previousLessonIndex===null} onClick={()=>previousLessonIndex!==null&&handleSelectLesson(previousLessonIndex)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10 sm:px-4 sm:text-sm"><span className="sm:hidden">← Trước</span><span className="hidden sm:inline">← Bài trước</span></button><button type="button" onClick={()=>nextLessonIndex!==null?handleSelectLesson(nextLessonIndex):(openNextPlaylistCourse()||handleManualComplete())} className="min-w-0 rounded-xl bg-blue-600 px-2 py-3 text-xs font-black text-white sm:px-7 sm:text-sm">{nextLessonIndex!==null?'Tiếp tục học ▶':playlistAutoplay&&playlistCourseIds[playlistIndex+1]?'Phát bài tiếp ▶':'Hoàn thành ✓'}</button><button type="button" disabled={nextLessonIndex===null} onClick={()=>nextLessonIndex!==null&&handleSelectLesson(nextLessonIndex)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10 sm:px-4 sm:text-sm"><span className="sm:hidden">Tiếp →</span><span className="hidden sm:inline">Bài tiếp theo →</span></button></div></div>
     </main>
   )
 }
-
-function LessonDetailBlock({ lesson, index, courseId, currentUser, currentRole, totalLessons, onSkipWarning }) {
-  const mode = lesson.attachMode || 'youtube'
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-950/50">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="font-bold text-slate-950 dark:text-white">Bài {index + 1}: {lesson.title}</div>
-          {lesson.content && <div className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{lesson.content}</div>}
-        </div>
-        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700 dark:bg-sky-400/10 dark:text-sky-200">
-          {mode === 'youtube' ? 'YouTube' : mode === 'file' ? 'Word/PDF' : mode === 'code' ? `Code ${lesson.codeLanguage === 'cpp' ? 'C++' : 'JavaScript'}` : 'Tài liệu'}
-        </span>
-      </div>
-
-      {mode === 'youtube' && getYoutubeVideoId(lesson.youtubeUrl) && (
-        <YoutubeProgressPlayer
-          youtubeUrl={lesson.youtubeUrl}
-          title={lesson.title || `Bài ${index + 1}`}
-          courseId={courseId}
-          currentUser={currentUser}
-          currentRole={currentRole}
-          lessonIndex={index}
-          totalLessons={totalLessons}
-          onSkipWarning={onSkipWarning}
-        />
-      )}
-
-      {mode === 'youtube' && !getYoutubeVideoId(lesson.youtubeUrl) && lesson.mp4FileUrl && (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-black dark:border-white/10">
-          <video
-            src={lesson.mp4FileUrl}
-            title={lesson.title || `MP4 bài ${index + 1}`}
-            controls
-            className="aspect-video w-full"
-          />
-        </div>
-      )}
-
-      {mode === 'file' && lesson.wordFileUrl && (
-        <div className="mt-4">
-          {isPdfFile(lesson.wordFileName, lesson.wordFileUrl) && (
-            <iframe
-              src={lesson.wordFileUrl}
-              title={lesson.wordFileName || `File bài ${index + 1}`}
-              className="h-[500px] w-full rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-950"
-            />
-          )}
-          {lesson.fileExtractedText && (
-            <div className="mt-4 whitespace-pre-line rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
-              {lesson.fileExtractedText}
-            </div>
-          )}
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <a
-              href={lesson.wordFileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-3 rounded-2xl bg-sky-400 px-5 py-3 font-bold text-slate-950 transition hover:bg-sky-300"
-            >
-              📄 Mở file {lesson.wordFileName || 'tài liệu'}
-            </a>
-
-            <a
-              href={lesson.wordFileUrl}
-              download={lesson.wordFileName || true}
-              className="inline-flex items-center gap-3 rounded-2xl bg-emerald-400 px-5 py-3 font-bold text-slate-950 transition hover:bg-emerald-300"
-            >
-              ⬇️ Tải xuống
-            </a>
-          </div>
-        </div>
-      )}
-
-      {mode === 'code' && lesson.codeContent && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <pre className="min-h-72 overflow-auto rounded-2xl border border-emerald-400/20 bg-black p-5 font-mono text-sm leading-7 text-emerald-300">
-            {lesson.codeContent}
-          </pre>
-          {lesson.codeLanguage === 'cpp' ? <CppNote /> : <CodeRunner code={lesson.codeContent} />}
-        </div>
-      )}
-
-      {mode === 'document' && lesson.richDocument && (
-        <div
-          className="prose mt-4 max-w-none rounded-2xl bg-white p-5 text-base leading-8 text-slate-700 dark:prose-invert dark:bg-slate-950/70 dark:text-slate-200 [&_ol]:ml-6 [&_ol]:list-decimal [&_ul]:ml-6 [&_ul]:list-disc"
-          dangerouslySetInnerHTML={{ __html: lesson.richDocument }}
-        />
-      )}
-    </div>
-  )
-}
-
-
-
-
-function YoutubeProgressPlayer({
-  youtubeUrl,
-  title,
-  courseId,
-  currentUser,
-  currentRole,
-  lessonIndex = 0,
-  totalLessons = 1,
-  onSkipWarning,
-}) {
-  const videoId = getYoutubeVideoId(youtubeUrl)
-  const playerElementId = `youtube-player-${courseId || 'course'}-${lessonIndex}-${videoId}`
-  const [progressText, setProgressText] = useState('Đang tải tiến trình đã lưu...')
-  const [progressValue, setProgressValue] = useState(0)
-  const maxWatchedRef = useRef(0)
-  const lastPlayerTimeRef = useRef(0)
-  const warningCooldownRef = useRef(0)
-  const hasRestoredRef = useRef(false)
-
-  useEffect(() => {
-    if (!videoId) return
-
-    let player = null
-    let interval = null
-    let cancelled = false
-
-    async function loadSavedProgress() {
-      if (!currentUser || !courseId || !canTrackLearningProgress(currentRole)) return 0
-
-      try {
-        const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', courseId)
-        const progressSnap = await getDoc(progressRef)
-
-        if (!progressSnap.exists()) return 0
-
-        const data = progressSnap.data()
-        const lessonMaxWatchedSeconds = data.lessonMaxWatchedSeconds || {}
-        const lessonWatchedSeconds = data.lessonWatchedSeconds || {}
-        const savedTime =
-          Number(lessonMaxWatchedSeconds[lessonIndex] || 0) ||
-          Number(lessonWatchedSeconds[lessonIndex] || 0) ||
-          Number(data.watchedSeconds || 0)
-
-        return Math.max(0, savedTime)
-      } catch (error) {
-        console.warn('Không thể tải tiến trình YouTube đã lưu:', error)
-        return 0
-      }
-    }
-
-    async function saveYoutubeProgress(watchedTime, duration) {
-      if (!currentUser || !courseId || !canTrackLearningProgress(currentRole) || !duration) return
-
-      const safeWatchedTime = Math.min(Number(watchedTime || 0), Number(duration || 0))
-      const watchedSeconds = Math.floor(safeWatchedTime)
-      const durationSeconds = Math.floor(duration)
-      const lessonProgress = Math.min(100, Math.round((safeWatchedTime / duration) * 100))
-      const safeTotalLessons = Math.max(1, Number(totalLessons || 1))
-      const courseProgress =
-        safeTotalLessons <= 1
-          ? lessonProgress
-          : Math.min(100, Math.round(((lessonIndex + lessonProgress / 100) / safeTotalLessons) * 100))
-
-      const today = getLocalDateKey()
-      const statsRef = doc(db, 'learningStats', currentUser.uid)
-      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', courseId)
-
-      await setDoc(
-        progressRef,
-        {
-          courseId,
-          progress: courseProgress,
-          watchedSeconds,
-          durationSeconds,
-          lastViewedAt: serverTimestamp(),
-          lastWatchedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          watchedDate: today,
-          [`lessonProgress.${lessonIndex}`]: lessonProgress,
-          [`lessonWatchedSeconds.${lessonIndex}`]: watchedSeconds,
-          [`lessonDurationSeconds.${lessonIndex}`]: durationSeconds,
-          [`lessonMaxWatchedSeconds.${lessonIndex}`]: watchedSeconds,
-        },
-        { merge: true },
-      )
-
-      const statsSnap = await getDoc(statsRef)
-      const statsData = statsSnap.exists() ? statsSnap.data() : {}
-      const oldDates = Array.isArray(statsData.watchedDates) ? statsData.watchedDates : []
-      const oldCourseIds = Array.isArray(statsData.watchedCourseIds) ? statsData.watchedCourseIds : []
-      const nextDates = oldDates.includes(today) ? oldDates : [...oldDates, today]
-      const nextCourseIds = oldCourseIds.includes(courseId) ? oldCourseIds : [...oldCourseIds, courseId]
-
-      await setDoc(
-        statsRef,
-        {
-          watchedLessons: nextCourseIds.length,
-          watchedCourses: nextCourseIds.length,
-          watchedCourseIds: nextCourseIds,
-          watchedDates: nextDates,
-          firstWatchedAt: statsData.firstWatchedAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
-    }
-
-    function showSkipWarning() {
-      const now = Date.now()
-      if (now - warningCooldownRef.current < 2500) return
-      warningCooldownRef.current = now
-
-      if (typeof onSkipWarning === 'function') {
-        onSkipWarning()
-      } else {
-        window.dispatchEvent(new CustomEvent('youtube-skip-warning'))
-      }
-    }
-
-    function updateProgressDisplay(watchedTime, duration) {
-      if (!duration) return
-
-      const safeWatchedTime = Math.min(Number(watchedTime || 0), Number(duration || 0))
-      const nextProgress = Math.min(100, Math.round((safeWatchedTime / duration) * 100))
-
-      setProgressValue(nextProgress)
-      setProgressText(`${formatSeconds(safeWatchedTime)} / ${formatSeconds(duration)} • ${nextProgress}%`)
-    }
-
-    function syncProgress() {
-      if (!player || typeof player.getCurrentTime !== 'function') return
-
-      const currentTime = Number(player.getCurrentTime() || 0)
-      const duration = Number(player.getDuration() || 0)
-
-      if (!duration) return
-
-      const currentMaxWatched = Number(maxWatchedRef.current || 0)
-      const allowedForwardLimit = currentMaxWatched + 300
-
-      if (currentTime > allowedForwardLimit) {
-        showSkipWarning()
-
-        const rewindTo = Math.max(0, currentMaxWatched)
-        player.seekTo(rewindTo, true)
-        lastPlayerTimeRef.current = rewindTo
-        updateProgressDisplay(currentMaxWatched, duration)
-        return
-      }
-
-      if (currentTime > currentMaxWatched) {
-        maxWatchedRef.current = currentTime
-      }
-
-      lastPlayerTimeRef.current = currentTime
-
-      const safeWatchedTime = Math.min(maxWatchedRef.current, duration)
-      updateProgressDisplay(safeWatchedTime, duration)
-
-      saveYoutubeProgress(safeWatchedTime, duration).catch((error) => {
-        console.warn('Không thể lưu tiến trình YouTube:', error)
-      })
-    }
-
-    function createPlayer() {
-      if (cancelled || !window.YT?.Player || !document.getElementById(playerElementId)) return
-
-      player = new window.YT.Player(playerElementId, {
-        videoId,
-        playerVars: {
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-        },
-        events: {
-          onReady: async () => {
-            const savedTime = await loadSavedProgress()
-
-            if (cancelled || !player) return
-
-            const duration = Number(player.getDuration?.() || 0)
-            const safeSavedTime = duration ? Math.min(savedTime, duration) : savedTime
-
-            maxWatchedRef.current = safeSavedTime
-            lastPlayerTimeRef.current = safeSavedTime
-
-            if (safeSavedTime > 0 && !hasRestoredRef.current) {
-              hasRestoredRef.current = true
-              player.seekTo(safeSavedTime, true)
-            }
-
-            updateProgressDisplay(safeSavedTime, duration)
-
-            interval = setInterval(syncProgress, 3000)
-          },
-          onStateChange: () => {
-            syncProgress()
-          },
-        },
-      })
-    }
-
-    loadYoutubeIframeApi().then(createPlayer)
-
-    return () => {
-      cancelled = true
-      if (interval) clearInterval(interval)
-      if (player?.destroy) player.destroy()
-    }
-  }, [videoId, playerElementId, courseId, currentUser, currentRole, lessonIndex, totalLessons, onSkipWarning])
-
-  if (!videoId) return null
-
-  return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-950">
-      <div id={playerElementId} title={title} className="aspect-video w-full" />
-      <div className="border-t border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900">
-        <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
-          <span>Tiến trình thật</span>
-          <span>{progressText}</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-red-400 to-sky-400 transition-all duration-500"
-            style={{ width: `${Math.max(0, Math.min(100, progressValue))}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
-function HonestyWarningModal({ onClose, isDarkMode }) {
-  return (
-    <div className={`${isDarkMode ? 'dark ' : ''}fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-md`}>
-      <div className="w-full max-w-md rounded-[2rem] border border-amber-200 bg-white p-6 text-center shadow-2xl shadow-amber-900/20 dark:border-amber-300/20 dark:bg-[#0f1324]">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-400/15 text-4xl">
-          ⚠️
-        </div>
-
-        <h2 className="mt-5 text-2xl font-black text-slate-950 dark:text-white">
-          Không được lướt bài
-        </h2>
-
-        <p className="mt-3 text-sm font-bold leading-6 text-slate-600 dark:text-slate-300">
-          KHÔNG ĐƯỢC LƯỚT BÀI, XIN VUI LÒNG TRUNG THỰC TRONG HỌC TẬP
-        </p>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-300 to-orange-400 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/25 transition hover:-translate-y-0.5"
-        >
-          Tôi đã hiểu
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function CppNote() {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-950">
-      <div className="text-xs font-bold uppercase tracking-[0.25em] text-sky-600 dark:text-sky-300">Console</div>
-      <pre className="mt-4 w-full max-w-none whitespace-pre-wrap rounded-xl bg-white p-4 font-mono text-sm text-slate-700 dark:bg-black/50 dark:text-slate-300">
-        C++ không chạy trực tiếp trong trình duyệt. Cần backend/compiler service riêng để biên dịch và chạy.
-      </pre>
-    </div>
-  )
-}
-
-function RatingStars({
-  selectedRating,
-  ratingAverage,
-  ratingCount,
-  ratingBurst,
-  onRate,
-}) {
-  return (
-    <section className="relative mt-8 rounded-[1.5rem] border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]">
-      <div className="text-sm font-bold uppercase tracking-[0.3em] text-amber-500 dark:text-amber-300">Đánh giá bài học</div>
-      <h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">Bạn thấy bài học này thế nào?</h2>
-      <div className="relative mt-5 flex flex-wrap items-center gap-3">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            onClick={() => onRate(star)}
-            className={`relative cursor-pointer text-4xl transition duration-200 hover:scale-125 ${
-              star <= selectedRating
-                ? 'text-amber-300 drop-shadow-[0_0_14px_rgba(252,211,77,0.9)]'
-                : 'text-slate-300 hover:text-amber-300 dark:text-slate-600 dark:hover:text-amber-200'
-            }`}
-          >
-            ★
-          </button>
-        ))}
-        <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">Trung bình: ★ {ratingAverage} ({ratingCount} lượt)</span>
-        {ratingBurst && (
-          <div className="pointer-events-none absolute left-16 top-1/2">
-            {Array.from({ length: 14 }).map((_, index) => (
-              <span
-                key={index}
-                className="absolute h-2 w-2 animate-[ratingBurst_650ms_ease-out_forwards] rounded-full bg-amber-300"
-                style={{ '--rotate': `${index * 26}deg` }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function CodeRunner({ code }) {
-  const [output, setOutput] = useState('Ấn "Chạy code" để xem console.')
-
-  function runCode() {
-    const logs = []
-    const customConsole = {
-      log: (...args) => logs.push(args.map(String).join(' ')),
-      error: (...args) => logs.push(`Error: ${args.map(String).join(' ')}`),
-      warn: (...args) => logs.push(`Warn: ${args.map(String).join(' ')}`),
-    }
-
-    try {
-      const runner = new Function('console', code || '')
-      const result = runner(customConsole)
-      if (result !== undefined) logs.push(String(result))
-      setOutput(logs.length ? logs.join('\n') : 'Code đã chạy xong nhưng không có output.')
-    } catch (error) {
-      setOutput(error.message)
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-950">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs font-bold uppercase tracking-[0.25em] text-sky-600 dark:text-sky-300">Console</div>
-        <button type="button" onClick={runCode} className="cursor-pointer rounded-xl bg-emerald-400 px-4 py-2 text-sm font-black text-slate-950 hover:bg-emerald-300">
-          Chạy code
-        </button>
-      </div>
-      <pre className="mt-4 min-h-60 whitespace-pre-wrap rounded-xl bg-white p-4 font-mono text-sm text-slate-700 dark:bg-black/50 dark:text-slate-300">{output}</pre>
-    </div>
-  )
-}
-
-function Metric({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.05]">
-      <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 font-bold text-slate-950 dark:text-white">{value}</div>
-    </div>
-  )
-}
-function InfoPanel({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.05]">
-      <div className="text-xs font-bold uppercase tracking-[0.25em] text-sky-600 dark:text-sky-300">{label}</div>
-      <div className="mt-2 font-bold text-slate-950 dark:text-white">{value}</div>
-    </div>
-  )
-}
-
-function getCurrentCourseTeacherName(course, teacherProfile) {
-  const currentName = getProfileDisplayName(teacherProfile)
-  return currentName || course?.teacherName || course?.teacherEmail || 'Đang cập nhật'
-}
-
-function getProfileDisplayName(profile) {
-  return (
-    profile?.fullName ||
-    profile?.name ||
-    profile?.displayName ||
-    profile?.teacherName ||
-    profile?.userName ||
-    ''
-  )
-}
-
-function stripHtml(value) { return String(value || '').replace(/<[^>]*>/g, '') }
-
-function getLocalDateKey(date = new Date()) {
-  const safeDate = date instanceof Date ? date : new Date(date)
-  if (Number.isNaN(safeDate.getTime())) return ''
-
-  const year = safeDate.getFullYear()
-  const month = String(safeDate.getMonth() + 1).padStart(2, '0')
-  const day = String(safeDate.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
-function formatFullDateTime(value) {
-  const time = getOpenAtMs(value)
-  if (!time) return 'Chưa có thời gian'
-  return new Date(time).toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
-
-function formatOpenAt(value) { if (!value) return '---'; const date = new Date(value); if (Number.isNaN(date.getTime())) return value; return date.toLocaleString('vi-VN') }
-function isPdfFile(name, url) { return `${name || ''} ${url || ''}`.toLowerCase().includes('.pdf') }
-function getRatingAverage(course) { if (course.ratingCount && course.ratingTotal) return (course.ratingTotal / course.ratingCount).toFixed(1); return Number(course.rating || 0).toFixed(1) }
-function getYoutubeEmbedUrl(url) {
-  const videoId = getYoutubeVideoId(url)
-  return videoId ? `https://www.youtube.com/embed/${videoId}` : ''
-}
-
-function getYoutubeVideoId(url) {
-  if (!url) return ''
-
-  try {
-    const parsedUrl = new URL(url)
-    const hostname = parsedUrl.hostname.replace('www.', '')
-
-    if (hostname.includes('youtu.be')) {
-      return parsedUrl.pathname.replace('/', '').split('?')[0]
-    }
-
-    if (hostname.includes('youtube.com')) {
-      const videoId = parsedUrl.searchParams.get('v')
-      if (videoId) return videoId
-
-      if (parsedUrl.pathname.includes('/embed/')) {
-        return parsedUrl.pathname.split('/embed/')[1]?.split('/')[0] || ''
-      }
-
-      if (parsedUrl.pathname.includes('/shorts/')) {
-        return parsedUrl.pathname.split('/shorts/')[1]?.split('/')[0] || ''
-      }
-    }
-
-    return ''
-  } catch {
-    return ''
-  }
-}
-
-function loadYoutubeIframeApi() {
-  if (window.YT?.Player) return Promise.resolve()
-
-  if (window.youtubeIframeApiPromise) return window.youtubeIframeApiPromise
-
-  window.youtubeIframeApiPromise = new Promise((resolve) => {
-    const previousCallback = window.onYouTubeIframeAPIReady
-
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof previousCallback === 'function') previousCallback()
-      resolve()
-    }
-
-    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-      const script = document.createElement('script')
-      script.src = 'https://www.youtube.com/iframe_api'
-      script.async = true
-      document.body.appendChild(script)
-    }
-  })
-
-  return window.youtubeIframeApiPromise
-}
-
-function formatSeconds(value) {
-  const total = Math.max(0, Math.floor(Number(value || 0)))
-  const minutes = Math.floor(total / 60)
-  const seconds = String(total % 60).padStart(2, '0')
-  return `${minutes}:${seconds}`
-}
-function getCourseMinutes(duration) { if (!duration) return 0; const text = String(duration).toLowerCase(); const hourMatch = text.match(/(\d+)\s*h/); const minuteMatch = text.match(/(\d+)\s*m/); const hours = hourMatch ? Number(hourMatch[1]) : 0; const minutes = minuteMatch ? Number(minuteMatch[1]) : 0; if (hours || minutes) return hours * 60 + minutes; const numberOnly = Number(text.replace(/\D/g, '')); return Number.isFinite(numberOnly) ? numberOnly : 0 }
-
-/*
-Thêm CSS này vào index.css hoặc App.css để hiệu ứng nổ sao hoạt động:
-@keyframes ratingBurst {
-  0% { opacity: 1; transform: rotate(var(--rotate, 0deg)) translateX(0) scale(1); }
-  100% { opacity: 0; transform: rotate(var(--rotate, 0deg)) translateX(70px) scale(0.2); }
-}
-*/
-
-function isTeacherRole(role) {
-  const normalizedRole = String(role || '').trim().replace(/[\s_-]/g, '').toUpperCase()
-  return ['TEACHER', 'ADMINDEV', 'ADMIN', 'GIAOVIEN', 'GIÁOVIÊN'].includes(normalizedRole)
-}
-
-function canTrackLearningProgress(role) {
-  return isStudentRole(role) || isTeacherRole(role)
-}
-
-function getOpenAtMs(value) {
-  if (!value) return 0
-  if (typeof value.toMillis === 'function') return value.toMillis()
-  if (value.seconds) return value.seconds * 1000
-  const time = new Date(value).getTime()
-  return Number.isFinite(time) ? time : 0
-}
-
-function isCourseLocked(course) {
-  const openTime = getOpenAtMs(course?.openAtMs || course?.openAt)
-  return Boolean(openTime && Date.now() < openTime)
-}
-
-
-function getUserClassName(userData) {
-  const rawClass =
-    userData?.className ||
-    userData?.class ||
-    userData?.studentClass ||
-    userData?.lopHoc ||
-    userData?.lop ||
-    userData?.classId ||
-    ''
-
-  if (Array.isArray(rawClass)) return String(rawClass[0] || '').trim()
-  return String(rawClass || '').trim()
-}
-
-function normalizeClassName(value) {
-  return String(value || '').trim().toLowerCase()
-}
-
-function canAccessCourseByClass(course, studentClass) {
-  if (course?.visibility !== 'private') return true
-
-  const allowedClasses = [
-    course.className,
-    ...(Array.isArray(course.classNames) ? course.classNames : []),
-    ...(Array.isArray(course.allowedClasses) ? course.allowedClasses : []),
-  ].filter(Boolean)
-
-  if (!allowedClasses.length) return false
-
-  const normalizedStudentClass = normalizeClassName(studentClass)
-
-  return allowedClasses.some((classItem) => normalizeClassName(classItem) === normalizedStudentClass)
-}
-
-function isStudentRole(role) {
-  return String(role || '').trim().toUpperCase() === 'STUDENT'
-}
-
-function useDarkMode() {
-  const getIsDark = () => {
-    if (typeof window === 'undefined') return false
-    const root = document.documentElement
-    const body = document.body
-    const storedTheme = window.localStorage?.getItem('theme') || window.localStorage?.getItem('color-theme')
-    return (
-      root.classList.contains('dark') ||
-      body.classList.contains('dark') ||
-      root.dataset.theme === 'dark' ||
-      body.dataset.theme === 'dark' ||
-      storedTheme === 'dark'
-    )
-  }
-
-  const [isDarkMode, setIsDarkMode] = useState(getIsDark)
-
-  useEffect(() => {
-    const update = () => setIsDarkMode(getIsDark())
-
-    update()
-
-    const observer = new MutationObserver(update)
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-
-    window.addEventListener('storage', update)
-
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('storage', update)
-    }
-  }, [])
-
-  return isDarkMode
-}
-
 
 export default CourseDetail

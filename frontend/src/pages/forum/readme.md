@@ -13,6 +13,7 @@
 * [x] người tạo kênh (trưởng nhóm) trước khi muốn rời nhóm phải chuyển nhượng chức trưởng nhóm cho một người bất kì trong nhóm
 * [x] tạo thêm nút logo danh sách có chức năng duyệt thành viên khi nhóm chọn duyệt thành viên, hãy tự thêm logic cho tôi
 * [x] setting (admin có thêm lựa chọn duyệt thành viên/ người dùng bình thường chỉ thấy được: tổng quan/cấu hình nhóm/kênh/quyền thành viên/mời bạn bè (có nghĩa là không cho người dùng xem: duyệt/giới hạn thành viên/giao diện/dữ liệu hệ thống))
+-quản trị viên chặn người dùng nhắn trên đại sảnh
 
 ### 🔒 Quyền riêng tư & Tham gia nhóm
 
@@ -40,6 +41,10 @@
 * [x] thanh sidebar di chuyển liên tục
 * [x] nút báo cáo nhóm nằm trong nhóm kế răng cưa setting
 * [x] trong kênh chat chính thì khi ấn dấu cộng thì nó xoay 45 độ và hiện ra ba mục (hình ảnh/file/thông báo)
+- đồng bộ avtar người dùng
+- xóa ô mẹo học
+- tạo thẻ liên kết người dùng
+-responsive
 
 ### 💬 Nhóm học & Kênh
 
@@ -65,7 +70,6 @@
 * [x] khi sự kiện tới lúc mở thì sẽ hiện thông báo cho mọi người
 
 ### 🧹 Khác
-
 * [x] xóa đóng góp nổi bật
 
 ---
@@ -87,8 +91,6 @@
 ---
 > [!NOTE]
 # 💡 4. Ý Tưởng / Ghi Chú
-
-
 
 
 
