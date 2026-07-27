@@ -11,6 +11,10 @@ from chatbot.knowledge import (
     find_relevant_features,
     get_page_profile,
 )
+from chatbot.data_context import (
+    format_platform_context,
+    get_contextual_actions,
+)
 
 
 class ChatbotError(Exception):
@@ -23,6 +27,8 @@ Chỉ khẳng định thông tin chức năng khi có trong ngữ cảnh đượ
 Nếu thiếu thông tin, nói rõ giới hạn thay vì bịa ra.
 Trả lời ngắn gọn, thực dụng; không hướng dẫn gian lận trong bài thi.
 Ưu tiên trả lời về trang hiện tại và dùng đúng dữ liệu giao diện được cung cấp.
+Khi có DỮ LIỆU NỀN TẢNG, phải dựa vào đúng tên khóa học, bài giảng, tiến độ và hồ sơ đó.
+Nếu người dùng hỏi tiếp, phải sử dụng lịch sử hội thoại để giữ ngữ cảnh, tránh hỏi lại thông tin đã có.
 Không yêu cầu mật khẩu, mã xác thực, khóa API hoặc dữ liệu nhạy cảm.
 """
 
@@ -64,7 +70,7 @@ def _sanitize_history(history):
     if not isinstance(history, list):
         return cleaned
 
-    for item in history[-8:]:
+    for item in history[-20:]:
         if not isinstance(item, dict):
             continue
         role = item.get("role")
@@ -95,7 +101,7 @@ def _sanitize_visible_context(page_context, allow_visible_context=True):
     return cleaned
 
 
-def _build_context(message, page_context):
+def _build_context(message, page_context, data_context=None):
     relevant = find_relevant_features(message)
     path = str((page_context or {}).get("path", "/"))[:200]
     role = str((page_context or {}).get("role", "guest"))[:40]
@@ -117,9 +123,10 @@ def _build_context(message, page_context):
         f"Mục đích trang: {profile['summary']}\n"
         f"Quy tắc riêng: {profile['instructions']}\n"
         f"Tín hiệu giao diện an toàn:\n{signals or '- Không có'}\n"
-        f"Kiến thức liên quan:\n{knowledge or '- Chỉ dùng kiến thức của trang hiện tại'}"
+        f"Kiến thức liên quan:\n{knowledge or '- Chỉ dùng kiến thức của trang hiện tại'}\n"
+        f"DỮ LIỆU NỀN TẢNG ĐÃ KIỂM TRA QUYỀN:\n{format_platform_context(data_context)}"
     )
-    return relevant, profile, visible, context_text
+    return relevant, profile, visible, context_text[:36000]
 
 
 def _extract_output_text(payload):
@@ -193,14 +200,28 @@ def _gemini_reply(message, history, context_text):
     return reply
 
 
-def _mock_reply(message, relevant, profile, visible):
+def _mock_reply(message, relevant, profile, visible, data_context=None):
     normalized = str(message or "").lower()
     page_title = profile["title"]
+    courses = (data_context or {}).get("courses") or []
 
     if profile["id"] == "exam-room":
         return (
             "Tôi đang ở chế độ hỗ trợ Phòng thi. Tôi có thể giúp Bạn xử lý sự cố, "
             "toàn màn hình, đồng hồ và nộp bài; tôi không thể giải hoặc gợi ý đáp án."
+        )
+
+    if courses and any(term in normalized for term in ("khóa học", "bài học", "bài giảng", "học gì", "học nào")):
+        course = courses[0]
+        lesson_names = ", ".join(
+            lesson.get("title", "")
+            for lesson in course.get("lessons", [])[:3]
+            if lesson.get("title")
+        )
+        return (
+            f"Tôi đã đọc dữ liệu học tập của Bạn. Khóa học phù hợp là “{course['title']}”"
+            f"{f' với các bài: {lesson_names}' if lesson_names else ''}. "
+            f"Tiến độ hiện tại là {course.get('progress', 0)}%. Bạn có thể mở khóa học bằng nút bên dưới."
         )
 
     if any(term in normalized for term in ("trang này", "làm gì", "chức năng")):
@@ -240,17 +261,17 @@ def _merge_actions(primary, secondary, limit=4):
     return merged
 
 
-def create_chat_response(message, history=None, page_context=None):
+def create_chat_response(message, history=None, page_context=None, data_context=None):
     provider = _resolve_provider()
     page_context = page_context or {}
-    relevant, profile, visible, context_text = _build_context(message, page_context)
+    relevant, profile, visible, context_text = _build_context(message, page_context, data_context)
 
     if provider == "openai":
         reply = _openai_reply(message, history or [], context_text)
     elif provider == "gemini":
         reply = _gemini_reply(message, history or [], context_text)
     elif provider == "mock":
-        reply = _mock_reply(message, relevant, profile, visible)
+        reply = _mock_reply(message, relevant, profile, visible, data_context)
     elif provider == "unavailable":
         raise ChatbotError("Backend chưa cấu hình OPENAI_API_KEY hoặc GEMINI_API_KEY.")
     else:
@@ -258,11 +279,14 @@ def create_chat_response(message, history=None, page_context=None):
 
     role = page_context.get("role", "")
     page_actions = filter_actions_for_role(profile.get("actions", []), role)
+    contextual_actions = get_contextual_actions(message, data_context or {})
     feature_actions = []
     for item in relevant:
         if item["id"] != profile["id"]:
             feature_actions.extend(item.get("actions", []))
-    if feature_actions:
+    if contextual_actions:
+        actions = _merge_actions(contextual_actions, [*feature_actions, *page_actions])
+    elif feature_actions:
         actions = _merge_actions(feature_actions, page_actions)
     else:
         actions = _merge_actions(page_actions, [])
@@ -278,5 +302,11 @@ def create_chat_response(message, history=None, page_context=None):
             "id": profile["id"],
             "title": profile["title"],
             "suggestions": profile["suggestions"],
+        },
+        "grounding": {
+            "authenticated": bool((data_context or {}).get("authenticated")),
+            "courseCount": int((data_context or {}).get("courseCount") or 0),
+            "lessonCount": int((data_context or {}).get("lessonCount") or 0),
+            "restricted": bool((data_context or {}).get("restricted")),
         },
     }

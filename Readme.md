@@ -36,6 +36,12 @@ API key chỉ được đặt ở backend, không được thêm vào biến `VI
 Nếu production chưa đổi sang OpenAI, backend tự động tiếp tục dùng
 `GEMINI_API_KEY` hiện có khi `CHATBOT_PROVIDER` không được khai báo.
 
+Chatbot hiện lưu lịch sử theo tài khoản trong collection Firestore
+`chatConversations/{uid}` và đọc các khóa học/bài giảng mà tài khoản đó được
+phép xem. Frontend production cần đặt `VITE_API_BASE_URL` trỏ tới backend;
+backend production cần cho phép domain frontend trong `ALLOWED_ORIGINS`.
+Các nút gợi ý mở khóa học được tạo từ dữ liệu thật và khung chat có nút mở rộng.
+
 ---
 
 ## Di chuyển vào thư mục frontend

@@ -1,4 +1,13 @@
-import { ArrowUpRight, Send, Sparkles, X } from 'lucide-react'
+import {
+  ArrowUpRight,
+  Database,
+  Maximize2,
+  Minimize2,
+  Send,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.jsx'
@@ -15,10 +24,6 @@ const API_BASE_URL = (
   (import.meta.env.VITE_LOCAL_DEV_MODE === 'true' ? 'http://127.0.0.1:5000' : '')
 ).replace(/\/$/, '')
 
-if (!API_BASE_URL) {
-  throw new Error('Missing environment variable: VITE_API_BASE_URL')
-}
-
 function normalizeReply(text) {
   return String(text || '').trim()
 }
@@ -32,6 +37,12 @@ function buildPageWelcome(profile) {
   }
 }
 
+async function buildAuthHeaders(user) {
+  if (!user) return {}
+  const token = await user.getIdToken()
+  return { Authorization: `Bearer ${token}` }
+}
+
 export default function ChatbotWidget() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -39,6 +50,10 @@ export default function ChatbotWidget() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [memoryCount, setMemoryCount] = useState(0)
+  const [grounding, setGrounding] = useState(null)
 
   const isDark = useSyncedDarkMode()
   const messagesEndRef = useRef(null)
@@ -76,6 +91,44 @@ export default function ChatbotWidget() {
   }, [userName])
 
   useEffect(() => {
+    let cancelled = false
+
+    async function loadHistory() {
+      if (!user) {
+        setMessages([])
+        setMemoryCount(0)
+        return
+      }
+
+      setHistoryLoading(true)
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/chat/history`, {
+          headers: await buildAuthHeaders(user),
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data?.error || 'Không tải được lịch sử')
+        if (!cancelled) {
+          const restored = (data.messages || []).map((message, index) => ({
+            ...message,
+            id: `history-${index}-${message.createdAt || ''}`,
+          }))
+          setMessages(restored)
+          setMemoryCount(Number(data.messageCount || restored.length))
+        }
+      } catch (error) {
+        console.warn('Không thể tải lịch sử ZUNY AI:', error)
+      } finally {
+        if (!cancelled) setHistoryLoading(false)
+      }
+    }
+
+    loadHistory()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
       behavior: 'smooth',
       block: 'end',
@@ -111,14 +164,21 @@ export default function ChatbotWidget() {
     setLoading(true)
 
     try {
+      if (!API_BASE_URL) {
+        throw new Error('Chưa cấu hình VITE_API_BASE_URL cho chatbot backend.')
+      }
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
+          ...(await buildAuthHeaders(user)),
         },
         body: JSON.stringify({
           message: trimmedInput,
-          history: messages.slice(-8).map(({ role, content }) => ({ role, content })),
+          history: messages
+            .filter((message) => !message.contextIntro && !message.actionResult)
+            .slice(-20)
+            .map(({ role, content }) => ({ role, content })),
           context: {
             path: location.pathname,
             pageId: pageProfile.id,
@@ -147,13 +207,15 @@ export default function ChatbotWidget() {
           page: data.page,
         },
       ])
-    } catch {
+      setMemoryCount(Number(data.memoryCount || 0))
+      setGrounding(data.grounding || null)
+    } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           role: 'assistant',
-          content: 'Không thể kết nối tới ZUNY AI. Vui lòng thử lại sau.',
+          content: error?.message || 'Không thể kết nối tới ZUNY AI. Vui lòng thử lại sau.',
         },
       ])
     } finally {
@@ -183,6 +245,23 @@ export default function ChatbotWidget() {
           actionResult: true,
         },
       ])
+    }
+  }
+
+  const handleClearHistory = async () => {
+    if (!user || loading) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/history`, {
+        method: 'DELETE',
+        headers: await buildAuthHeaders(user),
+      })
+      if (!response.ok) throw new Error('Không thể xóa lịch sử')
+      setMessages([buildPageWelcome(pageProfile)])
+      setMemoryCount(0)
+      setGrounding(null)
+      activeContextRef.current = ''
+    } catch (error) {
+      console.warn('Không thể xóa lịch sử ZUNY AI:', error)
     }
   }
 
@@ -227,13 +306,16 @@ export default function ChatbotWidget() {
         <div
           role="dialog"
           aria-label={pageProfile.title}
-          className={`mb-3 w-[min(390px,calc(100vw-2rem))] overflow-hidden rounded-[28px] border shadow-2xl transition-all duration-500 ${
+          className={`${expanded
+            ? 'fixed inset-2 w-auto sm:inset-5 lg:inset-8'
+            : 'mb-3 w-[min(390px,calc(100vw-2rem))]'
+          } overflow-hidden rounded-[28px] border shadow-2xl transition-all duration-300 ${
             isDark
               ? 'border-violet-400/30 bg-[#080808] shadow-violet-500/20'
               : 'border-cyan-200 bg-white shadow-cyan-500/20'
           }`}
         >
-          <div className="relative flex h-[580px] max-h-[calc(100vh-7rem)] flex-col overflow-hidden">
+          <div className={`relative flex flex-col overflow-hidden ${expanded ? 'h-full' : 'h-[580px] max-h-[calc(100vh-7rem)]'}`}>
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div
                 className={`absolute -right-16 top-8 h-14 w-40 rounded-full border ${
@@ -261,11 +343,11 @@ export default function ChatbotWidget() {
                   : 'border-cyan-200 bg-white/75 text-slate-900'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 {renderBotAvatar('large')}
 
                 <div>
-                  <h2 className="max-w-[230px] truncate text-sm font-black leading-none">
+                  <h2 className={`${expanded ? 'max-w-[55vw]' : 'max-w-[190px]'} truncate text-sm font-black leading-none`}>
                     {pageProfile.title}
                   </h2>
 
@@ -280,18 +362,19 @@ export default function ChatbotWidget() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                  isDark
-                    ? 'text-violet-300 hover:bg-violet-500/20'
-                    : 'text-cyan-600 hover:bg-cyan-100'
-                }`}
-                aria-label="Đóng chatbot"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {user && (
+                  <button type="button" onClick={handleClearHistory} disabled={loading || historyLoading} className={`flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-40 ${isDark ? 'text-violet-300 hover:bg-violet-500/20' : 'text-cyan-600 hover:bg-cyan-100'}`} aria-label="Xóa lịch sử trò chuyện" title="Xóa lịch sử">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+                <button type="button" onClick={() => setExpanded((value) => !value)} className={`flex h-8 w-8 items-center justify-center rounded-lg ${isDark ? 'text-violet-300 hover:bg-violet-500/20' : 'text-cyan-600 hover:bg-cyan-100'}`} aria-label={expanded ? 'Thu nhỏ chatbot' : 'Mở rộng chatbot'} title={expanded ? 'Thu nhỏ' : 'Mở rộng'}>
+                  {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+                <button type="button" onClick={() => setOpen(false)} className={`flex h-8 w-8 items-center justify-center rounded-lg ${isDark ? 'text-violet-300 hover:bg-violet-500/20' : 'text-cyan-600 hover:bg-cyan-100'}`} aria-label="Đóng chatbot">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div
@@ -308,14 +391,19 @@ export default function ChatbotWidget() {
                 </p>
               </div>
 
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold ${isDark ? 'text-violet-200/60' : 'text-slate-500'}`}>
+                <span className="inline-flex items-center gap-1"><Database className="h-3 w-3" />{grounding?.authenticated ? `Đã đọc ${grounding.courseCount} khóa học, ${grounding.lessonCount} bài giảng` : 'Đăng nhập để AI đọc dữ liệu học tập'}</span>
+                {user && <span>Nhớ {memoryCount} tin nhắn</span>}
+              </div>
+
+              <div className="mt-3 flex max-h-24 flex-wrap gap-2 overflow-y-auto pb-1 pr-1">
                 {pageProfile.suggestions.map((suggestion) => (
                   <button
                     key={suggestion}
                     type="button"
                     onClick={() => handleSend(suggestion)}
                     disabled={loading}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50 ${
+                    className={`max-w-full break-words rounded-full border px-3 py-1.5 text-left text-[11px] font-bold leading-4 transition disabled:opacity-50 ${
                       isDark
                         ? 'border-violet-400/25 bg-black/30 text-violet-200 hover:bg-violet-500/15'
                         : 'border-cyan-200 bg-white text-cyan-700 hover:border-cyan-300'
@@ -327,7 +415,7 @@ export default function ChatbotWidget() {
               </div>
             </div>
 
-            <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 overscroll-contain">
+            <div className={`relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 overscroll-contain ${expanded ? 'sm:px-8' : ''}`}>
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -337,7 +425,7 @@ export default function ChatbotWidget() {
                 >
                   {message.role === 'assistant' && renderBotAvatar()}
 
-                  <div className="max-w-[76%]">
+                  <div className={expanded ? 'max-w-[82%]' : 'max-w-[76%]'}>
                     <div
                     className={`break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                       message.role === 'user'
@@ -362,7 +450,7 @@ export default function ChatbotWidget() {
                             key={action.id || `${action.type}-${action.target}`}
                             type="button"
                             onClick={() => handleAction(action)}
-                            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                            className={`max-w-full break-words rounded-full border px-3 py-1.5 text-left text-xs font-bold leading-5 transition ${
                               isDark
                                 ? 'border-violet-400/30 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20'
                                 : 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
@@ -382,7 +470,7 @@ export default function ChatbotWidget() {
                 </div>
               ))}
 
-              {loading && (
+              {(loading || historyLoading) && (
                 <div className="mb-4 flex items-end gap-3">
                   {renderBotAvatar()}
 
@@ -393,7 +481,7 @@ export default function ChatbotWidget() {
                         : 'border border-cyan-200 bg-white/90 text-slate-700'
                     }`}
                   >
-                    Đang suy nghĩ...
+                    {historyLoading ? 'Đang khôi phục cuộc trò chuyện...' : 'Đang đọc dữ liệu và suy nghĩ...'}
                   </div>
                 </div>
               )}
@@ -415,17 +503,18 @@ export default function ChatbotWidget() {
                     : 'border-cyan-200 bg-slate-50'
                 }`}
               >
-                <input
+                <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
+                    if (event.key === 'Enter' && !event.shiftKey) {
                       event.preventDefault()
                       handleSend()
                     }
                   }}
                   disabled={loading}
-                  className={`flex-1 bg-transparent px-2 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                  rows={1}
+                  className={`max-h-28 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
                     isDark
                       ? 'text-white placeholder:text-violet-300/50'
                       : 'text-slate-900 placeholder:text-cyan-700/40'

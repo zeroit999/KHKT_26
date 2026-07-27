@@ -8,6 +8,14 @@ from pypdf import PdfReader
 from dotenv import load_dotenv
 from config.config import Config
 from chatbot.service import ChatbotError, create_chat_response, get_capabilities
+from chatbot.data_context import build_platform_context
+from chatbot.memory import append_chat_turn, clear_chat_memory, load_chat_memory
+from auth.auth import (
+    JWTManager,
+    auth_required,
+    build_firebase_user_payload,
+    get_user_data_firebase,
+)
 
 
 load_dotenv()
@@ -22,6 +30,30 @@ DEFAULT_ALLOWED_ORIGINS = [
 ]
 
 SUPPORTED_FILE_EXTENSIONS = {".docx", ".pdf"}
+
+
+def get_optional_chat_user():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header:
+        return None
+    if not auth_header.startswith("Bearer "):
+        raise ChatbotError("Authorization header không hợp lệ.")
+
+    token = auth_header.split(" ", 1)[1].strip()
+    firebase_user = JWTManager.verify_firebase_token(token)
+    if firebase_user:
+        user_data = get_user_data_firebase(firebase_user["uid"]) or {}
+        return {
+            **user_data,
+            **build_firebase_user_payload(firebase_user, user_data),
+        }
+
+    jwt_payload = JWTManager.verify_token(token)
+    if jwt_payload and jwt_payload.get("type") == "access":
+        user_data = get_user_data_firebase(jwt_payload.get("uid")) or {}
+        return {**user_data, **jwt_payload}
+
+    raise ChatbotError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
 
 def get_allowed_origins():
     origins = []
@@ -140,6 +172,22 @@ def create_app():
     def chat_capabilities():
         return jsonify({"success": True, **get_capabilities()})
 
+    @app.get("/api/chat/history")
+    @auth_required
+    def chat_history():
+        messages = load_chat_memory(request.current_user.get("uid"))
+        return jsonify({
+            "success": True,
+            "messages": messages,
+            "messageCount": len(messages),
+        })
+
+    @app.delete("/api/chat/history")
+    @auth_required
+    def delete_chat_history():
+        clear_chat_memory(request.current_user.get("uid"))
+        return jsonify({"success": True, "messages": []})
+
     @app.post("/api/chat")
     def chat():
         data = request.get_json(silent=True) or {}
@@ -154,11 +202,26 @@ def create_app():
             }), 400
 
         try:
+            current_user = get_optional_chat_user()
+            stored_history = load_chat_memory(current_user.get("uid")) if current_user else []
+            effective_history = stored_history or history
+            data_context = build_platform_context(current_user, page_context)
             result = create_chat_response(
                 message=message,
-                history=history,
+                history=effective_history,
                 page_context=page_context,
+                data_context=data_context,
             )
+            if current_user:
+                saved_messages = append_chat_turn(
+                    current_user.get("uid"),
+                    effective_history,
+                    message,
+                    result["reply"],
+                )
+                result["memoryCount"] = len(saved_messages)
+            else:
+                result["memoryCount"] = len(effective_history)
             return jsonify({"success": True, **result})
 
         except ChatbotError as error:

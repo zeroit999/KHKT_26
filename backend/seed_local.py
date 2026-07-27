@@ -103,6 +103,19 @@ def seed():
         "teacherId": "local-teacher-001",
         "teacherName": "Giáo viên Demo",
         "published": True,
+        "lessonCount": 2,
+        "lessons": [
+            {
+                "title": "Ôn tập hàm số",
+                "content": "Nhận biết tập xác định, tính đơn điệu và đồ thị hàm số.",
+                "attachMode": "document",
+            },
+            {
+                "title": "Quy tắc đạo hàm",
+                "content": "Tổng hợp công thức và bài tập vận dụng đạo hàm cơ bản.",
+                "attachMode": "document",
+            },
+        ],
         "isLocalDemo": True,
     }, merge=True)
 

@@ -162,6 +162,42 @@ class ChatbotServiceTest(unittest.TestCase):
         self.assertIn("open_create_exam", [item.get("command") for item in teacher["actions"]])
         self.assertNotIn("open_create_exam", [item.get("command") for item in student["actions"]])
 
+    def test_course_data_is_grounded_and_returns_real_course_action(self):
+        data_context = {
+            "authenticated": True,
+            "courseCount": 1,
+            "lessonCount": 2,
+            "courses": [{
+                "id": "course-123",
+                "title": "Đại số 12 nâng cao",
+                "progress": 35,
+                "lessons": [
+                    {"number": 1, "title": "Hàm số", "summary": "Ôn tập hàm số"},
+                    {"number": 2, "title": "Đạo hàm", "summary": "Quy tắc đạo hàm"},
+                ],
+            }],
+        }
+
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Tôi nên học khóa học nào?",
+                page_context={"path": "/courses", "role": "student"},
+                data_context=data_context,
+            )
+
+        self.assertIn("Đại số 12 nâng cao", result["reply"])
+        self.assertEqual(result["actions"][0]["target"], "/courses/course-123")
+        self.assertEqual(result["grounding"]["courseCount"], 1)
+
+    def test_courses_detail_route_uses_course_profile(self):
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Trang này có gì?",
+                page_context={"path": "/courses/course-123", "role": "student"},
+            )
+
+        self.assertEqual(result["page"]["id"], "course-detail")
+
     def test_openai_requires_key(self):
         env = {"CHATBOT_PROVIDER": "openai", "OPENAI_API_KEY": ""}
         with patch.dict(os.environ, env, clear=False):

@@ -30,7 +30,7 @@ const PAGE_PROFILES = [
   },
   {
     id: 'course-detail',
-    match: (path) => /^\/(e-learning|learn)\/[^/]+$/i.test(path),
+    match: (path) => /^\/(e-learning|courses|learn)\/[^/]+$/i.test(path),
     title: 'AI đồng hành bài học',
     eyebrow: 'Học thông minh',
     description: 'Tóm tắt cấu trúc và đề xuất cách học.',
