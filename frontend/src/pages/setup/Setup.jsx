@@ -514,7 +514,7 @@ function Setup() {
 
               <div ref={schoolBoxRef} className="relative md:col-span-2">
                 <p className="mb-2 px-1 text-xs font-black uppercase tracking-[0.25em] text-blue-500">
-                  Trường học
+                  Trường học (không bắt buộc)
                 </p>
 
                 <div className="relative">
@@ -624,8 +624,8 @@ function Setup() {
               <p
                 className={`md:col-span-2 -mt-2 px-1 text-sm ${helperTextClass}`}
               >
-                Bạn chỉ cần nhập số điện thoại hoặc email. Sau này Zuny sẽ yêu
-                cầu xác minh.
+                Không tìm thấy trường thì có thể để trống. Bạn chỉ cần nhập số
+                điện thoại hoặc email; có thể bổ sung trường sau.
               </p>
             </div>
 
