@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
+import MarkdownMessage from './MarkdownMessage.jsx'
 import {
   collectSafePageContext,
   executeSafePageAction,
@@ -436,17 +437,21 @@ export default function ChatbotWidget() {
 
                   <div className={expanded ? 'max-w-[82%]' : 'max-w-[76%]'}>
                     <div
-                    className={`break-words whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                    className={`break-words rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                       message.role === 'user'
                         ? isDark
-                          ? 'rounded-br-md bg-violet-500 text-white'
-                          : 'rounded-br-md bg-cyan-500 text-white'
+                          ? 'whitespace-pre-wrap rounded-br-md bg-violet-500 text-white'
+                          : 'whitespace-pre-wrap rounded-br-md bg-cyan-500 text-white'
                         : isDark
                           ? 'rounded-bl-md border border-violet-400/25 bg-black/65 text-violet-100'
                           : 'rounded-bl-md border border-cyan-200 bg-white/90 text-slate-700'
                     }`}
                   >
-                    {message.content}
+                    {message.role === 'assistant' ? (
+                      <MarkdownMessage content={message.content} isDark={isDark} />
+                    ) : (
+                      message.content
+                    )}
                     {message.provider === 'mock' && (
                       <div className="mt-2 text-[10px] font-bold uppercase tracking-wide opacity-60">Local mock</div>
                     )}
