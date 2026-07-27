@@ -7,6 +7,13 @@ os.environ.setdefault("CHATBOT_PROVIDER", "mock")
 
 from app import create_app
 from chatbot.service import ChatbotError, _resolve_provider, create_chat_response
+from chatbot.data_context import (
+    _can_read_class,
+    _can_read_course,
+    _can_read_exam,
+    _selected_domains,
+    format_platform_context,
+)
 from exams.exam_service import (
     normalize_proctoring_config,
     restrict_evidence_paths,
@@ -162,6 +169,85 @@ class ChatbotServiceTest(unittest.TestCase):
         self.assertIn("open_create_exam", [item.get("command") for item in teacher["actions"]])
         self.assertNotIn("open_create_exam", [item.get("command") for item in student["actions"]])
 
+    def test_course_data_is_grounded_and_returns_real_course_action(self):
+        data_context = {
+            "authenticated": True,
+            "courseCount": 1,
+            "lessonCount": 2,
+            "courses": [{
+                "id": "course-123",
+                "title": "Đại số 12 nâng cao",
+                "progress": 35,
+                "lessons": [
+                    {"number": 1, "title": "Hàm số", "summary": "Ôn tập hàm số"},
+                    {"number": 2, "title": "Đạo hàm", "summary": "Quy tắc đạo hàm"},
+                ],
+            }],
+        }
+
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Tôi nên học khóa học nào?",
+                page_context={"path": "/courses", "role": "student"},
+                data_context=data_context,
+            )
+
+        self.assertIn("Đại số 12 nâng cao", result["reply"])
+        self.assertEqual(result["actions"][0]["target"], "/courses/course-123")
+        self.assertEqual(result["grounding"]["courseCount"], 1)
+
+    def test_deep_database_context_returns_exam_result_action(self):
+        data_context = {
+            "authenticated": True,
+            "examCount": 1,
+            "resultCount": 1,
+            "exams": [{
+                "id": "exam-123",
+                "title": "Thi thử học kỳ",
+                "duration": 50,
+                "totalScore": 10,
+                "results": [{"score": 8.5, "totalScore": 10, "violationCount": 0}],
+            }],
+        }
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Điểm thi của tôi thế nào?",
+                page_context={"path": "/exams", "role": "student"},
+                data_context=data_context,
+            )
+        self.assertIn("8.5/10", result["reply"])
+        self.assertEqual(result["actions"][0]["target"], "/exam/exam-123/result")
+        self.assertEqual(result["grounding"]["resultCount"], 1)
+
+    def test_mock_can_summarize_multiple_database_domains(self):
+        data_context = {
+            "authenticated": True,
+            "learning": {"watchedCourses": 1},
+            "courses": [{"id": "course-1", "title": "Tin học 12"}],
+            "exams": [{"id": "exam-1", "title": "Thi thử", "results": [{"score": 9, "totalScore": 10}]}],
+            "classes": [{"id": "class-1", "name": "12A1"}],
+            "forumPosts": [{"id": "post-1", "title": "Ôn thi"}],
+        }
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Phân tích toàn bộ cơ sở dữ liệu của tôi",
+                page_context={"path": "/profile", "role": "student"},
+                data_context=data_context,
+            )
+        self.assertIn("1 khóa học, 1 bài thi, 1 lớp học và 1 bài viết", result["reply"])
+        self.assertIn("9/10 điểm", result["reply"])
+        self.assertEqual(result["actions"][0]["target"], "/courses/course-1")
+        self.assertEqual(result["actions"][1]["target"], "/exam/exam-1/result")
+
+    def test_courses_detail_route_uses_course_profile(self):
+        with patch.dict(os.environ, {"CHATBOT_PROVIDER": "mock"}, clear=False):
+            result = create_chat_response(
+                "Trang này có gì?",
+                page_context={"path": "/courses/course-123", "role": "student"},
+            )
+
+        self.assertEqual(result["page"]["id"], "course-detail")
+
     def test_openai_requires_key(self):
         env = {"CHATBOT_PROVIDER": "openai", "OPENAI_API_KEY": ""}
         with patch.dict(os.environ, env, clear=False):
@@ -214,6 +300,39 @@ class ChatbotServiceTest(unittest.TestCase):
         self.assertEqual(result["provider"], "gemini")
         self.assertIn("Diễn đàn", result["reply"])
         client.models.generate_content.assert_called_once()
+
+
+class ChatbotDataPermissionTest(unittest.TestCase):
+    def test_student_cannot_read_another_private_course(self):
+        student = {"uid": "student-a", "role": "STUDENT", "className": "12A1"}
+        course = {"visibility": "private", "allowedClasses": ["12A2"]}
+        self.assertFalse(_can_read_course(student, course))
+
+    def test_student_only_reads_exam_for_own_class_and_grade(self):
+        student = {"uid": "student-a", "role": "STUDENT", "className": "12A1", "grade": "12"}
+        self.assertTrue(_can_read_exam(student, {"status": "public", "selectedClasses": ["12A1"], "selectedGrades": ["12"]}))
+        self.assertFalse(_can_read_exam(student, {"status": "public", "selectedClasses": ["12A2"], "selectedGrades": ["12"]}))
+
+    def test_teacher_only_reads_owned_class(self):
+        teacher = {"uid": "teacher-a", "role": "TEACHER"}
+        self.assertTrue(_can_read_class(teacher, "12A1", {"teacherIds": ["teacher-a", "teacher-b"]}))
+        self.assertFalse(_can_read_class(teacher, "12A2", {"teacherId": "teacher-c"}))
+
+    def test_database_question_selects_all_scoped_domains(self):
+        domains = _selected_domains("Phân tích cơ sở dữ liệu của tôi", "/profile")
+        self.assertEqual(domains, {"learning", "courses", "exams", "classes", "forum"})
+
+    def test_formatted_context_contains_authorized_domains(self):
+        formatted = format_platform_context({
+            "authenticated": True,
+            "profile": {"name": "An", "role": "STUDENT"},
+            "learning": {"watchedCourses": 2},
+            "forumPosts": [{
+                "id": "post-1", "title": "Ôn thi", "content": "Lập kế hoạch", "tags": ["ôn tập"], "canReply": True,
+            }],
+        })
+        self.assertIn("THỐNG KÊ HỌC TẬP", formatted)
+        self.assertIn("Ôn thi", formatted)
 
 
 class ChatbotApiTest(unittest.TestCase):

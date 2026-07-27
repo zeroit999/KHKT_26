@@ -98,7 +98,7 @@ PAGE_PROFILES = [
     },
     {
         "id": "course-detail",
-        "pattern": r"^/(e-learning|learn)/[^/]+$",
+        "pattern": r"^/(e-learning|courses|learn)/[^/]+$",
         "title": "Nội dung bài học",
         "icon": "book",
         "summary": "Tóm tắt cấu trúc bài học, hướng dẫn học và đề xuất bước tiếp theo.",

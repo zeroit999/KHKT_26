@@ -219,7 +219,7 @@ export function useSetupForm() {
         (item) => normalizeText(item.name) === normalizeText(school)
       );
 
-      if (!role || !fullName || !school || !city || !provinceCode) {
+      if (!role || !fullName || !city || !provinceCode) {
         toast.error("Vui lòng nhập đầy đủ thông tin");
         return;
       }
@@ -229,7 +229,7 @@ export function useSetupForm() {
         return;
       }
 
-      if (!selectedSchool) {
+      if (school.trim() && !selectedSchool) {
         toast.error("Vui lòng chọn trường trong danh sách");
         return;
       }
@@ -262,11 +262,11 @@ export function useSetupForm() {
         fullName: fullName.trim(),
         name: fullName.trim(),
 
-        school: selectedSchool.name || "",
-        schoolCode: selectedSchool.school_code || "",
-        schoolType: selectedSchool.school_type || "",
-        schoolAddress: selectedSchool.address || "",
-        schoolWard: selectedSchool.ward || "",
+        school: selectedSchool?.name || "",
+        schoolCode: selectedSchool?.school_code || "",
+        schoolType: selectedSchool?.school_type || "",
+        schoolAddress: selectedSchool?.address || "",
+        schoolWard: selectedSchool?.ward || "",
 
         grade: normalizedGrade,
         khoi: normalizedGrade,
