@@ -21,8 +21,8 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-import RichEditor from './RichEditor.jsx'
 import DarkModeSelect from './DarkModeSelect.jsx'
+import DateTimePicker from './DateTimePicker.jsx'
 
 import { parseWordExamApi } from '../../api/examApi'
 import {
@@ -849,12 +849,6 @@ function CreateExamModal({
           />
         </div>
 
-        <RichEditor
-          label="Nội dung câu hỏi"
-          value={question.question}
-          onChange={(value) => updateQuestion(questionIndex, 'question', value)}
-        />
-
         {type === 'short-answer' && (
           <div className="mt-4">
             <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
@@ -939,14 +933,6 @@ function CreateExamModal({
             >
               + Thêm đáp án
             </button>
-
-            <RichEditor
-              label="Giải thích đáp án"
-              value={question.explanation ?? ''}
-              onChange={(value) =>
-                updateQuestion(questionIndex, 'explanation', value)
-              }
-            />
           </div>
         )}
 
@@ -1312,15 +1298,13 @@ function CreateExamModal({
               <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
                 Thời gian mở
               </label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={form.openDate}
-                onChange={(event) => {
-                  const openDate = event.target.value
-                  updateForm('openDate', openDate)
-                  updateForm('closeDate', addMinutesToDateTime(openDate, form.duration))
+                onChange={(value) => {
+                  updateForm('openDate', value)
+                  updateForm('closeDate', addMinutesToDateTime(value, form.duration))
                 }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                hasError={Boolean(!form.openDate && form.closeDate)}
               />
             </div>
 
@@ -1328,16 +1312,11 @@ function CreateExamModal({
               <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
                 Thời gian đóng
               </label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={form.closeDate}
                 min={form.openDate || undefined}
-                onChange={(event) => updateForm('closeDate', event.target.value)}
-                className={`w-full rounded-xl border bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:bg-slate-900 dark:text-white ${
-                  invalidCloseDate
-                    ? 'border-red-400 focus:border-red-500 dark:border-red-400'
-                    : 'border-slate-300 dark:border-white/10'
-                }`}
+                onChange={(value) => updateForm('closeDate', value)}
+                hasError={invalidCloseDate}
               />
               {invalidCloseDate && (
                 <p className="mt-2 text-xs font-black text-red-600 dark:text-red-300">

@@ -19,7 +19,6 @@ import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx';
 import Home from './pages/Home.jsx';
 import Exams from './pages/exam/Exams.jsx';
 import ExamRoom from './pages/exam/ExamRoom.jsx';
-import ResultPage from './pages/exam/ResultPage.jsx';
 import Forum from './pages/forum/Forum.jsx';
 import Leaderboard from './pages/leaderboard/Leaderboard.jsx';
 import ELearning from './pages/e-learning/E-learning.jsx';
@@ -168,6 +167,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   const { user, userDetails, isLoading } = useAuth();
 
   const isForumRoute = location.pathname.toLowerCase() === '/forum';
+  const isExamsRoute = location.pathname.toLowerCase() === '/exams';
 
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
@@ -242,7 +242,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
         mainClassName={isForumRoute ? 'pt-0' : 'pt-20'}
-        showFooter={!isForumRoute}
+        showFooter={!isForumRoute && !isExamsRoute}
         showNavbar={!isForumRoute}
         lockPageScroll={isForumRoute}
       >
@@ -342,16 +342,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                   </ProtectedRoute>
                 }
               />
-
-              <Route
-                path="/exam/:id/result"
-                element={
-                  <ProtectedRoute>
-                    <ResultPage />
-                  </ProtectedRoute>
-                }
-              />
-
+              
               <Route
                 path="/classes"
                 element={
