@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKEND_ROOT="$PROJECT_ROOT/backend"
 FRONTEND_ROOT="$PROJECT_ROOT/frontend"
 

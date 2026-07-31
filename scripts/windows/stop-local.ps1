@@ -1,4 +1,4 @@
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 function Stop-ProcessTree {
     param([int]$RootProcessId)

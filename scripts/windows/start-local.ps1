@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $backendRoot = Join-Path $projectRoot "backend"
 $frontendRoot = Join-Path $projectRoot "frontend"
 $pythonPath = Join-Path $backendRoot "venv311\Scripts\python.exe"
