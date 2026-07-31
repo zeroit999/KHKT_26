@@ -82,7 +82,11 @@ function ScrollToTop() {
 }
 
 function LoadingScreen() {
-  return <LoadingSkeleton />;
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <LoadingSkeleton />
+    </div>
+  );
 }
 
 function RouteAwareChatbot() {
@@ -419,20 +423,6 @@ function App() {
     }),
     [darkMode]
   );
-
-  const [showInitialLoading, setShowInitialLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setShowInitialLoading(false);
-    }, 2500);
-
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  if (showInitialLoading) {
-    return <LoadingSkeleton />;
-  }
 
   return (
     <AuthProvider>

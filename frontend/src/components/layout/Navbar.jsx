@@ -1,29 +1,24 @@
 import {
   Bell,
+  BookOpenCheck,
+  ClipboardList,
   ChevronDown,
+  GraduationCap,
+  Home,
+  LayoutDashboard,
+  LogIn,
   LogOut,
-  Menu,
   Moon,
   Search,
   Settings,
   Sun,
+  Trophy,
   User,
-  X,
+  Users,
 } from 'lucide-react'
-
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-
-import {
-  Link,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom'
-
+import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 
 import { auth } from '../firebase'
@@ -32,344 +27,426 @@ import { useAuth } from '../../contexts/AuthContext'
 import darkLogo from '../../assets/favicon-dark-mode.png'
 import lightLogo from '../../assets/favicon-light-mode.png'
 
-export default function Navbar({
-  darkMode,
-  onToggleDarkMode,
-}) {
-  const navigate = useNavigate()
+const normalizeRole = (role) =>
+  String(role || '')
+    .trim()
+    .replace(/[\s_-]/g, '')
+    .toUpperCase()
+
+export default function Navbar({ darkMode, onToggleDarkMode }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { user, userDetails } = useAuth()
 
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [openDropdown, setOpenDropdown] = useState(false)
-  const dropdownRef = useRef(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isAccountOpen, setIsAccountOpen] = useState(false)
+  const accountRef = useRef(null)
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target)
-      ) {
-        setOpenDropdown(false)
+  const role = normalizeRole(userDetails?.role)
+  const displayName =
+    userDetails?.fullName ||
+    user?.displayName ||
+    user?.email?.split('@')[0] ||
+    'Tài khoản'
+
+  const classItem = useMemo(() => {
+    const teacherRoles = ['TEACHER', 'ADMINUSER', 'ADMINDEV']
+    const studentRoles = ['STUDENT', 'STUDENR', 'USER']
+
+    if (teacherRoles.includes(role)) {
+      return {
+        label: 'Quản lý lớp học',
+        shortLabel: 'Quản lý lớp học',
+        path: '/classes',
+        icon: LayoutDashboard,
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+    if (studentRoles.includes(role)) {
+      return {
+        label: 'Lớp học',
+        shortLabel: 'Lớp học',
+        path: '/classes',
+        icon: GraduationCap,
+      }
     }
+
+    return null
+  }, [role])
+
+  const navItems = useMemo(
+    () => [
+      { label: 'Trang chủ', shortLabel: 'Trang chủ', path: '/', icon: Home },
+      { label: 'Đề thi', shortLabel: 'Đề thi', path: '/exams', icon: ClipboardList },
+      {
+        label: 'E-learning',
+        shortLabel: 'E-learning',
+        path: '/e-learning',
+        icon: BookOpenCheck,
+      },
+      {
+        label: 'Xếp hạng',
+        shortLabel: 'Xếp hạng',
+        path: '/leaderboard',
+        icon: Trophy,
+      },
+      { label: 'Cộng đồng', shortLabel: 'Cộng đồng', path: '/forum', icon: Users },
+      ...(classItem ? [classItem] : []),
+    ],
+    [classItem]
+  )
+
+  const currentItem =
+    navItems.find((item) =>
+      item.path === '/'
+        ? location.pathname === '/'
+        : location.pathname.toLowerCase().startsWith(item.path.toLowerCase())
+    ) || {
+      label: location.pathname === '/profile' ? 'Trang cá nhân' : 'ZUNY',
+      shortLabel: location.pathname === '/profile' ? 'Trang cá nhân' : 'ZUNY',
+      icon: Home,
+    }
+
+  const expanded = isHovered || isAccountOpen
+
+  useEffect(() => {
+    setIsAccountOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (accountRef.current && !accountRef.current.contains(event.target)) {
+        setIsAccountOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
   const handleLogout = async () => {
     try {
       await signOut(auth)
+      setIsAccountOpen(false)
       navigate('/login')
     } catch (error) {
-      console.error(error)
+      console.error('Không thể đăng xuất:', error)
     }
   }
 
-  const classNavItem = useMemo(() => {
-    if (userDetails?.role === 'TEACHER') {
-      return {
-        label: 'Quản lý lớp học',
-        path: '/classes',
-      }
-    }
-
-    if (userDetails?.role === 'STUDENT') {
-      return {
-        label: 'Lớp học',
-        path: '/classes',
-      }
-    }
-
-    return null
-  }, [userDetails?.role])
-
-  const navItems = useMemo(
-    () => [
-      { label: 'Trang chủ', path: '/' },
-      { label: 'Đề thi', path: '/exams' },
-      { label: 'E-Learning', path: '/e-learning' },
-      { label: 'Xếp hạng', path: '/leaderboard' },
-      { label: 'Cộng đồng', path: '/forum' },
-      ...(classNavItem ? [classNavItem] : []),
-    ],
-    [classNavItem]
-  )
+  const CurrentIcon = currentItem.icon
 
   return (
-    <header
-      className={`sticky top-0 z-50 border-b backdrop-blur-xl transition-all duration-300 ${
-        darkMode
-          ? 'border-white/10 bg-[#020817]/90'
-          : 'border-slate-200 bg-white/90'
-      }`}
-    >
-      <div className="mx-auto flex h-20 max-w-screen-xl items-center px-6">
-        <div className="flex shrink-0 items-center">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="rounded-md bg-gradient-to-r from-cyan-400 to-blue-500 p-[2px] shadow-lg">
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-3 sm:top-5">
+      <motion.header
+        layout
+        initial={false}
+        transition={{
+          type: 'spring',
+          stiffness: 420,
+          damping: 34,
+          mass: 0.75,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => {
+          if (!isAccountOpen) setIsHovered(false)
+        }}
+        className={`pointer-events-auto relative h-16 max-w-[96vw] rounded-full border backdrop-blur-3xl ${
+          expanded ? 'w-[min(97vw,1320px)]' : 'w-auto'
+        } ${
+          darkMode
+            ? 'border-violet-400/25 bg-[#090912]/92 shadow-[0_20px_60px_rgba(124,58,237,0.25)]'
+            : 'border-slate-200/90 bg-white/90 shadow-[0_20px_55px_rgba(15,23,42,0.16)]'
+        }`}
+      >
+        <div className="flex h-full min-w-0 items-center gap-2 overflow-visible px-2.5">
+          <Link
+            to="/"
+            aria-label="ZUNY - Trang chủ"
+            className={`flex h-12 shrink-0 items-center rounded-full transition-colors ${
+              expanded ? 'gap-2 px-2' : 'w-10 justify-center'
+            } ${
+              darkMode
+                ? 'hover:bg-white/8'
+                : 'hover:bg-slate-100'
+            }`}
+          >
+            <span className="rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 p-[2px] shadow-[0_0_14px_rgba(99,102,241,0.42)]">
               <img
                 src={darkMode ? darkLogo : lightLogo}
-                alt="logo"
-                className="h-9 w-9 rounded-sm object-cover"
+                alt="ZUNY"
+                className="h-9 w-9 rounded-full object-cover"
               />
-            </div>
+            </span>
 
-            <div>
-              <h1
-                className={`text-2xl font-bold ${
-                  darkMode ? 'text-white' : 'text-slate-900'
-                }`}
-              >
-                ZUNY
-              </h1>
-
-              <p className="text-xs font-medium text-cyan-500">
-                THPT Platform
-              </p>
-            </div>
-          </Link>
-        </div>
-
-        <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path
-
-            return (
-              <Link
-                key={`${item.label}-${item.path}`}
-                to={item.path}
-                className={`relative whitespace-nowrap text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'text-cyan-400'
-                    : darkMode
-                    ? 'text-white/80 hover:text-white'
-                    : 'text-slate-700 hover:text-slate-900'
-                }`}
-              >
-                {item.label}
-
-                {isActive && (
-                  <span className="absolute -bottom-2 left-0 h-[2px] w-full rounded-full bg-cyan-400" />
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="flex shrink-0 items-center justify-end gap-1">
-          <button
-            type="button"
-            className={`rounded-xl p-2.5 transition-all ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
-            }`}
-          >
-            <Search
-              size={18}
-              className={darkMode ? 'text-white' : 'text-slate-700'}
-            />
-          </button>
-
-          <button
-            type="button"
-            className={`relative rounded-xl p-2.5 transition-all ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
-            }`}
-          >
-            <Bell
-              size={18}
-              className={darkMode ? 'text-white' : 'text-slate-700'}
-            />
-
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-400" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleDarkMode}
-            className={`rounded-xl p-2.5 transition-all ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
-            }`}
-          >
-            {darkMode ? (
-              <Sun size={18} className="text-yellow-400" />
-            ) : (
-              <Moon size={18} className="text-slate-700" />
-            )}
-          </button>
-
-          {user ? (
-            <div className="relative ml-1" ref={dropdownRef}>
-              <button
-                type="button"
-                onClick={() => setOpenDropdown(!openDropdown)}
-                className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition-all ${
-                  darkMode
-                    ? 'border-white/10 bg-white/5 hover:bg-white/10'
-                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                }`}
-              >
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt="avatar"
-                    className="h-6 w-7 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-sm font-bold text-white">
-                    {(
-                      userDetails?.fullName ||
-                      user.displayName ||
-                      user.email
-                    )
-                      ?.charAt(0)
-                      ?.toUpperCase()}
-                  </div>
-                )}
-
-                <div className="hidden text-left md:block">
-                  <p
-                    className={`max-w-[100px] truncate text-sm font-semibold ${
-                      darkMode ? 'text-white' : 'text-slate-900'
-                    }`}
-                  >
-                    {userDetails?.fullName ||
-                      user?.displayName ||
-                      user?.email?.split('@')[0] ||
-                      'User'}
-                  </p>
-                </div>
-
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform duration-200 ${
-                    openDropdown ? 'rotate-180' : ''
-                  } ${darkMode ? 'text-white' : 'text-slate-700'}`}
-                />
-              </button>
-
-              {openDropdown && (
-                <div
-                  className={`absolute right-0 top-[calc(100%+10px)] w-56 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl ${
-                    darkMode
-                      ? 'border-white/10 bg-[#0f1829]/80'
-                      : 'border-slate-200/80 bg-white/80'
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.span
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 'auto', opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ duration: 0.16 }}
+                  className={`overflow-hidden whitespace-nowrap text-base font-extrabold tracking-wide ${
+                    darkMode ? 'text-white' : 'text-slate-900'
                   }`}
                 >
-                  <div
-                    className={`border-b px-4 py-3 ${
-                      darkMode ? 'border-white/10' : 'border-slate-100'
-                    }`}
-                  >
-                    <p
-                      className={`truncate text-sm font-semibold ${
-                        darkMode ? 'text-white' : 'text-slate-900'
-                      }`}
-                    >
-                      {userDetails?.fullName || user?.displayName || 'User'}
-                    </p>
-
-                    <p
-                      className={`truncate text-xs ${
-                        darkMode ? 'text-white/50' : 'text-slate-400'
-                      }`}
-                    >
-                      {user?.email}
-                    </p>
-                  </div>
-
-                  <div className="p-1.5">
-                    <Link
-                      to="/profile"
-                      onClick={() => setOpenDropdown(false)}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                        darkMode
-                          ? 'text-white/80 hover:bg-white/10 hover:text-white'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
-                    >
-                      <User size={16} />
-                      Trang cá nhân
-                    </Link>
-
-                    <Link
-                      to="/settings"
-                      onClick={() => setOpenDropdown(false)}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                        darkMode
-                          ? 'text-white/80 hover:bg-white/10 hover:text-white'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
-                    >
-                      <Settings size={16} />
-                      Cài đặt
-                    </Link>
-                  </div>
-
-                  <div
-                    className={`border-t p-1.5 ${
-                      darkMode ? 'border-white/10' : 'border-slate-100'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-400 transition-all hover:bg-red-500/10"
-                    >
-                      <LogOut size={16} />
-                      Đăng xuất
-                    </button>
-                  </div>
-                </div>
+                  ZUNY
+                </motion.span>
               )}
-            </div>
-          ) : (
-            <div className="ml-1 flex items-center gap-2">
-              <Link
-                to="/login"
-                className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+            </AnimatePresence>
+          </Link>
+
+          <div
+            className={`h-7 w-px shrink-0 ${
+              darkMode ? 'bg-white/10' : 'bg-slate-200'
+            }`}
+          />
+
+          <AnimatePresence mode="popLayout" initial={false}>
+            {expanded ? (
+              <motion.nav
+                key="expanded-nav"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.16 }}
+                className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden"
+              >
+                {navItems.map((item) => {
+                  const Icon = item.icon
+                  const active =
+                    item.path === '/'
+                      ? location.pathname === '/'
+                      : location.pathname
+                          .toLowerCase()
+                          .startsWith(item.path.toLowerCase())
+
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      title={item.label}
+                      aria-label={item.label}
+                      className={`relative flex min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-full px-2.5 py-2.5 text-sm font-semibold transition-colors 2xl:px-3 ${
+                        active
+                          ? darkMode
+                            ? 'bg-violet-500/22 text-violet-200'
+                            : 'bg-violet-100 text-violet-700'
+                          : darkMode
+                            ? 'text-white/48 hover:bg-white/7 hover:text-white/85'
+                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <Icon size={18} strokeWidth={2} />
+                      <span className="hidden whitespace-nowrap 2xl:inline">{item.shortLabel}</span>
+
+                      {active && (
+                        <motion.span
+                          layoutId="navbar-active-dot"
+                          className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.95)]"
+                        />
+                      )}
+                    </Link>
+                  )
+                })}
+              </motion.nav>
+            ) : (
+              <motion.div
+                key="collapsed-nav"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.16 }}
+                className="flex min-w-0 flex-none items-center gap-2 px-2 sm:min-w-max"
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 shadow-[0_0_12px_rgba(124,58,237,0.95)]" />
+                <CurrentIcon
+                  size={18}
+                  className={darkMode ? 'text-violet-300' : 'text-violet-600'}
+                />
+                <span
+                  className={`min-w-0 truncate text-base font-bold sm:whitespace-nowrap ${
+                    darkMode ? 'text-violet-200' : 'text-slate-800'
+                  }`}
+                >
+                  {currentItem.shortLabel}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div
+            className={`mx-1.5 h-8 w-px shrink-0 ${
+              darkMode ? 'bg-white/10' : 'bg-slate-200'
+            }`}
+          />
+
+          {expanded && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                aria-label="Tìm kiếm"
+                className={`hidden rounded-full p-2.5 transition sm:inline-flex ${
                   darkMode
-                    ? 'text-white/80 hover:bg-white/10 hover:text-white'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'text-white/55 hover:bg-white/8 hover:text-white'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
-                Đăng nhập
-              </Link>
+                <Search size={18} />
+              </button>
 
-              <Link
-                to="/register"
-                className="whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 transition-all hover:opacity-90"
+              <button
+                type="button"
+                aria-label="Thông báo"
+                className={`relative hidden rounded-full p-2 transition sm:inline-flex ${
+                  darkMode
+                    ? 'text-white/55 hover:bg-white/8 hover:text-white'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
               >
-                Đăng ký
-              </Link>
+                <Bell size={18} />
+                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleDarkMode}
+                aria-label={darkMode ? 'Bật giao diện sáng' : 'Bật giao diện tối'}
+                className={`rounded-full p-2.5 transition ${
+                  darkMode
+                    ? 'text-amber-300 hover:bg-white/8'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className={`rounded-xl p-2.5 lg:hidden ${
-              darkMode ? 'hover:bg-white/10' : 'hover:bg-slate-100'
-            }`}
-          >
-            {mobileOpen ? (
-              <X
-                size={20}
-                className={darkMode ? 'text-white' : 'text-slate-700'}
-              />
+          <div className="relative shrink-0" ref={accountRef}>
+            {user ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsAccountOpen((value) => !value)}
+                  className={`flex h-12 items-center gap-2.5 rounded-full border px-1.5 pr-3 transition ${
+                    darkMode
+                      ? 'border-violet-400/35 bg-violet-500/10 hover:bg-violet-500/18'
+                      : 'border-violet-200 bg-violet-50 hover:bg-violet-100'
+                  }`}
+                >
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt=""
+                      className="h-9 w-9 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-violet-600 text-sm font-bold text-white">
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+
+                  <span
+                    className={`max-w-[120px] truncate text-sm font-medium ${
+                      darkMode ? 'text-violet-200' : 'text-violet-800'
+                    }`}
+                  >
+                    {expanded ? displayName : displayName.split(' ')[0]}
+                  </span>
+
+                  {expanded && (
+                    <ChevronDown
+                      size={15}
+                      className={`transition-transform ${
+                        isAccountOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isAccountOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                      transition={{ duration: 0.16 }}
+                      className={`absolute right-0 top-[calc(100%+12px)] w-56 overflow-hidden rounded-2xl border p-1.5 shadow-2xl backdrop-blur-2xl ${
+                        darkMode
+                          ? 'border-white/10 bg-[#0b0b16]/96'
+                          : 'border-slate-200 bg-white/96'
+                      }`}
+                    >
+                      <div className="px-3 py-2">
+                        <p
+                          className={`truncate text-sm font-semibold ${
+                            darkMode ? 'text-white' : 'text-slate-900'
+                          }`}
+                        >
+                          {displayName}
+                        </p>
+                        <p
+                          className={`truncate text-xs ${
+                            darkMode ? 'text-white/45' : 'text-slate-500'
+                          }`}
+                        >
+                          {user.email}
+                        </p>
+                      </div>
+
+                      <Link
+                        to="/profile"
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                          darkMode
+                            ? 'text-white/70 hover:bg-white/8 hover:text-white'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <User size={16} />
+                        Trang cá nhân
+                      </Link>
+
+                      <Link
+                        to="/settings"
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                          darkMode
+                            ? 'text-white/70 hover:bg-white/8 hover:text-white'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Settings size={16} />
+                        Cài đặt
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                      >
+                        <LogOut size={16} />
+                        Đăng xuất
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
             ) : (
-              <Menu
-                size={20}
-                className={darkMode ? 'text-white' : 'text-slate-700'}
-              />
+              <Link
+                to="/login"
+                className={`flex h-12 items-center gap-2.5 rounded-full border px-4 text-sm font-semibold ${
+                  darkMode
+                    ? 'border-violet-400/30 bg-violet-500/10 text-violet-200'
+                    : 'border-violet-200 bg-violet-50 text-violet-700'
+                }`}
+              >
+                <LogIn size={17} />
+                <span>{expanded ? 'Đăng nhập' : 'Khách'}</span>
+              </Link>
             )}
-          </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </motion.header>
+    </div>
   )
 }
