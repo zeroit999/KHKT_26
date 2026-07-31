@@ -322,6 +322,10 @@ class ChatbotDataPermissionTest(unittest.TestCase):
         domains = _selected_domains("Phân tích cơ sở dữ liệu của tôi", "/profile")
         self.assertEqual(domains, {"learning", "courses", "exams", "classes", "forum"})
 
+    def test_learning_recommendation_loads_course_details(self):
+        domains = _selected_domains("Tôi nên học gì tiếp theo?", "/profile")
+        self.assertIn("courses", domains)
+
     def test_formatted_context_contains_authorized_domains(self):
         formatted = format_platform_context({
             "authenticated": True,

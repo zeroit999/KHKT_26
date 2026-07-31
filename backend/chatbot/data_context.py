@@ -109,7 +109,10 @@ def _selected_domains(message, path):
     ))
     domains = {"learning"}
     rules = {
-        "courses": (r"/(?:courses|e-learning|learn)", ("khóa học", "bài học", "bài giảng", "course", "lesson")),
+        "courses": (
+            r"/(?:courses|e-learning|learn)",
+            ("khóa học", "bài học", "bài giảng", "học gì", "học nào", "học tiếp", "course", "lesson"),
+        ),
         "exams": (r"/(?:exams|exam/)", ("bài thi", "đề thi", "kết quả thi", "điểm thi", "lần làm", "exam")),
         "classes": (r"/(?:classes|learning/classes)", ("lớp học", "môn học", "bảng điểm", "học sinh", "giáo viên", "class")),
         "forum": (r"/forum", ("diễn đàn", "bài viết", "thảo luận", "forum", "cộng đồng")),
