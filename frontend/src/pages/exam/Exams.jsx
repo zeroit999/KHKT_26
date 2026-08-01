@@ -12,6 +12,7 @@ import {
   Eye,
   ChevronRight,
   ClipboardList,
+  DoorOpen,
   FileText,
   LayoutDashboard,
   MoreHorizontal,
@@ -451,32 +452,36 @@ function SectionTopbar({ page, isStudent, activeSection }) {
 }
 
 function DashboardShell({ page, isStudent, activeSection, onNavigate, children }) {
+  const [sidebarExpanded, setSidebarExpanded] = useState(false)
+
   return (
     <div className={page.dark ? 'dark' : ''}>
       <div
-        className="bg-[#eef2f8] py-3 text-slate-950 transition dark:bg-slate-950 sm:py-4"
-        style={{ minHeight: 'calc(100dvh - var(--zuny-navbar-height, 72px))' }}
+        className="relative min-h-[calc(100dvh-var(--zuny-navbar-height,72px))] bg-white text-slate-950 transition-colors dark:bg-slate-950"
       >
-        <div
-          className="flex w-full overflow-hidden rounded-[32px] border border-slate-200/80 bg-[#f7f9fc] shadow-[0_18px_60px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-slate-950"
-          style={{ minHeight: 'calc(100dvh - var(--zuny-navbar-height, 72px) - 32px)' }}
-        >
-          <ExamSidebar
-            page={page}
-            isStudent={isStudent}
-            activeItem={activeSection}
-            onNavigate={onNavigate}
-          />
+        <ExamSidebar
+          page={page}
+          isStudent={isStudent}
+          activeItem={activeSection}
+          onNavigate={onNavigate}
+          onExpandedChange={setSidebarExpanded}
+        />
 
-          <section className="min-w-0 flex-1 overflow-hidden lg:pl-24">
+        <section
+          className={`min-w-0 transition-[padding] duration-300 ease-out ${
+            sidebarExpanded ? 'lg:pl-[272px]' : 'lg:pl-24'
+          }`}
+        >
+          <div className="min-h-[calc(100dvh-var(--zuny-navbar-height,72px))] bg-white dark:bg-slate-950">
             {activeSection === 'overview' ? (
               <DashboardHeader page={page} isStudent={isStudent} />
             ) : (
               <SectionTopbar page={page} isStudent={isStudent} activeSection={activeSection} />
             )}
-            <main className="w-full px-5 py-7 lg:px-8">{children}</main>
-          </section>
-        </div>
+
+            <main className="w-full px-5 pb-10 pt-7 lg:px-8">{children}</main>
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -791,20 +796,98 @@ function StatisticsSection({ page, isStudent }) {
   )
 }
 
+
+function ExamRoomSection({ page, isStudent }) {
+  const roomExams = (page.visibleExams || []).filter(
+    (exam) => exam.isActive || exam.isUpcoming,
+  )
+
+  return (
+    <section className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          Phòng thi
+        </h1>
+        <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+          {isStudent
+            ? 'Chọn đề thi đang mở để bắt đầu làm bài trong phòng thi được giám sát.'
+            : 'Xem trước phòng thi của các đề đang mở hoặc sắp diễn ra.'}
+        </p>
+      </div>
+
+      {roomExams.length ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {roomExams.map((exam) => (
+            <article
+              key={exam.id}
+              className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/5"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[#5339f7]">
+                    {exam.subject || 'Môn học'}
+                  </p>
+                  <h2 className="mt-2 truncate text-lg font-black text-slate-900 dark:text-white">
+                    {exam.title || 'Đề thi chưa đặt tên'}
+                  </h2>
+                </div>
+                <ExamStatusBadge exam={exam} />
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-slate-50 px-3 py-3 dark:bg-white/5">
+                  <p className="text-xs font-bold text-slate-400">Số câu</p>
+                  <p className="mt-1 font-black text-slate-700 dark:text-slate-100">
+                    {exam.questionCount || exam.questions?.length || 0}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-3 dark:bg-white/5">
+                  <p className="text-xs font-bold text-slate-400">Thời gian</p>
+                  <p className="mt-1 font-black text-slate-700 dark:text-slate-100">
+                    {exam.duration || 45} phút
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Hạn nộp: {formatDate(exam.closeDate)}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => page.previewExam?.(exam)}
+                disabled={isStudent && !exam.isActive}
+                className="mt-5 w-full rounded-xl bg-[#5339f7] px-4 py-3 text-sm font-black text-white transition hover:bg-[#4630df] disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
+              >
+                {isStudent
+                  ? exam.isActive
+                    ? 'Vào phòng thi'
+                    : 'Chưa đến giờ thi'
+                  : 'Xem trước phòng thi'}
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center text-slate-400 dark:border-white/10 dark:bg-white/5">
+          <DoorOpen className="h-12 w-12" />
+          <p className="mt-4 text-sm font-bold">Chưa có phòng thi khả dụng</p>
+          <p className="mt-1 text-xs font-medium">
+            Phòng thi sẽ xuất hiện khi có đề đang mở hoặc sắp diễn ra.
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function ActiveSection({ page, isStudent, activeSection }) {
   switch (activeSection) {
     case 'overview':
       return <OverviewSection page={page} isStudent={isStudent} />
 
     case 'exam-room':
-      return (
-        <MaintenanceState
-          badge="Phòng thi"
-          title="Đang bảo trì"
-          subtitle="Phòng thi trực tuyến đang được hoàn thiện"
-          description="Khu vực giám sát và tổ chức phòng thi hiện chưa sẵn sàng. Vui lòng quay lại sau."
-        />
-      )
+      return <ExamRoomSection page={page} isStudent={isStudent} />
 
     case 'submissions':
       return (

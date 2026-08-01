@@ -184,7 +184,7 @@ export default function useExamRoom() {
 
     Object.entries(textAnswers).forEach(([questionId, value]) => {
       if (Array.isArray(value)) {
-        result[questionId] = value.filter(Boolean).join(' ').trim()
+        result[questionId] = value.filter(Boolean).join('').trim()
       } else {
         result[questionId] = String(value || '').trim()
       }

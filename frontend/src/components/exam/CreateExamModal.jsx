@@ -865,18 +865,6 @@ function CreateExamModal({
           </div>
         )}
 
-        {(type === 'essay' || type === 'code' || type === 'short-answer') && (
-          <div className="mt-4">
-            <RichEditor
-              label="Gợi ý/chấm điểm"
-              value={question.explanation ?? ''}
-              onChange={(value) =>
-                updateQuestion(questionIndex, 'explanation', value)
-              }
-            />
-          </div>
-        )}
-
         {type === 'multiple' && (
           <div className="mt-4 space-y-3">
             {(question.answers ?? createDefaultAnswers()).map(
@@ -994,14 +982,6 @@ function CreateExamModal({
                 </div>
               ),
             )}
-
-            <RichEditor
-              label="Giải thích đáp án"
-              value={question.explanation ?? ''}
-              onChange={(value) =>
-                updateQuestion(questionIndex, 'explanation', value)
-              }
-            />
           </div>
         )}
       </div>
