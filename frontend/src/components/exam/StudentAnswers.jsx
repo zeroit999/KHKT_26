@@ -1,4 +1,23 @@
-import { getAnswerDisplayValue } from '../../utils/examHelpers'
+const getSubmittedAnswer = (question, result) => {
+  if (question.type === 'essay' || question.type === 'code' || question.type === 'short-answer') {
+    return result?.textAnswers?.[question.id] || 'Chưa trả lời'
+  }
+
+  if (question.type === 'truefalse') {
+    const values = result?.answers?.[question.id]
+    if (!values || typeof values !== 'object') return 'Chưa trả lời'
+    return (question.answers || []).map((_, index) => {
+      const value = values[index] ?? values[String(index)]
+      return `${String.fromCharCode(97 + index)}) ${value === true ? 'Đúng' : value === false ? 'Sai' : '—'}`
+    }).join(' · ')
+  }
+
+  const selectedIndex = result?.answers?.[question.id]
+  if (selectedIndex === undefined || selectedIndex === null) return 'Chưa trả lời'
+  const answer = question.answers?.[Number(selectedIndex)]
+  const content = typeof answer === 'string' ? answer : answer?.content
+  return `${String.fromCharCode(65 + Number(selectedIndex))}. ${content || ''}`.trim()
+}
 
 function StudentAnswers({ exam, result }) {
   return (
@@ -16,7 +35,7 @@ function StudentAnswers({ exam, result }) {
             <span className="font-black text-slate-950 dark:text-white">
               Câu {questionIndex + 1}:{' '}
             </span>
-            <span>{getAnswerDisplayValue(question, result)}</span>
+            <span>{getSubmittedAnswer(question, result)}</span>
           </div>
         ))}
       </div>

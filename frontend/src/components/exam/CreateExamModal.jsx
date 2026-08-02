@@ -10,7 +10,6 @@ import {
   Loader2,
   MonitorUp,
   MousePointer2,
-  Plus,
   ScanEye,
   ShieldAlert,
   ShieldCheck,
@@ -23,6 +22,7 @@ import toast from 'react-hot-toast'
 
 import DarkModeSelect from './DarkModeSelect.jsx'
 import DateTimePicker from './DateTimePicker.jsx'
+import RichEditor from './RichEditor.jsx'
 
 import { parseWordExamApi } from '../../api/examApi'
 import {
@@ -46,6 +46,7 @@ const questionTypes = [
   { value: 'truefalse', label: 'Đúng/Sai 4 ý' },
   { value: 'short-answer', label: 'Trả lời ngắn' },
   { value: 'essay', label: 'Tự luận' },
+  { value: 'code', label: 'Lập trình / Code' },
 ]
 
 const defaultScoring = {
@@ -143,7 +144,7 @@ function CreateExamModal({
           ? 'part2'
           : question.type === 'short-answer'
             ? 'part3'
-            : question.type === 'essay'
+            : question.type === 'essay' || question.type === 'code'
               ? 'part4'
               : 'part1'),
       score: question.score ?? '',
@@ -245,6 +246,8 @@ function CreateExamModal({
           ? normalizeQuestions(editingExam.questions)
           : [createQuestionWithSection('part1')]
 
+      // Đồng bộ dữ liệu khi mở modal chỉnh sửa là chủ đích của component form.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         id: editingExam.id,
         title: editingExam.title ?? '',
@@ -373,7 +376,7 @@ function CreateExamModal({
         ? 'part2'
         : type === 'short-answer'
           ? 'part3'
-          : type === 'essay'
+          : type === 'essay' || type === 'code'
             ? 'part4'
             : 'part1'
 
@@ -570,6 +573,36 @@ function CreateExamModal({
 
     if (!form.questions.length) {
       alert('Vui lòng thêm ít nhất 1 câu hỏi')
+      return
+    }
+
+    const emptyQuestionIndex = form.questions.findIndex(
+      (question) => !String(question.question || '').replace(/<[^>]+>/g, '').trim(),
+    )
+
+    if (emptyQuestionIndex >= 0) {
+      alert(`Vui lòng nhập nội dung câu ${emptyQuestionIndex + 1}`)
+      return
+    }
+
+    const invalidAnswerIndex = form.questions.findIndex((question) => {
+      if (question.type === 'multiple' || question.type === 'truefalse') {
+        const answers = question.answers ?? []
+        const requiredAnswerCount = question.type === 'truefalse' ? 4 : 2
+        return (
+          answers.length < requiredAnswerCount ||
+          answers.some(
+            (answer) => !String(answer.content || '').trim(),
+          ) ||
+          (question.type === 'multiple' && !answers.some((answer) => answer.isCorrect))
+        )
+      }
+
+      return question.type === 'short-answer' && !String(question.correctAnswer || '').trim()
+    })
+
+    if (invalidAnswerIndex >= 0) {
+      alert(`Vui lòng nhập đầy đủ đáp án cho câu ${invalidAnswerIndex + 1}`)
       return
     }
 
@@ -849,6 +882,13 @@ function CreateExamModal({
           />
         </div>
 
+        <RichEditor
+          label="Nội dung câu hỏi"
+          value={question.question ?? ''}
+          onChange={(value) => updateQuestion(questionIndex, 'question', value)}
+          rows={5}
+        />
+
         {type === 'short-answer' && (
           <div className="mt-4">
             <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
@@ -861,6 +901,18 @@ function CreateExamModal({
               }
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               placeholder="Nhập đáp án đúng"
+            />
+          </div>
+        )}
+
+        {(type === 'short-answer' || type === 'essay' || type === 'code') && (
+          <div className="mt-4">
+            <RichEditor
+              label="Gợi ý / hướng dẫn chấm"
+              value={question.explanation ?? ''}
+              onChange={(value) =>
+                updateQuestion(questionIndex, 'explanation', value)
+              }
             />
           </div>
         )}
@@ -921,6 +973,14 @@ function CreateExamModal({
             >
               + Thêm đáp án
             </button>
+
+            <RichEditor
+              label="Giải thích đáp án"
+              value={question.explanation ?? ''}
+              onChange={(value) =>
+                updateQuestion(questionIndex, 'explanation', value)
+              }
+            />
           </div>
         )}
 
@@ -982,6 +1042,14 @@ function CreateExamModal({
                 </div>
               ),
             )}
+
+            <RichEditor
+              label="Giải thích đáp án"
+              value={question.explanation ?? ''}
+              onChange={(value) =>
+                updateQuestion(questionIndex, 'explanation', value)
+              }
+            />
           </div>
         )}
       </div>

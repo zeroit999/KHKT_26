@@ -357,8 +357,19 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     setScreenActive(false)
   }, [appendEvent, stopStream])
 
-  const flushEvidence = useCallback(async () => {
-    await evidenceQueueRef.current
+  const flushEvidence = useCallback(async (timeoutMs = 3000) => {
+    let timeoutId
+
+    try {
+      await Promise.race([
+        evidenceQueueRef.current,
+        new Promise((resolve) => {
+          timeoutId = window.setTimeout(resolve, Math.max(0, timeoutMs))
+        }),
+      ])
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
   }, [])
 
   useEffect(() => {

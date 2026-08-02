@@ -51,7 +51,6 @@ export default function useExamsPage() {
   const {
     role,
     currentUserId,
-    studentClasses,
     visibleExams,
     codeSearch,
     setStatsOpen,
@@ -264,7 +263,12 @@ export default function useExamsPage() {
   }
 
   const previewExam = (exam) => {
-    navigate(`/exam/${exam.id}`, { state: { role, preview: true } })
+    navigate(`/exam/${exam.id}`, {
+      state: {
+        role,
+        preview: !isStudent,
+      },
+    })
   }
 
   const getStudentAttemptCount = (exam) => {
