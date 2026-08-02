@@ -43,7 +43,8 @@ const renderRichContent = (content = '', isDark = false) => {
 const getQuestionTypeLabel = (type) => {
   if (type === 'truefalse') return 'Đúng / Sai';
   if (type === 'short-answer') return 'Trả lời ngắn';
-  if (type === 'essay' || type === 'code') return 'Tự luận';
+  if (type === 'code') return 'Lập trình / Code';
+  if (type === 'essay') return 'Tự luận';
   return 'Trắc nghiệm';
 };
 

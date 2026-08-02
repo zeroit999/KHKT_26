@@ -19,6 +19,7 @@ import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx';
 import Home from './pages/Home.jsx';
 import Exams from './pages/exam/Exams.jsx';
 import ExamRoom from './pages/exam/ExamRoom.jsx';
+import ResultPage from './pages/exam/ResultPage.jsx';
 import Forum from './pages/forum/Forum.jsx';
 import Leaderboard from './pages/leaderboard/Leaderboard.jsx';
 import ELearning from './pages/e-learning/E-learning.jsx';
@@ -61,13 +62,6 @@ function applyDarkModeToDocument(isDark) {
   }
 }
 
-function normalizeAppRole(role) {
-  return String(role || '')
-    .trim()
-    .replace(/[\s_-]/g, '')
-    .toUpperCase();
-}
-
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -104,33 +98,6 @@ function ProtectedRoute({ children }) {
 
   if (isLoading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
-
-  return children;
-}
-
-function TeacherRoute({ children }) {
-  const { user, userDetails, isLoading } = useAuth();
-
-  if (isLoading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
-
-  const normalizedRole = normalizeAppRole(userDetails?.role);
-  const allowed = normalizedRole === 'TEACHER' || normalizedRole === 'ADMINDEV';
-
-  if (!allowed) return <Navigate to="/" replace />;
-
-  return children;
-}
-
-function AdminDevRoute({ children }) {
-  const { user, userDetails, isLoading } = useAuth();
-
-  if (isLoading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
-
-  const allowed = normalizeAppRole(userDetails?.role) === 'ADMINDEV';
-
-  if (!allowed) return <Navigate to="/" replace />;
 
   return children;
 }
@@ -343,6 +310,15 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 element={
                   <ProtectedRoute>
                     <Exams />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/exam/:id/result"
+                element={
+                  <ProtectedRoute>
+                    <ResultPage />
                   </ProtectedRoute>
                 }
               />

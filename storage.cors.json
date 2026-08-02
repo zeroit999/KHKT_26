@@ -1,0 +1,17 @@
+[
+  {
+    "origin": [
+      "https://ai-exam-monitoring.vercel.app",
+      "http://localhost:5173",
+      "http://127.0.0.1:5173"
+    ],
+    "method": ["GET", "HEAD", "POST", "PUT", "DELETE"],
+    "responseHeader": [
+      "Authorization",
+      "Content-Type",
+      "Content-Length",
+      "X-Goog-Resumable"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

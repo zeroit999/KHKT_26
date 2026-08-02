@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("LOCAL_DEV_MODE", "1")
 os.environ.setdefault("CHATBOT_PROVIDER", "mock")
 
-from app import create_app
+from app import create_app, get_allowed_origins
 from chatbot.service import ChatbotError, _resolve_provider, create_chat_response
 from chatbot.data_context import (
     _can_read_class,
@@ -101,6 +101,33 @@ class ProctoringConfigTest(unittest.TestCase):
         self.assertEqual(report["sessionId"], "sessionunsafe")
         self.assertEqual(report["totalViolations"], 1)
         self.assertEqual(len(report["events"]), 2)
+
+
+class CorsConfigTest(unittest.TestCase):
+    def test_production_origin_is_kept_when_environment_adds_origins(self):
+        with patch.dict(os.environ, {"ALLOWED_ORIGINS": "https://custom.example"}):
+            origins = get_allowed_origins()
+
+        self.assertIn("https://ai-exam-monitoring.vercel.app", origins)
+        self.assertIn("https://custom.example", origins)
+
+    def test_preflight_allows_production_frontend(self):
+        app = create_app()
+        client = app.test_client()
+        response = client.options(
+            "/api/chat/history",
+            headers={
+                "Origin": "https://ai-exam-monitoring.vercel.app",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get("Access-Control-Allow-Origin"),
+            "https://ai-exam-monitoring.vercel.app",
+        )
 
 
 class ChatbotServiceTest(unittest.TestCase):

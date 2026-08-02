@@ -56,7 +56,7 @@ def get_optional_chat_user():
     raise ChatbotError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
 
 def get_allowed_origins():
-    origins = []
+    origins = list(DEFAULT_ALLOWED_ORIGINS)
 
     config_origins = getattr(Config, "ALLOWED_ORIGINS", []) or []
 
@@ -76,7 +76,7 @@ def get_allowed_origins():
         if str(origin or "").strip()
     ]
 
-    return cleaned_origins or DEFAULT_ALLOWED_ORIGINS
+    return list(dict.fromkeys(cleaned_origins))
 
 
 def configure_cors(app):

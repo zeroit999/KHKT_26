@@ -13,15 +13,70 @@ def get_selected_value(answers, question_id):
     return answers.get(question_id)
 
 
+def get_question_answers(question):
+    values = question.get("answers") or question.get("options") or []
+    return values if isinstance(values, list) else []
+
+
+def get_correct_multiple_indexes(question):
+    question_answers = get_question_answers(question)
+    correct_indexes = [
+        index
+        for index, answer in enumerate(question_answers)
+        if isinstance(answer, dict) and answer.get("isCorrect")
+    ]
+
+    if correct_indexes:
+        return correct_indexes
+
+    legacy_correct = question.get("correctAnswer")
+    legacy_values = legacy_correct if isinstance(legacy_correct, list) else [legacy_correct]
+    indexes = []
+
+    for value in legacy_values:
+        if isinstance(value, bool) or value is None:
+            continue
+
+        if isinstance(value, int) or str(value).strip().isdigit():
+            index = int(value)
+        else:
+            text = str(value).strip()
+            if len(text) == 1 and text.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                index = ord(text.upper()) - ord("A")
+            else:
+                index = next(
+                    (
+                        answer_index
+                        for answer_index, answer in enumerate(question_answers)
+                        if is_same_answer(
+                            answer.get("content") if isinstance(answer, dict) else answer,
+                            text,
+                        )
+                    ),
+                    -1,
+                )
+
+        if 0 <= index < len(question_answers) and index not in indexes:
+            indexes.append(index)
+
+    return indexes
+
+
+def get_truefalse_correct_value(answer, legacy_correct, index):
+    if isinstance(answer, dict):
+        return bool(answer.get("isCorrect"))
+
+    if isinstance(legacy_correct, (list, tuple)) and index < len(legacy_correct):
+        return bool(legacy_correct[index])
+
+    return False
+
+
 def grade_multiple(question, answers, scoring):
     question_id = question.get("id")
     selected = get_selected_value(answers, question_id)
 
-    correct_indexes = [
-        index
-        for index, answer in enumerate(question.get("answers", []))
-        if answer.get("isCorrect")
-    ]
+    correct_indexes = get_correct_multiple_indexes(question)
 
     is_correct = selected in correct_indexes
     point = float(scoring.get("part1", {}).get("perQuestion", 0) or 0)
@@ -47,8 +102,11 @@ def grade_truefalse(question, answers, scoring):
 
     correct_count = 0
 
-    for index, answer in enumerate(question.get("answers", [])):
-        correct_value = bool(answer.get("isCorrect"))
+    question_answers = get_question_answers(question)
+    legacy_correct = question.get("correctAnswer")
+
+    for index, answer in enumerate(question_answers):
+        correct_value = get_truefalse_correct_value(answer, legacy_correct, index)
         selected_value = selected_map.get(str(index))
 
         if selected_value is None:
@@ -73,8 +131,8 @@ def grade_truefalse(question, answers, scoring):
         return point, None
 
     correct_answer = "; ".join(
-        f"{index + 1}. {'Đúng' if answer.get('isCorrect') else 'Sai'}"
-        for index, answer in enumerate(question.get("answers", []))
+        f"{index + 1}. {'Đúng' if get_truefalse_correct_value(answer, legacy_correct, index) else 'Sai'}"
+        for index, answer in enumerate(question_answers)
     )
 
     return point, {

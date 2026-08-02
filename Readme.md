@@ -89,6 +89,13 @@ Nếu chưa có môi trường phù hợp, script sẽ báo thiếu `backend/ven
 - Frontend production cần đặt `VITE_API_BASE_URL` trỏ tới backend.
 - Backend production cần cho phép domain frontend trong `ALLOWED_ORIGINS`.
 - Nếu muốn dùng OpenAI thật, cấu hình trong `backend/.env`, không đặt API key vào biến `VITE_*`.
+- Firebase Storage cần áp dụng CORS một lần cho bucket để lưu ảnh bằng chứng giám sát từ frontend:
+
+```bash
+gcloud storage buckets update gs://<FIREBASE_STORAGE_BUCKET> --cors-file=storage.cors.json
+```
+
+Sau khi đổi domain frontend, cập nhật `storage.cors.json` và chạy lại lệnh trên.
 
 ## Deploy
 

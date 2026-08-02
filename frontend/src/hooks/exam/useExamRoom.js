@@ -216,6 +216,11 @@ export default function useExamRoom() {
         return
       }
 
+      if (question.type === 'essay' || question.type === 'code') {
+        if (String(textAnswers[question.id] || '').trim()) count += 1
+        return
+      }
+
       if (answers[question.id] !== undefined && answers[question.id] !== null) {
         count += 1
       }
@@ -243,16 +248,18 @@ export default function useExamRoom() {
 
       try {
         setSubmitting(true)
+        let submittedResult = null
 
         if (!preview && !isTeacher) {
-          await flushEvidence()
+          await flushEvidence(autoSubmit ? 1000 : 3000)
           const proctoringReport = getProctoringReport()
-          await submitExamApi(exam.id, {
+          const response = await submitExamApi(exam.id, {
             answers,
             textAnswers: normalizedTextAnswers,
             fullscreenViolations: submitViolations,
             proctoringReport,
           })
+          submittedResult = response.data?.result ?? null
           stopMonitoring('submitted')
         }
 
@@ -267,6 +274,7 @@ export default function useExamRoom() {
             textAnswers: normalizedTextAnswers,
             autoSubmit,
             violations: submitViolations,
+            result: submittedResult,
           },
         })
       } catch (error) {
