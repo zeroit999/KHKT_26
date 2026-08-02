@@ -10,13 +10,19 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 class Config:
     LOCAL_DEV_MODE = os.getenv("LOCAL_DEV_MODE", "0") == "1"
 
-    FIREBASE_ADMIN_KEY_PATH = os.getenv(
+FIREBASE_ADMIN_KEY_PATH = os.getenv(
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    os.getenv(
         "FIREBASE_ADMIN_KEY_PATH",
-        os.path.join(CONFIG_DIR, "firebase-admin-key.json")
-    )
+        os.path.join(CONFIG_DIR, "firebase-admin-key.json"),
+    ),
+)
 
-    if not os.path.isabs(FIREBASE_ADMIN_KEY_PATH):
-        FIREBASE_ADMIN_KEY_PATH = os.path.join(BASE_DIR, FIREBASE_ADMIN_KEY_PATH)
+if not os.path.isabs(FIREBASE_ADMIN_KEY_PATH):
+    FIREBASE_ADMIN_KEY_PATH = os.path.join(
+        BASE_DIR,
+        FIREBASE_ADMIN_KEY_PATH,
+    )
 
     # Dùng khi deploy Render/Vercel/Railway: copy toàn bộ nội dung firebase-admin-key.json vào ENV này
     FIREBASE_SERVICE_ACCOUNT = os.getenv("FIREBASE_SERVICE_ACCOUNT", "")
