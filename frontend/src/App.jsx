@@ -21,7 +21,6 @@ import Exams from './pages/exam/Exams.jsx';
 import ExamRoom from './pages/exam/ExamRoom.jsx';
 import ResultPage from './pages/exam/ResultPage.jsx';
 import Forum from './pages/forum/Forum.jsx';
-import Leaderboard from './pages/leaderboard/Leaderboard.jsx';
 import ELearning from './pages/e-learning/E-learning.jsx';
 import ELearningDetail from './pages/e-learning/E-learningDetail.jsx';
 import LearningPage from './pages/learning/LearningPage.jsx';
@@ -255,15 +254,6 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 element={
                   <ProtectedRoute>
                     <Forum />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/leaderboard"
-                element={
-                  <ProtectedRoute>
-                    <Leaderboard />
                   </ProtectedRoute>
                 }
               />

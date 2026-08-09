@@ -53,14 +53,6 @@ const PAGE_PROFILES = [
     suggestions: ['Giúp tôi viết câu hỏi rõ ràng', 'Tìm thảo luận liên quan', 'Cách đăng bài mới?'],
   },
   {
-    id: 'leaderboard',
-    match: (path) => /^\/leaderboard\/?$/i.test(path),
-    title: 'AI phân tích xếp hạng',
-    eyebrow: 'Hiểu thành tích',
-    description: 'Giải thích điểm, vị trí và xu hướng học tập.',
-    suggestions: ['Điểm xếp hạng tính thế nào?', 'Phân tích vị trí của tôi', 'Tìm một học sinh hoặc lớp'],
-  },
-  {
     id: 'classes',
     match: (path) => /^\/classes\/?$/i.test(path),
     title: 'AI quản lý lớp',
@@ -110,7 +102,6 @@ const ACTION_SELECTORS = {
   focus_exam_code: ['input[placeholder="Mã bài thi"]'],
   focus_course_search: ['input[placeholder="Tìm kiếm bài học, chủ đề, môn học, mã bài..."]'],
   focus_forum_search: ['input[placeholder="Tìm kiếm bài viết, câu hỏi, tài liệu..."]'],
-  focus_leaderboard_search: ['input[placeholder="Tìm học sinh, lớp, trường..."]'],
   focus_class_search: ['input[placeholder="Tìm kiếm học sinh..."]'],
   open_create_exam: ['[data-zuny-ai-action="create-exam"]'],
   open_create_post: ['[data-zuny-ai-action="create-post"]'],

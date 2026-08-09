@@ -101,12 +101,6 @@ export default function MobileNavbar({
         icon: BookOpenCheck,
       },
       {
-        label: 'Xếp hạng',
-        shortLabel: 'Xếp hạng',
-        path: '/leaderboard',
-        icon: Trophy,
-      },
-      {
         label: 'Cộng đồng',
         shortLabel: 'Cộng đồng',
         path: '/forum',

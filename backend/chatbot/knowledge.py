@@ -37,14 +37,6 @@ FEATURES = [
             {"id": "open_profile", "label": "Mở Hồ sơ", "type": "navigate", "target": "/profile"},
         ],
     },
-    {
-        "id": "leaderboard",
-        "keywords": ["xếp hạng", "leaderboard", "điểm", "thành tích"],
-        "content": "Bảng xếp hạng hiển thị điểm, thứ hạng và thành tích học tập.",
-        "actions": [
-            {"id": "open_leaderboard", "label": "Xem xếp hạng", "type": "navigate", "target": "/leaderboard"},
-        ],
-    },
 ]
 
 
@@ -132,19 +124,6 @@ PAGE_PROFILES = [
         "actions": [
             {"id": "focus_forum_search", "label": "Tìm bài viết", "type": "page_action", "command": "focus_forum_search"},
             {"id": "create_post", "label": "Đăng bài mới", "type": "page_action", "command": "open_create_post"},
-        ],
-    },
-    {
-        "id": "leaderboard",
-        "pattern": r"^/leaderboard/?$",
-        "title": "Bảng xếp hạng",
-        "icon": "trophy",
-        "summary": "Giải thích thứ hạng, điểm số, bộ lọc và xu hướng thành tích.",
-        "instructions": "Không suy đoán dữ liệu không có trong tín hiệu trang.",
-        "suggestions": ["Điểm xếp hạng tính thế nào?", "Phân tích vị trí của tôi", "Tìm một học sinh hoặc lớp"],
-        "actions": [
-            {"id": "focus_leaderboard_search", "label": "Tìm trên BXH", "type": "page_action", "command": "focus_leaderboard_search"},
-            {"id": "open_exams", "label": "Cải thiện điểm", "type": "navigate", "target": "/exams"},
         ],
     },
     {

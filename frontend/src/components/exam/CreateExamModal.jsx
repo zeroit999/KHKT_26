@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   BookOpenCheck,
@@ -17,20 +17,20 @@ import {
   Upload,
   UsersRound,
   X,
-} from 'lucide-react'
-import toast from 'react-hot-toast'
+} from 'lucide-react';
+import toast from 'react-hot-toast';
 
-import DarkModeSelect from './DarkModeSelect.jsx'
-import DateTimePicker from './DateTimePicker.jsx'
-import RichEditor from './RichEditor.jsx'
+import DarkModeSelect from './DarkModeSelect.jsx';
+import DateTimePicker from './DateTimePicker.jsx';
+import RichEditor from './RichEditor.jsx';
 
-import { parseWordExamApi } from '../../api/examApi'
+import { parseWordExamApi } from '../../api/examApi';
 import {
   LEGACY_PROCTORING_CONFIG,
   PROCTORING_SETTING_ITEMS,
   STRICT_PROCTORING_CONFIG,
   normalizeProctoringConfig,
-} from '../../utils/proctoringConfig.js'
+} from '../../utils/proctoringConfig.js';
 
 import {
   addMinutesToDateTime,
@@ -39,15 +39,14 @@ import {
   getCodeNumberFromExam,
   getExamCode,
   normalizeSubject,
-} from '../../utils/examHelpers'
+} from '../../utils/examHelpers';
 
 const questionTypes = [
   { value: 'multiple', label: 'Trắc nghiệm A/B/C/D' },
   { value: 'truefalse', label: 'Đúng/Sai 4 ý' },
   { value: 'short-answer', label: 'Trả lời ngắn' },
-  { value: 'essay', label: 'Tự luận' },
   { value: 'code', label: 'Lập trình / Code' },
-]
+];
 
 const defaultScoring = {
   part1: {
@@ -62,7 +61,7 @@ const defaultScoring = {
   part3: {
     perQuestion: '',
   },
-}
+};
 
 const proctoringIcons = {
   requireFullscreen: MonitorUp,
@@ -75,10 +74,17 @@ const proctoringIcons = {
   requireScreenShare: MonitorUp,
   requireEntireScreen: MonitorUp,
   autoSubmit: ShieldAlert,
-}
+};
 
-function ProctoringToggle({ settingKey, title, description, checked, onChange, disabled }) {
-  const Icon = proctoringIcons[settingKey] || ShieldCheck
+function ProctoringToggle({
+  settingKey,
+  title,
+  description,
+  checked,
+  onChange,
+  disabled,
+}) {
+  const Icon = proctoringIcons[settingKey] || ShieldCheck;
 
   return (
     <button
@@ -93,20 +99,30 @@ function ProctoringToggle({ settingKey, title, description, checked, onChange, d
       }`}
     >
       <span className="flex min-w-0 items-start gap-3">
-        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-white/10'}`}>
+        <span
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-white/10'}`}
+        >
           <Icon className="h-4 w-4" />
         </span>
         <span>
-          <span className="block text-sm font-black text-slate-900 dark:text-white">{title}</span>
-          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{description}</span>
+          <span className="block text-sm font-black text-slate-900 dark:text-white">
+            {title}
+          </span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+            {description}
+          </span>
         </span>
       </span>
 
-      <span className={`mt-1 flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition ${checked ? 'bg-red-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
-        <span className={`h-4 w-4 rounded-full bg-white shadow transition ${checked ? 'translate-x-5' : ''}`} />
+      <span
+        className={`mt-1 flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition ${checked ? 'bg-red-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+      >
+        <span
+          className={`h-4 w-4 rounded-full bg-white shadow transition ${checked ? 'translate-x-5' : ''}`}
+        />
       </span>
     </button>
-  )
+  );
 }
 
 function CreateExamModal({
@@ -118,7 +134,7 @@ function CreateExamModal({
   teacherName = 'GiaoVien',
   availableClasses = [],
 }) {
-  const fixedTeacherSubject = normalizeSubject(teacherSubject)
+  const fixedTeacherSubject = normalizeSubject(teacherSubject);
 
   const createQuestionWithSection = (section = 'part1') => ({
     ...createDefaultQuestion(),
@@ -128,12 +144,10 @@ function CreateExamModal({
         ? 'truefalse'
         : section === 'part3'
           ? 'short-answer'
-          : section === 'part4'
-            ? 'essay'
-            : 'multiple',
+          : 'multiple',
     score: '',
     correctAnswer: '',
-  })
+  });
 
   const normalizeQuestions = (questions = []) =>
     questions.map((question) => ({
@@ -142,16 +156,14 @@ function CreateExamModal({
         question.section ||
         (question.type === 'truefalse'
           ? 'part2'
-          : question.type === 'short-answer'
+          : question.type === 'short-answer' || question.type === 'code'
             ? 'part3'
-            : question.type === 'essay' || question.type === 'code'
-              ? 'part4'
-              : 'part1'),
+            : 'part1'),
       score: question.score ?? '',
       correctAnswer: question.correctAnswer ?? '',
-    }))
+    }));
 
-  const [parsingWord, setParsingWord] = useState(false)
+  const [parsingWord, setParsingWord] = useState(false);
 
   const [form, setForm] = useState({
     title: '',
@@ -174,77 +186,77 @@ function CreateExamModal({
     maxFullscreenViolations: 2,
     proctoring: { ...STRICT_PROCTORING_CONFIG },
     questions: [createQuestionWithSection('part1')],
-  })
+  });
 
   const examCodePreview = useMemo(() => {
-    return getExamCode(teacherName, fixedTeacherSubject, form.codeNumber)
-  }, [teacherName, fixedTeacherSubject, form.codeNumber])
+    return getExamCode(teacherName, fixedTeacherSubject, form.codeNumber);
+  }, [teacherName, fixedTeacherSubject, form.codeNumber]);
 
   const sectionCounts = useMemo(() => {
     const counts = {
       part1: 0,
       part2: 0,
       part3: 0,
-      part4: 0,
-    }
+    };
 
     for (const question of form.questions ?? []) {
-      const section = question.section || 'part1'
-      counts[section] = (counts[section] || 0) + 1
+      const section = question.section || 'part1';
+      counts[section] = (counts[section] || 0) + 1;
     }
 
-    return counts
-  }, [form.questions])
+    return counts;
+  }, [form.questions]);
 
-  const part1Total = Number(form.scoring.part1.perQuestion || 0) * sectionCounts.part1
-  const part2Total = Number(form.scoring.part2.fourCorrect || 0) * sectionCounts.part2
-  const part3Total = Number(form.scoring.part3.perQuestion || 0) * sectionCounts.part3
-
-  const part4Total = (form.questions ?? [])
-    .filter((question) => question.section === 'part4')
-    .reduce((total, question) => total + Number(question.score || 0), 0)
+  const part1Total =
+    Number(form.scoring.part1.perQuestion || 0) * sectionCounts.part1;
+  const part2Total =
+    Number(form.scoring.part2.fourCorrect || 0) * sectionCounts.part2;
+  const part3Total =
+    Number(form.scoring.part3.perQuestion || 0) * sectionCounts.part3;
 
   const computedTotalScore = Number(
-    (part1Total + part2Total + part3Total + part4Total).toFixed(2),
-  )
+    (part1Total + part2Total + part3Total).toFixed(2)
+  );
 
-  const scoreOverLimit = computedTotalScore > 10
+  const scoreOverLimit = computedTotalScore > 10;
 
-  const openTimeValue = form.openDate ? new Date(form.openDate).getTime() : 0
-  const closeTimeValue = form.closeDate ? new Date(form.closeDate).getTime() : 0
+  const openTimeValue = form.openDate ? new Date(form.openDate).getTime() : 0;
+  const closeTimeValue = form.closeDate
+    ? new Date(form.closeDate).getTime()
+    : 0;
   const invalidCloseDate = Boolean(
     form.openDate &&
-      form.closeDate &&
-      !Number.isNaN(openTimeValue) &&
-      !Number.isNaN(closeTimeValue) &&
-      closeTimeValue <= openTimeValue,
-  )
+    form.closeDate &&
+    !Number.isNaN(openTimeValue) &&
+    !Number.isNaN(closeTimeValue) &&
+    closeTimeValue <= openTimeValue
+  );
 
   const getValidCloseDate = (openDate, duration = 45, closeDate = '') => {
-    if (!openDate) return closeDate || ''
+    if (!openDate) return closeDate || '';
 
-    const fallbackCloseDate = addMinutesToDateTime(openDate, duration || 45)
+    const fallbackCloseDate = addMinutesToDateTime(openDate, duration || 45);
 
-    if (!closeDate) return fallbackCloseDate
+    if (!closeDate) return fallbackCloseDate;
 
-    const openTime = new Date(openDate).getTime()
-    const closeTime = new Date(closeDate).getTime()
+    const openTime = new Date(openDate).getTime();
+    const closeTime = new Date(closeDate).getTime();
 
     if (Number.isNaN(openTime) || Number.isNaN(closeTime)) {
-      return fallbackCloseDate
+      return fallbackCloseDate;
     }
 
-    return closeTime > openTime ? closeDate : fallbackCloseDate
-  }
+    return closeTime > openTime ? closeDate : fallbackCloseDate;
+  };
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
 
     if (editingExam) {
       const existingQuestions =
         editingExam.questions?.length > 0
           ? normalizeQuestions(editingExam.questions)
-          : [createQuestionWithSection('part1')]
+          : [createQuestionWithSection('part1')];
 
       // Đồng bộ dữ liệu khi mở modal chỉnh sửa là chủ đích của component form.
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -264,7 +276,7 @@ function CreateExamModal({
         closeDate: getValidCloseDate(
           editingExam.openDate ?? '',
           Number(editingExam.duration || 45),
-          editingExam.closeDate ?? '',
+          editingExam.closeDate ?? ''
         ),
         shuffleQuestions: Boolean(editingExam.shuffleQuestions),
         shuffleAnswers: Boolean(editingExam.shuffleAnswers),
@@ -286,13 +298,15 @@ function CreateExamModal({
           },
         },
         wordFileName: editingExam.wordFileName ?? '',
-        maxFullscreenViolations: Number(editingExam.maxFullscreenViolations ?? 2),
+        maxFullscreenViolations: Number(
+          editingExam.maxFullscreenViolations ?? 2
+        ),
         proctoring: normalizeProctoringConfig(
           editingExam,
-          LEGACY_PROCTORING_CONFIG,
+          LEGACY_PROCTORING_CONFIG
         ),
         questions: existingQuestions,
-      })
+      });
     } else {
       setForm({
         title: '',
@@ -315,15 +329,15 @@ function CreateExamModal({
         maxFullscreenViolations: 2,
         proctoring: { ...STRICT_PROCTORING_CONFIG },
         questions: [createQuestionWithSection('part1')],
-      })
+      });
     }
-  }, [open, editingExam, fixedTeacherSubject])
+  }, [open, editingExam, fixedTeacherSubject]);
 
-  if (!open) return null
+  if (!open) return null;
 
   const updateForm = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const updateScoring = (part, key, value) => {
     setForm((prev) => ({
@@ -335,50 +349,48 @@ function CreateExamModal({
           [key]: value,
         },
       },
-    }))
-  }
+    }));
+  };
 
   const updateProctoring = (key, value) => {
     setForm((prev) => {
       const nextProctoring = {
         ...prev.proctoring,
         [key]: value,
-      }
+      };
       if (key === 'requireCamera' && !value) {
-        nextProctoring.captureCameraEvidence = false
+        nextProctoring.captureCameraEvidence = false;
       }
       if (key === 'requireMicrophone' && !value) {
-        nextProctoring.detectVoiceActivity = false
+        nextProctoring.detectVoiceActivity = false;
       }
       if (key === 'requireScreenShare' && !value) {
-        nextProctoring.requireEntireScreen = false
-        nextProctoring.captureScreenEvidence = false
+        nextProctoring.requireEntireScreen = false;
+        nextProctoring.captureScreenEvidence = false;
       }
       return {
         ...prev,
         proctoring: nextProctoring,
-      }
-    })
-  }
+      };
+    });
+  };
 
   const updateQuestion = (questionIndex, key, value) => {
     setForm((prev) => ({
       ...prev,
       questions: prev.questions.map((question, index) =>
-        index === questionIndex ? { ...question, [key]: value } : question,
+        index === questionIndex ? { ...question, [key]: value } : question
       ),
-    }))
-  }
+    }));
+  };
 
   const updateQuestionType = (questionIndex, type) => {
     const section =
       type === 'truefalse'
         ? 'part2'
-        : type === 'short-answer'
+        : type === 'short-answer' || type === 'code'
           ? 'part3'
-          : type === 'essay' || type === 'code'
-            ? 'part4'
-            : 'part1'
+          : 'part1';
 
     setForm((prev) => ({
       ...prev,
@@ -395,34 +407,34 @@ function CreateExamModal({
                     : createDefaultAnswers()
                   : [],
             }
-          : question,
+          : question
       ),
-    }))
-  }
+    }));
+  };
 
   const updateAnswer = (questionIndex, answerIndex, key, value) => {
     setForm((prev) => ({
       ...prev,
       questions: prev.questions.map((question, index) => {
-        if (index !== questionIndex) return question
+        if (index !== questionIndex) return question;
 
         return {
           ...question,
           answers: question.answers.map((answer, currentAnswerIndex) =>
             currentAnswerIndex === answerIndex
               ? { ...answer, [key]: value }
-              : answer,
+              : answer
           ),
-        }
+        };
       }),
-    }))
-  }
+    }));
+  };
 
   const setCorrectAnswer = (questionIndex, answerIndex) => {
     setForm((prev) => ({
       ...prev,
       questions: prev.questions.map((question, index) => {
-        if (index !== questionIndex) return question
+        if (index !== questionIndex) return question;
 
         return {
           ...question,
@@ -430,21 +442,21 @@ function CreateExamModal({
             ...answer,
             isCorrect: currentAnswerIndex === answerIndex,
           })),
-        }
+        };
       }),
-    }))
-  }
+    }));
+  };
 
   const toggleTrueFalseAnswer = (questionIndex, answerIndex, value) => {
-    updateAnswer(questionIndex, answerIndex, 'isCorrect', value)
-  }
+    updateAnswer(questionIndex, answerIndex, 'isCorrect', value);
+  };
 
   const addQuestion = (section = 'part1') => {
     setForm((prev) => ({
       ...prev,
       questions: [...prev.questions, createQuestionWithSection(section)],
-    }))
-  }
+    }));
+  };
 
   const removeQuestion = (questionIndex) => {
     setForm((prev) => ({
@@ -453,8 +465,8 @@ function CreateExamModal({
         prev.questions.length > 1
           ? prev.questions.filter((_, index) => index !== questionIndex)
           : prev.questions,
-    }))
-  }
+    }));
+  };
 
   const addAnswer = (questionIndex) => {
     setForm((prev) => ({
@@ -473,181 +485,183 @@ function CreateExamModal({
                 },
               ],
             }
-          : question,
+          : question
       ),
-    }))
-  }
+    }));
+  };
 
   const removeAnswer = (questionIndex, answerIndex) => {
     setForm((prev) => ({
       ...prev,
       questions: prev.questions.map((question, index) => {
-        if (index !== questionIndex) return question
+        if (index !== questionIndex) return question;
 
         return {
           ...question,
           answers:
             question.answers.length > 2
               ? question.answers.filter(
-                  (_, currentAnswerIndex) => currentAnswerIndex !== answerIndex,
+                  (_, currentAnswerIndex) => currentAnswerIndex !== answerIndex
                 )
               : question.answers,
-        }
+        };
       }),
-    }))
-  }
+    }));
+  };
 
   const toggleClass = (className) => {
     setForm((prev) => {
-      const selected = prev.selectedClasses ?? []
+      const selected = prev.selectedClasses ?? [];
 
       return {
         ...prev,
         selectedClasses: selected.includes(className)
           ? selected.filter((item) => item !== className)
           : [...selected, className],
-      }
-    })
-  }
+      };
+    });
+  };
 
   const toggleGrade = (grade) => {
     setForm((prev) => {
-      const selected = prev.selectedGrades ?? []
+      const selected = prev.selectedGrades ?? [];
 
       return {
         ...prev,
         selectedGrades: selected.includes(grade)
           ? selected.filter((item) => item !== grade)
           : [...selected, grade],
-      }
-    })
-  }
+      };
+    });
+  };
 
   const handleWordFileChange = async (event) => {
-    const file = event.target.files?.[0]
+    const file = event.target.files?.[0];
 
-    if (!file) return
+    if (!file) return;
 
-    updateForm('wordFileName', file.name)
+    updateForm('wordFileName', file.name);
 
-    const formData = new FormData()
-    formData.append('file', file)
+    const formData = new FormData();
+    formData.append('file', file);
 
     try {
-      setParsingWord(true)
+      setParsingWord(true);
 
-      const response = await parseWordExamApi(formData)
-      const parsedQuestions = response.data?.questions ?? []
+      const response = await parseWordExamApi(formData);
+      const parsedQuestions = response.data?.questions ?? [];
 
       if (!parsedQuestions.length) {
-        toast.error('Không tìm thấy câu hỏi trong file Word')
-        return
+        toast.error('Không tìm thấy câu hỏi trong file Word');
+        return;
       }
 
       setForm((prev) => ({
         ...prev,
         wordFileName: file.name,
         questions: normalizeQuestions(parsedQuestions),
-      }))
+      }));
 
-      toast.success(`Đã nhập ${parsedQuestions.length} câu hỏi từ file Word`)
+      toast.success(`Đã nhập ${parsedQuestions.length} câu hỏi từ file Word`);
     } catch (error) {
-      console.error(error)
+      console.error(error);
 
       toast.error(
         error?.response?.data?.message ||
           error.message ||
-          'Không thể đọc file Word',
-      )
+          'Không thể đọc file Word'
+      );
     } finally {
-      setParsingWord(false)
-      event.target.value = ''
+      setParsingWord(false);
+      event.target.value = '';
     }
-  }
+  };
 
   const handleSubmit = () => {
     if (!form.title.trim()) {
-      alert('Vui lòng nhập tên bài thi')
-      return
+      alert('Vui lòng nhập tên bài thi');
+      return;
     }
 
     if (!form.questions.length) {
-      alert('Vui lòng thêm ít nhất 1 câu hỏi')
-      return
+      alert('Vui lòng thêm ít nhất 1 câu hỏi');
+      return;
     }
 
     const emptyQuestionIndex = form.questions.findIndex(
-      (question) => !String(question.question || '').replace(/<[^>]+>/g, '').trim(),
-    )
+      (question) =>
+        !String(question.question || '')
+          .replace(/<[^>]+>/g, '')
+          .trim()
+    );
 
     if (emptyQuestionIndex >= 0) {
-      alert(`Vui lòng nhập nội dung câu ${emptyQuestionIndex + 1}`)
-      return
+      alert(`Vui lòng nhập nội dung câu ${emptyQuestionIndex + 1}`);
+      return;
     }
 
     const invalidAnswerIndex = form.questions.findIndex((question) => {
       if (question.type === 'multiple' || question.type === 'truefalse') {
-        const answers = question.answers ?? []
-        const requiredAnswerCount = question.type === 'truefalse' ? 4 : 2
+        const answers = question.answers ?? [];
+        const requiredAnswerCount = question.type === 'truefalse' ? 4 : 2;
         return (
           answers.length < requiredAnswerCount ||
-          answers.some(
-            (answer) => !String(answer.content || '').trim(),
-          ) ||
-          (question.type === 'multiple' && !answers.some((answer) => answer.isCorrect))
-        )
+          answers.some((answer) => !String(answer.content || '').trim()) ||
+          (question.type === 'multiple' &&
+            !answers.some((answer) => answer.isCorrect))
+        );
       }
 
-      return question.type === 'short-answer' && !String(question.correctAnswer || '').trim()
-    })
+      return (
+        question.type === 'short-answer' &&
+        !String(question.correctAnswer || '').trim()
+      );
+    });
 
     if (invalidAnswerIndex >= 0) {
-      alert(`Vui lòng nhập đầy đủ đáp án cho câu ${invalidAnswerIndex + 1}`)
-      return
+      alert(`Vui lòng nhập đầy đủ đáp án cho câu ${invalidAnswerIndex + 1}`);
+      return;
     }
 
     if (form.status === 'public' && !(form.selectedGrades ?? []).length) {
-      alert('Bài thi công khai bắt buộc phải chọn ít nhất 1 khối')
-      return
+      alert('Bài thi công khai bắt buộc phải chọn ít nhất 1 khối');
+      return;
     }
 
     if (form.status === 'private' && !(form.selectedClasses ?? []).length) {
-      alert('Bài thi riêng tư bắt buộc phải chọn ít nhất 1 lớp')
-      return
+      alert('Bài thi riêng tư bắt buộc phải chọn ít nhất 1 lớp');
+      return;
     }
 
     if (!form.openDate) {
-      alert('Vui lòng chọn thời gian mở bài thi')
-      return
+      alert('Vui lòng chọn thời gian mở bài thi');
+      return;
     }
 
     if (!form.closeDate) {
-      alert('Vui lòng chọn thời gian đóng bài thi')
-      return
+      alert('Vui lòng chọn thời gian đóng bài thi');
+      return;
     }
 
     if (invalidCloseDate) {
-      alert('Thời gian đóng phải sau thời gian mở')
-      return
+      alert('Thời gian đóng phải sau thời gian mở');
+      return;
     }
 
     if (computedTotalScore <= 0) {
-      alert('Vui lòng nhập điểm cho từng phần')
-      return
+      alert('Vui lòng nhập điểm cho từng phần');
+      return;
     }
 
     if (scoreOverLimit) {
-      alert('Tổng điểm đang vượt quá 10. Vui lòng điều chỉnh điểm từng phần.')
-      return
+      alert('Tổng điểm đang vượt quá 10. Vui lòng điều chỉnh điểm từng phần.');
+      return;
     }
 
     const questionsWithScore = form.questions.map((question) => ({
       ...question,
-      score:
-        question.section === 'part4'
-          ? Number(question.score || 0)
-          : 0,
-    }))
+      score: 0,
+    }));
 
     onSave({
       ...form,
@@ -676,10 +690,10 @@ function CreateExamModal({
       maxFullscreenViolations: Number(form.proctoring?.maxViolations ?? 2),
       proctoring: normalizeProctoringConfig(
         form.proctoring,
-        STRICT_PROCTORING_CONFIG,
+        STRICT_PROCTORING_CONFIG
       ),
-    })
-  }
+    });
+  };
 
   const renderScoreSettings = () => (
     <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
@@ -695,7 +709,8 @@ function CreateExamModal({
                 Cấu hình chấm điểm theo cấu trúc đề
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Thiết lập điểm cho từng phần; phần tự luận nhập điểm riêng từng câu.
+                Thiết lập điểm cho từng phần; phần tự luận không còn dùng điểm
+                riêng.
               </p>
             </div>
           </div>
@@ -800,24 +815,12 @@ function CreateExamModal({
             Tổng phần 3: {Number(part3Total.toFixed(2))}
           </p>
         </div>
-
-        <div className="rounded-2xl bg-white p-4 dark:bg-slate-900">
-          <p className="font-black text-slate-900 dark:text-white">
-            Phần 4: Tự luận
-          </p>
-          <p className="mt-1 text-xs font-semibold text-slate-500">
-            {sectionCounts.part4} câu • nhập điểm riêng từng câu
-          </p>
-          <p className="mt-3 text-sm font-black text-blue-600">
-            Tổng phần 4: {Number(part4Total.toFixed(2))}
-          </p>
-        </div>
       </div>
     </div>
-  )
+  );
 
   const renderQuestion = (question, questionIndex) => {
-    const type = question.type ?? 'multiple'
+    const type = question.type ?? 'multiple';
 
     return (
       <div
@@ -835,30 +838,8 @@ function CreateExamModal({
                 ? 'Phần 1'
                 : question.section === 'part2'
                   ? 'Phần 2'
-                  : question.section === 'part3'
-                    ? 'Phần 3'
-                    : 'Phần 4'}
+                  : 'Phần 3'}
             </p>
-
-            {question.section === 'part4' && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500">
-                  Điểm tự luận:
-                </span>
-
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={question.score ?? ''}
-                  onChange={(event) =>
-                    updateQuestion(questionIndex, 'score', event.target.value)
-                  }
-                  className="w-28 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-black text-blue-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-blue-200"
-                  placeholder="0"
-                />
-              </div>
-            )}
           </div>
 
           <button
@@ -897,7 +878,11 @@ function CreateExamModal({
             <input
               value={question.correctAnswer ?? ''}
               onChange={(event) =>
-                updateQuestion(questionIndex, 'correctAnswer', event.target.value)
+                updateQuestion(
+                  questionIndex,
+                  'correctAnswer',
+                  event.target.value
+                )
               }
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               placeholder="Nhập đáp án đúng"
@@ -944,7 +929,7 @@ function CreateExamModal({
                         questionIndex,
                         answerIndex,
                         'content',
-                        event.target.value,
+                        event.target.value
                       )
                     }
                     className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
@@ -963,7 +948,7 @@ function CreateExamModal({
                     Xóa
                   </button>
                 </div>
-              ),
+              )
             )}
 
             <button
@@ -986,8 +971,9 @@ function CreateExamModal({
 
         {type === 'truefalse' && (
           <div className="mt-4 space-y-3">
-            {(question.answers ?? createDefaultAnswers()).slice(0, 4).map(
-              (answer, answerIndex) => (
+            {(question.answers ?? createDefaultAnswers())
+              .slice(0, 4)
+              .map((answer, answerIndex) => (
                 <div
                   key={answer.id ?? answerIndex}
                   className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900 lg:grid-cols-[auto_1fr_auto]"
@@ -1003,7 +989,7 @@ function CreateExamModal({
                         questionIndex,
                         answerIndex,
                         'content',
-                        event.target.value,
+                        event.target.value
                       )
                     }
                     className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
@@ -1040,8 +1026,7 @@ function CreateExamModal({
                     </button>
                   </div>
                 </div>
-              ),
-            )}
+              ))}
 
             <RichEditor
               label="Giải thích đáp án"
@@ -1053,8 +1038,8 @@ function CreateExamModal({
           </div>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div
@@ -1135,13 +1120,17 @@ function CreateExamModal({
               </label>
               <input
                 value={form.codeNumber}
-                onChange={(event) => updateForm('codeNumber', event.target.value)}
+                onChange={(event) =>
+                  updateForm('codeNumber', event.target.value)
+                }
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
                 placeholder="Ví dụ: 001"
               />
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 Mã bài thi hoàn chỉnh:{' '}
-                <span className="font-black text-blue-600">{examCodePreview}</span>
+                <span className="font-black text-blue-600">
+                  {examCodePreview}
+                </span>
               </p>
             </div>
 
@@ -1170,7 +1159,8 @@ function CreateExamModal({
                 1. Phạm vi hiển thị bài thi
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Chọn cách mở bài thi trước, sau đó chọn khối hoặc lớp được phép nhìn thấy bài thi.
+                Chọn cách mở bài thi trước, sau đó chọn khối hoặc lớp được phép
+                nhìn thấy bài thi.
               </p>
             </div>
           </div>
@@ -1189,7 +1179,8 @@ function CreateExamModal({
                 ]}
               />
               <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Công khai: học sinh cùng khối sẽ thấy bài thi. Riêng tư: chỉ lớp được chọn thấy bài thi.
+                Công khai: học sinh cùng khối sẽ thấy bài thi. Riêng tư: chỉ lớp
+                được chọn thấy bài thi.
               </p>
             </div>
 
@@ -1218,7 +1209,8 @@ function CreateExamModal({
                       Chọn khối học sinh
                     </h4>
                     <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
-                      Bắt buộc chọn ít nhất 1 khối để học sinh nhìn thấy bài thi công khai.
+                      Bắt buộc chọn ít nhất 1 khối để học sinh nhìn thấy bài thi
+                      công khai.
                     </p>
                   </div>
                 </div>
@@ -1230,13 +1222,14 @@ function CreateExamModal({
 
               {!(form.selectedGrades ?? []).length && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                  Bài thi công khai chưa chọn khối nên học sinh sẽ không thấy bài thi.
+                  Bài thi công khai chưa chọn khối nên học sinh sẽ không thấy
+                  bài thi.
                 </div>
               )}
 
               <div className="mt-5 flex flex-wrap gap-3">
                 {['10', '11', '12'].map((grade) => {
-                  const selected = (form.selectedGrades ?? []).includes(grade)
+                  const selected = (form.selectedGrades ?? []).includes(grade);
 
                   return (
                     <button
@@ -1251,7 +1244,7 @@ function CreateExamModal({
                     >
                       Khối {grade}
                     </button>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -1270,7 +1263,8 @@ function CreateExamModal({
                       Chọn lớp làm bài
                     </h4>
                     <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">
-                      Dữ liệu lớp lấy từ Quản lý lớp học. Bắt buộc chọn ít nhất 1 lớp.
+                      Dữ liệu lớp lấy từ Quản lý lớp học. Bắt buộc chọn ít nhất
+                      1 lớp.
                     </p>
                   </div>
                 </div>
@@ -1282,7 +1276,8 @@ function CreateExamModal({
 
               {!(form.selectedClasses ?? []).length && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                  Bài thi riêng tư chưa chọn lớp nên học sinh sẽ không thấy bài thi.
+                  Bài thi riêng tư chưa chọn lớp nên học sinh sẽ không thấy bài
+                  thi.
                 </div>
               )}
 
@@ -1296,9 +1291,11 @@ function CreateExamModal({
                           classItem.className ||
                           classItem.title ||
                           classItem.id ||
-                          'Lớp'
+                          'Lớp';
 
-                    const selected = (form.selectedClasses ?? []).includes(className)
+                    const selected = (form.selectedClasses ?? []).includes(
+                      className
+                    );
 
                     return (
                       <button
@@ -1313,7 +1310,7 @@ function CreateExamModal({
                       >
                         {className}
                       </button>
-                    )
+                    );
                   })
                 ) : (
                   <div className="w-full rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-bold text-slate-500 dark:border-white/10 dark:bg-slate-900 dark:text-slate-400">
@@ -1336,7 +1333,8 @@ function CreateExamModal({
                 2. Thời gian và quy định làm bài
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Thiết lập lịch mở, lịch đóng, thời lượng, số lượt làm và giới hạn thoát toàn màn hình.
+                Thiết lập lịch mở, lịch đóng, thời lượng, số lượt làm và giới
+                hạn thoát toàn màn hình.
               </p>
             </div>
           </div>
@@ -1349,8 +1347,11 @@ function CreateExamModal({
               <DateTimePicker
                 value={form.openDate}
                 onChange={(value) => {
-                  updateForm('openDate', value)
-                  updateForm('closeDate', addMinutesToDateTime(value, form.duration))
+                  updateForm('openDate', value);
+                  updateForm(
+                    'closeDate',
+                    addMinutesToDateTime(value, form.duration)
+                  );
                 }}
                 hasError={Boolean(!form.openDate && form.closeDate)}
               />
@@ -1382,11 +1383,14 @@ function CreateExamModal({
                 min={1}
                 value={form.duration}
                 onChange={(event) => {
-                  const duration = Number(event.target.value || 45)
-                  updateForm('duration', duration)
+                  const duration = Number(event.target.value || 45);
+                  updateForm('duration', duration);
 
                   if (form.openDate) {
-                    updateForm('closeDate', addMinutesToDateTime(form.openDate, duration))
+                    updateForm(
+                      'closeDate',
+                      addMinutesToDateTime(form.openDate, duration)
+                    );
                   }
                 }}
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
@@ -1400,8 +1404,8 @@ function CreateExamModal({
               <DarkModeSelect
                 value={form.attemptMode}
                 onChange={(value) => {
-                  updateForm('attemptMode', value)
-                  if (value === 'once') updateForm('maxAttempts', 1)
+                  updateForm('attemptMode', value);
+                  if (value === 'once') updateForm('maxAttempts', 1);
                 }}
                 options={[
                   { value: 'once', label: 'Chỉ 1 lần' },
@@ -1432,7 +1436,10 @@ function CreateExamModal({
                 max={20}
                 value={form.proctoring?.maxViolations ?? 3}
                 onChange={(event) =>
-                  updateProctoring('maxViolations', Number(event.target.value || 1))
+                  updateProctoring(
+                    'maxViolations',
+                    Number(event.target.value || 1)
+                  )
                 }
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               />
@@ -1451,7 +1458,8 @@ function CreateExamModal({
                   Giám sát phòng thi nghiêm ngặt
                 </h3>
                 <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-                  Mỗi đề có cấu hình riêng. Camera, microphone và chia sẻ màn hình luôn yêu cầu học sinh đồng ý trước khi bắt đầu.
+                  Mỗi đề có cấu hình riêng. Camera, microphone và chia sẻ màn
+                  hình luôn yêu cầu học sinh đồng ý trước khi bắt đầu.
                 </p>
               </div>
             </div>
@@ -1459,34 +1467,45 @@ function CreateExamModal({
             <button
               type="button"
               aria-pressed={Boolean(form.proctoring?.enabled)}
-              onClick={() => updateProctoring('enabled', !form.proctoring?.enabled)}
+              onClick={() =>
+                updateProctoring('enabled', !form.proctoring?.enabled)
+              }
               className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
                 form.proctoring?.enabled
                   ? 'bg-red-600 text-white shadow-lg shadow-red-500/20'
                   : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300'
               }`}
             >
-              {form.proctoring?.enabled ? 'Đang bật giám sát' : 'Đã tắt giám sát'}
+              {form.proctoring?.enabled
+                ? 'Đang bật giám sát'
+                : 'Đã tắt giám sát'}
             </button>
           </div>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
-            {PROCTORING_SETTING_ITEMS.map(([settingKey, title, description]) => (
-              <ProctoringToggle
-                key={settingKey}
-                settingKey={settingKey}
-                title={title}
-                description={description}
-                checked={Boolean(form.proctoring?.[settingKey])}
-                disabled={!form.proctoring?.enabled || (
-                  (settingKey === 'requireEntireScreen' && !form.proctoring?.requireScreenShare) ||
-                  (settingKey === 'detectVoiceActivity' && !form.proctoring?.requireMicrophone) ||
-                  (settingKey === 'captureCameraEvidence' && !form.proctoring?.requireCamera) ||
-                  (settingKey === 'captureScreenEvidence' && !form.proctoring?.requireScreenShare)
-                )}
-                onChange={(value) => updateProctoring(settingKey, value)}
-              />
-            ))}
+            {PROCTORING_SETTING_ITEMS.map(
+              ([settingKey, title, description]) => (
+                <ProctoringToggle
+                  key={settingKey}
+                  settingKey={settingKey}
+                  title={title}
+                  description={description}
+                  checked={Boolean(form.proctoring?.[settingKey])}
+                  disabled={
+                    !form.proctoring?.enabled ||
+                    (settingKey === 'requireEntireScreen' &&
+                      !form.proctoring?.requireScreenShare) ||
+                    (settingKey === 'detectVoiceActivity' &&
+                      !form.proctoring?.requireMicrophone) ||
+                    (settingKey === 'captureCameraEvidence' &&
+                      !form.proctoring?.requireCamera) ||
+                    (settingKey === 'captureScreenEvidence' &&
+                      !form.proctoring?.requireScreenShare)
+                  }
+                  onChange={(value) => updateProctoring(settingKey, value)}
+                />
+              )
+            )}
           </div>
 
           <div className="mt-4 grid gap-4 rounded-2xl border border-red-200 bg-white/80 p-4 sm:grid-cols-2 dark:border-red-500/20 dark:bg-slate-950/50">
@@ -1500,7 +1519,12 @@ function CreateExamModal({
                 max={20}
                 disabled={!form.proctoring?.enabled}
                 value={form.proctoring?.maxViolations ?? 3}
-                onChange={(event) => updateProctoring('maxViolations', Number(event.target.value || 1))}
+                onChange={(event) =>
+                  updateProctoring(
+                    'maxViolations',
+                    Number(event.target.value || 1)
+                  )
+                }
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-800 outline-none focus:border-red-500 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               />
             </div>
@@ -1511,7 +1535,9 @@ function CreateExamModal({
               </label>
               <DarkModeSelect
                 value={String(form.proctoring?.heartbeatSeconds ?? 30)}
-                onChange={(value) => updateProctoring('heartbeatSeconds', Number(value))}
+                onChange={(value) =>
+                  updateProctoring('heartbeatSeconds', Number(value))
+                }
                 options={[
                   { value: '15', label: '15 giây (rất nghiêm)' },
                   { value: '30', label: '30 giây' },
@@ -1632,14 +1658,6 @@ function CreateExamModal({
               >
                 + Phần 3
               </button>
-
-              <button
-                type="button"
-                onClick={() => addQuestion('part4')}
-                className="rounded-xl bg-orange-600 px-4 py-3 text-sm font-black text-white"
-              >
-                + Phần 4
-              </button>
             </div>
           </div>
 
@@ -1666,7 +1684,7 @@ function CreateExamModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default CreateExamModal
+export default CreateExamModal;

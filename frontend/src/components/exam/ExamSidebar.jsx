@@ -80,15 +80,6 @@ function ExamSidebar({
               badge: page?.studentResults?.length || 0,
             },
             {
-              id: 'grading',
-              label: 'Chấm tự luận',
-              icon: FileCheck2,
-              badge:
-                page?.studentResults?.filter(
-                  (item) => item.status === 'pending' || item.needsGrading,
-                ).length || 0,
-            },
-            {
               id: 'statistics',
               label: 'Thống kê',
               icon: BarChart3,

@@ -16,7 +16,6 @@ const quickLinks = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Kho đề thi', href: '/exams' },
   { label: 'E-Learning', href: '/courses' },
-  { label: 'Bảng xếp hạng', href: '/leaderboard' },
   { label: 'Cộng đồng', href: '/Forum' },
 ]
 
