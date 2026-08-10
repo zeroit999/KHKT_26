@@ -2,843 +2,1335 @@ import {
   BookOpen,
   Camera,
   Edit3,
+  Flame,
   GraduationCap,
   Mail,
   MapPin,
   Phone,
+  Save,
   School,
-  Shield,
   User,
+  X,
 } from 'lucide-react'
 
-import { doc, updateDoc } from 'firebase/firestore'
-import { useEffect, useMemo, useState } from 'react'
+import {
+  doc,
+  updateDoc,
+} from 'firebase/firestore'
+
+import {
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytes,
+} from 'firebase/storage'
+
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
 import toast from 'react-hot-toast'
+
 import { db } from '../firebase'
-import { useAuth } from '../../contexts/AuthContext'
+
+import {
+  useAuth,
+} from '../../contexts/AuthContext'
+
 import defaultAvatar from '../../assets/favicon-light-mode.png'
 
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-  name,
-  isEditing,
-  onChange,
-  iconColor = '#6366F1',
-  theme,
-  readOnly = false,
-}) {
-  return (
-    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          background: theme.iconBg,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={18} color={iconColor} />
-      </div>
+import InfoRow from './profile/InfoRow'
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 12,
-            color: theme.mutedText,
-            fontWeight: 500,
-            marginBottom: 2,
-          }}
-        >
-          {label}
-        </div>
+import {
+  normalizeProfileData,
+  validateImage,
+} from './profile/profileUtils'
 
-        {isEditing && name && !readOnly ? (
-          (
-          <input
-            name={name}
-            value={value || ''}
-            onChange={onChange}
-            style={{
-              width: '100%',
-              fontSize: 14,
-              fontWeight: 600,
-              color: theme.text,
-              border: `1.5px solid ${theme.border}`,
-              borderRadius: 8,
-              padding: '4px 10px',
-              outline: 'none',
-              background: theme.inputBg,
-              boxSizing: 'border-box',
-            }}
-          />
-          )
-        ) : (
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: theme.text,
-              wordBreak: 'break-word',
-            }}
-          >
-            {value || '—'}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+import {
+  getProfileTheme,
+} from './profile/profileTheme'
+
+import {
+  getUserAvatar,
+} from '../../utils/userAvatar'
+
+import './profile/profile.css'
 
 export default function Profile() {
-  const { user, userDetails, refreshUserData } = useAuth()
+  const {
+    user,
+    userDetails,
+    refreshUserData,
+  } = useAuth()
 
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState('')
-  const [coverPreview, setCoverPreview] = useState('')
-  const [isDark, setIsDark] = useState(false)
+  const storage = useMemo(
+    () => getStorage(),
+    []
+  )
 
-  const [profileData, setProfileData] = useState({
-    fullName: '',
-    bio: '',
-    phone: '',
-    school: '',
-    className: '',
-    grade: '',
-    subject: '',
-    city: '',
-    learningStreak: 0,
-    points: 0,
-    role: 'STUDENT',
-    avatar: defaultAvatar,
-    coverPhoto: '',
+  const coverInputRef =
+    useRef(null)
+
+  const [
+    isEditing,
+    setIsEditing,
+  ] = useState(false)
+
+  const [
+    isSaving,
+    setIsSaving,
+  ] = useState(false)
+
+  const [
+    isUploadingCover,
+    setIsUploadingCover,
+  ] = useState(false)
+
+  /* =====================================================
+     DARK MODE
+
+     Chỉ đồng bộ với class .dark mà ZUNY đang sử dụng.
+
+     Không dùng:
+     - prefers-color-scheme
+     - body.dark
+     - data-theme
+
+     => Không bị lệch với Navbar.
+  ===================================================== */
+
+  const [
+    isDark,
+    setIsDark,
+  ] = useState(() => {
+    if (
+      typeof document ===
+      'undefined'
+    ) {
+      return false
+    }
+
+    return document
+      .documentElement
+      .classList
+      .contains('dark')
   })
 
-  useEffect(() => {
-    const checkDarkMode = () => {
-      const html = document.documentElement
-      const body = document.body
+  const [
+    profileData,
+    setProfileData,
+  ] = useState(() =>
+    normalizeProfileData(
+      null,
+      null
+    )
+  )
 
+  /* =====================================================
+     SYNC DARK MODE
+  ===================================================== */
+
+  useEffect(() => {
+    const html =
+      document.documentElement
+
+    const syncDarkMode = () => {
       setIsDark(
-        html.classList.contains('dark') ||
-          body.classList.contains('dark') ||
-          html.getAttribute('data-theme') === 'dark' ||
-          body.getAttribute('data-theme') === 'dark' ||
-          window.matchMedia?.('(prefers-color-scheme: dark)').matches
+        html.classList.contains(
+          'dark'
+        )
       )
     }
 
-    checkDarkMode()
+    syncDarkMode()
 
-    const observer = new MutationObserver(checkDarkMode)
+    const observer =
+      new MutationObserver(
+        syncDarkMode
+      )
 
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
-    media?.addEventListener?.('change', checkDarkMode)
+    observer.observe(
+      html,
+      {
+        attributes: true,
+        attributeFilter: [
+          'class',
+        ],
+      }
+    )
 
     return () => {
       observer.disconnect()
-      media?.removeEventListener?.('change', checkDarkMode)
     }
   }, [])
 
-  const theme = useMemo(() => {
-    if (isDark) {
-      return {
-        pageBg: '#0B1020',
-        cardBg: '#111827',
-        inputBg: '#0F172A',
-        iconBg: '#1F2937',
-        text: '#F9FAFB',
-        subText: '#CBD5E1',
-        mutedText: '#94A3B8',
-        border: '#334155',
-        shadow: '0 2px 16px rgba(0,0,0,0.35)',
-        shadowSm: '0 2px 8px rgba(0,0,0,0.35)',
-        cancelBg: '#1F2937',
-        cancelText: '#CBD5E1',
-        badgeBg: '#1E1B4B',
-        badgeText: '#C7D2FE',
-        pointsBg: '#422006',
-        pointsText: '#FDE68A',
-      }
-    }
+  const theme = useMemo(
+    () =>
+      getProfileTheme(
+        isDark
+      ),
+    [isDark]
+  )
 
-    return {
-      pageBg: '#F3F4F8',
-      cardBg: '#FFFFFF',
-      inputBg: '#FFFFFF',
-      iconBg: '#F5F5FA',
-      text: '#111827',
-      subText: '#6B7280',
-      mutedText: '#9CA3AF',
-      border: '#E5E7EB',
-      shadow: '0 2px 16px rgba(0,0,0,0.08)',
-      shadowSm: '0 2px 8px rgba(0,0,0,0.12)',
-      cancelBg: '#F3F4F8',
-      cancelText: '#6B7280',
-      badgeBg: '#EEF2FF',
-      badgeText: '#4338CA',
-      pointsBg: '#FEF9C3',
-      pointsText: '#92400E',
-    }
-  }, [isDark])
+  /* =====================================================
+     FIREBASE -> PROFILE
+  ===================================================== */
 
   useEffect(() => {
-    if (userDetails) {
-      setProfileData({
-        fullName: userDetails.fullName || user?.displayName || '',
-        bio: userDetails.bio || '',
-        phone: userDetails.phone || '',
-        school: userDetails.school || '',
-        className: userDetails.className || userDetails.class || userDetails.lop || userDetails.studentClass || '',
-        grade: String(
-          userDetails.grade ||
-            userDetails.khoi ||
-            userDetails.gradeLevel ||
-            userDetails.studentGrade ||
-            '',
-        ).trim(),
-        subject:
-          userDetails.subject ||
-          userDetails.teacherSubject ||
-          userDetails.major ||
-          userDetails.specialization ||
-          userDetails.chuyenMon ||
-          userDetails['chuyênMôn'] ||
-          '',
-        city: userDetails.city || '',
-        learningStreak: userDetails.learningStreak || 0,
-        points: userDetails.points || 0,
-        role: userDetails.role || 'STUDENT',
-        avatar:
-          userDetails.avatar ||
-          userDetails.photoURL ||
-          user?.photoURL ||
-          defaultAvatar,
-        coverPhoto: userDetails.coverPhoto || '',
-      })
-    }
-  }, [userDetails, user])
-
-  useEffect(() => {
-    setAvatarPreview(profileData.avatar || '')
-    setCoverPreview(profileData.coverPhoto || '')
-  }, [profileData.avatar, profileData.coverPhoto])
-
-  const isTeacher =
-    profileData.role?.trim()?.toUpperCase() === 'TEACHER'
-
-  const avatarSrc = useMemo(() => {
-    if (userDetails?.avatar) return userDetails.avatar
-    if (userDetails?.photoURL) return userDetails.photoURL
-    if (user?.photoURL) return user.photoURL
-    return defaultAvatar
-  }, [user, userDetails])
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setProfileData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const url = URL.createObjectURL(file)
-    setAvatarPreview(url)
-    setProfileData((prev) => ({ ...prev, avatar: url }))
-  }
-
-  const handleCoverChange = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const url = URL.createObjectURL(file)
-    setCoverPreview(url)
-    setProfileData((prev) => ({ ...prev, coverPhoto: url }))
-  }
-
-  const handleSave = async () => {
-    if (!user?.uid) {
-      toast.error('Không tìm thấy người dùng')
+    if (
+      !user &&
+      !userDetails
+    ) {
       return
     }
 
-    try {
-      setIsSaving(true)
+    setProfileData(
+      normalizeProfileData(
+        user,
+        userDetails
+      )
+    )
+  }, [
+    user,
+    userDetails,
+  ])
 
-      const dataToSave = {
-        ...profileData,
-        khoi: profileData.grade,
-        gradeLevel: profileData.grade,
-        studentGrade: profileData.grade,
-        teacherSubject: profileData.subject,
-        major: profileData.subject,
-        specialization: profileData.subject,
-        chuyenMon: profileData.subject,
+  /* =====================================================
+     ROLE
+
+     Role chỉ dùng để quyết định UI.
+     Không cho phép sửa role.
+  ===================================================== */
+
+  const isTeacher =
+    profileData.role
+      ?.trim()
+      ?.toUpperCase() ===
+    'TEACHER'
+
+  /* =====================================================
+     AVATAR
+
+     Google:
+       Firebase Auth user.photoURL
+
+     Email/password:
+       Logo ZUNY
+  ===================================================== */
+
+  const avatarSrc =
+    getUserAvatar(user)
+
+  /* =====================================================
+     HERO IMAGE
+  ===================================================== */
+
+  const heroImage =
+    profileData.coverPhoto ||
+    avatarSrc
+
+  /* =====================================================
+     INPUT
+  ===================================================== */
+
+  const handleChange = (
+    event
+  ) => {
+    const {
+      name,
+      value,
+    } = event.target
+
+    setProfileData(
+      (previous) => ({
+        ...previous,
+        [name]: value,
+      })
+    )
+  }
+
+  /* =====================================================
+     COVER PHOTO
+  ===================================================== */
+
+  const handleCoverChange =
+    async (event) => {
+      const file =
+        event.target
+          .files?.[0]
+
+      event.target.value =
+        ''
+
+      if (!file) {
+        return
       }
 
-      const userRef = doc(db, 'users', user.uid)
+      if (!user?.uid) {
+        toast.error(
+          'Không tìm thấy người dùng'
+        )
 
-      await updateDoc(userRef, dataToSave)
+        return
+      }
 
-      if (refreshUserData) await refreshUserData()
+      const validation =
+        validateImage(file)
 
-      toast.success('Đã cập nhật thông tin')
+      if (
+        !validation.valid
+      ) {
+        if (
+          validation.message
+        ) {
+          toast.error(
+            validation.message
+          )
+        }
+
+        return
+      }
+
+      try {
+        setIsUploadingCover(
+          true
+        )
+
+        const extension =
+          file.name
+            .split('.')
+            .pop()
+            ?.toLowerCase() ||
+          'jpg'
+
+        const storageRef =
+          ref(
+            storage,
+            `users/${user.uid}/profile/cover.${extension}`
+          )
+
+        await uploadBytes(
+          storageRef,
+          file,
+          {
+            contentType:
+              file.type,
+          }
+        )
+
+        const downloadURL =
+          await getDownloadURL(
+            storageRef
+          )
+
+        const userRef =
+          doc(
+            db,
+            'users',
+            user.uid
+          )
+
+        await updateDoc(
+          userRef,
+          {
+            coverPhoto:
+              downloadURL,
+          }
+        )
+
+        setProfileData(
+          (previous) => ({
+            ...previous,
+            coverPhoto:
+              downloadURL,
+          })
+        )
+
+        if (
+          refreshUserData
+        ) {
+          await refreshUserData()
+        }
+
+        toast.success(
+          'Đã cập nhật ảnh bìa'
+        )
+      } catch (error) {
+        console.error(
+          'Upload cover error:',
+          error
+        )
+
+        toast.error(
+          'Không thể cập nhật ảnh bìa'
+        )
+      } finally {
+        setIsUploadingCover(
+          false
+        )
+      }
+    }
+
+  /* =====================================================
+     SAVE PROFILE
+
+     ĐƯỢC SỬA:
+     - fullName
+     - bio
+     - phone
+     - grade (học sinh)
+
+     KHÔNG ĐƯỢC SỬA:
+     - email
+     - city
+     - school
+     - subject
+     - role
+     - points
+     - learningStreak
+     - avatar
+
+     Học sinh không còn cập nhật className.
+  ===================================================== */
+
+  const handleSave =
+    async () => {
+      if (!user?.uid) {
+        toast.error(
+          'Không tìm thấy người dùng'
+        )
+
+        return
+      }
+
+      try {
+        setIsSaving(true)
+
+        const userRef =
+          doc(
+            db,
+            'users',
+            user.uid
+          )
+
+        const dataToSave = {
+          fullName:
+            profileData
+              .fullName
+              .trim(),
+
+          bio:
+            profileData
+              .bio
+              .trim(),
+
+          phone:
+            profileData
+              .phone
+              .trim(),
+        }
+
+        /*
+         * Chỉ học sinh mới chỉnh Khối.
+         */
+        if (!isTeacher) {
+          const grade =
+            profileData
+              .grade
+              .trim()
+
+          dataToSave.grade =
+            grade
+
+          dataToSave.khoi =
+            grade
+
+          dataToSave.gradeLevel =
+            grade
+
+          dataToSave.studentGrade =
+            grade
+        }
+
+        await updateDoc(
+          userRef,
+          dataToSave
+        )
+
+        if (
+          refreshUserData
+        ) {
+          await refreshUserData()
+        }
+
+        setIsEditing(false)
+
+        toast.success(
+          'Đã cập nhật thông tin'
+        )
+      } catch (error) {
+        console.error(
+          'Update profile error:',
+          error
+        )
+
+        toast.error(
+          'Cập nhật thông tin thất bại'
+        )
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+  /* =====================================================
+     CANCEL
+  ===================================================== */
+
+  const handleCancelEdit =
+    () => {
+      setProfileData(
+        normalizeProfileData(
+          user,
+          userDetails
+        )
+      )
 
       setIsEditing(false)
-    } catch (error) {
-      console.error(error)
-      toast.error('Cập nhật thất bại')
-    } finally {
-      setIsSaving(false)
     }
-  }
-
-  const page = {
-    minHeight: '100vh',
-    background: theme.pageBg,
-    padding: '24px 16px',
-    fontFamily: "'Be Vietnam Pro', 'Segoe UI', sans-serif",
-    transition: 'background 0.2s ease',
-  }
-
-  const container = {
-    maxWidth: 900,
-    margin: '0 auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 20,
-  }
-
-  const card = {
-    background: theme.cardBg,
-    borderRadius: 20,
-    padding: 24,
-    boxShadow: theme.shadow,
-    border: `1px solid ${
-      isDark ? theme.border : 'transparent'
-    }`,
-  }
 
   return (
-    <div style={page}>
-      <div style={container}>
-        <div
-          style={{
-            background: theme.cardBg,
-            borderRadius: 24,
-            overflow: 'hidden',
-            boxShadow: theme.shadow,
-            border: `1px solid ${
-              isDark ? theme.border : 'transparent'
-            }`,
-          }}
-        >
-          <div style={{ position: 'relative', height: 180 }}>
-            {coverPreview ? (
-              <img
-                src={coverPreview}
-                alt="cover"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  background:
-                    'linear-gradient(135deg, #6366F1 0%, #8B5CF6 40%, #EC4899 80%, #F43F5E 100%)',
-                }}
-              />
-            )}
+    <div
+      className="zuny-profile-page"
 
-            {isEditing && (
-              <label
-                style={{
-                  position: 'absolute',
-                  top: 12,
-                  right: 12,
-                  background: 'rgba(0,0,0,0.45)',
-                  color: '#fff',
-                  borderRadius: 10,
-                  padding: '6px 14px',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  backdropFilter: 'blur(6px)',
-                }}
-              >
-                <Camera size={15} /> Đổi ảnh bìa
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={handleCoverChange}
-                />
-              </label>
-            )}
-          </div>
+      style={{
+        '--zuny-profile-page-bg': theme.pageBg,
+        '--zuny-profile-glow': theme.glow,
+
+        background:
+          theme.pageBg,
+
+        fontFamily:
+          "'Be Vietnam Pro', 'Segoe UI', sans-serif",
+
+        transition:
+          'background 0.25s ease',
+      }}
+    >
+      {/* =================================================
+          FULL-VIEWPORT BACKGROUND
+          Phủ kín cả vùng phía sau Dynamic Navbar, kể cả khi
+          layout cha đang chừa khoảng trống cho navbar fixed.
+      ================================================= */}
+
+      <div className="zuny-profile-backdrop" />
+
+      {/* =================================================
+          BACKGROUND GRID
+      ================================================= */}
+
+      <div
+        className="zuny-profile-grid"
+
+        style={{
+          opacity:
+            isDark
+              ? 0.12
+              : 0.045,
+        }}
+      />
+
+      {/* =================================================
+          BACKGROUND GLOW
+      ================================================= */}
+
+      <div
+        className="zuny-profile-glow"
+
+        style={{
+          background:
+            theme.glow,
+        }}
+      />
+
+      {/* =================================================
+          PROFILE CARD
+      ================================================= */}
+
+      <div
+        className="zuny-profile-card"
+
+        style={{
+          border:
+            `1px solid ${theme.border}`,
+
+          background:
+            theme.panelSolid,
+
+          boxShadow:
+            isDark
+              ? '0 30px 90px rgba(0,0,0,0.34)'
+              : '0 30px 90px rgba(15,23,42,0.10)',
+
+          transition:
+            'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+        }}
+      >
+        {/* =================================================
+            LEFT SIDE
+        ================================================= */}
+
+        <section
+          className="zuny-profile-left"
+        >
+          <img
+            className="zuny-profile-cover"
+
+            src={
+              heroImage
+            }
+
+            alt={
+              profileData.fullName ||
+              'Profile'
+            }
+
+            referrerPolicy="no-referrer"
+
+            onError={(
+              event
+            ) => {
+              event.currentTarget.onerror =
+                null
+
+              event.currentTarget.src =
+                defaultAvatar
+            }}
+          />
 
           <div
+            className="zuny-profile-left-overlay"
+          />
+
+          {/* ROLE BADGE */}
+
+          <div
+            className="zuny-profile-role-badge"
+
             style={{
-              padding: '0 28px 24px',
-              position: 'relative',
+              background:
+                isTeacher
+                  ? 'rgba(52,65,95,0.72)'
+                  : 'rgba(3,59,87,0.72)',
             }}
           >
-            <div
+            <span
+              className="zuny-profile-role-dot"
+
               style={{
-                position: 'relative',
-                display: 'inline-block',
-                marginTop: -48,
+                background:
+                  isTeacher
+                    ? '#4ADE80'
+                    : '#38BDF8',
+
+                boxShadow:
+                  isTeacher
+                    ? '0 0 15px rgba(74,222,128,.9)'
+                    : '0 0 15px rgba(56,189,248,.9)',
               }}
-            >
-              <div
+            />
+
+            {isTeacher
+              ? 'Giáo viên'
+              : 'Học sinh'}
+          </div>
+
+          {/* CHANGE COVER */}
+
+          {isEditing && (
+            <>
+              <button
+                type="button"
+
+                className="zuny-profile-cover-button"
+
+                disabled={
+                  isUploadingCover
+                }
+
+                onClick={() =>
+                  coverInputRef
+                    .current
+                    ?.click()
+                }
+
                 style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: '50%',
-                  border: `4px solid ${theme.cardBg}`,
-                  background:
-                    'linear-gradient(135deg, #6366F1, #EC4899)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                  opacity:
+                    isUploadingCover
+                      ? 0.7
+                      : 1,
+
+                  cursor:
+                    isUploadingCover
+                      ? 'wait'
+                      : 'pointer',
                 }}
               >
-                {avatarPreview || avatarSrc ? (
-                  <img
-                    src={avatarPreview || avatarSrc}
-                    alt="avatar"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                ) : (
-                  <GraduationCap size={40} color="#fff" />
-                )}
-              </div>
+                <Camera
+                  size={15}
+                />
 
-              {isEditing && (
-                <label
-                  style={{
-                    position: 'absolute',
-                    bottom: 2,
-                    right: 2,
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: '#6366F1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    border: `2px solid ${theme.cardBg}`,
-                    boxShadow:
-                      '0 2px 6px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  <Edit3 size={13} color="#fff" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={handleAvatarChange}
-                  />
-                </label>
-              )}
-            </div>
+                {isUploadingCover
+                  ? 'Đang tải...'
+                  : 'Đổi ảnh bìa'}
+              </button>
+
+              <input
+                ref={
+                  coverInputRef
+                }
+
+                type="file"
+
+                accept="image/jpeg,image/png,image/webp"
+
+                hidden
+
+                onChange={
+                  handleCoverChange
+                }
+              />
+            </>
+          )}
+
+          {/* LEFT NAME */}
+
+          <div
+            className="zuny-profile-left-info"
+          >
+            <h1
+              className="zuny-profile-left-name"
+            >
+              {profileData.fullName ||
+                user?.displayName ||
+                'Chưa cập nhật tên'}
+            </h1>
 
             <div
-              style={{
-                marginTop: 12,
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                gap: 16,
-                flexWrap: 'wrap',
-              }}
+              className="zuny-profile-left-subtitle"
             >
-              <div style={{ flex: 1 }}>
-                {isEditing ? (
-                  <input
-                    name="fullName"
-                    value={profileData.fullName || ''}
-                    onChange={handleChange}
-                    style={{
-                      fontSize: 22,
-                      fontWeight: 800,
-                      color: theme.text,
-                      border: `1.5px solid ${theme.border}`,
-                      borderRadius: 8,
-                      padding: '4px 10px',
-                      outline: 'none',
-                      width: '100%',
-                      marginBottom: 8,
-                      background: theme.inputBg,
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 22,
-                      fontWeight: 800,
-                      color: theme.text,
-                      marginBottom: 6,
-                    }}
-                  >
-                    {profileData.fullName ||
-                      user?.displayName ||
-                      'Tên người dùng'}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginBottom: 8,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span
-                    style={{
-                      background: theme.pointsBg,
-                      color: theme.pointsText,
-                      borderRadius: 20,
-                      padding: '3px 12px',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 5,
-                    }}
-                  >
-                    ⭐ {profileData.points} Points
-                  </span>
-
-                  <span
-                    style={{
-                      background: theme.badgeBg,
-                      color: theme.badgeText,
-                      borderRadius: 20,
-                      padding: '3px 12px',
-                      fontSize: 13,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {isTeacher
-                      ? '👨‍🏫 Giáo viên'
-                      : '🎓 Học sinh'}
-                  </span>
-                </div>
-
-                {isEditing ? (
-                  <textarea
-                    name="bio"
-                    value={profileData.bio || ''}
-                    onChange={handleChange}
-                    rows={2}
-                    placeholder="Giới thiệu bản thân..."
-                    style={{
-                      width: '100%',
-                      fontSize: 14,
-                      color: theme.subText,
-                      border: `1.5px solid ${theme.border}`,
-                      borderRadius: 8,
-                      padding: '6px 10px',
-                      outline: 'none',
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box',
-                      background: theme.inputBg,
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 14,
-                      color: theme.subText,
-                      lineHeight: 1.6,
-                      maxWidth: 540,
-                    }}
-                  >
-                    {profileData.bio ||
-                      'Tôi là một người yêu thích khoa học và học tập, luôn tìm kiếm cơ hội để khám phá những điều mới mẻ và phát triển bản thân.'}
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  flexShrink: 0,
-                }}
-              >
-                {!isEditing ? (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    style={{
-                      background: '#6366F1',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 12,
-                      padding: '10px 22px',
-                      fontWeight: 700,
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <Edit3 size={16} /> Chỉnh sửa
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      style={{
-                        background: theme.cancelBg,
-                        color: theme.cancelText,
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 12,
-                        padding: '10px 18px',
-                        fontWeight: 600,
-                        fontSize: 14,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Huỷ
-                    </button>
-
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      style={{
-                        background: '#10B981',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 12,
-                        padding: '10px 22px',
-                        fontWeight: 700,
-                        fontSize: 14,
-                        cursor: 'pointer',
-                        opacity: isSaving ? 0.7 : 1,
-                      }}
-                    >
-                      {isSaving
-                        ? 'Đang lưu...'
-                        : 'Lưu thay đổi'}
-                    </button>
-                  </>
-                )}
-              </div>
+              {profileData.bio ||
+                (isTeacher
+                  ? 'Giáo viên'
+                  : 'Học sinh')}
             </div>
           </div>
-        </div>
+        </section>
 
-        <div
+        {/* =================================================
+            RIGHT SIDE
+        ================================================= */}
+
+        <section
+          className="zuny-profile-right"
+
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 20,
+            background:
+              theme.panel,
+
+            transition:
+              'background 0.25s ease',
           }}
         >
-          <div style={card}>
+          {/* SECTION TITLE */}
+
+          <div
+            className="zuny-profile-section-label"
+
+            style={{
+              color:
+                theme.label,
+            }}
+          >
+            Thông tin cá nhân
+          </div>
+
+          {/* =================================================
+              IDENTITY
+          ================================================= */}
+
+          <div
+            className="zuny-profile-identity"
+          >
+            {/* AVATAR */}
+
             <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                marginBottom: 20,
-              }}
+              className="zuny-profile-avatar-wrapper"
             >
               <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 10,
-                  background: theme.badgeBg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Mail size={16} color="#6366F1" />
-              </div>
+                className="zuny-profile-avatar-border"
 
-              <div
                 style={{
-                  fontWeight: 800,
-                  fontSize: 16,
-                  color: theme.text,
+                  background:
+                    isTeacher
+                      ? 'linear-gradient(135deg,#8B5CF6,#6D28D9)'
+                      : 'linear-gradient(135deg,#38BDF8,#2563EB)',
+
+                  boxShadow:
+                    isTeacher
+                      ? '0 0 0 4px rgba(139,92,246,0.12)'
+                      : '0 0 0 4px rgba(56,189,248,0.12)',
                 }}
               >
-                Thông tin liên hệ
+                <div
+                  className="zuny-profile-avatar-inner"
+
+                  style={{
+                    border:
+                      isDark
+                        ? '3px solid #211A3E'
+                        : '3px solid #FFFFFF',
+                  }}
+                >
+                  <img
+                    className="zuny-profile-avatar-image"
+
+                    src={
+                      avatarSrc
+                    }
+
+                    alt={
+                      profileData.fullName ||
+                      'Avatar'
+                    }
+
+                    referrerPolicy="no-referrer"
+
+                    onError={(
+                      event
+                    ) => {
+                      event.currentTarget.onerror =
+                        null
+
+                      event.currentTarget.src =
+                        defaultAvatar
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
+            {/* NAME */}
+
             <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
+              className="zuny-profile-name-wrapper"
             >
-              <InfoRow
-                icon={Mail}
-                label="Email"
-                value={user?.email}
-                isEditing={false}
-                theme={theme}
-              />
+              {isEditing ? (
+                <input
+                  name="fullName"
 
-              <InfoRow
-                icon={Phone}
-                label="Số điện thoại"
-                value={profileData.phone}
-                name="phone"
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-                readOnly={true}
-              />
+                  value={
+                    profileData.fullName
+                  }
 
+                  onChange={
+                    handleChange
+                  }
 
-              <InfoRow
-                icon={MapPin}
-                label="Thành phố"
-                value={profileData.city}
-                name="city"
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-                readOnly={true}
-              />
+                  placeholder="Họ và tên"
+
+                  className="zuny-profile-name-input"
+
+                  style={{
+                    border:
+                      `1px solid ${theme.inputBorder}`,
+
+                    background:
+                      theme.inputBg,
+
+                    color:
+                      theme.text,
+                  }}
+                />
+              ) : (
+                <h2
+                  className="zuny-profile-name"
+
+                  style={{
+                    color:
+                      theme.text,
+                  }}
+                >
+                  {profileData.fullName ||
+                    user?.displayName ||
+                    'Chưa cập nhật tên'}
+                </h2>
+              )}
+
+              <span
+                className="zuny-profile-role-small"
+
+                style={{
+                  border:
+                    isTeacher
+                      ? '1px solid rgba(139,92,246,0.30)'
+                      : '1px solid rgba(14,165,233,0.30)',
+
+                  background:
+                    isTeacher
+                      ? 'rgba(124,58,237,0.10)'
+                      : 'rgba(14,165,233,0.10)',
+
+                  color:
+                    isTeacher
+                      ? '#A78BFA'
+                      : '#38BDF8',
+                }}
+              >
+                {isTeacher
+                  ? '👨‍🏫 Giáo viên'
+                  : '🎓 Học sinh'}
+              </span>
+            </div>
+
+            {/* ACTIONS */}
+
+            <div
+              className="zuny-profile-actions"
+            >
+              {!isEditing ? (
+                <button
+                  type="button"
+
+                  className="zuny-profile-button"
+
+                  onClick={() =>
+                    setIsEditing(
+                      true
+                    )
+                  }
+
+                  style={{
+                    border:
+                      'none',
+
+                    background:
+                      '#7C3AED',
+
+                    color:
+                      '#FFFFFF',
+
+                    boxShadow:
+                      '0 7px 20px rgba(124,58,237,0.25)',
+                  }}
+                >
+                  <Edit3
+                    size={14}
+                  />
+
+                  Chỉnh sửa
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+
+                    className="zuny-profile-button"
+
+                    disabled={
+                      isSaving
+                    }
+
+                    onClick={
+                      handleCancelEdit
+                    }
+
+                    style={{
+                      border:
+                        `1px solid ${theme.border}`,
+
+                      background:
+                        theme.buttonSecondary,
+
+                      color:
+                        theme.buttonSecondaryText,
+                    }}
+                  >
+                    <X
+                      size={14}
+                    />
+
+                    Huỷ
+                  </button>
+
+                  <button
+                    type="button"
+
+                    className="zuny-profile-button"
+
+                    disabled={
+                      isSaving
+                    }
+
+                    onClick={
+                      handleSave
+                    }
+
+                    style={{
+                      border:
+                        'none',
+
+                      background:
+                        '#10B981',
+
+                      color:
+                        '#FFFFFF',
+
+                      opacity:
+                        isSaving
+                          ? 0.7
+                          : 1,
+
+                      cursor:
+                        isSaving
+                          ? 'wait'
+                          : 'pointer',
+                    }}
+                  >
+                    <Save
+                      size={14}
+                    />
+
+                    {isSaving
+                      ? 'Đang lưu'
+                      : 'Lưu'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          <div style={card}>
+          {/* DIVIDER */}
+
+          <div
+            className="zuny-profile-divider"
+
+            style={{
+              background:
+                theme.divider,
+            }}
+          />
+
+          {/* =================================================
+              INFORMATION
+
+              1 CỘT — KHÔNG CHIA GRID 2 CỘT
+          ================================================= */}
+
+          <div
+            className="zuny-profile-information"
+          >
             <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                marginBottom: 20,
-              }}
+              className="zuny-profile-info-grid"
             >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 10,
-                  background: theme.badgeBg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <User size={16} color="#6366F1" />
-              </div>
-
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: 16,
-                  color: theme.text,
-                }}
-              >
-                Thông tin cá nhân
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
-            >
-              <InfoRow
-                icon={User}
-                label="Họ tên"
-                value={profileData.fullName}
-                name="fullName"
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-              />
-
-              <InfoRow
-                icon={School}
-                label="Trường"
-                value={profileData.school}
-                name="school"
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-              />
-
+              {/* EMAIL — LOCK */}
 
               <InfoRow
                 icon={
-                  isTeacher
-                    ? BookOpen
-                    : GraduationCap
+                  Mail
                 }
-                label={
-                  isTeacher
-                    ? 'Chuyên môn'
-                    : 'Khối'
-                }
+
+                label="Email"
+
                 value={
-                  isTeacher
-                    ? profileData.subject
-                    : profileData.grade
+                  user?.email ||
+                  ''
                 }
-                name={
-                  isTeacher
-                    ? 'subject'
-                    : 'grade'
+
+                readOnly
+
+                isEditing={
+                  isEditing
                 }
-                isEditing={isEditing}
-                onChange={handleChange}
-                theme={theme}
-                readOnly={false}
+
+                theme={
+                  theme
+                }
+
+                accentColor={
+                  isDark
+                    ? '#8C83A5'
+                    : '#64748B'
+                }
               />
 
+              {/* PHONE — EDITABLE */}
+
+              <InfoRow
+                icon={
+                  Phone
+                }
+
+                label="Số điện thoại"
+
+                value={
+                  profileData.phone
+                }
+
+                name="phone"
+
+                isEditing={
+                  isEditing
+                }
+
+                onChange={
+                  handleChange
+                }
+
+                theme={
+                  theme
+                }
+
+                placeholder="Nhập số điện thoại"
+
+                accentColor="#C43B91"
+              />
+
+              {/* SCHOOL — LOCK */}
+
+              <InfoRow
+                icon={
+                  School
+                }
+
+                label={
+                  isTeacher
+                    ? 'Đơn vị / Trường'
+                    : 'Trường theo học'
+                }
+
+                value={
+                  profileData.school
+                }
+
+                readOnly
+
+                isEditing={
+                  isEditing
+                }
+
+                theme={
+                  theme
+                }
+
+                accentColor="#7C5CC4"
+              />
+
+              {/* CITY — LOCK */}
+
+              <InfoRow
+                icon={
+                  MapPin
+                }
+
+                label="Tỉnh / Thành phố"
+
+                value={
+                  profileData.city
+                }
+
+                readOnly
+
+                isEditing={
+                  isEditing
+                }
+
+                theme={
+                  theme
+                }
+
+                accentColor="#C43B91"
+              />
+
+              {/* TEACHER / STUDENT */}
+
+              {isTeacher ? (
+                /* TEACHER SUBJECT — LOCK */
+
+                <InfoRow
+                  icon={
+                    BookOpen
+                  }
+
+                  label="Chuyên môn"
+
+                  value={
+                    profileData.subject
+                  }
+
+                  readOnly
+
+                  isEditing={
+                    isEditing
+                  }
+
+                  theme={
+                    theme
+                  }
+
+                  accentColor="#8B5CF6"
+                />
+              ) : (
+                /* STUDENT — ONLY GRADE */
+
+                <InfoRow
+                  icon={
+                    GraduationCap
+                  }
+
+                  label="Khối"
+
+                  value={
+                    profileData.grade
+                  }
+
+                  name="grade"
+
+                  isEditing={
+                    isEditing
+                  }
+
+                  onChange={
+                    handleChange
+                  }
+
+                  theme={
+                    theme
+                  }
+
+                  placeholder="Ví dụ: 12"
+
+                  accentColor="#4F6DE0"
+                />
+              )}
+
+              {/* BIO */}
+
+              <InfoRow
+                icon={
+                  User
+                }
+
+                label="Giới thiệu bản thân"
+
+                value={
+                  profileData.bio
+                }
+
+                name="bio"
+
+                isEditing={
+                  isEditing
+                }
+
+                onChange={
+                  handleChange
+                }
+
+                theme={
+                  theme
+                }
+
+                multiline
+
+                placeholder="Giới thiệu bản thân..."
+
+                accentColor="#8B5CF6"
+              />
             </div>
           </div>
-        </div>
+
+          {/* =================================================
+              STATS
+          ================================================= */}
+
+          {!isTeacher && (
+            <div
+              className="zuny-profile-stats"
+
+              style={{
+                borderTop:
+                  `1px solid ${theme.divider}`,
+              }}
+            >
+              <div
+                className="zuny-profile-stat-card"
+
+                style={{
+                  border:
+                    `1px solid ${theme.border}`,
+
+                  background:
+                    isDark
+                      ? 'rgba(255,255,255,0.035)'
+                      : 'rgba(255,255,255,0.60)',
+                }}
+              >
+                <Flame
+                  size={18}
+
+                  color="#F97316"
+                />
+
+                <div>
+                  <div
+                    style={{
+                      color:
+                        theme.label,
+
+                      fontSize:
+                        10,
+
+                      fontWeight:
+                        800,
+
+                      textTransform:
+                        'uppercase',
+
+                      letterSpacing:
+                        '0.05em',
+                    }}
+                  >
+                    Learning Streak
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop:
+                        2,
+
+                      color:
+                        theme.text,
+
+                      fontWeight:
+                        800,
+
+                      fontSize:
+                        15,
+                    }}
+                  >
+                    {
+                      profileData.learningStreak
+                    }{' '}
+                    ngày
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

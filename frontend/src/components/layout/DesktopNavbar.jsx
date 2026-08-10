@@ -25,6 +25,7 @@ import { auth } from '../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
 import useResponsive from '../../hooks/common/useResponsive';
+import { getUserAvatar } from '../../utils/userAvatar';
 
 import darkLogo from '../../assets/favicon-dark-mode.png';
 import lightLogo from '../../assets/favicon-light-mode.png';
@@ -50,6 +51,8 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
     user?.displayName ||
     user?.email?.split('@')[0] ||
     'Tài khoản';
+
+  const avatarSrc = getUserAvatar(user);
 
   const classItem = useMemo(() => {
     const teacherRoles = ['TEACHER', 'ADMINUSER', 'ADMINDEV'];
@@ -339,18 +342,16 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
                       : 'border-violet-200 bg-violet-50 hover:bg-violet-100'
                   }`}
                 >
-                  {user.photoURL ? (
-                    <img
-                      src={user.photoURL}
-                      alt=""
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-violet-600 text-sm font-bold text-white">
-                      {displayName.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-
+                  <img
+                    src={avatarSrc}
+                    alt={displayName}
+                    referrerPolicy="no-referrer"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = lightLogo;
+                    }}
+                    className="h-9 w-9 rounded-full object-cover"
+                  />
                   <span
                     className={`max-w-[120px] truncate text-sm font-medium ${
                       darkMode ? 'text-violet-200' : 'text-violet-800'

@@ -56,6 +56,7 @@ function applyDarkModeToDocument(isDark) {
   document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 
   const favicon = document.getElementById('favicon');
+
   if (favicon) {
     favicon.setAttribute('href', isDark ? '/dark-mode.png' : '/light-mode.png');
   }
@@ -129,6 +130,7 @@ function ProfileRoute() {
 
 function LegacyCourseDetailRedirect() {
   const { id } = useParams();
+
   return <Navigate to={`/e-learning/${id}`} replace />;
 }
 
@@ -137,7 +139,10 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   const { user, userDetails, isLoading } = useAuth();
 
   const isForumRoute = location.pathname.toLowerCase() === '/forum';
+
   const isExamsRoute = location.pathname.toLowerCase() === '/exams';
+
+  const isProfileRoute = location.pathname.toLowerCase() === '/profile';
 
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
@@ -162,10 +167,22 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            initial={{
+              opacity: 0,
+              y: 16,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            exit={{
+              opacity: 0,
+              y: -12,
+            }}
+            transition={{
+              duration: 0.28,
+              ease: 'easeOut',
+            }}
           >
             <Routes location={location}>
               <Route
@@ -211,24 +228,38 @@ function AppContent({ darkMode, onToggleDarkMode }) {
       <AppLayout
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
-        mainClassName={isForumRoute ? 'pt-0' : 'pt-20'}
-        showFooter={!isForumRoute && !isExamsRoute}
+        mainClassName={isForumRoute || isProfileRoute ? 'pt-0' : 'pt-20'}
+        showFooter={!isForumRoute && !isExamsRoute && !isProfileRoute}
         showNavbar={!isForumRoute}
-        lockPageScroll={isForumRoute}
+        lockPageScroll={isForumRoute || isProfileRoute}
       >
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            initial={{
+              opacity: 0,
+              y: 16,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            exit={{
+              opacity: 0,
+              y: -12,
+            }}
+            transition={{
+              duration: 0.28,
+              ease: 'easeOut',
+            }}
           >
             <Routes location={location}>
               <Route path="/" element={<Home />} />
+
               <Route path="/home" element={<Navigate to="/" replace />} />
 
               <Route path="/login" element={<Login />} />
+
               <Route path="/register" element={<Register />} />
 
               <Route
@@ -312,7 +343,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                   </ProtectedRoute>
                 }
               />
-              
+
               <Route
                 path="/classes"
                 element={
@@ -346,7 +377,9 @@ function AppContent({ darkMode, onToggleDarkMode }) {
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
     const initialDarkMode = getInitialDarkMode();
+
     applyDarkModeToDocument(initialDarkMode);
+
     return initialDarkMode;
   });
 
@@ -356,6 +389,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('darkMode', String(darkMode));
+
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
@@ -365,11 +399,15 @@ function App() {
 
       style: {
         border: '1px solid rgba(34, 211, 238, 0.28)',
+
         background: darkMode
           ? 'rgba(6, 12, 30, 0.92)'
           : 'rgba(255, 255, 255, 0.95)',
+
         color: darkMode ? '#e5faff' : '#0f172a',
+
         boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
+
         backdropFilter: 'blur(18px)',
       },
 
