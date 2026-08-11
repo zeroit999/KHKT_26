@@ -19,6 +19,8 @@ import {
 } from '../utils/forumUtils'
 
 const DRAFT_KEY = 'zuny_group_modal_draft'
+const MAX_TEXT_CHANNELS = 10
+const MAX_VOICE_CHANNELS = 10
 
 const GROUP_COVER_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
@@ -175,6 +177,24 @@ const parseCustomColorInput = (input = '', type = 'hex') => {
   return { ok: false, error: 'Kiểu màu không hợp lệ.' }
 }
 
+function ChannelSortRow({ channel, idx, dragOverIdx, handleDragStart, handleDragOver, handleDrop, handleDragEnd, onRemove }) {
+  return (
+    <div
+      draggable
+      onDragStart={() => handleDragStart(idx)}
+      onDragOver={(event) => handleDragOver(event, idx)}
+      onDrop={() => handleDrop(idx)}
+      onDragEnd={handleDragEnd}
+      className={`flex cursor-grab items-center gap-3 rounded-xl border px-3 py-2.5 transition active:cursor-grabbing ${dragOverIdx === idx ? 'border-blue-400 bg-blue-500/20' : 'border-white/10 bg-white/5'}`}
+    >
+      <GripVertical className="h-4 w-4 shrink-0 text-slate-500" />
+      {channel.icon ? <span className="text-base">{channel.icon}</span> : null}
+      <span className="flex-1 text-sm font-black text-white">{channel.type === 'voice' ? '🔊' : '#'} {channel.label}</span>
+      <button type="button" onClick={onRemove} className="rounded-lg p-1 text-slate-500 transition hover:bg-white/10 hover:text-rose-300" aria-label={`Xóa kênh ${channel.label}`}><X className="h-4 w-4" /></button>
+    </div>
+  )
+}
+
 function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   const themeColors = [
     { name: 'Đỏ', value: '#ef4444' },
@@ -209,6 +229,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     { id: 'meo-hoc', label: 'mẹo-học', icon: '💡', type: 'chat' },
     { id: 'thanh-tich', label: 'thành-tích', icon: '🏆', type: 'info' },
     { id: 'noi-quy', label: 'nội-quy', icon: '📌', type: 'info' },
+    { id: 'phong-hoc-thoai', label: 'phòng-học-thoại', icon: '🔊', type: 'voice' },
   ]
 
   const defaultChannelIds = ['thong-bao', 'thao-luan']
@@ -278,6 +299,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
 
   const [form, setForm] = useState(initialForm)
   const [activePanel, setActivePanel] = useState('basic')
+  const [gradeDropdownOpen, setGradeDropdownOpen] = useState(false)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [colorMode, setColorMode] = useState('solid') // 'solid' | 'gradient'
   const [customColorType, setCustomColorType] = useState('hex')
@@ -286,7 +308,11 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [dragOverIdx, setDragOverIdx] = useState(null)
   const [customChannelName, setCustomChannelName] = useState('')
-  const [customChannelIcon, setCustomChannelIcon] = useState('#')
+  const [customChannelIcon, setCustomChannelIcon] = useState('')
+  const [customChannelIconOpen, setCustomChannelIconOpen] = useState(false)
+  const [textChannelListCollapsed, setTextChannelListCollapsed] = useState(false)
+  const [voiceChannelListCollapsed, setVoiceChannelListCollapsed] = useState(false)
+  const [customChannelType, setCustomChannelType] = useState('chat')
   const dragIdxRef = useRef(null)
   const coverImageInputRef = useRef(null)
   const [coverImageUploading, setCoverImageUploading] = useState(false)
@@ -341,8 +367,8 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     { value: 'none', label: 'Không' },
   ]
 
-  const customChannelIcons = ['#', '📢', '💬', '❓', '📚', '🎯', '💡', '📌', '🧠', '🏆']
-  const customChannelIconText = customChannelIcon === '#' ? '#' : customChannelIcon
+  const customChannelIcons = ['📢', '💬', '❓', '📚', '🎯', '💡', '📌', '🧠', '🏆', '🔊']
+  const customChannelIconText = customChannelIcon || ''
 
   const handleCoverImageUpload = async (event) => {
     const file = event.target.files?.[0]
@@ -382,6 +408,11 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     })
     .filter(Boolean)
 
+  const selectedTextChannels = selectedChannels.filter((channel) => channel.type !== 'voice')
+  const selectedVoiceChannels = selectedChannels.filter((channel) => channel.type === 'voice')
+  const channelLimitForType = (type) => type === 'voice' ? MAX_VOICE_CHANNELS : MAX_TEXT_CHANNELS
+  const channelCountForType = (type) => type === 'voice' ? selectedVoiceChannels.length : selectedTextChannels.length
+
   const inviteCode = form.inviteCode
 
   const groupTypeOptions = [
@@ -408,11 +439,9 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   const panelItems = [
     { id: 'basic', label: 'Thông tin cơ bản', icon: '🧩' },
     { id: 'privacy', label: 'Cấu hình nhóm', icon: '🔐' },
+    { id: 'appearance', label: 'Giao diện', icon: '🎨' },
     { id: 'channels', label: 'Kênh ban đầu', icon: '#️⃣' },
-    { id: 'cover', label: 'Ảnh bìa', icon: '🖼️' },
-    { id: 'icon', label: 'Icon & màu', icon: '🎨' },
-    { id: 'permissions', label: 'Quyền thành viên', icon: '🛡️' },
-    { id: 'limit', label: 'Giới hạn thành viên', icon: '👥' },
+    { id: 'members', label: 'Thành viên', icon: '👥' },
     { id: 'confirm', label: 'Xác nhận & tạo', icon: '✅' },
   ]
 
@@ -427,25 +456,60 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
 
   const toggleChannel = (id) => {
     const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
-    const nextIds = currentIds.includes(id)
+    const isRemoving = currentIds.includes(id)
+    const channel = channelOptions.find((item) => item.id === id)
+    const channelType = channel?.type === 'voice' ? 'voice' : 'chat'
+
+    if (!isRemoving && channelCountForType(channelType) >= channelLimitForType(channelType)) {
+      toast.error(channelType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+      return
+    }
+
+    const nextIds = isRemoving
       ? currentIds.filter((item) => item !== id)
       : [...currentIds, id]
+
     setForm({ ...form, channelIds: nextIds })
   }
 
   const addCustomChannel = () => {
     const label = customChannelName.trim()
-    if (!label) return
-    const id = `custom-${Date.now()}`
-    const newCh = { id, label, icon: customChannelIconText, type: 'chat' }
+    if (!label) {
+      toast.error('Vui lòng nhập tên kênh')
+      return
+    }
+
     const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
+    if (channelCountForType(customChannelType) >= channelLimitForType(customChannelType)) {
+      toast.error(customChannelType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+      return
+    }
+
+    const normalizedLabel = label.toLowerCase()
+    const duplicated = selectedChannels.some(
+      (channel) => String(channel?.label || '').trim().toLowerCase() === normalizedLabel,
+    )
+    if (duplicated) {
+      toast.error('Tên kênh này đã tồn tại')
+      return
+    }
+
+    const id = `custom-${Date.now()}`
+    const newCh = {
+      id,
+      label,
+      icon: customChannelIconText,
+      type: customChannelType,
+    }
     setForm({
       ...form,
       channelIds: [...currentIds, id],
       customChannels: [...(form.customChannels || []), newCh],
     })
     setCustomChannelName('')
-    setCustomChannelIcon('#')
+    setCustomChannelIcon('')
+    setCustomChannelIconOpen(false)
+    setCustomChannelType('chat')
   }
 
   // Drag-and-drop for channel ordering
@@ -480,7 +544,11 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
       .map((item) => item.trim())
       .filter(Boolean)
     if (currentTags.includes(tag)) return
-    setForm({ ...form, tags: [...currentTags, tag].join(', ') })
+    if (currentTags.length >= 3) {
+      toast.error('Chỉ được chọn tối đa 3 môn học')
+      return
+    }
+    setForm({ ...form, tags: [...currentTags, tag].slice(0, 3).join(', ') })
   }
 
   const updateCustomColorInput = (value, type = customColorType) => {
@@ -557,6 +625,12 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
       return
     }
 
+    if (selectedTextChannels.length > MAX_TEXT_CHANNELS || selectedVoiceChannels.length > MAX_VOICE_CHANNELS) {
+      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản và ${MAX_VOICE_CHANNELS} kênh âm thanh`)
+      setActivePanel('channels')
+      return
+    }
+
     const safeGroupCode = normalizeGroupCode(form.groupCode)
     if (safeGroupCode.length !== 7) {
       toast.error('Mã nhóm phải gồm đúng 7 ký tự A-Z, a-z hoặc 0-9')
@@ -593,7 +667,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     const memberLimit = form.memberLimit === '' ? 1000 : Number(form.memberLimit)
     if (!Number.isFinite(memberLimit) || memberLimit < 1) {
       toast.error('Giới hạn thành viên phải là số lớn hơn 0')
-      setActivePanel('limit')
+      setActivePanel('members')
       return
     }
 
@@ -602,6 +676,12 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   }
 
   const submit = () => {
+    if (selectedTextChannels.length > MAX_TEXT_CHANNELS || selectedVoiceChannels.length > MAX_VOICE_CHANNELS) {
+      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản và ${MAX_VOICE_CHANNELS} kênh âm thanh`)
+      setActivePanel('channels')
+      return
+    }
+
     const safeGroupCode = normalizeGroupCode(form.groupCode)
     const memberLimit = form.memberLimit === '' ? 1000 : Number(form.memberLimit)
     const channelIds = form.channelIds.length ? form.channelIds : defaultChannelIds
@@ -645,9 +725,21 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     ? { background: form.themeGradient }
     : { backgroundColor: form.themeColor }
 
+  const creationStep = activePanel === 'confirm'
+    ? 3
+    : ['channels', 'members'].includes(activePanel)
+      ? 2
+      : 1
+
+  const visiblePanelItems = creationStep === 1
+    ? panelItems.filter((item) => ['basic', 'privacy', 'appearance'].includes(item.id))
+    : creationStep === 2
+      ? panelItems.filter((item) => ['channels', 'members'].includes(item.id))
+      : panelItems.filter((item) => item.id === 'confirm')
+
   return (
     <div
-      className="zuny-group-modal fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md dark:bg-slate-950/70"
+      className="zuny-group-modal fixed inset-0 z-[90] flex items-center justify-center overflow-hidden bg-slate-950/75 backdrop-blur-md dark:bg-black/80"
       onMouseDown={handleClose}
     >
       <style>{`
@@ -668,14 +760,14 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body textarea::placeholder {
           color: #94a3b8 !important;
         }
-        html:not(.dark) .zuny-group-modal .zuny-group-modal-body .text-white:not(.bg-violet-600):not(.bg-emerald-500):not(.bg-rose-600):not(.bg-cyan-600):not(.bg-amber-500):not(.bg-fuchsia-600) { color: #0f172a !important; }
+        html:not(.dark) .zuny-group-modal .zuny-group-modal-body .text-white:not(.bg-blue-600):not(.bg-emerald-500):not(.bg-rose-600):not(.bg-cyan-600):not(.bg-amber-500):not(.bg-fuchsia-600) { color: #0f172a !important; }
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .text-slate-300,
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .text-slate-400 { color: #475569 !important; }
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .text-slate-500 { color: #64748b !important; }
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .border-white\/10 { border-color: #e2e8f0 !important; }
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .bg-white\/5,
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .bg-white\/10 { background: #ffffff !important; }
-        html:not(.dark) .zuny-group-modal .zuny-group-modal-body button:not(.bg-violet-600):not(.bg-emerald-500):not([class*='bg-gradient']):hover {
+        html:not(.dark) .zuny-group-modal .zuny-group-modal-body button:not(.bg-blue-600):not(.bg-emerald-500):not([class*='bg-gradient']):hover {
           background: #f1f5f9 !important;
         }
         html:not(.dark) .zuny-group-modal .zuny-group-modal-body .bg-slate-900 { background: #ffffff !important; }
@@ -689,69 +781,97 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
           color: #334155 !important;
         }
         .dark .zuny-group-modal * { scrollbar-color: rgba(148,163,184,.55) rgba(15,23,42,.55); }
+        @keyframes zunyGroupWorkspaceIn { from { opacity: 0; transform: scale(.985) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .zuny-group-workspace { animation: zunyGroupWorkspaceIn 240ms cubic-bezier(.2,.8,.2,1); }
       `}</style>
       <form
         onSubmit={validateAndShowConfirm}
         onMouseDown={(event) => event.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white text-slate-950 shadow-2xl shadow-violet-500/15 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:shadow-violet-950/40"
+        className="zuny-group-workspace flex h-[100dvh] w-screen flex-col overflow-hidden border-0 bg-white text-slate-950 shadow-2xl dark:bg-slate-950 dark:text-white"
       >
-        <div
-          className="relative overflow-hidden border-b border-white/10 px-6 py-6"
-          style={{
-            ...(colorMode === 'gradient' && form.themeGradient
-              ? { background: form.themeGradient }
-              : { backgroundColor: form.themeColor }),
-            color: form.themeColor === '#ffffff' ? '#020617' : '#ffffff',
-          }}
-        >
-          <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="relative shrink-0 border-b border-slate-200 bg-white px-3 py-3 sm:px-6 sm:py-4 dark:border-white/10 dark:bg-slate-950 sm:px-6">
+          <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-500">Cộng đồng ZUNY</p>
+              <h2 className="mt-1 truncate text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">Tạo nhóm học mới</h2>
+            </div>
 
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-white/70">
-                <Users className="h-3 w-3" />
-                Study Group
-              </div>
-
-              <h2 className="text-3xl font-black text-white p-0.5">Tạo nhóm học tập</h2>
+            <div className="hidden flex-1 items-center justify-center md:flex">
+              {[
+                { step: 1, label: 'Thông tin' },
+                { step: 2, label: 'Kênh & quyền' },
+                { step: 3, label: 'Hoàn tất' },
+              ].map((item, index, items) => {
+                const active = creationStep === item.step
+                const completed = creationStep > item.step
+                return (
+                  <div key={item.step} className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setActivePanel(item.step === 1 ? 'basic' : item.step === 2 ? 'channels' : 'confirm')}
+                      className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-black transition ${
+                        active
+                          ? 'text-blue-600 dark:text-blue-300'
+                          : completed
+                            ? 'text-sky-600 dark:text-sky-300'
+                            : 'text-slate-400 dark:text-slate-500'
+                      }`}
+                    >
+                      <span className={`grid h-9 w-9 place-items-center rounded-full border text-sm ${
+                        active
+                          ? 'border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                          : completed
+                            ? 'border-sky-400 bg-sky-50 text-sky-600 dark:bg-sky-500/10'
+                            : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400'
+                      }`}>
+                        {completed ? '✓' : item.step}
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                    {index < items.length - 1 && (
+                      <div className={`mx-3 h-px w-16 lg:w-28 ${creationStep > item.step ? 'bg-sky-400' : 'bg-slate-200 dark:bg-white/10'}`} />
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-2xl p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
               aria-label="Đóng"
             >
-              <X className="h-5 w-5" />
+              <X className="h-6 w-6" />
             </button>
           </div>
         </div>
 
-        <div className="zuny-group-modal-body grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)_270px]">
-          <aside className="border-b border-white/10 bg-white/[0.03] p-4 lg:border-b-0 lg:border-r">
-            <div className="space-y-2">
-              {panelItems.map((item) => {
+        <div className="zuny-group-modal-body mx-auto grid min-h-0 w-full max-w-[1500px] flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950 lg:grid-cols-[minmax(0,1fr)_390px]">
+          <aside className="col-span-full shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 dark:border-white/10 dark:bg-slate-950 sm:px-6">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {visiblePanelItems.map((item) => {
                 const active = activePanel === item.id
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setActivePanel(item.id)}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black transition ${
+                    className={`flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
                       active
-                        ? 'bg-violet-600 text-white shadow-lg shadow-violet-950/30'
-                        : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                        ? 'border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-200'
                     }`}
                   >
                     <span>{item.icon}</span>
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    <span>{item.label}</span>
                   </button>
                 )
               })}
             </div>
           </aside>
 
-          <div className="min-h-0 overflow-y-auto p-6">
+          <div className="min-h-0 overflow-y-auto bg-white p-3 pb-24 sm:p-6 sm:pb-24 dark:bg-slate-950 sm:p-6 lg:p-7">
             {/* ── BASIC ─────────────────────────────────────────── */}
             {activePanel === 'basic' && (
               <div className="space-y-5">
@@ -766,7 +886,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                     value={form.name}
                     onChange={(event) => setForm({ ...form, name: event.target.value.slice(0, 50) })}
                     placeholder="VD: Toán 12 ôn thi THPTQG"
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400 focus:bg-white/10"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:bg-white/10"
                   />
                 </div>
 
@@ -780,7 +900,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                     onChange={(event) => setForm({ ...form, description: event.target.value.slice(0, 200) })}
                     rows={5}
                     placeholder="Có thể bỏ trống hoặc ghi ngắn gọn mục tiêu của nhóm."
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400 focus:bg-white/10"
+                    className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold leading-6 text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:bg-white/10"
                   />
                 </div>
 
@@ -788,9 +908,12 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                   <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-400">Tags</label>
                   <input
                     value={form.tags}
-                    onChange={(event) => setForm({ ...form, tags: event.target.value })}
-                    placeholder="[môn học],[môn học],..(tối đa 4)"
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400 focus:bg-white/10"
+                    onChange={(event) => {
+                      const nextTags = event.target.value.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 3)
+                      setForm({ ...form, tags: nextTags.join(', ') })
+                    }}
+                    placeholder="[môn học], [môn học], [môn học] (tối đa 3)"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:bg-white/10"
                   />
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -799,7 +922,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                         key={tag}
                         type="button"
                         onClick={() => addTag(tag)}
-                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black text-slate-300 transition hover:border-violet-400/60 hover:bg-violet-500/15 hover:text-white"
+                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black text-slate-300 transition hover:border-blue-400/60 hover:bg-blue-500/15 hover:text-white"
                       >
                         + {tag}
                       </button>
@@ -836,8 +959,8 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                         onClick={() => setGroupType(item.value)}
                         className={`rounded-3xl border p-4 text-left transition ${
                           active
-                            ? 'border-violet-400 bg-violet-500/15 text-white'
-                            : 'border-white/10 bg-white/5 text-slate-300 hover:border-violet-400/50 hover:bg-white/10'
+                            ? 'border-blue-400 bg-blue-500/15 text-white'
+                            : 'border-white/10 bg-white/5 text-slate-300 hover:border-blue-400/50 hover:bg-white/10'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -846,7 +969,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                             <p className="text-sm font-black">{item.label}</p>
                             <p className="mt-1 text-xs font-semibold leading-5 text-slate-400">{item.helper}</p>
                           </div>
-                          <span className={`mt-1 h-4 w-4 rounded-full border ${active ? 'border-violet-300 bg-violet-400' : 'border-white/20'}`} />
+                          <span className={`mt-1 h-4 w-4 rounded-full border ${active ? 'border-blue-300 bg-blue-400' : 'border-white/20'}`} />
                         </div>
                       </button>
                     )
@@ -904,7 +1027,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                         type="button"
                         onClick={copyInviteCode}
                         title="Copy mã mời"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300 transition hover:bg-violet-500/40 hover:text-white"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300 transition hover:bg-blue-500/40 hover:text-white"
                       >
                         <Clipboard className="h-4 w-4" />
                       </button>
@@ -923,7 +1046,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                             onClick={() => setForm({ ...form, inviteExpiry: opt.value })}
                             className={`rounded-2xl border px-3 py-2.5 text-xs font-black transition ${
                               form.inviteExpiry === opt.value
-                                ? 'border-violet-400 bg-violet-500/20 text-white'
+                                ? 'border-blue-400 bg-blue-500/20 text-white'
                                 : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
                             }`}
                           >
@@ -964,20 +1087,31 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                 </div>
 
                 {/* Lớp học / tuổi tối thiểu */}
-                <div>
+                <div className="relative">
                   <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-400">Lớp học tối thiểu để tham gia</label>
-                  <select
-                    value={form.minGrade}
-                    onChange={(event) => setForm({ ...form, minGrade: event.target.value })}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-violet-400 focus:bg-white/10"
+                  <button
+                    type="button"
+                    onClick={() => setGradeDropdownOpen((value) => !value)}
+                    className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-bold text-white transition hover:bg-white/10 focus:border-blue-400"
                   >
-                    {gradeOptions.map((option) => (
-                      <option key={option.value || 'empty'} value={option.value} className="bg-slate-950 text-white">{option.label}</option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                    Dùng để lọc đối tượng tham gia nhóm. Để trống nếu không giới hạn lớp học.
-                  </p>
+                    <span>{gradeOptions.find((option) => option.value === form.minGrade)?.label || 'Không giới hạn'}</span>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition ${gradeDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {gradeDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-slate-950 p-1 shadow-2xl">
+                      {gradeOptions.filter((option, index, items) => items.findIndex((item) => item.value === option.value) === index).map((option) => (
+                        <button
+                          key={option.value || 'empty'}
+                          type="button"
+                          onClick={() => { setForm({ ...form, minGrade: option.value }); setGradeDropdownOpen(false) }}
+                          className={`block w-full rounded-xl px-4 py-3 text-left text-sm font-black transition ${form.minGrade === option.value ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">Dùng để lọc đối tượng tham gia nhóm. Để trống nếu không giới hạn lớp học.</p>
                 </div>
               </div>
             )}
@@ -986,10 +1120,81 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
             {activePanel === 'channels' && (
               <div className="space-y-5">
                 <SectionTitle title="Kênh ban đầu" description="Chọn kênh mặc định, đặt tên tùy ý hoặc kéo thả để sắp xếp thứ tự." />
+                <div className="mb-4 flex justify-end">
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-black ${selectedTextChannels.length >= MAX_TEXT_CHANNELS ? 'bg-rose-500/15 text-rose-300' : 'bg-blue-500/15 text-blue-300'}`}># {selectedTextChannels.length}/{MAX_TEXT_CHANNELS} văn bản</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black ${selectedVoiceChannels.length >= MAX_VOICE_CHANNELS ? 'bg-rose-500/15 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'}`}>🔊 {selectedVoiceChannels.length}/{MAX_VOICE_CHANNELS} âm thanh</span>
+                  </div>
+                </div>
+
+                {/* Custom channel input */}
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-400">Thêm kênh tùy chỉnh</label>
+                  <div className="mb-3 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setCustomChannelType('chat')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${customChannelType === 'chat' ? 'bg-blue-600 text-white' : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}># Kênh văn bản</button>
+                    <button type="button" onClick={() => setCustomChannelType('voice')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${customChannelType === 'voice' ? 'bg-emerald-600 text-white' : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}>🔊 Kênh thoại</button>
+                  </div>
+                  <div className="grid items-start gap-3 md:grid-cols-[190px_minmax(0,1fr)]">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setCustomChannelIconOpen((value) => !value)}
+                        className="flex h-10 w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-black text-slate-200 transition hover:bg-white/10"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="grid h-6 w-6 place-items-center rounded-lg bg-white/10 text-sm">{customChannelIcon || '∅'}</span>
+                          {customChannelIcon ? 'Đã chọn icon' : 'Không có icon'}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 text-slate-400 transition ${customChannelIconOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {customChannelIconOpen && (
+                        <div className="absolute left-0 top-full z-30 mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl">
+                          <button
+                            type="button"
+                            onClick={() => { setCustomChannelIcon(''); setCustomChannelIconOpen(false) }}
+                            className={`mb-2 flex h-9 w-full items-center justify-center rounded-xl border text-xs font-black transition ${!customChannelIcon ? 'border-blue-300 bg-blue-500/25 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                          >
+                            Không
+                          </button>
+                          <div className="grid grid-cols-5 gap-2">
+                            {customChannelIcons.map((icon) => (
+                              <button
+                                key={icon}
+                                type="button"
+                                onClick={() => { setCustomChannelIcon(icon); setCustomChannelIconOpen(false) }}
+                                className={`h-9 rounded-xl border text-sm font-black transition ${customChannelIcon === icon ? 'border-blue-300 bg-blue-500/25 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                              >
+                                {icon}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={customChannelName}
+                        onChange={(e) => setCustomChannelName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomChannel() } }}
+                        placeholder="Tên kênh tùy ý..."
+                        className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:bg-white/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={addCustomChannel}
+                        className="h-10 shrink-0 rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-500"
+                      >
+                        Thêm
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs font-bold text-slate-500">Kênh văn bản hiển thị dấu #; kênh thoại hiển thị biểu tượng 🔊 và cho phép thành viên nói chuyện bằng microphone.</p>
+                </div>
 
                 {/* Preset channel selector */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {channelOptions.map((channel) => {
+                  {channelOptions.filter((channel) => customChannelType === 'voice' ? channel.type === 'voice' : channel.type !== 'voice').map((channel) => {
                     const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
                     const active = currentIds.includes(channel.id)
                     return (
@@ -1003,86 +1208,47 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                             : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                         }`}
                       >
-                        <p className="text-sm font-black">{channel.icon} # {channel.label}</p>
+                        <p className="text-sm font-black">{channel.icon} {channel.type === 'voice' ? '🔊' : '#'} {channel.label}</p>
                         <p className="mt-1 text-xs font-semibold text-slate-500">{channel.type}</p>
                       </button>
                     )
                   })}
                 </div>
 
-                {/* Custom channel input */}
-                <div>
-                  <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-400">Thêm kênh tùy chỉnh</label>
-                  <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Icon</p>
-                      <div className="grid grid-cols-5 gap-2">
-                        {customChannelIcons.map((icon) => (
-                          <button
-                            key={icon}
-                            type="button"
-                            onClick={() => setCustomChannelIcon(icon)}
-                            className={`h-9 rounded-xl border text-sm font-black transition ${customChannelIcon === icon ? 'border-violet-300 bg-violet-500/25 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
-                          >
-                            {icon}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        value={customChannelName}
-                        onChange={(e) => setCustomChannelName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomChannel() } }}
-                        placeholder="Tên kênh tùy ý..."
-                        className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400 focus:bg-white/10"
-                      />
-                      <button
-                        type="button"
-                        onClick={addCustomChannel}
-                        className="shrink-0 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-500"
-                      >
-                        Thêm
-                      </button>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs font-bold text-slate-500">Kênh luôn có dấu # phía trước. Ví dụ chọn icon # và nhập Nam sẽ hiển thị: #Nam.</p>
-                </div>
-
                 {/* Drag-n-drop reorder */}
                 {selectedChannels.length > 0 && (
                   <div>
                     <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-400">Kéo thả để sắp xếp thứ tự kênh</label>
-                    <div className="space-y-2">
-                      {selectedChannels.map((channel, idx) => (
-                        <div
-                          key={channel.id}
-                          draggable
-                          onDragStart={() => handleDragStart(idx)}
-                          onDragOver={(e) => handleDragOver(e, idx)}
-                          onDrop={() => handleDrop(idx)}
-                          onDragEnd={handleDragEnd}
-                          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-                            dragOverIdx === idx
-                              ? 'border-violet-400 bg-violet-500/20'
-                              : 'border-white/10 bg-white/5'
-                          } cursor-grab active:cursor-grabbing`}
-                        >
-                          <GripVertical className="h-4 w-4 shrink-0 text-slate-500" />
-                          <span className="text-base">{channel.icon}</span>
-                          <span className="flex-1 text-sm font-black text-white"># {channel.label}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
-                              setForm({ ...form, channelIds: currentIds.filter((id) => id !== channel.id) })
-                            }}
-                            className="rounded-lg p-1 text-slate-500 hover:bg-white/10 hover:text-rose-400"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="space-y-3">
+                      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                        <button type="button" onClick={() => setTextChannelListCollapsed((value) => !value)} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-white/5">
+                          <span className="text-sm font-black text-white"># Kênh văn bản <span className="ml-2 text-xs text-slate-500">{selectedTextChannels.length}</span></span>
+                          <ChevronDown className={`h-4 w-4 text-slate-400 transition ${textChannelListCollapsed ? '-rotate-90' : ''}`} />
+                        </button>
+                        {!textChannelListCollapsed && <div className="space-y-2 border-t border-white/10 p-3">
+                          {selectedTextChannels.length ? selectedTextChannels.map((channel) => {
+                            const idx = selectedChannels.findIndex((item) => item.id === channel.id)
+                            return (
+                              <ChannelSortRow key={channel.id} channel={channel} idx={idx} dragOverIdx={dragOverIdx} handleDragStart={handleDragStart} handleDragOver={handleDragOver} handleDrop={handleDrop} handleDragEnd={handleDragEnd} onRemove={() => { const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds; setForm({ ...form, channelIds: currentIds.filter((id) => id !== channel.id) }) }} />
+                            )
+                          }) : <p className="px-2 py-3 text-xs font-bold text-slate-500">Chưa có kênh văn bản.</p>}
+                        </div>}
+                      </div>
+
+                      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                        <button type="button" onClick={() => setVoiceChannelListCollapsed((value) => !value)} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-white/5">
+                          <span className="text-sm font-black text-white">🔊 Kênh âm thanh <span className="ml-2 text-xs text-slate-500">{selectedVoiceChannels.length}</span></span>
+                          <ChevronDown className={`h-4 w-4 text-slate-400 transition ${voiceChannelListCollapsed ? '-rotate-90' : ''}`} />
+                        </button>
+                        {!voiceChannelListCollapsed && <div className="space-y-2 border-t border-white/10 p-3">
+                          {selectedVoiceChannels.length ? selectedVoiceChannels.map((channel) => {
+                            const idx = selectedChannels.findIndex((item) => item.id === channel.id)
+                            return (
+                              <ChannelSortRow key={channel.id} channel={channel} idx={idx} dragOverIdx={dragOverIdx} handleDragStart={handleDragStart} handleDragOver={handleDragOver} handleDrop={handleDrop} handleDragEnd={handleDragEnd} onRemove={() => { const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds; setForm({ ...form, channelIds: currentIds.filter((id) => id !== channel.id) }) }} />
+                            )
+                          }) : <p className="px-2 py-3 text-xs font-bold text-slate-500">Chưa có kênh âm thanh.</p>}
+                        </div>}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1090,7 +1256,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
             )}
 
             {/* ── COVER ────────────────────────────────────────── */}
-            {activePanel === 'cover' && (
+            {activePanel === 'appearance' && (
               <div className="space-y-5">
                 <SectionTitle title="Ảnh bìa" description="Dán URL ảnh bìa để nhóm nổi bật hơn trong danh sách khám phá." />
 
@@ -1101,7 +1267,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                       value={form.coverImage}
                       onChange={(event) => setForm({ ...form, coverImage: event.target.value })}
                       placeholder="https://..."
-                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400 focus:bg-white/10"
+                      className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:bg-white/10"
                     />
                     <input
                       ref={coverImageInputRef}
@@ -1114,7 +1280,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                       type="button"
                       onClick={() => coverImageInputRef.current?.click()}
                       disabled={coverImageUploading}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {coverImageUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                       {coverImageUploading ? 'Đang tải...' : 'Tải ảnh'}
@@ -1132,7 +1298,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
             )}
 
             {/* ── ICON & COLOR ─────────────────────────────────── */}
-            {activePanel === 'icon' && (
+            {activePanel === 'appearance' && (
               <div className="space-y-5">
                 <SectionTitle title="Icon & màu chủ đề" description="Chọn icon và màu nhận diện cho nhóm. Hỗ trợ màu đơn và gradient." />
 
@@ -1146,7 +1312,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                         onClick={() => setForm({ ...form, emoji: icon })}
                         className={`flex h-12 items-center justify-center rounded-2xl border text-xl transition ${
                           form.emoji === icon
-                            ? 'border-violet-400 bg-violet-500/20'
+                            ? 'border-blue-400 bg-blue-500/20'
                             : 'border-white/10 bg-white/5 hover:bg-white/10'
                         }`}
                       >
@@ -1168,7 +1334,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                         onClick={() => setColorMode(mode)}
                         className={`rounded-xl px-4 py-2 text-xs font-black transition ${
                           colorMode === mode
-                            ? 'bg-violet-600 text-white'
+                            ? 'bg-blue-600 text-white'
                             : 'border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
                         }`}
                       >
@@ -1216,7 +1382,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                                 }}
                                 className={`h-9 w-9 rounded-full border-2 transition hover:scale-110 ${
                                   form.themeColor === color.value
-                                    ? 'border-white ring-2 ring-violet-400'
+                                    ? 'border-white ring-2 ring-blue-400'
                                     : 'border-white/20'
                                 }`}
                                 style={{ backgroundColor: color.value }}
@@ -1233,7 +1399,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                               />
                             </div>
 
-                            <div className="flex overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition focus-within:border-violet-400 focus-within:bg-white/10">
+                            <div className="flex overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition focus-within:border-blue-400 focus-within:bg-white/10">
                               <input
                                 value={customColorInput}
                                 onChange={(event) => updateCustomColorInput(event.target.value)}
@@ -1276,7 +1442,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                           onClick={() => setForm({ ...form, themeGradient: grad.value })}
                           className={`relative h-16 overflow-hidden rounded-2xl border-2 transition hover:scale-105 ${
                             form.themeGradient === grad.value
-                              ? 'border-white ring-2 ring-violet-400'
+                              ? 'border-white ring-2 ring-blue-400'
                               : 'border-white/10'
                           }`}
                           style={{ background: grad.value }}
@@ -1293,7 +1459,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
             )}
 
             {/* ── PERMISSIONS ──────────────────────────────────── */}
-            {activePanel === 'permissions' && (
+            {activePanel === 'members' && (
               <div className="space-y-5">
                 <SectionTitle title="Quyền thành viên" description="Tắt quyền nào thì thành viên thường sẽ không dùng được hành động đó trong nhóm." />
 
@@ -1334,7 +1500,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
             )}
 
             {/* ── LIMIT ────────────────────────────────────────── */}
-            {activePanel === 'limit' && (
+            {activePanel === 'members' && (
               <div className="space-y-5">
                 <SectionTitle title="Giới hạn thành viên" description="Nếu bỏ trống, hệ thống tự đặt giới hạn mặc định là 1000 thành viên." />
 
@@ -1346,7 +1512,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                     value={form.memberLimit}
                     onChange={(event) => setForm({ ...form, memberLimit: event.target.value })}
                     placeholder="1000"
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400 focus:bg-white/10"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:bg-white/10"
                   />
                   <p className="mt-3 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-xs font-bold leading-5 text-cyan-100/80">
                     Giới hạn thành viên giúp kiểm soát được lưu lượng thành viên, giảm giật lag khi tải chat nhóm.
@@ -1388,9 +1554,9 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
           </div>
 
           {/* Preview */}
-          <div className="min-h-0 overflow-y-auto border-t border-white/10 bg-white/[0.03] p-4 lg:border-l lg:border-t-0">
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-              <p className="mb-3 text-sm font-black text-white">Xem trước nhóm</p>
+          <div className="min-h-0 overflow-y-auto border-t border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/70 lg:border-l lg:border-t-0 lg:p-6">
+            <div className="sticky top-0 rounded-[1.75rem] border border-blue-100 bg-white p-4 shadow-xl shadow-blue-950/5 dark:border-blue-400/10 dark:bg-white/5">
+              <p className="mb-3 text-sm font-black text-slate-900 dark:text-white">Xem trước nhóm</p>
 
               <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
                 <div
@@ -1457,15 +1623,16 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-white/[0.03] px-6 py-4">
+        <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-3 dark:border-white/10 dark:bg-slate-950 sm:px-6">
+          <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-2 sm:gap-3">
           <p className="hidden text-xs font-bold text-slate-500 sm:block">
             {form.name.trim()
               ? 'Nhóm đã sẵn sàng để tạo.'
               : 'Gợi ý: tên nhóm rõ ràng sẽ giúp học sinh tìm thấy nhóm dễ hơn.'}
           </p>
 
-          <div className="ml-auto flex gap-3">
-            <button type="button" onClick={handleClose} className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-black text-slate-200 transition hover:bg-white/15">
+          <div className="ml-auto grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-3">
+            <button type="button" onClick={handleClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm text-sm font-black text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10">
               Hủy
             </button>
 
@@ -1474,19 +1641,29 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                 type="button"
                 onClick={submit}
                 disabled={!form.name.trim()}
-                className="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none disabled:hover:translate-y-0"
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-3 py-2.5 text-xs sm:rounded-2xl sm:px-6 sm:py-3 sm:text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:from-blue-700 hover:to-sky-600 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:hover:translate-y-0 dark:disabled:from-slate-700 dark:disabled:to-slate-700 dark:disabled:text-slate-400"
               >
                 ✅ Xác nhận tạo nhóm
+              </button>
+            ) : creationStep === 1 ? (
+              <button
+                type="button"
+                onClick={() => setActivePanel('channels')}
+                disabled={!form.name.trim()}
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-3 py-2.5 text-xs sm:rounded-2xl sm:px-6 sm:py-3 sm:text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500"
+              >
+                Tiếp theo →
               </button>
             ) : (
               <button
                 type="submit"
                 disabled={!form.name.trim()}
-                className="rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none disabled:hover:translate-y-0"
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-3 py-2.5 text-xs sm:rounded-2xl sm:px-6 sm:py-3 sm:text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500"
               >
-                Tạo nhóm
+                Tiếp theo →
               </button>
             )}
+          </div>
           </div>
         </div>
       </form>

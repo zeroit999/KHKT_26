@@ -15,7 +15,7 @@ import lightLogo from '../../assets/favicon-light-mode.png'
 const quickLinks = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Kho đề thi', href: '/exams' },
-  { label: 'E-Learning', href: '/courses' },
+  { label: 'Thư viện', href: '/courses' },
   { label: 'Cộng đồng', href: '/Forum' },
 ]
 
@@ -58,9 +58,12 @@ function Footer({ darkMode }) {
           </Link>
 
           <p className="max-w-md text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Nền tảng luyện thi và E-Learning hiện đại cho học sinh
-            THPT, tập trung vào trải nghiệm thi online, tiến độ học
-            tập và phân tích năng lực trực quan.
+           Nền tảng luyện thi hiện đại tích hợp thư viện học liệu,
+            giao diện kiểm tra trực tuyến, cộng đồng học tập, 
+            bảng xếp hạng trực quan và AI phân tích hành vi, 
+            giúp học sinh học hiệu quả hơn và hỗ trợ giáo viên đánh giá khách quan hơn.
+
+
           </p>
 
           <div className="mt-5 flex gap-2">
@@ -115,7 +118,7 @@ function Footer({ darkMode }) {
 
             <p className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-cyan-500" />
-              Hà Nội, Việt Nam
+              Việt Nam
             </p>
 
           </div>

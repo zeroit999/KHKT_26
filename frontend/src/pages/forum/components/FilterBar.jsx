@@ -31,7 +31,7 @@ function FilterBar({
                 active ? 'w-auto gap-1.5 px-3' : 'w-10 px-0'
               } ${
                 active
-                  ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                   : 'bg-white text-slate-500 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
               }`}
             >
@@ -62,7 +62,7 @@ function FilterBar({
             bg-white px-9 py-2.5 text-xs font-bold
             text-slate-700 outline-none transition
             placeholder:text-slate-400
-            focus:border-violet-400
+            focus:border-blue-400
             dark:border-white/10
             dark:bg-white/5
             dark:text-white
@@ -80,9 +80,9 @@ function FilterBar({
             flex min-w-[132px] items-center justify-between gap-3 rounded-2xl border
             border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700
             shadow-sm transition
-            hover:border-violet-300
-            hover:bg-violet-50
-            hover:text-violet-700
+            hover:border-blue-300
+            hover:bg-blue-50
+            hover:text-blue-700
             dark:border-white/10
             dark:bg-slate-900
             dark:text-white
@@ -124,7 +124,7 @@ function FilterBar({
                 }}
                 className={`block w-full rounded-xl px-3 py-2.5 text-left text-xs font-black transition ${
                   sortBy === value
-                    ? 'bg-violet-600 text-white'
+                    ? 'bg-blue-600 text-white'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
                 }`}
               >

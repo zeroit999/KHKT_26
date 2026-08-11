@@ -4,6 +4,11 @@ import { subjectCodes, defaultLearningChecklist } from '../constants/courseConst
 export function getVideoDuration(course) { if (Number(course.estimatedMinutes||0)>0) return `${Number(course.estimatedMinutes)} phút`; if(course.duration&&course.duration!=='---') return course.duration; const lessons=Number(course.lessonCount||normalizeLessons(course.lessons).length||1); return `${lessons} bài` }
 export function formatViews(value) { const n=Number(value||0); if(n>=1_000_000)return `${(n/1_000_000).toFixed(n>=10_000_000?0:1)} Tr`; if(n>=1_000)return `${(n/1_000).toFixed(n>=10_000?0:1)} N`; return String(n) }
 export function formatRelativeDate(value) { const time=getAnyTime(value); if(!time)return 'Chưa cập nhật'; const days=Math.max(0,Math.floor((Date.now()-time)/86400000)); if(days===0)return 'Hôm nay'; if(days===1)return 'Hôm qua'; if(days<30)return `${days} ngày trước`; const months=Math.floor(days/30); if(months<12)return `${months} tháng trước`; return `${Math.floor(months/12)} năm trước` }
+export function getCurrentLocalDateTimeValue(date = new Date()) {
+  const safeDate = date instanceof Date ? date : new Date(date)
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${safeDate.getFullYear()}-${pad(safeDate.getMonth() + 1)}-${pad(safeDate.getDate())}T${pad(safeDate.getHours())}:${pad(safeDate.getMinutes())}`
+}
 export function getEmptyForm(defaultSubject = '') {
   return {
     title: '',
@@ -18,6 +23,9 @@ export function getEmptyForm(defaultSubject = '') {
     simulationMode: 'embed',
     simulationUrl: '',
     simulationHtml: '',
+    simulationLanguage: 'html',
+    simulationCode: '',
+    simulationCodes: {},
     simulationInstructions: '',
     youtubeUrl: '',
     lumiUrl: '',
@@ -44,7 +52,7 @@ export function getEmptyForm(defaultSubject = '') {
     courseCode: '',
     visibility: 'public',
     className: '',
-    openAt: '',
+    openAt: getCurrentLocalDateTimeValue(),
     attachMode: 'youtube',
     codeLanguage: 'javascript',
     codeContent: '',
@@ -129,10 +137,10 @@ export function resolveClassesFromClassDocs(docs = [], user, userData = {}) {
 export function getUserClassName(userData = {}) {
   return userData?.className || userData?.class || userData?.lop || userData?.studentClass || ''
 }
-export function canAccessCourseByClass(course, currentStudentClass) {
-  if (!course || course.visibility !== 'private') return true
-  if (!course.className) return true
-  return String(course.className) === String(currentStudentClass)
+export function canAccessCourseByClass() {
+  // Quyền 'Dành cho lớp' chỉ dùng để phân loại thẻ theo bộ lọc lớp,
+  // không còn khóa người học theo lớp lưu trong hồ sơ tài khoản.
+  return true
 }
 export function getCourseCreatedTime(course) {
   return getAnyTime(course?.createdAt || course?.updatedAt || course?.openAt || course?.openAtMs)

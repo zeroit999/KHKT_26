@@ -105,7 +105,7 @@ function PostCard({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">{post.authorInitials || getInitials(post.authorName)}</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-sm font-black text-white">{post.authorInitials || getInitials(post.authorName)}</div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-black text-slate-950 dark:text-white">{post.authorName || 'Người dùng ZUNY'}</h3>
@@ -147,7 +147,7 @@ function PostCard({
         )}
 
         {post.teacherOnly && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-sky-500/15 dark:text-sky-200">
             🎓 Chỉ giáo viên được trả lời
           </div>
         )}
@@ -203,7 +203,7 @@ function PollBlock({ post, currentUserId, onVote }) {
   const totalVotes = Object.values(pollCounts).reduce((sum, value) => sum + Number(value || 0), 0)
 
   return (
-    <div className="mt-4 rounded-3xl border border-fuchsia-100 bg-fuchsia-50 p-4 dark:border-fuchsia-400/20 dark:bg-fuchsia-500/10">
+    <div className="mt-4 rounded-3xl border border-fuchsia-100 bg-fuchsia-50 p-4 dark:border-fuchsia-400/20 dark:bg-blue-500/10">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm font-black text-fuchsia-700 dark:text-fuchsia-200">📊 Bình chọn</p>
         <p className="text-xs font-bold text-slate-400">{totalVotes} lượt</p>
@@ -229,7 +229,7 @@ function PollBlock({ post, currentUserId, onVote }) {
                   : 'border-slate-200 bg-white hover:border-fuchsia-300 dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-fuchsia-400/50'
               }`}
             >
-              <span className="absolute inset-y-0 left-0 bg-fuchsia-500/15 transition-all" style={{ width: `${percent}%` }} />
+              <span className="absolute inset-y-0 left-0 bg-blue-500/15 transition-all" style={{ width: `${percent}%` }} />
               <span className="relative flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-sm font-black text-slate-800 dark:text-white">
                   {selected ? '✓ ' : ''}{option.text}
@@ -330,7 +330,7 @@ function ReactionButton({ reaction, summary, disabled = false, onReact = () => {
         }}
         className={`inline-flex touch-manipulation items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
           reaction
-            ? 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-200'
+            ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200'
             : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
         }`}
       >
@@ -426,7 +426,7 @@ function MiniReactionButton({ reaction, summary, onReact = () => {} }) {
         }}
         className={`inline-flex touch-manipulation items-center gap-1 rounded-full px-2 py-1 text-[11px] font-black transition ${
           reaction
-            ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200'
             : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'
         }`}
       >
@@ -478,7 +478,7 @@ function ActionButton({ icon: Icon, label, active, disabled = false, onClick = (
 
 
 function EmptyState({ icon, title, description, actionLabel, onAction }) {
-  return <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center dark:border-white/10 dark:bg-white/5"><div className="text-5xl">{icon}</div><h3 className="mt-4 text-xl font-black text-slate-950 dark:text-white">{title}</h3><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">{description}</p>{actionLabel && <button type="button" onClick={onAction} className="mt-5 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white">{actionLabel}</button>}</div>
+  return <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center dark:border-white/10 dark:bg-white/5"><div className="text-5xl">{icon}</div><h3 className="mt-4 text-xl font-black text-slate-950 dark:text-white">{title}</h3><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">{description}</p>{actionLabel && <button type="button" onClick={onAction} className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white">{actionLabel}</button>}</div>
 }
 
 export { PostList, PostCard, MiniReactionButton, ReactionButton }

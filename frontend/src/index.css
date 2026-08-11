@@ -355,6 +355,7 @@ button:disabled {
   box-shadow: 0 0 16px currentColor;
   animation: fireworkParticle 1.15s ease-out 0.45s forwards;
 }
+
 @keyframes ratingBurst {
   0% { opacity: 1; transform: rotate(var(--rotate, 0deg)) translateX(0) scale(1); }
   100% { opacity: 0; transform: rotate(var(--rotate, 0deg)) translateX(70px) scale(0.2); }

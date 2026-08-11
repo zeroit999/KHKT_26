@@ -33,6 +33,7 @@ import {
   Hash,
   Image,
   LockKeyhole,
+  Menu,
   Paperclip,
   Pencil,
   Pin,
@@ -49,6 +50,7 @@ import {
 import toast from 'react-hot-toast'
 
 import { db } from '../../../components/firebase'
+import VoiceChannelRoom from './VoiceChannelRoom'
 import {
   formatRelativeTime,
   getInitials,
@@ -61,6 +63,8 @@ import {
 
 // Default channels when creating a new group
 const DEFAULT_CHANNEL_IDS = ['thong-bao', 'thao-luan']
+const MAX_TEXT_CHANNELS = 10
+const MAX_VOICE_CHANNELS = 10
 
 const normalizeInviteCode = (value = '') => {
   const cleaned = String(value || '').replace(/[^a-zA-Z0-9!@#$%^&*_]/g, '')
@@ -80,6 +84,7 @@ const ALL_POSSIBLE_CHANNELS = [
   { id: 'tai-lieu', label: 'tài-liệu', icon: '📚', type: 'files' },
   { id: 'thanh-tich', label: 'thành-tích', icon: '🏆', type: 'info' },
   { id: 'ai-hoc-tap', label: 'AI-học-tập', icon: '🧠', type: 'chat' },
+  { id: 'phong-hoc-thoai', label: 'phòng-học-thoại', icon: '🔊', type: 'voice' },
 ]
 
 const DEFAULT_CHANNELS = DEFAULT_CHANNEL_IDS
@@ -87,8 +92,8 @@ const DEFAULT_CHANNELS = DEFAULT_CHANNEL_IDS
   .filter(Boolean)
 
 const ROLE_BADGES = {
-  admin_dev: { label: 'Admin', bg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300', dot: 'bg-indigo-400' },
-  admin: { label: 'Admin', bg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300', dot: 'bg-indigo-400' },
+  admin_dev: { label: 'Admin', bg: 'bg-sky-100 text-blue-700 dark:bg-sky-500/20 dark:text-sky-300', dot: 'bg-sky-400' },
+  admin: { label: 'Admin', bg: 'bg-sky-100 text-blue-700 dark:bg-sky-500/20 dark:text-sky-300', dot: 'bg-sky-400' },
   teacher: { label: 'GV', bg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300', dot: 'bg-amber-400' },
   student: { label: 'HS', bg: 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300', dot: 'bg-emerald-400' },
 }
@@ -168,6 +173,33 @@ const getGroupAvatarStyle = (theme = '') => {
   return { background: theme }
 }
 
+const FirebaseUserAvatar = ({
+  avatarUrl = '',
+  name = 'Thành viên',
+  initials = '',
+  sizeClass = 'h-10 w-10',
+  roundedClass = 'rounded-full',
+  className = '',
+  children = null,
+}) => (
+  <div className={`relative shrink-0 overflow-visible ${sizeClass} ${className}`}>
+    <div className={`h-full w-full overflow-hidden bg-gradient-to-br from-sky-500 to-blue-500 text-xs font-black text-white ${roundedClass}`}>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={name || 'Thành viên'}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="grid h-full w-full place-items-center">{initials || getInitials(name)}</span>
+      )}
+    </div>
+    {children}
+  </div>
+)
+
 // ── PAGINATION ────────────────────────────────────────────────────────────────
 function Pagination({ page, totalPages, onChange }) {
   if (totalPages <= 1) return null
@@ -178,7 +210,7 @@ function Pagination({ page, totalPages, onChange }) {
         type="button"
         onClick={() => onChange(Math.max(1, page - 1))}
         disabled={page <= 1}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-violet-300 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -189,8 +221,8 @@ function Pagination({ page, totalPages, onChange }) {
           onClick={() => onChange(p)}
           className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-xs font-black transition ${
             p === page
-              ? 'bg-violet-600 text-white shadow-md shadow-violet-500/30'
-              : 'border border-slate-200 bg-white text-slate-500 hover:border-violet-300 hover:text-violet-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+              : 'border border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:text-blue-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
           }`}
         >
           {p}
@@ -200,7 +232,7 @@ function Pagination({ page, totalPages, onChange }) {
         type="button"
         onClick={() => onChange(Math.min(totalPages, page + 1))}
         disabled={page >= totalPages}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-violet-300 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
@@ -247,7 +279,7 @@ function ReactionPicker({ onSelect, onClose }) {
 }
 
 // ── PINNED MESSAGES POPUP ─────────────────────────────────────────────────────
-function PinnedMessagesPopup({ pinnedMessages, onClose }) {
+function PinnedMessagesPopup({ pinnedMessages, resolveUser = () => ({}), onClose }) {
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={onClose}>
       <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900" onMouseDown={(e) => e.stopPropagation()}>
@@ -263,18 +295,29 @@ function PinnedMessagesPopup({ pinnedMessages, onClose }) {
         <div className="max-h-[60vh] overflow-y-auto p-4 space-y-3">
           {pinnedMessages.length === 0 ? (
             <p className="py-8 text-center text-sm font-bold text-slate-400 dark:text-slate-500">Chưa có tin nhắn nào được ghim.</p>
-          ) : pinnedMessages.map((msg) => (
+          ) : pinnedMessages.map((msg) => {
+            const syncedAuthor = resolveUser(msg.authorId, {
+              name: msg.authorName,
+              initials: msg.authorInitials,
+              avatarUrl: msg.authorPhotoURL || msg.avatarUrl || '',
+            })
+
+            return (
             <div key={msg.id} className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-400/20 dark:bg-white/5">
               <div className="mb-2 flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white">
-                  {getInitials(msg.authorName)}
-                </div>
-                <span className="text-sm font-black text-slate-950 dark:text-white">{msg.authorName}</span>
+                <FirebaseUserAvatar
+                  avatarUrl={syncedAuthor.avatarUrl}
+                  name={syncedAuthor.name}
+                  initials={syncedAuthor.initials}
+                  sizeClass="h-7 w-7"
+                />
+                <span className="text-sm font-black text-slate-950 dark:text-white">{syncedAuthor.name}</span>
                 <span className="text-xs text-slate-400 dark:text-slate-500">{formatRelativeTime(msg.createdAt)}</span>
               </div>
               <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{msg.content}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
@@ -318,10 +361,22 @@ function MemberListPopup({
     const isNormalMember = !isOwner && !isDeputy
 
     return (
-      <div key={member.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-violet-200 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:border-violet-400/30 dark:hover:bg-white/[0.075]">
+      <div key={member.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-blue-200 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:border-blue-400/30 dark:hover:bg-white/[0.075]">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white shadow-lg shadow-violet-500/20">
-            {member.initials || getInitials(member.name)}
+          <div className="relative h-11 w-11 shrink-0 overflow-visible rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-xs font-black text-white shadow-lg shadow-blue-500/20">
+            <div className="h-full w-full overflow-hidden rounded-2xl">
+              {member.avatarUrl ? (
+                <img
+                  src={member.avatarUrl}
+                  alt={member.name || 'Thành viên'}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="grid h-full w-full place-items-center">{member.initials || getInitials(member.name)}</span>
+              )}
+            </div>
             <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-50 dark:border-slate-900 ${online ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'}`} />
           </div>
 
@@ -330,7 +385,7 @@ function MemberListPopup({
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${
                 isOwner
-                  ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200'
                   : isDeputy
                     ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200'
                     : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'
@@ -346,7 +401,7 @@ function MemberListPopup({
           {member.id !== currentUserId && (
             <div className="flex shrink-0 flex-col gap-1">
               {canManage && isNormalMember && (
-                <button type="button" onClick={() => onPromote(member)} className="rounded-lg bg-violet-100 px-2.5 py-1 text-[10px] font-black text-violet-700 transition hover:bg-violet-200 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25">
+                <button type="button" onClick={() => onPromote(member)} className="rounded-lg bg-blue-100 px-2.5 py-1 text-[10px] font-black text-blue-700 transition hover:bg-blue-200 dark:bg-blue-500/15 dark:text-blue-200 dark:hover:bg-blue-500/25">
                   Làm phó nhóm
                 </button>
               )}
@@ -381,12 +436,12 @@ function MemberListPopup({
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Kick thành viên</span>
-                <input type="checkbox" checked={deputyKickEnabled} onChange={(event) => onUpdateDeputyPermission('kickMember', event.target.checked)} className="h-4 w-4 accent-violet-600" />
+                <input type="checkbox" checked={deputyKickEnabled} onChange={(event) => onUpdateDeputyPermission('kickMember', event.target.checked)} className="h-4 w-4 accent-blue-600" />
               </label>
 
               <label className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Duyệt thành viên</span>
-                <input type="checkbox" checked={deputyApproveEnabled} onChange={(event) => onUpdateDeputyPermission('approveMember', event.target.checked)} className="h-4 w-4 accent-violet-600" />
+                <input type="checkbox" checked={deputyApproveEnabled} onChange={(event) => onUpdateDeputyPermission('approveMember', event.target.checked)} className="h-4 w-4 accent-blue-600" />
               </label>
             </div>
           </div>
@@ -400,7 +455,7 @@ function MemberListPopup({
       <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4 dark:border-white/10 dark:bg-slate-950/40">
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-violet-500" />
+            <Users className="h-5 w-5 text-blue-500" />
             <h3 className="text-lg font-black text-slate-950 dark:text-white">Thành viên nhóm</h3>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-500 dark:bg-white/10 dark:text-slate-300">{members.length}</span>
           </div>
@@ -416,8 +471,8 @@ function MemberListPopup({
             <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-1">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-400">Quản trị viên</p>
-                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-600 dark:bg-violet-500/15 dark:text-violet-200">{managers.length}</span>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-400">Quản trị viên</p>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600 dark:bg-blue-500/15 dark:text-blue-200">{managers.length}</span>
                 </div>
                 {pageManagers.length > 0 ? (
                   pageManagers.map(renderMemberCard)
@@ -573,7 +628,7 @@ function HistoryPopup({ title, icon, items = [], type = 'announcement', onClose 
       <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4 dark:border-white/10 dark:bg-slate-950/40">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
               <span>{icon}</span>
               Lịch sử nhóm
             </div>
@@ -612,7 +667,7 @@ function HistoryPopup({ title, icon, items = [], type = 'announcement', onClose 
                           <p className="truncate text-sm font-black text-slate-800 dark:text-white">{item.fileName || item.content || 'Tệp đính kèm'}</p>
                           <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">{[item.fileType, formatFileSize(item.fileSize)].filter(Boolean).join(' • ') || 'Tệp đã gửi trong nhóm'}</p>
                         </div>
-                        <a href={fileUrl} download={item.fileName || true} target="_blank" rel="noreferrer" className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white transition hover:bg-violet-700">
+                        <a href={fileUrl} download={item.fileName || true} target="_blank" rel="noreferrer" className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white transition hover:bg-blue-700">
                           Mở/Tải
                         </a>
                       </div>
@@ -631,7 +686,7 @@ function HistoryPopup({ title, icon, items = [], type = 'announcement', onClose 
             Trang trước
           </button>
           <span className="text-xs font-black text-slate-400 dark:text-slate-500">Trang {safePage}/{totalPages}</span>
-          <button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={safePage >= totalPages} className="rounded-2xl bg-violet-600 px-4 py-2 text-xs font-black text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={safePage >= totalPages} className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40">
             Trang sau
           </button>
         </div>
@@ -660,7 +715,7 @@ function ImageLightbox({ image, onClose }) {
 }
 
 
-export default function DiscordGroupsLayout({ groups, currentUser, displayName, initials, roleKey, userClass = '', initialActiveGroupId = '', onJoin, onDelete, onCreate, groupReports = [], onReportGroup = () => {}, onAdminJoinReportedGroup = () => {}, onChannelViewChange = () => {} }) {  const [activeGroupId, setActiveGroupId] = useState(null)
+export default function DiscordGroupsLayout({ groups, currentUser, displayName, initials, avatarUrl = '', roleKey, userClass = '', initialActiveGroupId = '', onJoin, onDelete, onCreate, groupReports = [], onReportGroup = () => {}, onAdminJoinReportedGroup = () => {}, onChannelViewChange = () => {} }) {  const [activeGroupId, setActiveGroupId] = useState(null)
 
   useEffect(() => {
     onChannelViewChange(Boolean(activeGroupId))
@@ -686,6 +741,11 @@ useEffect(() => {
   setActiveChannelId(firstChannel?.id || 'thao-luan')
 }, [initialActiveGroupId, groups])
   const [activeChannelId, setActiveChannelId] = useState('thao-luan')
+  const [lastTextChannelId, setLastTextChannelId] = useState('thao-luan')
+  const [textChannelsCollapsed, setTextChannelsCollapsed] = useState(false)
+  const [voiceChannelsCollapsed, setVoiceChannelsCollapsed] = useState(false)
+  const [settingsTextChannelsCollapsed, setSettingsTextChannelsCollapsed] = useState(false)
+  const [settingsVoiceChannelsCollapsed, setSettingsVoiceChannelsCollapsed] = useState(false)
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const [search, setSearch] = useState('')
@@ -749,6 +809,7 @@ useEffect(() => {
   const [groupChannels, setGroupChannels] = useState({})
   // Channel management (inline inside settings now)
   const [newChannelName, setNewChannelName] = useState('')
+  const [newChannelType, setNewChannelType] = useState('chat')
   const [editingChannelId, setEditingChannelId] = useState(null)
   const [editingChannelLabel, setEditingChannelLabel] = useState('')
   // Message reactions: { [msgId]: { [userId]: emoji } }
@@ -769,6 +830,8 @@ useEffect(() => {
   const [lastReadMs, setLastReadMs] = useState({})
   // Real presence for the active group only (used to mark members online/offline)
   const [activeGroupOnlineIds, setActiveGroupOnlineIds] = useState([])
+  // Realtime presence detail per user: channel currently being viewed.
+  const [activeGroupPresence, setActiveGroupPresence] = useState({})
   // Full member profiles for the active group's roster (uid -> { id, name, initials, role })
   const [memberProfiles, setMemberProfiles] = useState({})
   // Firebase user profiles for group owners, shown only to admin_dev on group cards
@@ -777,10 +840,13 @@ useEffect(() => {
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
   // Delete channel confirmation: { channelId, channelLabel } | null
   const [deleteChannelConfirm, setDeleteChannelConfirm] = useState(null)
+  const [leaveGroupConfirm, setLeaveGroupConfirm] = useState(false)
+  const [mobileChannelSidebarOpen, setMobileChannelSidebarOpen] = useState(false)
   // Member tooltip: { memberId, memberName, channelLabel } | null
   const [memberTooltip, setMemberTooltip] = useState(null)
   const memberTooltipTimeout = useRef(null)
   const leaveMessageSendingRef = useRef(new Set())
+  const voluntaryLeavingGroupIdsRef = useRef(new Set())
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -920,6 +986,7 @@ useEffect(() => {
   const joinedGroups = groups.filter((g) => isCurrentUserGroupMember(g))
   const orderedJoinedGroups = sortPinnedGroupsFirst(joinedGroups)
   const totalGroups = groups.filter((group) => !group.isSample).length
+  const publicGroupsCount = groups.filter((group) => !group.isSample && (group.groupType || (group.isPrivate ? 'private' : 'public')) === 'public' && !group.isHidden).length
   const getGroupOnlineCount = (group = {}) => Number(onlineCounts[group.id] ?? group.onlineCount ?? group.onlineMembersCount ?? 0)
   const totalOnline = groups.reduce((sum, group) => sum + getGroupOnlineCount(group), 0)
 
@@ -940,12 +1007,16 @@ useEffect(() => {
     const isOwner = isCurrentUserGroupOwner(activeGroup)
     const canViewWithoutMembership = roleKey === 'admin_dev'
     if (stillMember || isOwner || canViewWithoutMembership) return
+    const voluntarilyLeft = voluntaryLeavingGroupIdsRef.current.has(activeGroup.id)
+    if (voluntarilyLeft) voluntaryLeavingGroupIdsRef.current.delete(activeGroup.id)
     setShowMemberList(false)
     setGroupSettingsOpen(false)
     setGroupMenuOpen(false)
     setActiveGroupId(null)
     setActiveChannelId('thao-luan')
-    toast.error(`Bạn đã bị đưa ra khỏi nhóm "${activeGroup.name || 'Nhóm học'}"`, { id: 'forum-kicked-out-notice' })
+    if (!voluntarilyLeft) {
+      toast.error(`Bạn đã bị đưa ra khỏi nhóm "${activeGroup.name || 'Nhóm học'}"`, { id: 'forum-kicked-out-notice' })
+    }
   }, [activeGroup?.id, activeGroup?.memberIds?.join(','), activeGroup?.members?.length, activeGroup?.joinedUsers?.length, activeGroup?.ownerId, optimisticJoinedGroupIds.join(','), currentUser?.uid, roleKey])
 
   // Normalize a raw channel entry (supports legacy string ids and full objects)
@@ -956,7 +1027,7 @@ useEffect(() => {
       return preset ? { ...preset } : { id: raw, label: raw, icon: '#️⃣', type: 'chat' }
     }
     if (typeof raw === 'object') {
-      return { id: raw.id, label: raw.label || raw.id, icon: raw.icon || '#️⃣', type: raw.type || 'chat' }
+      return { id: raw.id, label: raw.label || raw.id, icon: Object.prototype.hasOwnProperty.call(raw, 'icon') ? raw.icon : '#️⃣', type: raw.type || 'chat' }
     }
     return null
   }
@@ -974,6 +1045,8 @@ useEffect(() => {
   }, [activeGroupId, groupChannels])
 
   const activeChannel = DISCORD_CHANNELS.find((c) => c.id === activeChannelId) || DISCORD_CHANNELS[0]
+  const textChannels = DISCORD_CHANNELS.filter((channel) => channel.type !== 'voice')
+  const voiceChannels = DISCORD_CHANNELS.filter((channel) => channel.type === 'voice')
   const activeGroupAdminIds = activeGroup?.adminIds || []
   const isActiveGroupOwner = Boolean(activeGroup && activeGroup.ownerId === currentUser?.uid)
   const isActiveGroupDeputy = Boolean(activeGroup && activeGroupAdminIds.includes(currentUser?.uid))
@@ -1091,17 +1164,38 @@ useEffect(() => {
     const ids = activeGroup.memberIds || []
     return ids.map((uid) => {
       if (uid === currentUser?.uid) {
-        return { id: uid, name: displayName, initials, role: roleKey }
+        return { id: uid, name: displayName, initials, role: roleKey, avatarUrl }
       }
       return memberProfiles[uid] || { id: uid, name: 'Thành viên', initials: 'TV', role: 'student' }
     })
-  }, [activeGroup, memberProfiles, currentUser?.uid, displayName, initials, roleKey])
+  }, [activeGroup, memberProfiles, currentUser?.uid, displayName, initials, avatarUrl, roleKey])
 
   // Only members who are genuinely online right now (joined + currently present)
   const onlineRosterMembers = useMemo(
     () => rosterMembers.filter((member) => activeGroupOnlineIds.includes(member.id)),
     [rosterMembers, activeGroupOnlineIds],
   )
+
+
+  const resolveSyncedUser = (userId = '', fallback = {}) => {
+    const firebaseProfile = userId === currentUser?.uid
+      ? { id: currentUser.uid, name: displayName, initials, role: roleKey, avatarUrl }
+      : memberProfiles[userId] || ownerProfiles[userId] || {}
+
+    const name = firebaseProfile.name || fallback.name || fallback.authorName || 'Thành viên'
+    return {
+      id: userId || firebaseProfile.id || fallback.id || '',
+      name,
+      initials: firebaseProfile.initials || fallback.initials || fallback.authorInitials || getInitials(name),
+      role: firebaseProfile.role || fallback.role || fallback.authorRole || 'student',
+      avatarUrl:
+        firebaseProfile.avatarUrl ||
+        fallback.avatarUrl ||
+        fallback.authorPhotoURL ||
+        fallback.photoURL ||
+        '',
+    }
+  }
 
   const filteredGroups = useMemo(() => {
     const keyword = normalizeText(search.trim())
@@ -1140,6 +1234,7 @@ useEffect(() => {
   const totalGroupPages = Math.max(1, Math.ceil(filteredGroups.length / GROUPS_PER_PAGE))
   const pagedGroups = filteredGroups.slice((groupsPage - 1) * GROUPS_PER_PAGE, groupsPage * GROUPS_PER_PAGE)
 
+  // Đồng bộ realtime hồ sơ người tạo nhóm đang hiển thị cho admin_dev.
   useEffect(() => {
     if (roleKey !== 'admin_dev') {
       setOwnerProfiles({})
@@ -1152,42 +1247,50 @@ useEffect(() => {
       return undefined
     }
 
-    let cancelled = false
+    const chunks = []
+    for (let index = 0; index < ownerIds.length; index += 10) {
+      chunks.push(ownerIds.slice(index, index + 10))
+    }
 
-    const loadOwnerProfiles = async () => {
-      try {
-        const chunks = []
-        for (let index = 0; index < ownerIds.length; index += 10) {
-          chunks.push(ownerIds.slice(index, index + 10))
-        }
+    const chunkProfiles = chunks.map(() => ({}))
+    const publishProfiles = () => setOwnerProfiles(Object.assign({}, ...chunkProfiles))
 
-        const snapshots = await Promise.all(
-          chunks.map((chunk) => getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))),
-        )
+    const unsubscribes = chunks.map((chunk, chunkIndex) => {
+      const ownersQuery = query(
+        collection(db, 'users'),
+        where(documentId(), 'in', chunk),
+      )
 
-        if (cancelled) return
-
-        const nextProfiles = {}
-        snapshots.forEach((snapshot) => {
+      return onSnapshot(
+        ownersQuery,
+        (snapshot) => {
+          const nextChunkProfiles = {}
           snapshot.docs.forEach((item) => {
             const data = item.data() || {}
             const name = data.fullName || data.displayName || data.name || data.email || 'Chưa rõ tên'
-            nextProfiles[item.id] = {
+            nextChunkProfiles[item.id] = {
               id: item.id,
               name,
               email: data.email || '',
+              initials: getInitials(name, data.email),
+              role: getRoleKey(data.role || data.userRole || data.type),
+              avatarUrl:
+                data.photoURL ||
+                data.avatarUrl ||
+                data.avatarURL ||
+                data.avatar ||
+                data.profileImage ||
+                '',
             }
           })
-        })
+          chunkProfiles[chunkIndex] = nextChunkProfiles
+          publishProfiles()
+        },
+        (error) => console.warn('Không thể đồng bộ người tạo nhóm:', error),
+      )
+    })
 
-        setOwnerProfiles(nextProfiles)
-      } catch (error) {
-        console.warn('Không thể tải thông tin người tạo nhóm từ hệ thống ZUNY:', error)
-      }
-    }
-
-    loadOwnerProfiles()
-    return () => { cancelled = true }
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe())
   }, [roleKey, pagedGroups.map((group) => group.ownerId || '').join('|')])
 
   useEffect(() => { setGroupsPage(1) }, [search])
@@ -1295,77 +1398,159 @@ useEffect(() => {
 
   // Real presence list (member ids actually online) for the active group only
   useEffect(() => {
-    if (!activeGroupId) { setActiveGroupOnlineIds([]); return undefined }
-    const presenceQuery = query(collection(db, 'forumGroups', activeGroupId, 'presence'), where('online', '==', true))
-    const unsubscribe = onSnapshot(presenceQuery, (snapshot) => {
-      const now = Date.now()
-      const ids = snapshot.docs
-        .filter((item) => {
-          const lastSeenMs = timestampToMs(item.data().lastSeen)
-          return !lastSeenMs || now - lastSeenMs <= 90 * 1000
+    if (!activeGroupId) {
+      setActiveGroupOnlineIds([])
+      setActiveGroupPresence({})
+      return undefined
+    }
+
+    const presenceQuery = query(
+      collection(db, 'forumGroups', activeGroupId, 'presence'),
+      where('online', '==', true),
+    )
+
+    const unsubscribe = onSnapshot(
+      presenceQuery,
+      (snapshot) => {
+        const now = Date.now()
+        const nextPresence = {}
+
+        snapshot.docs.forEach((item) => {
+          const data = item.data() || {}
+          const lastSeenMs = timestampToMs(data.lastSeen)
+          if (lastSeenMs && now - lastSeenMs > 90 * 1000) return
+
+          nextPresence[item.id] = {
+            userId: item.id,
+            channelId: data.channelId || '',
+            channelLabel: data.channelLabel || '',
+            lastSeen: data.lastSeen || null,
+          }
         })
-        .map((item) => item.id)
-      setActiveGroupOnlineIds(ids)
-    }, (error) => console.warn('Không thể tải trạng thái online thành viên:', error))
+
+        setActiveGroupPresence(nextPresence)
+        setActiveGroupOnlineIds(Object.keys(nextPresence))
+      },
+      (error) => console.warn('Không thể tải trạng thái online thành viên:', error),
+    )
+
     return () => unsubscribe()
   }, [activeGroupId])
 
-  // Load full member profiles for the active group's roster
+  // Đồng bộ realtime hồ sơ Firebase của toàn bộ thành viên trong nhóm.
+  // Avatar luôn lấy từ collection users, vì vậy khi người dùng đổi ảnh đại diện,
+  // danh sách thành viên và tin nhắn đang mở sẽ cập nhật ngay mà không cần tải lại trang.
   useEffect(() => {
     const ids = [...new Set([
       ...(activeGroup?.memberIds || []),
       ...(activeGroup?.pendingMemberIds || []),
     ])].filter((uid) => uid && uid !== currentUser?.uid)
-    if (!activeGroupId || !ids.length) { setMemberProfiles({}); return undefined }
-    let cancelled = false
-    const load = async () => {
-      try {
-        const chunks = []
-        for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10))
-        const snapshots = await Promise.all(
-          chunks.map((chunk) => getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))),
-        )
-        if (cancelled) return
-        const map = {}
-        snapshots.forEach((snap) => snap.docs.forEach((item) => {
-          const data = item.data() || {}
-          const name = data.fullName || data.displayName || data.name || 'Thành viên'
-          map[item.id] = {
-            id: item.id,
-            name,
-            initials: getInitials(name, data.email),
-            role: getRoleKey(data.role || data.userRole || data.type),
-          }
-        }))
-        setMemberProfiles(map)
-      } catch (error) {
-        console.warn('Không thể tải danh sách thành viên:', error)
-      }
+
+    if (!activeGroupId || !ids.length) {
+      setMemberProfiles({})
+      return undefined
     }
-    load()
-    return () => { cancelled = true }
+
+    const chunks = []
+    for (let index = 0; index < ids.length; index += 10) {
+      chunks.push(ids.slice(index, index + 10))
+    }
+
+    const chunkProfiles = chunks.map(() => ({}))
+    const publishProfiles = () => {
+      setMemberProfiles(Object.assign({}, ...chunkProfiles))
+    }
+
+    const unsubscribes = chunks.map((chunk, chunkIndex) => {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where(documentId(), 'in', chunk),
+      )
+
+      return onSnapshot(
+        usersQuery,
+        (snapshot) => {
+          const nextChunkProfiles = {}
+
+          snapshot.docs.forEach((item) => {
+            const data = item.data() || {}
+            const name = data.fullName || data.displayName || data.name || data.email || 'Thành viên'
+
+            nextChunkProfiles[item.id] = {
+              id: item.id,
+              name,
+              initials: getInitials(name, data.email),
+              role: getRoleKey(data.role || data.userRole || data.type),
+              avatarUrl:
+                data.photoURL ||
+                data.avatarUrl ||
+                data.avatarURL ||
+                data.avatar ||
+                data.profileImage ||
+                '',
+            }
+          })
+
+          chunkProfiles[chunkIndex] = nextChunkProfiles
+          publishProfiles()
+        },
+        (error) => console.warn('Không thể đồng bộ hồ sơ thành viên:', error),
+      )
+    })
+
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe())
   }, [activeGroupId, activeGroup?.memberIds?.join(','), activeGroup?.pendingMemberIds?.join(','), currentUser?.uid])
 
   useEffect(() => {
-    if (!currentUser?.uid || !activeGroupId) return undefined
+    if (!currentUser?.uid || !activeGroupId || !activeChannelId) return undefined
+
     const presenceRef = doc(db, 'forumGroups', activeGroupId, 'presence', currentUser.uid)
+    const currentChannelLabel = activeChannel?.label || activeChannelId
+
     const writeOnline = async () => {
       try {
-        await setDoc(presenceRef, { groupId: activeGroupId, userId: currentUser.uid, displayName, initials, roleKey, online: true, lastSeen: serverTimestamp() }, { merge: true })
+        await setDoc(
+          presenceRef,
+          {
+            groupId: activeGroupId,
+            userId: currentUser.uid,
+            displayName,
+            initials,
+            roleKey,
+            online: true,
+            channelId: activeChannelId,
+            channelLabel: currentChannelLabel,
+            lastSeen: serverTimestamp(),
+          },
+          { merge: true },
+        )
       } catch (error) {
         console.warn('Không thể cập nhật trạng thái online:', error)
       }
     }
-    const writeOffline = () => { updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {}) }
+
+    const writeOffline = () => {
+      updateDoc(presenceRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {})
+    }
+
     writeOnline()
     const interval = window.setInterval(writeOnline, 30000)
     window.addEventListener('beforeunload', writeOffline)
+
     return () => {
       window.clearInterval(interval)
       window.removeEventListener('beforeunload', writeOffline)
       writeOffline()
     }
-  }, [currentUser?.uid, activeGroupId, displayName, initials, roleKey])
+  }, [
+    currentUser?.uid,
+    activeGroupId,
+    activeChannelId,
+    activeChannel?.label,
+    displayName,
+    initials,
+    roleKey,
+  ])
 
   useEffect(() => {
     if (!activeGroupId || !activeChannelId) { setMessages([]); return undefined }
@@ -1450,6 +1635,7 @@ useEffect(() => {
         authorName: displayName,
         authorInitials: initials,
         authorRole: roleKey,
+        authorPhotoURL: avatarUrl,
         createdAt: serverTimestamp(),
       })
       setInputText('')
@@ -1485,6 +1671,7 @@ useEffect(() => {
             authorName: displayName,
             authorInitials: initials,
             authorRole: roleKey,
+            authorPhotoURL: avatarUrl,
             createdAt: serverTimestamp(),
           })
           toast.success(isImage ? 'Đã gửi hình ảnh' : 'Đã gửi file')
@@ -1538,6 +1725,7 @@ useEffect(() => {
         authorName: displayName,
         authorInitials: initials,
         authorRole: roleKey,
+        authorPhotoURL: avatarUrl,
         createdAt: serverTimestamp(),
         replyToId: replyTo.msgId,
         replyToAuthor: replyTo.authorName,
@@ -1623,6 +1811,7 @@ useEffect(() => {
 
   // Leaving a group while inside it immediately returns to the groups hall
 const handleLeaveGroup = async () => {
+  if (activeGroup?.id) voluntaryLeavingGroupIdsRef.current.add(activeGroup.id)
   if (!activeGroup) return
 
   if (activeGroup.ownerId === currentUser?.uid) {
@@ -1632,35 +1821,29 @@ const handleLeaveGroup = async () => {
 
   if (leaveMessageSendingRef.current.has(activeGroup.id)) return
   leaveMessageSendingRef.current.add(activeGroup.id)
-
-  try {
-    const rawChannels = Array.isArray(activeGroup.channels) && activeGroup.channels.length
-      ? activeGroup.channels
-      : DEFAULT_CHANNELS
-    const mainChannel = rawChannels
-      .map(normalizeChannel)
-      .filter(Boolean)
-      .find((channel) => channel.id === 'thao-luan') || rawChannels.map(normalizeChannel).filter(Boolean)[0]
-    const mainChannelId = mainChannel?.id || 'thao-luan'
-
-    await addDoc(collection(db, 'forumGroupChats', `${activeGroup.id}_${mainChannelId}`, 'messages'), {
-      type: 'system',
-      systemType: 'member-left',
-      content: `Thành viên ${displayName || 'Thành viên'} đã rời nhóm`,
-      authorId: 'system',
-      authorName: 'Hệ thống',
-      targetUserId: currentUser?.uid || '',
-      targetUserName: displayName || 'Thành viên',
-      createdAt: serverTimestamp(),
-    })
-  } catch (error) {
-    console.warn('Không thể tạo thông báo rời nhóm:', error)
-  } finally {
-    leaveMessageSendingRef.current.delete(activeGroup.id)
-  }
+  leaveMessageSendingRef.current.delete(activeGroup.id)
 
   setOptimisticJoinedGroupIds((prev) => prev.filter((groupId) => groupId !== activeGroup.id))
-  onJoin(activeGroup)
+
+  try {
+    const notificationSnapshot = await getDocs(
+      query(
+        collection(db, 'forumNotifications'),
+        where('toUserId', '==', currentUser?.uid || ''),
+        limit(300),
+      ),
+    )
+
+    const staleGroupNotifications = notificationSnapshot.docs.filter(
+      (notificationDoc) => notificationDoc.data()?.scope === 'group' && notificationDoc.data()?.groupId === activeGroup.id,
+    )
+
+    await Promise.all(staleGroupNotifications.map((notificationDoc) => deleteDoc(notificationDoc.ref)))
+  } catch (error) {
+    console.warn('Không thể dọn thông báo của nhóm đã rời:', error)
+  }
+
+  await onJoin(activeGroup)
   setGroupMenuOpen(false)
   setActiveGroupId(null)
   setActiveChannelId('thao-luan')
@@ -1929,30 +2112,74 @@ const handleLeaveGroup = async () => {
   }
 
   const saveChannels = async (newChannels) => {
-    if (!activeGroup?.id || !canManageActiveGroup) return
+    if (!activeGroup?.id || !canManageActiveGroup) return false
+
+    const nextTextCount = Array.isArray(newChannels) ? newChannels.filter((channel) => channel?.type !== 'voice').length : 0
+    const nextVoiceCount = Array.isArray(newChannels) ? newChannels.filter((channel) => channel?.type === 'voice').length : 0
+    if (!Array.isArray(newChannels) || nextTextCount > MAX_TEXT_CHANNELS || nextVoiceCount > MAX_VOICE_CHANNELS) {
+      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản và ${MAX_VOICE_CHANNELS} kênh âm thanh`)
+      return false
+    }
+
     try {
-      await updateDoc(doc(db, 'forumGroups', activeGroup.id), { channels: newChannels })
+      await updateDoc(doc(db, 'forumGroups', activeGroup.id), {
+        channels: newChannels,
+        updatedAt: serverTimestamp(),
+      })
       setGroupChannels((prev) => ({ ...prev, [activeGroup.id]: newChannels }))
+      return true
     } catch {
       toast.error('Không thể cập nhật kênh')
+      return false
     }
   }
 
   // Add a channel with a custom, free-form name typed by the group manager
-  const addCustomChannel = () => {
+  const addCustomChannel = async () => {
     const label = newChannelName.trim()
-    if (!label) { toast.error('Nhập tên kênh trước khi thêm'); return }
+    if (!label) {
+      toast.error('Nhập tên kênh trước khi thêm')
+      return
+    }
+
+    const currentTypeCount = newChannelType === 'voice' ? voiceChannels.length : textChannels.length
+    const currentTypeLimit = newChannelType === 'voice' ? MAX_VOICE_CHANNELS : MAX_TEXT_CHANNELS
+    if (currentTypeCount >= currentTypeLimit) {
+      toast.error(newChannelType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+      return
+    }
+
+    const duplicated = DISCORD_CHANNELS.some(
+      (channel) => normalizeText(channel.label || '') === normalizeText(label),
+    )
+    if (duplicated) {
+      toast.error('Tên kênh này đã tồn tại')
+      return
+    }
+
     const id = slugifyChannelId(label)
-    const nextChannels = [...DISCORD_CHANNELS, { id, label, icon: '#️⃣', type: 'chat' }]
-    saveChannels(nextChannels)
+    const nextChannels = [...DISCORD_CHANNELS, { id, label, icon: newChannelType === 'voice' ? '🔊' : '#️⃣', type: newChannelType }]
+    const saved = await saveChannels(nextChannels)
+    if (!saved) return
+
     setNewChannelName('')
-    toast.success('Đã thêm kênh mới')
+    setNewChannelType('chat')
+    toast.success(newChannelType === 'voice' ? 'Đã thêm kênh thoại' : 'Đã thêm kênh mới')
   }
 
   // Quick-add from a preset suggestion (still optional, not required)
-  const addPresetChannel = (preset) => {
+  const addPresetChannel = async (preset) => {
     if (DISCORD_CHANNELS.some((ch) => ch.id === preset.id)) return
-    saveChannels([...DISCORD_CHANNELS, preset])
+    const presetType = preset?.type === 'voice' ? 'voice' : 'chat'
+    const currentTypeCount = presetType === 'voice' ? voiceChannels.length : textChannels.length
+    const currentTypeLimit = presetType === 'voice' ? MAX_VOICE_CHANNELS : MAX_TEXT_CHANNELS
+    if (currentTypeCount >= currentTypeLimit) {
+      toast.error(presetType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+      return
+    }
+
+    const saved = await saveChannels([...DISCORD_CHANNELS, preset])
+    if (saved) toast.success('Đã thêm kênh mới')
   }
 
   const removeChannel = (channelId) => {
@@ -2100,7 +2327,7 @@ const handleLeaveGroup = async () => {
     }
   }
 
-  const groupColors = ['from-indigo-500 to-violet-600', 'from-emerald-500 to-teal-600', 'from-amber-500 to-orange-600', 'from-rose-500 to-pink-600', 'from-cyan-500 to-blue-600', 'from-fuchsia-500 to-purple-600']
+  const groupColors = ['from-sky-500 to-blue-600', 'from-emerald-500 to-teal-600', 'from-amber-500 to-orange-600', 'from-rose-500 to-pink-600', 'from-cyan-500 to-blue-600', 'from-blue-500 to-blue-700']
 
   const activeGroupCover = activeGroup?.coverImage || activeGroup?.coverUrl || activeGroup?.bannerUrl || activeGroup?.imageUrl || ''
   const activeGroupOnline = onlineRosterMembers.length
@@ -2119,8 +2346,8 @@ const handleLeaveGroup = async () => {
   if (!activeGroup) {
     return (
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-slate-200 bg-slate-50 py-3 dark:border-white/10 dark:bg-slate-950">
-          <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl text-white shadow-lg shadow-violet-500/25">🌍</div>
+        <div className="hidden w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-slate-200 bg-slate-50 py-3 dark:border-white/10 dark:bg-slate-950 sm:flex">
+          <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-xl text-white shadow-lg shadow-blue-500/25">🌍</div>
           <div className="my-1 h-px w-8 bg-slate-200 dark:bg-white/15" />
           {orderedJoinedGroups.map((g, i) => {
             const color = g.color?.includes('from-') ? g.color : groupColors[i % groupColors.length]
@@ -2140,77 +2367,40 @@ const handleLeaveGroup = async () => {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 dark:bg-slate-950">
-          <div className="relative overflow-hidden border-b border-slate-200 bg-white px-6 py-6 dark:border-white/10 dark:bg-slate-950 sm:px-8">
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-violet-700 via-indigo-700 to-slate-950 p-7 shadow-2xl shadow-violet-950/30 sm:p-9">
-              <div className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
-              <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
-              <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-                <div>
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/75 backdrop-blur">
-                    <Globe2 className="h-4 w-4 text-cyan-200" /> ZUNY Community
-                  </div>
-                  <h1 className="max-w-2xl text-4xl font-black leading-tight text-white sm:text-5xl">Khám phá nhóm học phù hợp với bạn</h1>
-                  <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/70 sm:text-base">Tìm nhóm theo môn học, mục tiêu ôn thi hoặc sở thích.</p>
-                  <div className="mt-7 flex flex-wrap items-center gap-3">
-                    <button type="button" onClick={onCreate} className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-indigo-50">
-                      <Plus className="h-4 w-4" /> Tạo nhóm mới
-                    </button>
-                    <div className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-black text-white/75 backdrop-blur">
-                      <Users className="h-4 w-4 text-emerald-300" /> {groups.length} nhóm đang hoạt động
-                    </div>
-                  </div>
+          <section className="relative overflow-hidden border-b border-blue-200 bg-white px-4 py-5 text-slate-950 shadow-[0_18px_50px_rgba(37,99,235,0.12)] dark:border-blue-400/15 dark:bg-[#061126] dark:text-white dark:shadow-[0_18px_50px_rgba(2,6,23,0.28)] sm:px-6">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.055)_1px,transparent_1px)] bg-[size:26px_26px]" />
+            <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-cyan-400/10 blur-3xl" />
+            <div className="relative">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300"><span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />Không gian nhóm học</div>
+                  <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">Học cùng nhau, kết nối hiệu quả</h2>
+                  <p className="mt-1 max-w-2xl text-sm font-semibold text-slate-500 dark:text-blue-100/55">Tìm nhóm phù hợp, nhập mã mời hoặc tạo không gian học tập riêng của bạn.</p>
                 </div>
-                <div className="hidden rounded-[1.75rem] border border-white/10 bg-white/10 p-4 backdrop-blur-xl lg:block">
-                  <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm font-black text-white">Hoạt động nổi bật</p>
-                    <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-black text-emerald-200">Live</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white/10 p-4"><p className="text-xs font-bold text-white/50">Số nhóm</p><p className="mt-2 text-3xl font-black text-white">{totalGroups}</p></div>
-                    <div className="rounded-2xl bg-white/10 p-4"><p className="text-xs font-bold text-white/50">Đang online</p><p className="mt-2 text-3xl font-black text-emerald-200">{totalOnline}</p></div>
-                  </div>
+                <button type="button" onClick={onCreate} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_28px_rgba(37,99,235,0.42)] transition hover:-translate-y-0.5 hover:brightness-110"><Plus className="h-4 w-4" />Tạo nhóm mới</button>
+              </div>
+
+              <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)_auto]">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/70" />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm theo tên nhóm, mã nhóm hoặc #tag..." className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:border-blue-300/20 dark:bg-[#08162d]/90 dark:text-white dark:placeholder:text-slate-500 focus:border-cyan-300/60 focus:shadow-[0_0_18px_rgba(56,189,248,0.12)]" />
+                </div>
+                <div className="flex min-w-0 gap-2">
+                  <input value={groupCodeInput} onChange={(e) => setGroupCodeInput(normalizeInviteCode(e.target.value))} onKeyDown={(e) => { if (e.key === 'Enter') openGroupCodePopup() }} maxLength={11} placeholder="Nhập mã mời" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm font-black uppercase tracking-[0.16em] text-slate-900 outline-none dark:border-blue-300/20 dark:bg-[#08162d]/90 dark:text-white placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-500 focus:border-cyan-300/60" />
+                  <button type="button" onClick={openGroupCodePopup} className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-black text-blue-700 transition hover:bg-blue-100 dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-200 dark:hover:bg-cyan-400/20">Tham gia</button>
+                </div>
+                <div className="flex rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-blue-300/20 dark:bg-[#08162d]/90">
+                  {[{ value: 'all', label: 'Tất cả' }, { value: 'joined', label: 'Đã tham gia' }].map((item) => {
+                    const active = groupListFilter === item.value
+                    return <button key={item.value} type="button" onClick={() => setGroupListFilter(item.value)} className={`rounded-xl px-4 py-2 text-xs font-black transition ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : 'text-slate-500 hover:bg-white hover:text-blue-700 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}>{item.label}</button>
+                  })}
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur dark:border-white/10 dark:bg-slate-950/95">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm theo tên nhóm, mã nhóm hoặc #tag..." className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500" />
-              </div>
-              <div className="flex gap-2">
-                <input value={groupCodeInput} onChange={(e) => setGroupCodeInput(normalizeInviteCode(e.target.value))} onKeyDown={(e) => { if (e.key === 'Enter') openGroupCodePopup() }} maxLength={11} placeholder="Nhập mã mời" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm font-black uppercase tracking-[0.18em] text-slate-900 outline-none placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500" />
-                <button type="button" onClick={openGroupCodePopup} className="rounded-2xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-400">Vào</button>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {[
-                { value: 'all', label: 'Tất cả' },
-                { value: 'joined', label: 'Đã tham gia' },
-              ].map((item) => {
-                const active = groupListFilter === item.value
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setGroupListFilter(item.value)}
-                    className={`rounded-2xl px-4 py-2 text-xs font-black transition ${
-                      active
-                        ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
-                        : 'border border-slate-200 bg-white text-slate-500 hover:border-violet-300 hover:text-violet-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 p-3 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 lg:p-6">
             {pagedGroups.map((group, i) => {
               const joined = (group.memberIds || []).includes(currentUser?.uid)
               const canDeleteGroup = !group.isSample && (group.ownerId === currentUser?.uid || ['admin', 'admin_dev'].includes(roleKey))
@@ -2231,7 +2421,7 @@ const handleLeaveGroup = async () => {
                 return sum
               }, 0)
               return (
-                <div key={group.id} className="group relative flex min-h-[470px] flex-col overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-violet-300 hover:shadow-2xl hover:shadow-violet-500/15 dark:border-white/10 dark:bg-white/5 dark:hover:border-violet-400/40">
+                <div key={group.id} className="group relative flex min-h-[420px] flex-col sm:min-h-[470px] overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-500/15 dark:border-white/10 dark:bg-white/5 dark:hover:border-blue-400/40">
                   <div className="relative h-40 overflow-hidden">
                     <div
                       className={`absolute inset-0 bg-gradient-to-br ${color} transition-transform duration-500 group-hover:scale-110`}
@@ -2257,7 +2447,7 @@ const handleLeaveGroup = async () => {
                           {groupUnreadCard > 99 ? '99+' : groupUnreadCard}
                         </span>
                       )}
-                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black backdrop-blur ${groupType === 'invite_only' ? 'bg-violet-400/25 text-violet-100' : group.isPrivate ? 'bg-amber-400/25 text-amber-100' : 'bg-emerald-400/25 text-emerald-100'}`}>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black backdrop-blur ${groupType === 'invite_only' ? 'bg-blue-400/25 text-blue-100' : group.isPrivate ? 'bg-amber-400/25 text-amber-100' : 'bg-emerald-400/25 text-emerald-100'}`}>
                         {groupType === 'invite_only' ? <Share2 className="h-3 w-3" /> : group.isPrivate ? <LockKeyhole className="h-3 w-3" /> : <Globe2 className="h-3 w-3" />}
                         {visibilityText}
                       </span>
@@ -2280,8 +2470,8 @@ const handleLeaveGroup = async () => {
                       const ownerEmailFromFirebase = ownerProfile.email || group.ownerEmail || group.createdByEmail || 'Chưa rõ email'
 
                       return (
-                        <div className="mt-2 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-indigo-300">
+                        <div className="mt-2 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-3 py-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-sky-300">
                             Người tạo nhóm
                           </p>
                           <p className="mt-1 truncate text-xs font-black text-slate-200">
@@ -2326,12 +2516,12 @@ const handleLeaveGroup = async () => {
                           <button
                             type="button"
                             onClick={() => joined ? (setActiveGroupId(group.id), setActiveChannelId('thao-luan')) : handleJoinGroup(group)}
-                            className="flex-1 rounded-2xl bg-violet-600 px-5 py-4 text-lg font-black text-white shadow-lg shadow-violet-500/20 transition hover:-translate-y-0.5 hover:bg-violet-700 hover:shadow-xl"
+                            className="flex-1 rounded-2xl bg-blue-600 px-5 py-4 text-lg font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl"
                           >
                             {joined ? 'Vào nhóm' : 'Tham gia nhóm'}
                           </button>
                         ) : (
-                          <div className="flex-1 rounded-2xl border border-violet-400/30 bg-violet-500/10 px-5 py-4 text-center text-sm font-black text-violet-200">
+                          <div className="flex-1 rounded-2xl border border-blue-400/30 bg-blue-500/10 px-5 py-4 text-center text-sm font-black text-blue-200">
                             Nhập mã để tham gia
                           </div>
                         )}
@@ -2391,14 +2581,13 @@ const handleLeaveGroup = async () => {
     ['overview','Tổng quan','👥'],
     ['privacy','Cấu hình nhóm', groupSettingsForm.groupType === 'invite_only' ? '✉️' : groupSettingsForm.groupType === 'private' ? '🔒' : '🌍'],
     ['channels','Kênh','#️⃣'],
-    ...(canApproveInActiveGroup ? [['approval',`Duyệt thành viên (${(activeGroup?.pendingMemberIds || []).length})`,'✅']] : []),
-    ['permissions','Quyền thành viên','🛡️'],
-    ...(canSeeAdvancedGroupSettings ? [['limit','Giới hạn thành viên','👥']] : []),
+    ...(canApproveInActiveGroup ? [['approval',`Duyệt (${(activeGroup?.pendingMemberIds || []).length})`,'✅']] : []),
+    ['members','Thành viên','👥'],
     ['invite','Mời bạn bè','✉️'],
     ...(canSeeAdvancedGroupSettings ? [['appearance','Giao diện','🎨'],['system','Dữ liệu hệ thống','🧩']] : []),
   ])
 
-  const groupColor = activeGroup.color?.includes('from-') ? activeGroup.color : 'from-indigo-500 to-violet-600'
+  const groupColor = activeGroup.color?.includes('from-') ? activeGroup.color : 'from-sky-500 to-blue-600'
 
   // Deduplicate messages for display grouping
   const msgGroups = []
@@ -2430,18 +2619,38 @@ const handleLeaveGroup = async () => {
   }
 
   const channelDescription =
-    activeChannel?.type === 'chat' ? 'Đặt câu hỏi, trao đổi bài tập và cùng nhau giải quyết vấn đề học tập.'
+    activeChannel?.type === 'voice' ? 'Trò chuyện trực tiếp với các thành viên bằng microphone.'
+    : activeChannel?.type === 'chat' ? 'Đặt câu hỏi, trao đổi bài tập và cùng nhau giải quyết vấn đề học tập.'
     : activeChannel?.type === 'files' ? 'Chia sẻ tài liệu, link học tập, đề ôn thi và ghi chú quan trọng.'
     : activeChannel?.type === 'announce' ? 'Nơi đăng thông báo quan trọng để mọi thành viên không bỏ lỡ.'
     : 'Thông tin nền tảng giúp nhóm học hoạt động rõ ràng và có tổ chức.'
 
   const availablePresetChannels = ALL_POSSIBLE_CHANNELS.filter((preset) => !DISCORD_CHANNELS.some((ch) => ch.id === preset.id))
 
+  const openChannel = (channel) => {
+    if (!channel) return
+    if (channel.type !== 'voice') setLastTextChannelId(channel.id)
+    setActiveChannelId(channel.id)
+  }
+
+  const returnFromVoiceChannel = () => {
+    const fallback = textChannels.find((channel) => channel.id === lastTextChannelId) || textChannels[0]
+    if (fallback) setActiveChannelId(fallback.id)
+  }
+
+  if (activeChannel?.type === 'voice') {
+    return (
+      <div className="fixed inset-0 z-[85] min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <VoiceChannelRoom groupId={activeGroup.id} channel={activeChannel} currentUser={currentUser} displayName={displayName} initials={initials} avatarUrl={avatarUrl} onBack={returnFromVoiceChannel} />
+      </div>
+    )
+  }
+
   return (
-    <div className="relative flex h-screen max-h-screen min-h-0 flex-1 overflow-hidden bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-white">
+    <div className="relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 overflow-hidden bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-white">
       {/* Group avatar sidebar */}
-      <div className="flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-slate-200 bg-white py-3 dark:border-white/10 dark:bg-slate-950">
-        <button type="button" title="Khám phá nhóm" onClick={() => setActiveGroupId(null)} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl text-white shadow-lg transition hover:rounded-[14px]">🌍</button>
+      <div className="hidden w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-slate-200 bg-white py-3 dark:border-white/10 dark:bg-slate-950 sm:flex">
+        <button type="button" title="Khám phá nhóm" onClick={() => { setGroupMenuOpen(false); setGroupSettingsOpen(false); setActiveGroupId(null); setActiveChannelId('thao-luan') }} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-xl text-white shadow-lg transition hover:rounded-[14px]">🌍</button>
         <div className="my-1 h-px w-8 bg-slate-200 dark:bg-white/15" />
         {orderedJoinedGroups.map((g, i) => {
           const color = g.color?.includes('from-') ? g.color : groupColors[i % groupColors.length]
@@ -2453,7 +2662,7 @@ const handleLeaveGroup = async () => {
           }, 0)
           return (
             <div key={g.id} className="relative">
-              {isActive && <span className="absolute -left-3 top-1/2 h-8 w-1.5 -translate-y-1/2 rounded-r-full bg-violet-600" />}
+              {isActive && <span className="absolute -left-3 top-1/2 h-8 w-1.5 -translate-y-1/2 rounded-r-full bg-blue-600" />}
               <button type="button" title={g.name} onClick={() => { setActiveGroupId(g.id); setActiveChannelId('thao-luan') }}
                 className={`relative flex h-11 w-11 items-center justify-center bg-gradient-to-br ${color} text-xl shadow-md transition-all duration-150 ${isActive ? 'rounded-2xl shadow-lg' : 'rounded-full hover:rounded-2xl'}`}
                 style={getGroupAvatarStyle(g.themeColor)}
@@ -2474,8 +2683,17 @@ const handleLeaveGroup = async () => {
         </button>
       </div>
 
+      {mobileChannelSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Đóng danh sách kênh"
+          onClick={() => setMobileChannelSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden"
+        />
+      )}
+
       {/* Channel sidebar */}
-      <div className="flex w-[350px] shrink-0 flex-col border-r border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
+      <div className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,350px)] shrink-0 flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 dark:border-white/10 dark:bg-slate-900 md:static md:z-auto md:w-[320px] md:translate-x-0 md:shadow-none xl:w-[350px] ${mobileChannelSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
           <div className="relative flex h-[88px] items-center gap-3 px-4">
             <div className="text-3xl">{activeGroup.emoji || '🏆'}</div>
@@ -2505,7 +2723,7 @@ const handleLeaveGroup = async () => {
 {joined && !isActiveGroupOwner && (
   <button
     type="button"
-    onClick={handleLeaveGroup}
+    onClick={() => { setLeaveGroupConfirm(true); setGroupMenuOpen(false) }}
     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-black text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
   >
     <X className="h-4 w-4" />
@@ -2541,23 +2759,49 @@ const handleLeaveGroup = async () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="mb-2 mt-3 px-3 text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Mục văn bản</p>
-          {DISCORD_CHANNELS.map((ch) => {
-            const docId = `${activeGroupId}_${ch.id}`
-            const unread = unreadCounts[docId] || 0
-            return (
-              <button key={ch.id} type="button" onClick={() => setActiveChannelId(ch.id)}
-                className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 pr-10 text-lg transition ${activeChannelId === ch.id ? 'bg-violet-50 text-violet-700 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
-              >
-                <span className="text-xl">{ch.icon}</span>
-                <span className="text-lg font-black text-slate-400 dark:text-slate-500">#</span>
-                <span className="truncate font-black">{ch.label}</span>
-                {unread > 0 && activeChannelId !== ch.id && (
-                  <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white shadow-lg shadow-rose-500/30">{unread > 99 ? '99+' : unread}</span>
-                )}
+          <div className="mb-2 mt-3 space-y-3">
+            <div>
+              <button type="button" onClick={() => setTextChannelsCollapsed((value) => !value)} className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-black uppercase tracking-[0.14em] text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-200">
+                <span className="flex items-center gap-2"><Hash className="h-4 w-4" />Kênh văn bản <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-white/10">{textChannels.length}</span></span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${textChannelsCollapsed ? '-rotate-90' : ''}`} />
               </button>
-            )
-          })}
+              {!textChannelsCollapsed && (
+                <div className="mt-1 space-y-1">
+                  {textChannels.map((ch) => {
+                    const docId = `${activeGroupId}_${ch.id}`
+                    const unread = unreadCounts[docId] || 0
+                    return (
+                      <button key={ch.id} type="button" onClick={() => { setLastTextChannelId(ch.id); setActiveChannelId(ch.id); setMobileChannelSidebarOpen(false) }} className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 pr-10 text-lg transition ${activeChannelId === ch.id ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}>
+                        {ch.icon ? <span className="text-xl">{ch.icon}</span> : null}
+                        <span className="text-lg font-black text-slate-400 dark:text-slate-500">#</span>
+                        <span className="truncate font-black">{ch.label}</span>
+                        {unread > 0 && activeChannelId !== ch.id && <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white shadow-lg shadow-rose-500/30">{unread > 99 ? '99+' : unread}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <button type="button" onClick={() => setVoiceChannelsCollapsed((value) => !value)} className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-black uppercase tracking-[0.14em] text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-200">
+                <span className="flex items-center gap-2"><span>🔊</span>Kênh âm thanh <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-white/10">{voiceChannels.length}</span></span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${voiceChannelsCollapsed ? '-rotate-90' : ''}`} />
+              </button>
+              {!voiceChannelsCollapsed && (
+                <div className="mt-1 space-y-1">
+                  {voiceChannels.map((ch) => (
+                    <button key={ch.id} type="button" onClick={() => { setActiveChannelId(ch.id); setMobileChannelSidebarOpen(false) }} className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 text-lg transition ${activeChannelId === ch.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}>
+                      {ch.icon ? <span className="text-xl">{ch.icon}</span> : null}
+                      <span className="text-lg">🔊</span>
+                      <span className="truncate font-black">{ch.label}</span>
+                    </button>
+                  ))}
+                  {voiceChannels.length === 0 && <p className="px-4 py-2 text-xs font-bold text-slate-400">Chưa có kênh âm thanh.</p>}
+                </div>
+              )}
+            </div>
+          </div>
 
           {canManageActiveGroup && (
             <button type="button" onClick={() => { setGroupSettingsTab('overview'); setGroupSettingsOpen(true) }} className="mt-3 flex w-full items-center gap-2 rounded-xl px-4 py-2 text-xs font-black text-slate-400 transition hover:bg-slate-50 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-300">
@@ -2568,7 +2812,7 @@ const handleLeaveGroup = async () => {
           <div className="mt-6 space-y-1 border-t border-slate-200 pt-4 dark:border-white/10">
             <p className="mb-2 px-3 text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Nhóm</p>
             {joined && !isActiveGroupOwner && (
-              <button type="button" onClick={handleLeaveGroup} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-black text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"><X className="h-4 w-4" />Rời nhóm</button>
+              <button type="button" onClick={() => setLeaveGroupConfirm(true)} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-black text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"><X className="h-4 w-4" />Rời nhóm</button>
             )}
             {canDeleteGroup && (
               <button type="button" onClick={() => onDelete(activeGroup)} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-black text-rose-500 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"><Trash2 className="h-4 w-4" />Xóa nhóm</button>
@@ -2578,10 +2822,9 @@ const handleLeaveGroup = async () => {
 
         <div className="border-t border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900">
           <div className="flex items-center gap-3">
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">
-              {initials}
-              <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-900" />
-            </div>
+            <FirebaseUserAvatar avatarUrl={avatarUrl} name={displayName} initials={initials} sizeClass="h-12 w-12">
+              <span className="absolute -bottom-0.5 -right-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-slate-900" />
+            </FirebaseUserAvatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black text-slate-950 dark:text-white">{displayName}</p>
               <p className="text-xs font-bold text-emerald-500 dark:text-emerald-400">{roleText[roleKey] || 'Thành viên'}</p>
@@ -2594,42 +2837,44 @@ const handleLeaveGroup = async () => {
       {/* Main chat */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
         {/* Channel header */}
-        <div className="flex h-[72px] shrink-0 items-center gap-5 border-b border-slate-200 bg-white px-6 dark:border-white/10 dark:bg-slate-950">
-          <span className="text-2xl">{activeChannel?.icon}</span>
-          <span className="text-2xl font-black text-slate-400 dark:text-slate-500">#</span>
-          <h2 className="truncate text-2xl font-black text-slate-950 dark:text-white">{activeChannel?.label}</h2>
-          <div className="h-8 w-px bg-slate-200 dark:bg-white/10" />
+        <div className="flex h-[64px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-950 sm:h-[72px] sm:gap-4 sm:px-5 lg:px-6">
+          <button type="button" onClick={() => setMobileChannelSidebarOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-blue-50 hover:text-blue-600 dark:bg-white/10 dark:text-slate-200 md:hidden" aria-label="Mở danh sách kênh"><Menu className="h-5 w-5" /></button>
+          <span className="hidden text-xl sm:inline sm:text-2xl">{activeChannel?.icon}</span>
+          <span className="text-xl font-black text-slate-400 dark:text-slate-500 sm:text-2xl">{activeChannel?.type === 'voice' ? '🔊' : '#'}</span>
+          <h2 className="min-w-0 truncate text-base font-black text-slate-950 dark:text-white sm:text-xl lg:text-2xl">{activeChannel?.label}</h2>
+          <div className="hidden h-8 w-px bg-slate-200 dark:bg-white/10 md:block" />
           <p className="hidden min-w-0 truncate text-sm font-semibold text-slate-400 dark:text-slate-400 md:block">
-            {activeChannel?.type === 'chat' ? 'Nơi trò chuyện và đặt câu hỏi' : activeChannel?.type === 'files' ? 'Chia sẻ tài liệu học tập' : 'Thông tin quan trọng của nhóm'}
+            {activeChannel?.type === 'voice' ? 'Trò chuyện trực tiếp bằng microphone' : activeChannel?.type === 'chat' ? 'Nơi trò chuyện và đặt câu hỏi' : activeChannel?.type === 'files' ? 'Chia sẻ tài liệu học tập' : 'Thông tin quan trọng của nhóm'}
           </p>
-          <div className="ml-auto flex items-center gap-3 text-slate-400 dark:text-slate-400">
+          <div className="ml-auto flex shrink-0 items-center gap-2 text-slate-400 dark:text-slate-400 sm:gap-3">
             <span className="hidden items-center gap-2 text-lg font-semibold xl:flex">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />{activeGroupOnline} online
             </span>
             {/* Search button */}
-            <button type="button" title="Tìm kiếm" onClick={() => setShowSearchPopup(true)} className="transition hover:text-slate-900 dark:hover:text-white"><Search className="h-6 w-6" /></button>
+            <button type="button" title="Tìm kiếm" onClick={() => setShowSearchPopup(true)} className="transition hover:text-slate-900 dark:hover:text-white"><Search className="h-5 w-5 sm:h-6 sm:w-6" /></button>
             {/* Pin button */}
             <button type="button" title="Tin nhắn đã ghim" onClick={() => setShowPinnedPopup(true)} className="relative transition hover:text-slate-900 dark:hover:text-white">
-              <Pin className="h-6 w-6" />
+              <Pin className="h-5 w-5 sm:h-6 sm:w-6" />
               {pinnedMessages.length > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-0.5 text-[9px] font-black text-black">{pinnedMessages.length}</span>}
             </button>
             {/* Member list button */}
-            <button type="button" title="Danh sách thành viên" onClick={() => setShowMemberList(true)} className="transition hover:text-slate-900 dark:hover:text-white"><Users className="h-6 w-6" /></button>
-            <button type="button" title="Cảnh báo / báo cáo nhóm" onClick={() => openGroupReportModal(activeGroup)} className="transition hover:text-amber-600 dark:hover:text-amber-300"><Flag className="h-6 w-6" /></button>
-            <button type="button" title="Cài đặt nhóm" onClick={() => { setGroupSettingsTab('overview'); setGroupSettingsOpen(true) }} className="transition hover:text-slate-900 dark:hover:text-white"><Settings className="h-6 w-6" /></button>
+            <button type="button" title="Danh sách thành viên" onClick={() => setShowMemberList(true)} className="transition hover:text-slate-900 dark:hover:text-white"><Users className="h-5 w-5 sm:h-6 sm:w-6" /></button>
+            <button type="button" title="Cảnh báo / báo cáo nhóm" onClick={() => openGroupReportModal(activeGroup)} className="transition hover:text-amber-600 dark:hover:text-amber-300"><Flag className="hidden h-5 w-5 sm:block sm:h-6 sm:w-6" /></button>
+            <button type="button" title="Cài đặt nhóm" onClick={() => { setGroupSettingsTab('overview'); setGroupSettingsOpen(true) }} className="transition hover:text-slate-900 dark:hover:text-white"><Settings className="hidden h-5 w-5 sm:block sm:h-6 sm:w-6" /></button>
           </div>
         </div>
 
+        <>
         {/* Messages */}
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ height: 0 }}>
           {messages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+            <div className="flex h-full flex-col items-center justify-center px-4 text-center sm:px-8">
               <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-slate-50 text-5xl shadow-sm dark:bg-white/5 dark:shadow-black/20">{activeChannel?.icon}</div>
-              <h1 className="text-3xl font-black text-slate-950 dark:text-white sm:text-4xl">Chào mừng đến #{activeChannel?.label}</h1>
+              <h1 className="text-2xl font-black text-slate-950 dark:text-white sm:text-4xl">Chào mừng đến #{activeChannel?.label}</h1>
               <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-slate-500 dark:text-slate-400 sm:text-base">{channelDescription}</p>
             </div>
           ) : (
-            <div className="px-8 py-7">
+            <div className="px-3 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
               <div className="space-y-5">
                 {msgGroups.map((group) => {
                   if (group.system) {
@@ -2646,12 +2891,31 @@ const handleLeaveGroup = async () => {
                   const AuthorRoleBadge = ROLE_BADGES[group.author.authorRole] || ROLE_BADGES.student
                   return (
                     <div key={group.author.id} className="group/message flex gap-4 rounded-2xl px-3 py-2 transition hover:bg-slate-50 dark:hover:bg-white/[0.025]">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-base font-black text-white shadow-lg shadow-violet-500/10">
-                        {group.author.authorInitials || getInitials(group.author.authorName)}
-                      </div>
+                      {(() => {
+                        const firebaseAuthor = group.author.authorId === currentUser?.uid
+                          ? { avatarUrl, name: displayName, initials }
+                          : memberProfiles[group.author.authorId]
+                        const syncedAvatarUrl =
+                          firebaseAuthor?.avatarUrl ||
+                          group.author.authorPhotoURL ||
+                          group.author.avatarUrl ||
+                          ''
+                        const syncedAuthorName = firebaseAuthor?.name || group.author.authorName || 'Thành viên'
+                        const syncedInitials = firebaseAuthor?.initials || group.author.authorInitials || getInitials(syncedAuthorName)
+
+                        return (
+                          <FirebaseUserAvatar
+                            avatarUrl={syncedAvatarUrl}
+                            name={syncedAuthorName}
+                            initials={syncedInitials}
+                            sizeClass="h-12 w-12"
+                            className="shadow-lg shadow-blue-500/10"
+                          />
+                        )
+                      })()}
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <span className="text-base font-black text-slate-950 dark:text-white">{group.author.authorName || 'Thành viên'}</span>
+                          <span className="text-base font-black text-slate-950 dark:text-white">{(group.author.authorId === currentUser?.uid ? displayName : memberProfiles[group.author.authorId]?.name) || group.author.authorName || 'Thành viên'}</span>
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${AuthorRoleBadge.bg}`}>{AuthorRoleBadge.label}</span>
                           <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{formatRelativeTime(group.author.createdAt)}</span>
                         </div>
@@ -2666,9 +2930,9 @@ const handleLeaveGroup = async () => {
                               <div key={msg.id} className="group/item relative rounded-xl px-0 py-0.5" onMouseLeave={() => { if (reactionPickerMsgId === msg.id) setReactionPickerMsgId(null) }}>
                                 {/* Reply context — styled like the Hall's threaded replies */}
                                 {msg.replyToId && (
-                                  <div className="mb-1 flex items-center gap-2 border-l-2 border-violet-300 pl-3 dark:border-violet-500/40">
-                                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-600 dark:bg-violet-500/15 dark:text-violet-200">Trả lời</span>
-                                    <span className="text-xs font-bold text-violet-600 dark:text-violet-300">{msg.replyToAuthor}</span>
+                                  <div className="mb-1 flex items-center gap-2 border-l-2 border-blue-300 pl-3 dark:border-blue-500/40">
+                                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600 dark:bg-blue-500/15 dark:text-blue-200">Trả lời</span>
+                                    <span className="text-xs font-bold text-blue-600 dark:text-blue-300">{msg.replyToAuthor}</span>
                                     <span className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">{msg.replyToContent}</span>
                                   </div>
                                 )}
@@ -2686,9 +2950,9 @@ const handleLeaveGroup = async () => {
                                         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEditMessage(msg) }
                                         if (e.key === 'Escape') { setEditingMsg(null); setEditingContent('') }
                                       }}
-                                      className="min-w-0 flex-1 rounded-xl border border-violet-300 bg-violet-50/40 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-white"
+                                      className="min-w-0 flex-1 rounded-xl border border-blue-300 bg-blue-50/40 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-white"
                                     />
-                                    <button type="button" onClick={() => commitEditMessage(msg)} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-700">Lưu</button>
+                                    <button type="button" onClick={() => commitEditMessage(msg)} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700">Lưu</button>
                                     <button type="button" onClick={() => { setEditingMsg(null); setEditingContent('') }} className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200">Hủy</button>
                                   </div>
                                 ) : isAnnouncementMessage(msg) ? (
@@ -2733,7 +2997,7 @@ const handleLeaveGroup = async () => {
                                     <p className="text-xs font-bold text-slate-400">{msg.fileName || msg.content}</p>
                                   </div>
                                 ) : msg.messageType === 'file' && msg.fileUrl ? (
-                                  <a href={msg.fileUrl} download={msg.fileName || true} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-violet-300 hover:text-violet-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-violet-400/50 dark:hover:text-violet-200">
+                                  <a href={msg.fileUrl} download={msg.fileName || true} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-blue-300 hover:text-blue-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-blue-400/50 dark:hover:text-blue-200">
                                     <Paperclip className="h-5 w-5 shrink-0 text-emerald-500" />
                                     <span className="truncate">{msg.fileName || msg.content || 'Tệp đính kèm'}</span>
                                   </a>
@@ -2755,7 +3019,7 @@ const handleLeaveGroup = async () => {
                                       const myReaction = msgReactionMap[currentUser?.uid]
                                       return (
                                         <button key={emoji} type="button" onClick={() => reactToMessage(msg, emoji)}
-                                          className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold transition ${myReaction === emoji ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-indigo-400 dark:bg-indigo-500/20 dark:text-indigo-200' : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20'}`}
+                                          className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold transition ${myReaction === emoji ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-sky-400 dark:bg-sky-500/20 dark:text-sky-200' : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20'}`}
                                         >
                                           {emoji} <span>{count}</span>
                                         </button>
@@ -2765,16 +3029,16 @@ const handleLeaveGroup = async () => {
                                 )}
                                 {/* Inline reply form — appears directly under the message, like the Hall */}
                                 {replyTo?.msgId === msg.id && (
-                                  <form onSubmit={submitReply} className="mt-2 flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50/60 p-2 dark:border-violet-500/20 dark:bg-violet-500/10">
+                                  <form onSubmit={submitReply} className="mt-2 flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50/60 p-2 dark:border-blue-500/20 dark:bg-blue-500/10">
                                     <input
                                       ref={replyInputRef}
                                       value={replyText}
                                       onChange={(e) => setReplyText(e.target.value)}
                                       placeholder={`Trả lời ${msg.authorName || 'thành viên'}...`}
-                                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 dark:border-white/10 dark:bg-slate-900 dark:text-white"
                                     />
                                     <button type="button" onClick={() => { setReplyTo(null); setReplyText('') }} className="rounded-xl px-3 py-2 text-xs font-black text-slate-400 hover:bg-white dark:hover:bg-white/10">Hủy</button>
-                                    <button type="submit" className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-700">Gửi</button>
+                                    <button type="submit" className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700">Gửi</button>
                                   </form>
                                 )}
                                 {/* Hover toolbar */}
@@ -2871,8 +3135,8 @@ const handleLeaveGroup = async () => {
         </div>
 
         {/* Input area */}
-        <div className="shrink-0 border-t border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950 sm:p-5">
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 shadow-inner shadow-black/5 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-500/30 dark:border-white/10 dark:bg-white/5 dark:shadow-black/10 dark:focus-within:ring-indigo-500/50">
+        <div className="shrink-0 border-t border-slate-200 bg-white p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] dark:border-white/10 dark:bg-slate-950 sm:p-5">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3 shadow-inner shadow-black/5 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-white/10 dark:bg-white/5 dark:shadow-black/10 dark:focus-within:ring-sky-500/50">
             {/* Plus button with dropdown */}
             <div ref={plusMenuRef} className="relative">
               <input ref={imageFileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleAttachmentInput(event, 'image')} />
@@ -2920,11 +3184,12 @@ const handleLeaveGroup = async () => {
               <ThumbsUp className="h-5 w-5" />
             </button>
 
-            <button type="button" onClick={sendMessage} disabled={!inputText.trim() || !canSendGroupMessage} className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600 text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+            <button type="button" onClick={sendMessage} disabled={!inputText.trim() || !canSendGroupMessage} className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40">
               <Send className="h-5 w-5" />
             </button>
           </div>
         </div>
+        </>
       </div>
 
       {/* Right sidebar collapse toggle button (always visible) */}
@@ -2964,17 +3229,21 @@ const handleLeaveGroup = async () => {
                       onClick={() => { setInputText((prev) => prev || `@${member.name} `); inputRef.current?.focus() }}
                       onMouseEnter={() => {
                         clearTimeout(memberTooltipTimeout.current)
-                        setMemberTooltip({ memberId: member.id, memberName: member.name, channelLabel: activeChannel?.label || '' })
+                        const presence = activeGroupPresence[member.id] || {}
+                        setMemberTooltip({
+                          memberId: member.id,
+                          memberName: member.name,
+                          channelLabel: presence.channelLabel || presence.channelId || 'Không xác định',
+                        })
                       }}
                       onMouseLeave={() => {
                         memberTooltipTimeout.current = setTimeout(() => setMemberTooltip(null), 150)
                       }}
                       className="flex w-full items-center gap-3 rounded-2xl p-2 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                     >
-                      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white">
-                        {member.initials || getInitials(member.name)}
-                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-900" />
-                      </div>
+                      <FirebaseUserAvatar avatarUrl={member.avatarUrl} name={member.name} initials={member.initials} sizeClass="h-10 w-10">
+                        <span className="absolute -bottom-0.5 -right-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-slate-900" />
+                      </FirebaseUserAvatar>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-slate-950 dark:text-white">{member.name}</p>
                         <p className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${badge.bg}`}>{badge.label}</p>
@@ -2983,7 +3252,7 @@ const handleLeaveGroup = async () => {
                     {memberTooltip?.memberId === member.id && (
                       <div className="absolute right-0 top-full z-50 mt-1 max-w-[calc(100vw-2rem)] whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xl dark:border-white/10 dark:bg-slate-800 dark:text-slate-200">
                         <span className="text-slate-400 dark:text-slate-400">Đang ở kênh </span>
-                        <span className="font-black text-violet-600 dark:text-violet-300">#{memberTooltip.channelLabel}</span>
+                        <span className="font-black text-blue-600 dark:text-blue-300">#{memberTooltip.channelLabel}</span>
                       </div>
                     )}
                   </div>
@@ -3008,7 +3277,7 @@ const handleLeaveGroup = async () => {
                     key={label}
                     type={clickable ? 'button' : undefined}
                     onClick={clickable ? onClick : undefined}
-                    className={`rounded-2xl bg-slate-50 p-4 text-center dark:bg-white/5 ${clickable ? 'w-full transition hover:-translate-y-0.5 hover:bg-violet-50 hover:shadow-lg dark:hover:bg-white/10' : ''}`}
+                    className={`rounded-2xl bg-slate-50 p-4 text-center dark:bg-white/5 ${clickable ? 'w-full transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-lg dark:hover:bg-white/10' : ''}`}
                   >
                     <div className="text-2xl">{icon}</div>
                     <p className="mt-2 text-xl font-black text-slate-950 dark:text-white">{value}</p>
@@ -3023,19 +3292,25 @@ const handleLeaveGroup = async () => {
 
       {/* Group settings modal (channel management now lives inside here) */}
       {groupSettingsOpen && activeGroup && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-md sm:p-6" onMouseDown={() => setGroupSettingsOpen(false)}>
-          <div className="flex h-[min(92vh,920px)] w-full max-w-6xl flex-col overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900 dark:shadow-black/60" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-5 border-b border-slate-200 bg-slate-50 px-7 py-6 dark:border-white/10 dark:bg-slate-950/40 sm:px-8">
-              <div className="min-w-0">
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-violet-700 dark:bg-white/10 dark:text-slate-300"><Settings className="h-3.5 w-3.5" />Group settings</div>
-                <h3 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">Cài đặt nhóm</h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">Dữ liệu đang lấy trực tiếp từ dữ liệu của nhóm <span className="font-black text-slate-950 dark:text-white">{activeGroup.name}</span>.</p>
+        <div className="fixed inset-0 z-[90] bg-slate-950/75 p-2 backdrop-blur-md sm:p-3" onMouseDown={() => setGroupSettingsOpen(false)}>
+          <style>{`
+            @keyframes zunySettingsOpen {
+              from { opacity: 0; transform: translateY(18px) scale(.975); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+          `}</style>
+          <div className="flex h-full w-full animate-[zunySettingsOpen_260ms_ease-out] flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-blue-950/30 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/70" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="relative flex shrink-0 items-center justify-center border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur dark:border-white/10 dark:bg-slate-950/95">
+              <div className="text-center">
+                <div className="mx-auto mb-2 inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-blue-700 dark:bg-blue-500/15 dark:text-blue-200"><Settings className="h-3.5 w-3.5" />ZUNY Group Settings</div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">Cài đặt nhóm</h3>
+                <p className="mt-1 hidden text-sm font-semibold text-slate-500 dark:text-slate-400 sm:block">Thiết lập và quản lý <span className="font-black text-slate-950 dark:text-white">{activeGroup.name}</span></p>
               </div>
-              <button type="button" onClick={() => setGroupSettingsOpen(false)} className="rounded-2xl p-3 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Đóng cài đặt nhóm"><X className="h-6 w-6" /></button>
+              <button type="button" onClick={() => setGroupSettingsOpen(false)} className="absolute right-4 top-1/2 -translate-y-1/2 rounded-2xl p-3 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white sm:right-6" aria-label="Đóng cài đặt nhóm"><X className="h-6 w-6" /></button>
             </div>
 
-            <div className="grid min-h-0 flex-1 md:grid-cols-[280px_minmax(0,1fr)]">
-              <aside className="border-b border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-950/40 md:border-b-0 md:border-r">
+            <div className="grid min-h-0 flex-1 md:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_330px]">
+              <aside className="min-h-0 overflow-y-auto border-b border-slate-200 bg-slate-50/90 p-4 dark:border-white/10 dark:bg-slate-900/55 md:border-b-0 md:border-r sm:p-5">
                 <div className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl shadow-lg" style={getGroupAvatarStyle(activeGroup.themeColor || groupSettingsForm.themeColor || '#8b5cf6')}>{activeGroup.emoji || '👥'}</div>
                   <h4 className="mt-3 truncate text-lg font-black text-slate-950 dark:text-white">{activeGroup.name}</h4>
@@ -3047,7 +3322,7 @@ const handleLeaveGroup = async () => {
                       key={id}
                       type="button"
                       onClick={() => setGroupSettingsTab(id)}
-                      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-black transition ${groupSettingsTab === id ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20' : 'text-slate-600 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}
+                      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-black transition ${groupSettingsTab === id ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'}`}
                     >
                       <span className="w-5 text-center">{icon}</span><span>{label}</span>
                     </button>
@@ -3055,7 +3330,7 @@ const handleLeaveGroup = async () => {
                 </div>
               </aside>
 
-              <div className="min-h-0 overflow-y-auto p-6 sm:p-8">
+              <div className="min-h-0 overflow-y-auto bg-white p-5 dark:bg-slate-950 sm:p-7 lg:p-8">
 
                 {/* TAB: Tổng quan */}
                 {groupSettingsTab === 'overview' && (
@@ -3076,8 +3351,8 @@ const handleLeaveGroup = async () => {
                     <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
                       <h5 className="mb-4 text-xl font-black text-slate-950 dark:text-white">Thông tin cơ bản</h5>
                       <div className="space-y-4">
-                        <div><label className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Tên nhóm</label><input value={groupSettingsForm.name} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, name: e.target.value })} disabled={!canManageActiveGroup} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" /></div>
-                        <div><label className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Mô tả</label><textarea value={groupSettingsForm.description} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, description: e.target.value })} disabled={!canManageActiveGroup} rows={4} placeholder="Chưa có mô tả." className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" /></div>
+                        <div><label className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Tên nhóm</label><input value={groupSettingsForm.name} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, name: e.target.value })} disabled={!canManageActiveGroup} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" /></div>
+                        <div><label className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Mô tả</label><textarea value={groupSettingsForm.description} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, description: e.target.value })} disabled={!canManageActiveGroup} rows={4} placeholder="Chưa có mô tả." className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" /></div>
                       </div>
                     </div>
                   </section>
@@ -3097,7 +3372,7 @@ const handleLeaveGroup = async () => {
                         ].map(([value, icon, label, helper]) => {
                           const active = groupSettingsForm.groupType === value
                           return (
-                            <button key={value} type="button" disabled={!canManageActiveGroup} onClick={() => setGroupSettingsForm({ ...groupSettingsForm, groupType: value, isPrivate: value === 'private', password: value === 'private' ? groupSettingsForm.password : '' })} className={`rounded-3xl border px-5 py-5 text-left transition disabled:opacity-60 ${active ? 'border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200' : 'border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300'}`}><p className="text-lg font-black">{icon} {label}</p><p className="mt-2 text-sm font-semibold opacity-75">{helper}</p></button>
+                            <button key={value} type="button" disabled={!canManageActiveGroup} onClick={() => setGroupSettingsForm({ ...groupSettingsForm, groupType: value, isPrivate: value === 'private', password: value === 'private' ? groupSettingsForm.password : '' })} className={`rounded-3xl border px-5 py-5 text-left transition disabled:opacity-60 ${active ? 'border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200' : 'border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300'}`}><p className="text-lg font-black">{icon} {label}</p><p className="mt-2 text-sm font-semibold opacity-75">{helper}</p></button>
                           )
                         })}
                       </div>
@@ -3157,45 +3432,72 @@ const handleLeaveGroup = async () => {
                 {/* TAB: Kênh */}
                 {groupSettingsTab === 'channels' && (
                   <section>
-                    <h4 className="mb-5 text-2xl font-black text-slate-950 dark:text-white">Quản lý kênh</h4>
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
-                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Thêm, đổi tên hoặc xoá kênh. Khi xoá kênh, toàn bộ tin nhắn và dữ liệu trong kênh đó sẽ bị mất vĩnh viễn.</p>
-                      <div className="mt-5 space-y-2">
-                        {DISCORD_CHANNELS.map((ch) => (
-                          <div key={ch.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-slate-950/40">
-                            <span className="text-xl">{ch.icon}</span>
-                            <span className="text-sm font-black text-slate-400 dark:text-slate-500">#</span>
-                            {editingChannelId === ch.id ? (
-                              <input autoFocus value={editingChannelLabel} onChange={(e) => setEditingChannelLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commitRenameChannel(); if (e.key === 'Escape') setEditingChannelId(null) }} className="min-w-0 flex-1 rounded-xl border border-violet-300 bg-violet-50/50 px-3 py-1.5 text-sm font-black text-slate-900 outline-none dark:border-violet-400/40 dark:bg-violet-500/10 dark:text-white" />
-                            ) : (
-                              <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-700 dark:text-slate-200">{ch.label}</span>
-                            )}
-                            <div className="flex items-center gap-1">
-                              {editingChannelId === ch.id ? (
-                                <button type="button" disabled={!canManageActiveGroup} onClick={commitRenameChannel} className="rounded-xl p-2 text-emerald-500 transition hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-500/10"><Check className="h-4 w-4" /></button>
-                              ) : (
-                                <button type="button" disabled={!canManageActiveGroup} onClick={() => startRenameChannel(ch)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-white"><Pencil className="h-4 w-4" /></button>
-                              )}
-                              <button type="button" disabled={!canManageActiveGroup || DISCORD_CHANNELS.length <= 1} onClick={() => removeChannel(ch.id)} className="rounded-xl p-2 text-rose-400 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-rose-500/10"><Trash2 className="h-4 w-4" /></button>
-                            </div>
-                          </div>
-                        ))}
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-2xl font-black text-slate-950 dark:text-white">Quản lý kênh</h4>
+                        <p className="mt-1 text-sm font-bold text-slate-400">Kênh văn bản và kênh âm thanh được quản lý độc lập.</p>
                       </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`rounded-full px-3 py-1 text-xs font-black ${textChannels.length >= MAX_TEXT_CHANNELS ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-200' : 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-200'}`}># {textChannels.length}/{MAX_TEXT_CHANNELS}</span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-black ${voiceChannels.length >= MAX_VOICE_CHANNELS ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-200' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-200'}`}>🔊 {voiceChannels.length}/{MAX_VOICE_CHANNELS}</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
                       {canManageActiveGroup && (
-                        <>
-                          <div className="mt-5 flex items-center gap-2">
-                            <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCustomChannel() }} placeholder="Nhập tên kênh tuỳ ý, VD: góc-deadline" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
-                            <button type="button" onClick={addCustomChannel} className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700"><Plus className="h-4 w-4" />Thêm kênh</button>
+                        <div className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950/40">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Thêm kênh tùy chỉnh</p>
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => setNewChannelType('chat')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${newChannelType === 'chat' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}># Kênh văn bản</button>
+                            <button type="button" onClick={() => setNewChannelType('voice')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${newChannelType === 'voice' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}>🔊 Kênh âm thanh</button>
                           </div>
-                          {availablePresetChannels.length > 0 && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomChannel() } }} placeholder={newChannelType === 'voice' ? 'Tên kênh âm thanh...' : 'Tên kênh văn bản...'} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
+                            <button type="button" onClick={addCustomChannel} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition ${newChannelType === 'voice' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}><Plus className="h-4 w-4" />Thêm</button>
+                          </div>
+                          {availablePresetChannels.filter((preset) => newChannelType === 'voice' ? preset.type === 'voice' : preset.type !== 'voice').length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {availablePresetChannels.map((preset) => (
-                                <button key={preset.id} type="button" onClick={() => addPresetChannel(preset)} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:text-violet-300"><span>{preset.icon}</span>{preset.label}</button>
+                              {availablePresetChannels.filter((preset) => newChannelType === 'voice' ? preset.type === 'voice' : preset.type !== 'voice').map((preset) => (
+                                <button key={preset.id} type="button" onClick={() => addPresetChannel(preset)} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300"><span>{preset.icon}</span>{preset.label}</button>
                               ))}
                             </div>
                           )}
-                        </>
+                        </div>
                       )}
+
+                      <div className="mt-5 space-y-4">
+                        {[
+                          { key: 'text', label: 'Kênh văn bản', icon: '#', channels: textChannels, collapsed: settingsTextChannelsCollapsed, toggle: () => setSettingsTextChannelsCollapsed((value) => !value) },
+                          { key: 'voice', label: 'Kênh âm thanh', icon: '🔊', channels: voiceChannels, collapsed: settingsVoiceChannelsCollapsed, toggle: () => setSettingsVoiceChannelsCollapsed((value) => !value) },
+                        ].map((section) => (
+                          <div key={section.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
+                            <button type="button" onClick={section.toggle} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-white/5">
+                              <span className="flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-200"><span>{section.icon}</span>{section.label}<span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-white/10 dark:text-slate-300">{section.channels.length}</span></span>
+                              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${section.collapsed ? '-rotate-90' : ''}`} />
+                            </button>
+                            {!section.collapsed && (
+                              <div className="space-y-2 border-t border-slate-200 p-3 dark:border-white/10">
+                                {section.channels.map((ch) => (
+                                  <div key={ch.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                                    {ch.icon ? <span className="text-xl">{ch.icon}</span> : null}
+                                    <span className="text-sm font-black text-slate-400 dark:text-slate-500">{ch.type === 'voice' ? 'VOICE' : '#'}</span>
+                                    {editingChannelId === ch.id ? (
+                                      <input autoFocus value={editingChannelLabel} onChange={(e) => setEditingChannelLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commitRenameChannel(); if (e.key === 'Escape') setEditingChannelId(null) }} className="min-w-0 flex-1 rounded-xl border border-blue-300 bg-blue-50/50 px-3 py-1.5 text-sm font-black text-slate-900 outline-none dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-white" />
+                                    ) : (
+                                      <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-700 dark:text-slate-200">{ch.label}</span>
+                                    )}
+                                    <div className="flex items-center gap-1">
+                                      {editingChannelId === ch.id ? <button type="button" disabled={!canManageActiveGroup} onClick={commitRenameChannel} className="rounded-xl p-2 text-emerald-500 transition hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-500/10"><Check className="h-4 w-4" /></button> : <button type="button" disabled={!canManageActiveGroup} onClick={() => startRenameChannel(ch)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-white"><Pencil className="h-4 w-4" /></button>}
+                                      <button type="button" disabled={!canManageActiveGroup || DISCORD_CHANNELS.length <= 1} onClick={() => removeChannel(ch.id)} className="rounded-xl p-2 text-rose-400 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-rose-500/10"><Trash2 className="h-4 w-4" /></button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {section.channels.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-7 text-center text-sm font-bold text-slate-400 dark:border-white/10">Chưa có {section.label.toLowerCase()}.</div>}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </section>
                 )}
@@ -3223,9 +3525,13 @@ const handleLeaveGroup = async () => {
                           return (
                             <div key={uid} className="flex items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
                               <div className="flex min-w-0 items-center gap-3">
-                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white">
-                                  {member.initials || getInitials(member.name)}
-                                </div>
+                                <FirebaseUserAvatar
+                                  avatarUrl={member.avatarUrl}
+                                  name={member.name}
+                                  initials={member.initials}
+                                  sizeClass="h-11 w-11"
+                                  roundedClass="rounded-2xl"
+                                />
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-black text-slate-950 dark:text-white">{member.name}</p>
                                   <p className="truncate text-xs font-bold text-slate-400 dark:text-slate-500">{uid}</p>
@@ -3244,7 +3550,7 @@ const handleLeaveGroup = async () => {
                 )}
 
                 {/* TAB: Quyền thành viên */}
-                {groupSettingsTab === 'permissions' && (
+                {groupSettingsTab === 'members' && (
                   <section>
                     <h4 className="mb-5 text-2xl font-black text-slate-950 dark:text-white">Quyền thành viên</h4>
                     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
@@ -3273,13 +3579,13 @@ const handleLeaveGroup = async () => {
                 )}
 
                 {/* TAB: Giới hạn thành viên */}
-                {groupSettingsTab === 'limit' && (
+                {groupSettingsTab === 'members' && (
                   <section>
                     <h4 className="mb-5 text-2xl font-black text-slate-950 dark:text-white">Giới hạn thành viên</h4>
                     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
                       <p className="text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">Nếu bỏ trống hoặc không hợp lệ, hệ thống dùng mặc định 1000 thành viên.</p>
                       <label className="mt-5 block text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Số thành viên tối đa</label>
-                      <input type="number" min="1" value={groupSettingsForm.memberLimit || ''} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, memberLimit: e.target.value })} disabled={!canManageActiveGroup} placeholder="1000" className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
+                      <input type="number" min="1" value={groupSettingsForm.memberLimit || ''} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, memberLimit: e.target.value })} disabled={!canManageActiveGroup} placeholder="1000" className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
                     </div>
                   </section>
                 )}
@@ -3301,9 +3607,9 @@ const handleLeaveGroup = async () => {
                               <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Mã mời</p>
                               <p className="mt-2 font-mono text-3xl font-black tracking-[0.28em] text-slate-950 dark:text-white">{activeGroup.inviteCode || 'NO-INVITE'}</p>
                             </div>
-                            <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup || !activeGroup.inviteCode} title="Copy mã mời" className="flex h-12 disabled:cursor-not-allowed disabled:opacity-45 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 transition hover:bg-violet-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30 dark:hover:text-indigo-200"><Copy className="h-5 w-5" /></button>
+                            <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup || !activeGroup.inviteCode} title="Copy mã mời" className="flex h-12 disabled:cursor-not-allowed disabled:opacity-45 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 transition hover:bg-blue-200 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30 dark:hover:text-sky-200"><Copy className="h-5 w-5" /></button>
                           </div>
-                          <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup || !activeGroup.inviteCode} className="mt-4 w-full rounded-2xl disabled:cursor-not-allowed disabled:opacity-45 bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700">Copy mã mời</button>
+                          <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup || !activeGroup.inviteCode} className="mt-4 w-full rounded-2xl disabled:cursor-not-allowed disabled:opacity-45 bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">Copy mã mời</button>
                         </>
                       )}
                     </div>
@@ -3319,11 +3625,11 @@ const handleLeaveGroup = async () => {
                       <div className="mt-5 grid gap-4 lg:grid-cols-[120px_minmax(0,1fr)]">
                         <div>
                           <label className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Icon nhóm</label>
-                          <input value={groupSettingsForm.emoji} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, emoji: e.target.value.slice(0, 4) })} disabled={!canManageActiveGroup} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-center text-3xl font-black text-slate-900 outline-none transition focus:border-violet-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white" />
+                          <input value={groupSettingsForm.emoji} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, emoji: e.target.value.slice(0, 4) })} disabled={!canManageActiveGroup} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-center text-3xl font-black text-slate-900 outline-none transition focus:border-blue-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white" />
                         </div>
                         <div>
                           <label className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Ảnh bìa</label>
-                          <input value={groupSettingsForm.coverImage} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, coverImage: e.target.value })} disabled={!canManageActiveGroup} placeholder="Dán URL ảnh bìa..." className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
+                          <input value={groupSettingsForm.coverImage} onChange={(e) => setGroupSettingsForm({ ...groupSettingsForm, coverImage: e.target.value })} disabled={!canManageActiveGroup} placeholder="Dán URL ảnh bìa..." className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 disabled:opacity-60 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
                         </div>
                       </div>
                       <div className="mt-5 h-36 overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 dark:border-white/10" style={getGroupThemeStyle(groupSettingsForm.themeColor || '#8b5cf6', groupSettingsForm.coverImage)} />
@@ -3356,7 +3662,7 @@ const handleLeaveGroup = async () => {
                                 type="button"
                                 disabled={!canManageActiveGroup}
                                 onClick={() => setGroupSettingsForm({ ...groupSettingsForm, themeColor: color.value })}
-                                className={`h-12 rounded-2xl border transition disabled:opacity-60 ${groupSettingsForm.themeColor === color.value ? 'scale-105 border-slate-950 ring-4 ring-violet-200 dark:border-white dark:ring-white/10' : 'border-slate-200 dark:border-white/10'}`}
+                                className={`h-12 rounded-2xl border transition disabled:opacity-60 ${groupSettingsForm.themeColor === color.value ? 'scale-105 border-slate-950 ring-4 ring-blue-200 dark:border-white dark:ring-white/10' : 'border-slate-200 dark:border-white/10'}`}
                                 style={{ background: color.value }}
                                 title={color.name}
                                 aria-label={`Chọn màu ${color.name}`}
@@ -3374,7 +3680,7 @@ const handleLeaveGroup = async () => {
                                 type="button"
                                 disabled={!canManageActiveGroup}
                                 onClick={() => setGroupSettingsForm({ ...groupSettingsForm, themeColor: gradient.value })}
-                                className={`relative h-14 overflow-hidden rounded-2xl border-2 transition disabled:opacity-60 ${groupSettingsForm.themeColor === gradient.value ? 'border-white ring-4 ring-violet-200 dark:ring-white/10' : 'border-slate-200 dark:border-white/10'}`}
+                                className={`relative h-14 overflow-hidden rounded-2xl border-2 transition disabled:opacity-60 ${groupSettingsForm.themeColor === gradient.value ? 'border-white ring-4 ring-blue-200 dark:ring-white/10' : 'border-slate-200 dark:border-white/10'}`}
                                 style={{ background: gradient.value }}
                                 aria-label={`Chọn gradient ${gradient.name}`}
                               >
@@ -3403,12 +3709,75 @@ const handleLeaveGroup = async () => {
                   </section>
                 )}
 
-                <div className="sticky bottom-0 -mx-6 -mb-6 mt-8 flex justify-end gap-3 border-t border-slate-200 bg-white/95 px-6 py-5 backdrop-blur dark:border-white/10 dark:bg-slate-900/95 sm:-mx-8 sm:-mb-8 sm:px-8">
+                <div className="sticky bottom-0 -mx-5 -mb-5 mt-8 flex flex-wrap justify-end gap-3 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-white/10 dark:bg-slate-950/95 sm:-mx-7 sm:-mb-7 sm:px-7 lg:-mx-8 lg:-mb-8 lg:px-8">
                   <button type="button" onClick={() => setGroupSettingsOpen(false)} className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15">Đóng</button>
                   {canManageActiveGroup && groupSettingsTab !== 'system' && groupSettingsTab !== 'invite' && groupSettingsTab !== 'channels' && (
-                    <button type="button" onClick={saveGroupSettings} disabled={savingGroupSettings} className="rounded-2xl bg-violet-600 px-6 py-3 text-sm font-black text-white transition hover:bg-violet-700 disabled:opacity-60">{savingGroupSettings ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
+                    <button type="button" onClick={saveGroupSettings} disabled={savingGroupSettings} className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60">{savingGroupSettings ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
                   )}
                 </div>
+              </div>
+
+              <aside className="hidden min-h-0 overflow-y-auto border-l border-slate-200 bg-slate-50/90 p-5 dark:border-white/10 dark:bg-slate-900/55 xl:block">
+                <div className="sticky top-0">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-500">Xem trước</p>
+                      <h4 className="mt-1 text-lg font-black text-slate-950 dark:text-white">Không gian nhóm</h4>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">Realtime</span>
+                  </div>
+
+                  <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/60 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/30">
+                    <div className="h-32 bg-slate-900" style={getGroupThemeStyle(groupSettingsForm.themeColor || activeGroup.themeColor || '#2563eb', groupSettingsForm.coverImage || activeGroup.coverImage || activeGroup.coverUrl || '')} />
+                    <div className="relative px-5 pb-5 pt-12">
+                      <div className="absolute -top-9 left-5 flex h-20 w-20 items-center justify-center rounded-[1.35rem] border-4 border-white text-3xl shadow-xl dark:border-slate-950" style={getGroupAvatarStyle(groupSettingsForm.themeColor || activeGroup.themeColor || '#2563eb')}>
+                        {groupSettingsForm.emoji || activeGroup.emoji || '👥'}
+                      </div>
+                      <h5 className="truncate text-xl font-black text-slate-950 dark:text-white">{groupSettingsForm.name || activeGroup.name || 'Nhóm học ZUNY'}</h5>
+                      <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">{groupSettingsForm.description || activeGroup.description || 'Không gian học tập và trao đổi kiến thức của nhóm.'}</p>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-black text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">{groupSettingsForm.groupType === 'private' ? '🔒 Riêng tư' : groupSettingsForm.groupType === 'invite_only' ? '✉️ Mã mời' : '🌍 Công khai'}</span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">👥 {memberCount.toLocaleString('vi-VN')}</span>
+                      </div>
+
+                      <div className="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Kênh hiện có</p>
+                        <div className="mt-3 space-y-2">
+                          {DISCORD_CHANNELS.slice(0, 5).map((channel) => (
+                            <div key={channel.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 dark:bg-white/5 dark:text-slate-300">
+                              <span>{channel.type === 'voice' ? '🔊' : '#'}</span>
+                              <span className="truncate">{channel.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-3xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-400/20 dark:bg-blue-500/10">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-600 dark:text-blue-300">Trạng thái</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-blue-700 dark:text-blue-100">{canManageActiveGroup ? 'Các thay đổi chỉ được ghi vào Firebase sau khi bạn nhấn “Lưu thay đổi”.' : 'Bạn đang xem cài đặt nhóm ở chế độ chỉ đọc.'}</p>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {leaveGroupConfirm && activeGroup && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md" onMouseDown={() => setLeaveGroupConfirm(false)}>
+          <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-rose-200 bg-white shadow-2xl dark:border-rose-500/20 dark:bg-slate-900" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="border-b border-rose-100 bg-rose-50 px-6 py-5 dark:border-rose-500/10 dark:bg-rose-500/5">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-600 dark:text-rose-300">Xác nhận rời nhóm</p>
+              <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">Rời khỏi {activeGroup.name || 'nhóm học'}?</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">Bạn sẽ không còn truy cập kênh chat, kênh âm thanh và thông báo của nhóm này. Bạn có chắc chắn muốn tiếp tục?</p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setLeaveGroupConfirm(false)} className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15">Hủy</button>
+                <button type="button" onClick={async () => { setLeaveGroupConfirm(false); await handleLeaveGroup() }} className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white transition hover:bg-rose-700">Rời nhóm</button>
               </div>
             </div>
           </div>
@@ -3449,16 +3818,16 @@ const handleLeaveGroup = async () => {
               <p className="mb-4 text-sm font-semibold text-slate-500 dark:text-slate-400">Chia sẻ mã mời này để mời bạn bè tham gia.</p>
               <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-slate-950/40">
                 <p className="flex-1 font-mono text-2xl font-black tracking-[0.28em] text-slate-950 dark:text-white">{activeGroup.inviteCode || 'NO-INVITE'}</p>
-                <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup} className="flex h-10 disabled:cursor-not-allowed disabled:opacity-45 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 transition hover:bg-violet-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30 dark:hover:text-indigo-200" title="Copy mã mời"><Copy className="h-5 w-5" /></button>
+                <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup} className="flex h-10 disabled:cursor-not-allowed disabled:opacity-45 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 transition hover:bg-blue-200 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30 dark:hover:text-sky-200" title="Copy mã mời"><Copy className="h-5 w-5" /></button>
               </div>
-              <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup} className="mt-4 w-full rounded-2xl disabled:cursor-not-allowed disabled:opacity-45 bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700">Copy mã mời</button>
+              <button type="button" onClick={copyGroupCode} disabled={!canInviteToActiveGroup} className="mt-4 w-full rounded-2xl disabled:cursor-not-allowed disabled:opacity-45 bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">Copy mã mời</button>
             </div>
           </div>
         </div>
       )}
 
       {/* Pinned messages popup */}
-      {showPinnedPopup && <PinnedMessagesPopup pinnedMessages={pinnedMessages} onClose={() => setShowPinnedPopup(false)} />}
+      {showPinnedPopup && <PinnedMessagesPopup pinnedMessages={pinnedMessages} resolveUser={resolveSyncedUser} onClose={() => setShowPinnedPopup(false)} />}
 
       {/* Member list popup — full roster, paginated 10 per page */}
       {groupReportModal?.group && (

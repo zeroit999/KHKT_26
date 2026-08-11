@@ -107,7 +107,7 @@ function MiniReactionButton({ reaction, summary, onReact = () => {} }) {
         }}
         className={`inline-flex touch-manipulation items-center gap-1 rounded-full px-2 py-1 text-[11px] font-black transition ${
           reaction
-            ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200'
             : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'
         }`}
       >
@@ -349,9 +349,9 @@ function PostDetailModal({ post, highlightedCommentId = '', currentUser, display
           </div>
         </div>
         <form onSubmit={addComment} className="flex items-center gap-3 border-t border-slate-200 p-4 dark:border-white/10">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white">{initials}</div>
-          <input ref={inputRef} value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder={!canComment ? 'Chỉ giáo viên được trả lời bài này' : 'Nhập bình luận...'} disabled={!canComment} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white" />
-          <button type="submit" disabled={!canComment} className="rounded-2xl bg-violet-600 p-3 text-white disabled:opacity-50"><Send className="h-5 w-5" /></button>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-xs font-black text-white">{initials}</div>
+          <input ref={inputRef} value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder={!canComment ? 'Chỉ giáo viên được trả lời bài này' : 'Nhập bình luận...'} disabled={!canComment} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white" />
+          <button type="submit" disabled={!canComment} className="rounded-2xl bg-blue-600 p-3 text-white disabled:opacity-50"><Send className="h-5 w-5" /></button>
         </form>
       </div>
     </div>
@@ -368,7 +368,7 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
   return (
     <div id={`forum-comment-${comment.id}`} className={`rounded-3xl transition ${highlighted ? 'bg-amber-100 p-2 ring-2 ring-amber-300 dark:bg-amber-500/15 dark:ring-amber-400/40' : ''}`}>
       <div className="flex gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 text-xs font-black text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-xs font-black text-white">
           {comment.authorInitials || getInitials(comment.authorName)}
         </div>
 
@@ -377,7 +377,7 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-black text-slate-950 dark:text-white">{comment.authorName}</span>
               <span className="text-[11px] font-bold text-slate-400">{formatRelativeTime(comment.createdAt)}</span>
-              {Number(comment.depth || level) > 1 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-600 dark:bg-violet-500/15 dark:text-violet-200">Trả lời</span>}
+              {Number(comment.depth || level) > 1 && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600 dark:bg-blue-500/15 dark:text-blue-200">Trả lời</span>}
             </div>
             <p className="mt-1 whitespace-pre-line text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{comment.content}</p>
           </div>
@@ -396,7 +396,7 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
                   if (!canComment) return toast.error('Bạn không có quyền trả lời bình luận này')
                   onReply(comment)
                 }}
-                className="rounded-full px-2 py-1 text-[11px] font-black text-violet-500 transition hover:bg-violet-50 dark:hover:bg-violet-500/10"
+                className="rounded-full px-2 py-1 text-[11px] font-black text-blue-500 transition hover:bg-blue-50 dark:hover:bg-blue-500/10"
               >
                 Trả lời
               </button>
@@ -422,15 +422,15 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
                 value={replyText}
                 onChange={(event) => onChangeReplyText(event.target.value)}
                 placeholder={`Trả lời ${comment.authorName || 'bình luận'}...`}
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold outline-none focus:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
               <button type="button" onClick={onCancelReply} className="rounded-xl px-3 py-2 text-xs font-black text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10">Hủy</button>
-              <button type="submit" className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">Gửi</button>
+              <button type="submit" className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white">Gửi</button>
             </form>
           )}
 
           {comment.replies?.length > 0 && (
-            <div className="mt-3 space-y-3 border-l-2 border-violet-100 pl-3 dark:border-violet-500/20">
+            <div className="mt-3 space-y-3 border-l-2 border-blue-100 pl-3 dark:border-blue-500/20">
               {comment.replies.map((reply) => (
                 <CommentItem
                   key={reply.id}

@@ -74,8 +74,8 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
       label: 'Bình chọn',
       icon: '📊',
       helper: 'Tạo câu hỏi bình chọn với ít nhất hai lựa chọn.',
-      activeClass: 'bg-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/25',
-      panelClass: 'border-fuchsia-200 bg-fuchsia-50 dark:border-fuchsia-400/20 dark:bg-fuchsia-500/10',
+      activeClass: 'bg-fuchsia-600 text-white shadow-lg shadow-blue-500/25',
+      panelClass: 'border-fuchsia-200 bg-fuchsia-50 dark:border-fuchsia-400/20 dark:bg-blue-500/10',
     },
   ]
 
@@ -84,7 +84,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
   const availableGroups = groups || []
   const availableClasses = classes || []
 
-  const inputClass = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400/60'
+  const inputClass = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400/60'
   const sectionClass = 'rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5'
 
   const addTag = () => {
@@ -162,12 +162,12 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm dark:bg-slate-950/70" onMouseDown={onClose}>
       <form
         onSubmit={submit}
-        className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-violet-500/15 dark:border-white/10 dark:bg-slate-900 dark:shadow-[0_0_60px_rgba(124,58,237,0.35)]"
+        className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-blue-500/15 dark:border-white/10 dark:bg-slate-900 dark:shadow-[0_0_60px_rgba(124,58,237,0.35)]"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 dark:border-white/10">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">ZUNY Community</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-500">Cộng đồng ZUNY</p>
             <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Đăng bài mới ✍️</h2>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Đóng">
@@ -177,7 +177,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
 
         <div className="max-h-[68vh] overflow-y-auto px-6 py-6">
           <div className="mb-5 flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white shadow-lg shadow-violet-500/20">
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-sm font-black text-white shadow-lg shadow-blue-500/20">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={displayName || 'Người dùng ZUNY'} className="h-full w-full object-cover" />
               ) : (
@@ -231,7 +231,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
                   value={form.title}
                   onChange={(event) => setForm({ ...form, title: event.target.value })}
                   placeholder={form.type === 'event' ? 'Tiêu đề sự kiện...' : form.type === 'poll' ? 'Câu hỏi bình chọn...' : 'Tiêu đề bài viết...'}
-                  className="w-full border-0 border-b border-slate-200 bg-transparent px-0 py-3 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:text-white dark:placeholder:text-slate-500"
+                  className="w-full border-0 border-b border-slate-200 bg-transparent px-0 py-3 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:text-white dark:placeholder:text-slate-500"
                 />
 
                 <textarea
@@ -245,7 +245,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
                         ? 'Mô tả câu hỏi, phần bạn chưa hiểu, dữ kiện bài toán...'
                         : 'Nội dung bài viết...'
                   }
-                  className="mt-4 w-full resize-none rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold leading-7 text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400/60"
+                  className="mt-4 w-full resize-none rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold leading-7 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400/60"
                 />
               </div>
 
@@ -363,7 +363,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
                   <button
                     type="button"
                     onClick={() => imageFileInputRef.current?.click()}
-                    className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700"
+                    className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700"
                   >
                     Tải ảnh lên
                   </button>
@@ -400,7 +400,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
                       key={tag}
                       type="button"
                       onClick={() => setForm({ ...form, tags: form.tags.filter((item) => item !== tag) })}
-                      className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/20 dark:text-violet-200"
+                      className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
                     >
                       #{tag} ×
                     </button>
@@ -434,7 +434,7 @@ function PostModal({ open, onClose, onSubmit, groups, classes, userClass, roleKe
             <button type="button" onClick={onClose} className="rounded-2xl px-5 py-3 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10">
               Hủy
             </button>
-            <button type="submit" className="rounded-2xl bg-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 disabled:opacity-50">
+            <button type="submit" className="rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 disabled:opacity-50">
               Đăng bài 🚀
             </button>
           </div>
@@ -452,12 +452,12 @@ function ToggleSwitch({ checked, onChange, icon, label }) {
       onClick={() => onChange(!checked)}
       className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition ${
         checked
-          ? 'border-violet-400 bg-violet-50 dark:border-violet-400/60 dark:bg-violet-500/15'
+          ? 'border-blue-400 bg-blue-50 dark:border-blue-400/60 dark:bg-blue-500/15'
           : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
       }`}
     >
       <span className="flex items-center gap-3 text-sm font-black text-slate-700 dark:text-slate-200"><span>{icon}</span>{label}</span>
-      <span className={`flex h-7 w-12 items-center rounded-full p-1 transition ${checked ? 'bg-violet-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
+      <span className={`flex h-7 w-12 items-center rounded-full p-1 transition ${checked ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
         <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${checked ? 'translate-x-5' : ''}`} />
       </span>
     </button>

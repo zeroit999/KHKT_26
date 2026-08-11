@@ -1,5 +1,6 @@
 import GroupModal from './components/GroupModal'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   addDoc,
   arrayRemove,
@@ -62,6 +63,17 @@ import {
   X,
   Zap,
   ChevronDown,
+  Bold,
+  Italic,
+  Underline,
+  Link2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  UploadCloud,
+  UserRoundX,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
@@ -76,6 +88,7 @@ const SECTIONS = {
   MY_POSTS: 'my-posts',
   SAVED: 'saved',
   NOTIFICATIONS: 'notifications',
+  ACCOUNT: 'account',
   ADMIN_REVIEW: 'admin-review',
 }
 const POST_TYPES = [
@@ -83,7 +96,7 @@ const POST_TYPES = [
   { value: 'discuss', label: 'Thảo luận', icon: TrendingUp, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200' },
   { value: 'announce', label: 'Thông báo', icon: Megaphone, color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200' },
   { value: 'event', label: 'Sự kiện', icon: Bell, color: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200' },
-  { value: 'poll', label: 'Bình chọn', icon: BarChart3, color: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-200' },
+  { value: 'poll', label: 'Bình chọn', icon: BarChart3, color: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-blue-500/15 dark:text-fuchsia-200' },
 ]
 
 const FILTER_TABS = [
@@ -337,7 +350,7 @@ const showConfirmPopup = ({ title, message, confirmText = 'Xác nhận', danger 
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={() => toast.dismiss(t.id)} className="cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">Hủy</button>
-          <button type="button" onClick={() => { toast.dismiss(t.id); onConfirm?.() }} className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-white transition ${danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-violet-600 hover:bg-violet-700'}`}>{confirmText}</button>
+          <button type="button" onClick={() => { toast.dismiss(t.id); onConfirm?.() }} className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-white transition ${danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'}`}>{confirmText}</button>
         </div>
       </div>
     </div>
@@ -360,7 +373,7 @@ const showSharePopup = (link) => {
         </div>
         <div className="mt-5 flex gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/5">
           <input readOnly value={link} className="min-w-0 flex-1 bg-transparent px-2 text-sm font-semibold text-slate-700 outline-none dark:text-slate-200" />
-          <button type="button" onClick={() => navigator.clipboard?.writeText(link).then(() => toast.success('Người dùng đã được copy link đó'))} className="cursor-pointer rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-700">Copy</button>
+          <button type="button" onClick={() => navigator.clipboard?.writeText(link).then(() => toast.success('Người dùng đã được copy link đó'))} className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700">Copy</button>
         </div>
         <button type="button" onClick={() => toast.dismiss(t.id)} className="mt-4 w-full cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">Đóng</button>
       </div>
@@ -368,6 +381,105 @@ const showSharePopup = (link) => {
   ), { id: 'forum-share-popup', duration: Infinity })
 }
 
+
+
+const sanitizeRichHtml = (value = '') => {
+  const source = String(value || '')
+  if (typeof window === 'undefined' || !source.includes('<')) return source
+  const doc = new DOMParser().parseFromString(source, 'text/html')
+  const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'A', 'P', 'DIV', 'BR', 'SPAN'])
+  doc.body.querySelectorAll('*').forEach((node) => {
+    if (!allowedTags.has(node.tagName)) {
+      node.replaceWith(...node.childNodes)
+      return
+    }
+    Array.from(node.attributes).forEach((attribute) => {
+      const name = attribute.name.toLowerCase()
+      if (node.tagName === 'A' && ['href', 'target', 'rel'].includes(name)) return
+      if (name === 'style') {
+        const textAlign = node.style.textAlign
+        node.removeAttribute('style')
+        if (['left', 'center', 'right'].includes(textAlign)) node.style.textAlign = textAlign
+        return
+      }
+      node.removeAttribute(attribute.name)
+    })
+    if (node.tagName === 'A') {
+      const href = String(node.getAttribute('href') || '').trim()
+      if (!/^(https?:\/\/|\/|#)/i.test(href)) node.removeAttribute('href')
+      node.setAttribute('rel', 'noopener noreferrer')
+    }
+  })
+  return doc.body.innerHTML
+}
+
+const stripRichHtml = (value = '') => {
+  const source = String(value || '')
+  if (typeof window === 'undefined') return source.replace(/<[^>]*>/g, ' ')
+  const doc = new DOMParser().parseFromString(source, 'text/html')
+  return doc.body.textContent || ''
+}
+
+const isInternalForumLink = (href = '') => {
+  try {
+    const url = new URL(href, window.location.origin)
+    return url.origin === window.location.origin
+  } catch {
+    return false
+  }
+}
+
+function ExternalLinkWarning({ href, onClose }) {
+  if (!href || typeof document === 'undefined') return null
+
+  const continueToExternalSite = () => {
+    const target = href
+    onClose()
+    window.open(target, '_blank', 'noopener,noreferrer')
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md" onMouseDown={onClose}>
+      <div className="w-full max-w-md rounded-3xl border border-amber-300/40 bg-white p-6 shadow-2xl dark:border-amber-300/20 dark:bg-slate-900" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-200"><AlertTriangle className="h-6 w-6" /></div>
+        <h3 className="mt-4 text-xl font-black text-slate-950 dark:text-white">Bạn đang rời khỏi ZUNY</h3>
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">Liên kết này dẫn tới một website bên ngoài. Hãy đề phòng các đường dẫn nguy hiểm trước khi tiếp tục.</p>
+        <p className="mt-3 break-all rounded-2xl bg-slate-100 px-4 py-3 text-xs font-bold text-blue-600 dark:bg-white/5 dark:text-blue-300">{href}</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-black text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">Hủy</button>
+          <button type="button" onClick={continueToExternalSite} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">Tiếp tục <ExternalLink className="h-4 w-4" /></button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function RichPostContent({ content = '', clamp = false }) {
+  const [externalHref, setExternalHref] = useState('')
+  const html = sanitizeRichHtml(content)
+  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(html)
+  if (!hasHtml) return <p className={`${clamp ? 'line-clamp-3' : ''} mt-3 whitespace-pre-wrap text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300`}>{content}</p>
+  return (
+    <>
+      <div
+        className={`${clamp ? 'line-clamp-3' : ''} mt-3 break-words text-sm font-semibold leading-7 text-slate-600 [overflow-wrap:anywhere] dark:text-slate-300 [&_a]:font-black [&_a]:text-blue-600 [&_a]:underline [&_a]:decoration-blue-400/50 [&_a]:underline-offset-2 dark:[&_a]:text-cyan-300`}
+        dangerouslySetInnerHTML={{ __html: html }}
+        onClick={(event) => {
+          const anchor = event.target.closest?.('a')
+          if (!anchor) return
+          event.preventDefault()
+          event.stopPropagation()
+          const href = anchor.getAttribute('href') || ''
+          if (!href) return
+          if (isInternalForumLink(href)) window.location.href = new URL(href, window.location.origin).href
+          else setExternalHref(new URL(href, window.location.origin).href)
+        }}
+      />
+      <ExternalLinkWarning href={externalHref} onClose={() => setExternalHref('')} />
+    </>
+  )
+}
 
 function RestrictionNoticeModal({ modal, onClose }) {
   if (!modal) return null
@@ -420,7 +532,7 @@ function CenterConfirmModal({ modal, onClose }) {
           <button type="button" onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
             Hủy
           </button>
-          <button type="button" onClick={runConfirm} className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-white transition ${modal.danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-violet-600 hover:bg-violet-700'}`}>
+          <button type="button" onClick={runConfirm} className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-white transition ${modal.danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
             {modal.confirmText || 'Xác nhận'}
           </button>
         </div>
@@ -471,7 +583,7 @@ function AdminReasonConfirmModal({ modal, onClose }) {
                 key={item}
                 type="button"
                 onClick={() => setSelectedOption(item)}
-                className={`rounded-2xl border px-3 py-2 text-left text-xs font-black transition ${selectedOption === item ? 'border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-200' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'}`}
+                className={`rounded-2xl border px-3 py-2 text-left text-xs font-black transition ${selectedOption === item ? 'border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-200' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'}`}
               >
                 {item}
               </button>
@@ -484,14 +596,14 @@ function AdminReasonConfirmModal({ modal, onClose }) {
           onChange={(event) => setReason(event.target.value)}
           rows={4}
           placeholder={modal.placeholder || 'Nhập lời giải thích...'}
-          className="mt-5 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500"
+          className="mt-5 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500"
         />
 
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
             Hủy
           </button>
-          <button type="button" onClick={runConfirm} className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-white transition ${modal.danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-violet-600 hover:bg-violet-700'}`}>
+          <button type="button" onClick={runConfirm} className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-black text-white transition ${modal.danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
             {modal.confirmText || 'Xác nhận'}
           </button>
         </div>
@@ -524,7 +636,7 @@ function CenterShareModal({ link, onClose }) {
 
         <div className="mt-5 flex gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/5">
           <input readOnly value={link} className="min-w-0 flex-1 bg-transparent px-2 text-sm font-semibold text-slate-700 outline-none dark:text-slate-200" />
-          <button type="button" onClick={copyLink} className="cursor-pointer rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-700">
+          <button type="button" onClick={copyLink} className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700">
             Copy
           </button>
         </div>
@@ -575,7 +687,7 @@ const showGroupCreatedPopup = ({ groupCode = '', inviteCode = '', onEnter = () =
         <div className="mt-5 grid gap-2">
           <button type="button" onClick={() => copyText(groupCode, 'mã nhóm')} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10">Copy mã nhóm</button>
           <button type="button" disabled={!inviteCode} onClick={() => copyText(inviteCode, 'mã mời')} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10">Copy mã mời</button>
-          <button type="button" onClick={() => { toast.dismiss(t.id); onEnter() }} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700">Vào nhóm ngay</button>
+          <button type="button" onClick={() => { toast.dismiss(t.id); onEnter() }} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">Vào nhóm ngay</button>
         </div>
       </div>
     </div>
@@ -593,6 +705,7 @@ function Forum({ onChannelViewChange = () => {} }) {
   const [profilePopup, setProfilePopup] = useState(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const [posts, setPosts] = useState([])
+  const [savedPosts, setSavedPosts] = useState([])
   const [groups, setGroups] = useState([])
   const [notifications, setNotifications] = useState([])
   const [loadingPosts, setLoadingPosts] = useState(true)
@@ -601,6 +714,7 @@ function Forum({ onChannelViewChange = () => {} }) {
   const [sortBy, setSortBy] = useState('newest')
   const [myPostStatusFilter, setMyPostStatusFilter] = useState('all')
   const [notificationFilter, setNotificationFilter] = useState('all')
+  const [accountTab, setAccountTab] = useState('my-posts')
   const [search, setSearch] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
   const [groupOpen, setGroupOpen] = useState(false)
@@ -630,7 +744,8 @@ function Forum({ onChannelViewChange = () => {} }) {
   const roleKey = getRoleKey(profile?.role || profile?.userRole || profile?.type)
   const displayName = profile?.fullName || profile?.displayName || profile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Người dùng ZUNY'
   const initials = getInitials(displayName, currentUser?.email)
-  const avatarUrl = profile?.photoURL || profile?.avatarUrl || profile?.avatarURL || profile?.avatar || profile?.profileImage || currentUser?.photoURL || ''
+  const liveCurrentUserProfile = userProfiles[currentUser?.uid] || profile || {}
+  const avatarUrl = liveCurrentUserProfile.photoURL || liveCurrentUserProfile.avatarUrl || liveCurrentUserProfile.avatarURL || liveCurrentUserProfile.avatar || liveCurrentUserProfile.profileImage || currentUser?.photoURL || ''
   const userClass = profile?.className || profile?.class || profile?.lop || profile?.studentClass || ''
   const currentForumRestrictions = userProfiles[currentUser?.uid]?.forumRestrictions || profile?.forumRestrictions || {}
 
@@ -705,6 +820,34 @@ function Forum({ onChannelViewChange = () => {} }) {
     return () => unsubscribe()
   }, [])
 
+  // Đồng bộ realtime riêng cho mục Đã lưu. Listener này không phụ thuộc giới hạn
+  // của bảng tin chung, nên bài cũ đã lưu vẫn xuất hiện và cập nhật ngay.
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setSavedPosts([])
+      return undefined
+    }
+
+    const savedPostsQuery = query(
+      collection(db, 'forumPosts'),
+      where('savedBy', 'array-contains', currentUser.uid),
+      limit(300),
+    )
+
+    const unsubscribe = onSnapshot(
+      savedPostsQuery,
+      (snapshot) => {
+        const nextSavedPosts = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .sort((a, b) => timestampToMs(b.createdAt) - timestampToMs(a.createdAt))
+        setSavedPosts(nextSavedPosts)
+      },
+      (error) => console.warn('Không thể đồng bộ bài đã lưu:', error),
+    )
+
+    return () => unsubscribe()
+  }, [currentUser?.uid])
+
   useEffect(() => {
     const groupsQuery = query(collection(db, 'forumGroups'), orderBy('createdAt', 'desc'), limit(80))
     const unsubscribe = onSnapshot(
@@ -748,16 +891,58 @@ function Forum({ onChannelViewChange = () => {} }) {
 
     const unsubscribe = onSnapshot(
       notificationsQuery,
-      (snapshot) => setNotifications(
-        snapshot.docs
+      (snapshot) => {
+        const joinedGroupIds = new Set(
+          groups
+            .filter((group) => {
+              const membershipLists = [
+                group?.memberIds,
+                group?.members,
+                group?.userIds,
+                group?.joinedUsers,
+                group?.participants,
+                group?.studentIds,
+                group?.students,
+                group?.adminIds,
+                group?.admins,
+              ]
+
+              const matchesCurrentUser = (value) => {
+                if (typeof value === 'string') return value === currentUser.uid
+                if (!value || typeof value !== 'object') return false
+                return value.uid === currentUser.uid || value.id === currentUser.uid || value.userId === currentUser.uid
+              }
+
+              return (
+                group?.ownerId === currentUser.uid ||
+                group?.createdBy === currentUser.uid ||
+                membershipLists.some((list) => Array.isArray(list) && list.some(matchesCurrentUser))
+              )
+            })
+            .map((group) => group.id),
+        )
+
+        const notificationsForCurrentMemberships = snapshot.docs
           .map((item) => ({ id: item.id, ...item.data() }))
-          .sort((a, b) => timestampToMs(b.createdAt) - timestampToMs(a.createdAt)),
-      ),
+          .filter((item) => {
+            const hiddenGroupTypes = new Set(['member-left', 'group-left', 'left-group', 'user-left-group'])
+            if (hiddenGroupTypes.has(String(item.type || '').toLowerCase())) return false
+            if (item.scope !== 'group' || !item.groupId) return true
+
+            // Chỉ giữ thông báo nhóm bị xóa; mọi thông báo khác của nhóm đã rời đều bị loại ngay.
+            if (item.type === 'group-deleted-by-admin') return true
+
+            return joinedGroupIds.has(item.groupId)
+          })
+          .sort((a, b) => timestampToMs(b.createdAt) - timestampToMs(a.createdAt))
+
+        setNotifications(notificationsForCurrentMemberships)
+      },
       (error) => console.warn('Không thể tải thông báo:', error),
     )
 
     return () => unsubscribe()
-  }, [currentUser?.uid])
+  }, [currentUser?.uid, groups])
 
   useEffect(() => {
     if (!posts.length) return
@@ -926,15 +1111,17 @@ function Forum({ onChannelViewChange = () => {} }) {
 
   const filteredPosts = useMemo(() => {
     const keyword = normalizeText(search.trim())
+    const accountMode = activeSection === SECTIONS.ACCOUNT ? accountTab : ''
+    const realtimeSourcePosts = accountMode === 'saved' || activeSection === SECTIONS.SAVED ? savedPosts : posts
 
-    const nextPosts = posts.filter((post) => {
+    const nextPosts = realtimeSourcePosts.filter((post) => {
 
       if (activeSection === SECTIONS.GROUPS) {
         if (post.scope !== 'group') return false
         if (roleKey === 'student' && post.groupId && !joinedGroupIds.has(post.groupId)) return false
       }
 
-if (activeSection === SECTIONS.MY_POSTS) {
+if (activeSection === SECTIONS.MY_POSTS || (activeSection === SECTIONS.ACCOUNT && accountTab === 'my-posts')) {
   if (post.authorId !== currentUser?.uid) return false
 
   const status = post.status || 'approved'
@@ -942,7 +1129,7 @@ if (activeSection === SECTIONS.MY_POSTS) {
   if (myPostStatusFilter === 'approved' && status !== 'approved') return false
   if (myPostStatusFilter === 'rejected' && status !== 'rejected') return false
 }
-      if (activeSection === SECTIONS.SAVED && !(post.savedBy || []).includes(currentUser?.uid)) return false
+      if ((activeSection === SECTIONS.SAVED || (activeSection === SECTIONS.ACCOUNT && accountTab === 'saved')) && !(post.savedBy || []).includes(currentUser?.uid)) return false
       if (activeSection === SECTIONS.ADMIN_REVIEW) {
         if (roleKey !== 'admin_dev') return false
         if (adminReviewMode !== 'pending') return false
@@ -951,7 +1138,7 @@ if (activeSection === SECTIONS.MY_POSTS) {
 
       if ([SECTIONS.HALL, SECTIONS.NOTIFICATIONS].includes(activeSection) && post.scope && post.scope !== 'hall') return false
       if (activeSection === SECTIONS.HALL && (post.status || 'approved') !== 'approved') return false
-      if (![SECTIONS.MY_POSTS, SECTIONS.ADMIN_REVIEW].includes(activeSection) && (post.status || 'approved') !== 'approved') return false
+      if (![SECTIONS.MY_POSTS, SECTIONS.ACCOUNT, SECTIONS.ADMIN_REVIEW].includes(activeSection) && (post.status || 'approved') !== 'approved') return false
 
 if (filter === 'hot') {
   const isAdminPost = ['admin', 'admin_dev'].includes(post.authorRole)
@@ -976,7 +1163,7 @@ if (filter === 'hot') {
       }
       return timestampToMs(b.createdAt) - timestampToMs(a.createdAt)
     })
-}, [posts, activeSection, currentUser?.uid, filter, search, sortBy, joinedGroupIds, roleKey, userClass, myPostStatusFilter, adminReviewMode])
+}, [posts, savedPosts, activeSection, accountTab, currentUser?.uid, filter, search, sortBy, joinedGroupIds, roleKey, userClass, myPostStatusFilter, adminReviewMode])
 const filteredNotifications = useMemo(() => {
   return notifications.filter((item) => {
     if (notificationFilter === 'all') return true
@@ -1129,10 +1316,17 @@ const filteredNotifications = useMemo(() => {
     })
   }
 
-  const stats = useMemo(() => ({
-    postCount: posts.filter((post) => (post.status || 'approved') === 'approved').length,
-    todayCount: posts.filter((post) => (post.status || 'approved') === 'approved' && new Date(timestampToMs(post.createdAt)).toDateString() === new Date().toDateString()).length,
-  }), [posts])
+  const stats = useMemo(() => {
+    const approvedPosts = posts.filter((post) => (post.status || 'approved') === 'approved')
+
+    return {
+      postCount: approvedPosts.length,
+      todayCount: approvedPosts.filter((post) => new Date(timestampToMs(post.createdAt)).toDateString() === new Date().toDateString()).length,
+      memberCount: Object.keys(userProfiles).length,
+      groupCount: groups.filter((group) => !group.isSample).length,
+      hotCount: approvedPosts.filter((post) => ['admin', 'admin_dev'].includes(post.authorRole) || Number(post.likesCount || 0) > 10).length,
+    }
+  }, [posts, userProfiles, groups])
 
   const openPost = async (post) => {
     setSelectedPost(post)
@@ -2262,11 +2456,41 @@ setCreatedGroupPopup({
         return
       }
 
-      await updateDoc(doc(db, 'forumGroups', group.id), {
+      const groupMembershipUpdate = {
         memberIds: joined ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
         membersCount: increment(joined ? -1 : 1),
         updatedAt: serverTimestamp(),
-      })
+      }
+
+      if (joined) {
+        groupMembershipUpdate.adminIds = arrayRemove(currentUser.uid)
+        groupMembershipUpdate.pendingMemberIds = arrayRemove(currentUser.uid)
+      }
+
+      await updateDoc(doc(db, 'forumGroups', group.id), groupMembershipUpdate)
+
+      if (joined) {
+        // Ẩn ngay tại giao diện trước khi Firestore hoàn tất xóa để không còn nhấp nháy thông báo cũ.
+        setNotifications((previous) => previous.filter((item) => item.groupId !== group.id))
+        setNotificationModal((previous) => previous?.groupId === group.id ? null : previous)
+
+        // Xóa các thông báo cũ của chính nhóm vừa rời để chúng không còn nằm trong hộp thư.
+        const userNotificationsSnapshot = await getDocs(
+          query(
+            collection(db, 'forumNotifications'),
+            where('toUserId', '==', currentUser.uid),
+            limit(200),
+          ),
+        )
+
+        const staleGroupNotifications = userNotificationsSnapshot.docs.filter((item) => {
+          const data = item.data() || {}
+          return data.scope === 'group' && data.groupId === group.id
+        })
+
+        await Promise.all(staleGroupNotifications.map((item) => deleteDoc(item.ref)))
+      }
+
       toast.success(joined ? 'Đã rời nhóm' : 'Đã tham gia nhóm')
     } catch (error) {
       console.error('Không thể cập nhật nhóm:', error)
@@ -2378,6 +2602,7 @@ setCreatedGroupPopup({
   initialActiveGroupId={openCreatedGroupId}
   displayName={displayName}
   initials={initials}
+  avatarUrl={avatarUrl}
   roleKey={roleKey}
   userClass={userClass}
   onJoin={toggleJoinGroup}
@@ -2393,22 +2618,31 @@ setCreatedGroupPopup({
 
             <div className={`mx-auto grid w-full max-w-7xl gap-4 px-3 py-3 sm:px-4 sm:py-4 lg:px-6 ${activeSection === SECTIONS.HALL ? "xl:grid-cols-[minmax(0,1fr)_300px]" : "grid-cols-1"}`}>
               <div className="min-w-0">
-                {activeSection === SECTIONS.HALL && <HallHero stats={stats} onCompose={openComposer} />}
+                {activeSection === SECTIONS.HALL && <HallHero stats={stats} onCompose={openComposer} onExploreGroups={() => setActiveSection(SECTIONS.GROUPS)} />}
                 {activeSection === SECTIONS.GROUPS && null}
-                {activeSection === SECTIONS.MY_POSTS && <SimpleHero icon="📝" title="Bài viết của tôi" subtitle="Quản lý các bài bạn đã đăng trong cộng đồng." />}
-                {activeSection === SECTIONS.MY_POSTS && (
-  <StatusFilterBar
-    value={myPostStatusFilter}
-    onChange={setMyPostStatusFilter}
-    options={[
-      { value: 'all', label: 'Tất cả' },
-      { value: 'approved', label: 'Bài đăng thành công' },
-      { value: 'rejected', label: 'Bài đăng thất bại' },
-    ]}
-  />
-)}
-                {activeSection === SECTIONS.SAVED && <SimpleHero icon="🔖" title="Bài đã lưu" subtitle="Tài liệu, câu hỏi và thảo luận bạn muốn xem lại." />}
-                {activeSection === SECTIONS.NOTIFICATIONS && <SimpleHero icon="🔔" title="Thông báo" subtitle="Tương tác mới từ bạn bè, giáo viên và nhóm học tập." />}
+                {activeSection === SECTIONS.ACCOUNT && (
+                  <AccountHero
+                    displayName={displayName}
+                    avatarUrl={avatarUrl}
+                    initials={initials}
+                    accountTab={accountTab}
+                    onChange={setAccountTab}
+                    myPostsCount={posts.filter((post) => post.authorId === currentUser?.uid).length}
+                    savedCount={savedPosts.length}
+                    unreadCount={unreadNotificationsCount}
+                  />
+                )}
+                {activeSection === SECTIONS.ACCOUNT && accountTab === 'my-posts' && (
+                  <StatusFilterBar
+                    value={myPostStatusFilter}
+                    onChange={setMyPostStatusFilter}
+                    options={[
+                      { value: 'all', label: 'Tất cả' },
+                      { value: 'approved', label: 'Bài đăng thành công' },
+                      { value: 'rejected', label: 'Bài đăng thất bại' },
+                    ]}
+                  />
+                )}
                 {activeSection === SECTIONS.ADMIN_REVIEW && <SimpleHero icon="🛡️" title="Quản lý" subtitle="Quản trị bài viết, báo cáo và nhóm học trong cộng đồng ZUNY." />}
 
                 {activeSection === SECTIONS.HALL && <ComposerBar onOpen={openComposer} onAvatarClick={() => openUserProfile({ uid: currentUser?.uid, name: displayName, role: roleKey, avatarUrl })} initials={initials} avatarUrl={avatarUrl} name={displayName} />}
@@ -2484,7 +2718,7 @@ setCreatedGroupPopup({
                       />
                     )}
                   </>
-                ) : activeSection === SECTIONS.NOTIFICATIONS ? (
+                ) : activeSection === SECTIONS.NOTIFICATIONS || (activeSection === SECTIONS.ACCOUNT && accountTab === 'notifications') ? (
                   <>
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <StatusFilterBar
@@ -2529,7 +2763,7 @@ setCreatedGroupPopup({
   userProfiles={userProfiles}
   onOpenUserProfile={openUserProfile}
   likingPostIds={likingPostIds}
-  showStatusBadge={activeSection === SECTIONS.MY_POSTS}
+  showStatusBadge={activeSection === SECTIONS.MY_POSTS || (activeSection === SECTIONS.ACCOUNT && accountTab === 'my-posts')}
   onOpen={openPost}
   onLike={toggleLike}
   onReport={setReportModal}
@@ -2620,7 +2854,7 @@ setCreatedGroupPopup({
               navigator.clipboard?.writeText(createdGroupPopup.groupCode || '')
               toast.success('Đã copy mã nhóm')
             }}
-            className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white transition hover:bg-violet-700"
+            className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-700"
           >
             Copy
           </button>
@@ -2643,7 +2877,7 @@ setCreatedGroupPopup({
                 navigator.clipboard?.writeText(createdGroupPopup.inviteCode)
                 toast.success('Đã copy mã mời')
               }}
-              className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white transition hover:bg-violet-700"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-700"
             >
               Copy
             </button>
@@ -2660,7 +2894,7 @@ setCreatedGroupPopup({
     setActiveSection(SECTIONS.GROUPS)
     setOpenCreatedGroupId(targetGroupId)
   }}
-  className="mt-2 w-full rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700"
+  className="mt-2 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700"
 >
   Vào nhóm ngay
 </button>
@@ -2689,12 +2923,9 @@ function Sidebar({
   onToggleCollapsed,
 }) {
   const items = [
-    
     { id: SECTIONS.HALL, label: 'Cộng đồng ZUNY', icon: Globe2 },
     { id: SECTIONS.GROUPS, label: 'Nhóm học', icon: Users },
-    { id: SECTIONS.MY_POSTS, label: 'Bài của tôi', icon: FileText },
-    { id: SECTIONS.SAVED, label: 'Đã lưu', icon: Bookmark },
-    { id: SECTIONS.NOTIFICATIONS, label: 'Thông báo', icon: Bell, badge: unreadNotificationsCount },
+    { id: SECTIONS.ACCOUNT, label: 'Tài khoản', icon: FileText, badge: unreadNotificationsCount },
     ...(roleKey === 'admin_dev'
       ? [{ id: SECTIONS.ADMIN_REVIEW, label: 'Quản lý', icon: ShieldCheck, badge: pendingReviewCount }]
       : []),
@@ -2702,31 +2933,33 @@ function Sidebar({
 
   const content = (
     <aside
-      className={`flex h-full max-h-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white/95 p-4 shadow-xl shadow-slate-200/70 backdrop-blur transition-all duration-300 dark:border-white/10 dark:bg-slate-950/95 dark:shadow-black/20 ${
+      className={`flex h-full max-h-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-4 shadow-xl shadow-slate-200/60 transition-all duration-300 dark:border-blue-950/80 dark:bg-[#030b1d] dark:shadow-black/30 ${
         collapsed ? 'w-24' : 'w-72'
       }`}
     >
-      <div className={`shrink-0 flex items-center gap-3 px-2 py-2 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-cyan-500 text-white shadow-lg shadow-indigo-500/25">
-            <Globe2 className="h-6 w-6" />
+      <div className={`flex shrink-0 items-center gap-3 px-2 pb-5 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex min-w-0 items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
+          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-300/50 bg-gradient-to-br from-cyan-400 via-blue-500 to-blue-700 text-white shadow-[0_0_24px_rgba(37,99,235,0.55)] dark:border-blue-400/40">
+            <Globe2 className="h-5 w-5" />
+            <span className="absolute inset-1 rounded-xl border border-white/15" />
           </div>
 
           {!collapsed && (
-            
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">ZUNY Community</h1>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Cộng đồng học tập</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-[15px] font-black uppercase tracking-[0.02em] text-slate-950 dark:text-white">Cộng đồng ZUNY</h1>
+              <p className="mt-0.5 truncate text-[10px] font-bold text-slate-400 dark:text-blue-200/55">Học tập · Chia sẻ · Kết nối</p>
             </div>
           )}
         </div>
 
-        <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 lg:hidden">
+        <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10 lg:hidden">
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      <nav className="mt-8 flex-1 space-y-2 overflow-y-auto pr-1">
+      <div className="mx-2 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-blue-900/70" />
+
+      <nav className="mt-4 flex-1 space-y-1.5 overflow-y-auto pr-1">
         {items.map((item) => {
           const Icon = item.icon
           const active = activeSection === item.id
@@ -2736,18 +2969,22 @@ function Sidebar({
               type="button"
               onClick={() => onChange(item.id)}
               title={collapsed ? item.label : undefined}
-              className={`flex w-full items-center rounded-2xl px-4 py-3 text-sm font-black transition ${
+              className={`group flex w-full items-center rounded-xl border px-3 py-2.5 text-sm font-black transition-all duration-200 ${
                 collapsed ? 'justify-center' : 'gap-3'
               } ${
                 active
-                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
+                  ? 'border-blue-400/50 bg-gradient-to-r from-blue-600/20 via-blue-500/15 to-cyan-400/10 text-blue-700 shadow-[inset_0_0_18px_rgba(37,99,235,0.08),0_0_20px_rgba(37,99,235,0.12)] dark:border-blue-500/60 dark:text-white dark:shadow-[inset_0_0_20px_rgba(37,99,235,0.14),0_0_22px_rgba(37,99,235,0.18)]'
+                  : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:border-blue-900/60 dark:hover:bg-blue-950/35 dark:hover:text-white'
               }`}
             >
-              <span className="relative inline-flex">
-                <Icon className="h-5 w-5 shrink-0" />
+              <span className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-200 ${
+                active
+                  ? 'bg-blue-600 text-white shadow-[0_0_18px_rgba(37,99,235,0.75)]'
+                  : 'text-slate-400 group-hover:text-blue-500 dark:text-slate-400 dark:group-hover:text-blue-300'
+              }`}>
+                <Icon className={`h-4.5 w-4.5 ${active ? 'drop-shadow-[0_0_7px_rgba(255,255,255,0.8)]' : ''}`} />
                 {item.badge > 0 && (
-                  <span className="absolute -right-2.5 -top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[10px] font-black text-white shadow-lg shadow-cyan-400/40">
+                  <span className="absolute -right-2.5 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-blue-500 px-1 text-[9px] font-black text-white shadow-lg dark:border-[#030b1d]">
                     {item.badge > 999 ? '999+' : item.badge}
                   </span>
                 )}
@@ -2763,18 +3000,9 @@ function Sidebar({
           type="button"
           onClick={onToggleCollapsed}
           title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
-          className={`group hidden w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-500 shadow-sm transition-all duration-300 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200 lg:flex ${
-            collapsed ? 'h-12 px-0' : ''
-          }`}
+          className={`group hidden w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 dark:border-blue-950/80 dark:bg-blue-950/25 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-200 lg:flex ${collapsed ? 'h-12 px-0' : ''}`}
         >
-          {collapsed ? (
-            <PanelRightOpen className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
-          ) : (
-            <>
-              <PanelLeftClose className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
-              <span className="whitespace-nowrap">Thu gọn menu</span>
-            </>
-          )}
+          {collapsed ? <PanelRightOpen className="h-5 w-5" /> : <><PanelLeftClose className="h-5 w-5" /><span>Thu gọn menu</span></>}
         </button>
       </div>
     </aside>
@@ -2797,9 +3025,9 @@ function TopBar({ search, setSearch, onCompose, onMenu, initials, unread, profil
         </button>
         <div className="relative min-w-0 flex-1 lg:max-w-2xl">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm kiếm bài viết, câu hỏi, tài liệu..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-slate-900" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm kiếm bài viết, câu hỏi, tài liệu..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-slate-900" />
         </div>
-        <button type="button" onClick={onCompose} className="hidden items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/25 transition hover:-translate-y-0.5 sm:flex">
+        <button type="button" onClick={onCompose} className="hidden items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-500/25 transition hover:-translate-y-0.5 sm:flex">
           <Plus className="h-4 w-4" />
           Đăng bài
         </button>
@@ -2807,7 +3035,7 @@ function TopBar({ search, setSearch, onCompose, onMenu, initials, unread, profil
           <Bell className="h-5 w-5" />
           {unread > 0 && <span className="absolute right-2 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">{unread > 9 ? '9+' : unread}</span>}
         </button>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-violet-500 text-sm font-black text-white shadow-lg shadow-cyan-500/20">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-sm font-black text-white shadow-lg shadow-cyan-500/20">
           {profileLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : initials}
         </div>
       </div>
@@ -2815,79 +3043,101 @@ function TopBar({ search, setSearch, onCompose, onMenu, initials, unread, profil
   )
 }
 
-function HallHero({ stats, onCompose }) {
-  const [now, setNow] = useState(new Date())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const currentTime = now.toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
+function HallHero({ stats, onCompose, onExploreGroups }) {
+  const metricItems = [
+    { value: Number(stats.memberCount || 0).toLocaleString('vi-VN'), label: 'Thành viên', icon: Users },
+    { value: Number(stats.todayCount || 0).toLocaleString('vi-VN'), label: 'Bài đăng hôm nay', icon: MessageSquare },
+  ]
 
   return (
-    <section className="relative mb-5 overflow-hidden rounded-[2rem] bg-gradient-to-br from-indigo-600 via-violet-600 to-cyan-600 p-7 text-white shadow-2xl shadow-indigo-500/20">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(255,255,255,0.20),transparent_35%),radial-gradient(circle_at_85%_10%,rgba(255,255,255,0.14),transparent_34%)]" />
-      <div className="relative z-10 max-w-xl">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/80 backdrop-blur">
-          <Globe2 className="h-4 w-4" />
-          ZUNY Community
-        </div>
-        <h2 className="text-3xl font-black tracking-tight md:text-5xl">Cộng đồng ZUNY 🌍</h2>
-        <p className="mt-4 max-w-lg text-sm font-semibold leading-7 text-white/75">Nơi học sinh và giáo viên cùng chia sẻ, hỏi đáp, đăng tài liệu và trò chuyện theo thời gian thực.</p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button data-zuny-ai-action="create-post" type="button" onClick={onCompose} className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5">
-            <Plus className="h-4 w-4" />
-            Đăng bài mới
-          </button>
-        </div>
+    <section className="relative mb-5 overflow-hidden rounded-[1.5rem] border border-blue-200 bg-white text-slate-950 shadow-[0_20px_70px_-30px_rgba(37,99,235,0.35)] dark:border-blue-400/25 dark:bg-[#041025] dark:text-white dark:shadow-[0_20px_70px_-30px_rgba(37,99,235,0.75)]">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(37,99,235,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.07)_1px,transparent_1px)] bg-[size:30px_30px] opacity-70 dark:bg-[linear-gradient(rgba(56,189,248,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.09)_1px,transparent_1px)] dark:opacity-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(59,130,246,0.16),transparent_33%),radial-gradient(circle_at_10%_100%,rgba(14,165,233,0.10),transparent_36%)] dark:bg-[radial-gradient(circle_at_82%_18%,rgba(37,99,235,0.42),transparent_33%),radial-gradient(circle_at_10%_100%,rgba(14,165,233,0.18),transparent_36%)]" />
+      <div className="pointer-events-none absolute -right-14 -top-24 hidden h-80 w-80 rounded-full border border-cyan-300/20 bg-[radial-gradient(circle_at_35%_30%,rgba(56,189,248,0.75),rgba(30,64,175,0.45)_38%,rgba(2,6,23,0.08)_70%)] shadow-[0_0_90px_rgba(37,99,235,0.45)] md:block">
+        <div className="absolute inset-[14%] rounded-full border border-blue-200/20" />
+        <div className="absolute inset-x-[7%] top-1/2 h-px bg-cyan-200/25" />
+        <div className="absolute bottom-[8%] left-1/2 top-[8%] w-px bg-blue-200/20" />
       </div>
-<div className="absolute right-10 top-1/3 hidden h-35 w-35 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/70 bg-slate-950/20 shadow-2xl shadow-white/10 backdrop-blur-md lg:flex">
-  <p className="text-2xl font-black tabular-nums tracking-wide text-white drop-shadow">
-    {currentTime}
-  </p>
-</div>
-      <div className="relative z-10 mt-7 flex gap-3 sm:absolute sm:bottom-6 sm:right-6 sm:mt-0">
-        <HeroStat value={stats.postCount} label="Bài viết" />
-        <HeroStat value={`+${stats.todayCount}`} label="Hôm nay" />
+
+      <div className="relative grid min-h-[235px] gap-6 p-5 sm:p-7 xl:grid-cols-[minmax(0,1fr)_330px] xl:items-end">
+        <div className="relative z-10 flex flex-col justify-center">
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-400/25 bg-blue-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-blue-700 dark:text-blue-100">
+            <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.95)]" /> Cộng đồng ZUNY
+          </div>
+          <h2 className="mt-5 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-[2.55rem]">
+            Không gian học tập,
+            <span className="block bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-300 bg-clip-text text-transparent">trao đổi và phát triển cùng nhau</span>
+          </h2>
+          <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-blue-100/65">Chia sẻ kiến thức, đặt câu hỏi và kết nối trong một cộng đồng học thuật hiện đại.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button type="button" onClick={onCompose} className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/35 bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2.5 text-xs font-black text-white shadow-[0_0_24px_rgba(37,99,235,0.55)] transition hover:-translate-y-0.5 hover:brightness-110"><Plus className="h-4 w-4" />Đăng bài mới</button>
+            <button type="button" onClick={onExploreGroups} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white/90 px-4 py-2.5 text-xs font-black text-blue-700 shadow-sm transition dark:border-blue-300/25 dark:bg-slate-950/35 dark:text-blue-50 hover:-translate-y-0.5 hover:bg-blue-950/55"><Users className="h-4 w-4" />Khám phá nhóm học</button>
+          </div>
+        </div>
+        <div className="relative z-10 grid grid-cols-2 gap-3">
+          {metricItems.map(({ value, label, icon: Icon }) => (
+            <div key={label} className="rounded-2xl border border-blue-200 bg-white/90 p-4 shadow-sm backdrop-blur-md dark:border-blue-300/20 dark:bg-slate-950/45 dark:shadow-none transition hover:-translate-y-0.5 hover:border-cyan-300/35">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-blue-400/25 bg-blue-500/15 text-cyan-300"><Icon className="h-4 w-4" /></div>
+              <p className="mt-4 text-2xl font-black tabular-nums">{value}</p>
+              <p className="mt-1 text-[11px] font-bold text-slate-500 dark:text-blue-100/55">{label}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
 }
 
-
-
-function HeroStat({ value, label }) {
+function AccountHero({ displayName, avatarUrl, initials, accountTab, onChange, myPostsCount, savedCount, unreadCount }) {
+  const tabs = [
+    { id: 'my-posts', label: 'Bài của tôi', icon: FileText, count: myPostsCount },
+    { id: 'saved', label: 'Đã lưu', icon: Bookmark, count: savedCount },
+    { id: 'notifications', label: 'Thông báo', icon: Bell, count: unreadCount },
+  ]
   return (
-    <div className="min-w-[58px] text-center">
-      <div className="text-lg font-black leading-none text-white md:text-xl">
-        {value}
+    <section className="relative mb-5 overflow-hidden rounded-[1.5rem] border border-blue-200 bg-white p-5 text-slate-950 shadow-[0_18px_55px_-28px_rgba(37,99,235,0.25)] dark:border-blue-400/20 dark:bg-[#061126] dark:text-white dark:shadow-[0_18px_55px_-28px_rgba(37,99,235,0.7)] sm:p-6">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(37,99,235,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.09)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
+      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <ProfileAvatar src={avatarUrl} initials={initials} className="h-16 w-16 rounded-2xl ring-1 ring-cyan-300/30" />
+          <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Trung tâm tài khoản</p><h2 className="mt-1 truncate text-2xl font-black">{displayName}</h2><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-blue-100/55">Quản lý nội dung, mục đã lưu và thông báo tại một nơi.</p></div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {tabs.map(({ id, label, icon: Icon, count }) => {
+            const active = accountTab === id
+            return <button key={id} type="button" onClick={() => onChange(id)} className={`group rounded-2xl border px-3 py-3 text-left transition ${active ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-[0_0_24px_rgba(37,99,235,0.18)] dark:border-cyan-300/45 dark:bg-blue-600/25 dark:text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-300/15 dark:bg-slate-950/30 dark:text-white dark:hover:border-blue-300/30 dark:hover:bg-blue-950/45'}`}><div className="flex items-center justify-between gap-2"><span className={`grid h-8 w-8 place-items-center rounded-xl ${active ? 'bg-blue-500 text-white shadow-[0_0_16px_rgba(59,130,246,0.7)]' : 'bg-white text-blue-500 shadow-sm dark:bg-white/5 dark:text-blue-200'}`}><Icon className="h-4 w-4" /></span><span className="text-sm font-black tabular-nums">{Number(count || 0).toLocaleString('vi-VN')}</span></div><p className="mt-2 text-[11px] font-bold text-slate-500 dark:text-blue-100/70">{label}</p></button>
+          })}
+        </div>
       </div>
-      <div className="mt-1 text-[11px] font-bold text-white/65">
-        {label}
-      </div>
-    </div>
+    </section>
   )
 }
-
 
 function GroupsHero({ onCreate }) {
   return null
 }
 
-function SimpleHero({ icon, title, subtitle, gradient = 'from-slate-900 via-indigo-700 to-violet-700' }) {
-  return <section className={`mb-5 rounded-[2rem] bg-gradient-to-br ${gradient} p-7 text-white shadow-xl`}><div className="text-4xl">{icon}</div><h2 className="mt-3 text-3xl font-black">{title}</h2><p className="mt-3 max-w-xl text-sm font-semibold leading-7 text-white/75">{subtitle}</p></section>
+function SimpleHero({ icon, title, subtitle }) {
+  return (
+    <section className="relative mb-5 overflow-hidden rounded-[1.5rem] border border-blue-200 bg-white p-6 text-slate-950 shadow-[0_18px_55px_-28px_rgba(37,99,235,0.28)] dark:border-blue-400/20 dark:bg-[#061126] dark:text-white dark:shadow-[0_18px_55px_-28px_rgba(37,99,235,0.7)] sm:p-7">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(37,99,235,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.07)_1px,transparent_1px)] bg-[size:28px_28px] dark:bg-[linear-gradient(rgba(56,189,248,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.08)_1px,transparent_1px)]" />
+      <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-500/20" />
+      <div className="relative flex items-center gap-4">
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-blue-200 bg-blue-50 text-2xl shadow-sm dark:border-blue-400/20 dark:bg-blue-500/15">{icon}</div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-cyan-300">Trung tâm điều hành</p>
+          <h2 className="mt-1 text-2xl font-black sm:text-3xl">{title}</h2>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-blue-100/60">{subtitle}</p>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 function ComposerBar({ onOpen, onAvatarClick, initials, avatarUrl, name }) {
   return (
-    <div className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-violet-300 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:hover:border-violet-400/50 sm:p-4">
-      <button type="button" onClick={onAvatarClick} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-400" aria-label="Mở hồ sơ người dùng">
+    <div className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-blue-300 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:hover:border-blue-400/50 sm:p-4">
+      <button type="button" onClick={onAvatarClick} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400" aria-label="Mở hồ sơ người dùng">
         <ProfileAvatar src={avatarUrl} initials={initials} className="h-10 w-10 sm:h-11 sm:w-11" />
       </button>
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 rounded-2xl bg-slate-100 px-3 py-3 text-left text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300 sm:px-4 sm:text-sm">{name ? `${name} ơi, bạn muốn chia sẻ gì?` : 'Bạn muốn chia sẻ gì?'}</button>
@@ -2906,7 +3156,7 @@ function StatusFilterBar({ value, onChange, options }) {
           onClick={() => onChange(item.value)}
           className={`rounded-2xl px-4 py-2 text-xs font-black transition ${
             value === item.value
-              ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
               : 'bg-white text-slate-500 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
           }`}
         >
@@ -2946,7 +3196,7 @@ function FilterBar({
                 active ? 'w-auto gap-1.5 px-3' : 'w-10 px-0'
               } ${
                 active
-                  ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                   : 'bg-white text-slate-500 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
               }`}
             >
@@ -2977,7 +3227,7 @@ function FilterBar({
             bg-white px-9 py-2.5 text-xs font-bold
             text-slate-700 outline-none transition
             placeholder:text-slate-400
-            focus:border-violet-400
+            focus:border-blue-400
             dark:border-white/10
             dark:bg-white/5
             dark:text-white
@@ -2995,9 +3245,9 @@ function FilterBar({
             flex min-w-[132px] items-center justify-between gap-3 rounded-2xl border
             border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700
             shadow-sm transition
-            hover:border-violet-300
-            hover:bg-violet-50
-            hover:text-violet-700
+            hover:border-blue-300
+            hover:bg-blue-50
+            hover:text-blue-700
             dark:border-white/10
             dark:bg-slate-900
             dark:text-white
@@ -3039,7 +3289,7 @@ function FilterBar({
                 }}
                 className={`block w-full rounded-xl px-3 py-2.5 text-left text-xs font-black transition ${
                   sortBy === value
-                    ? 'bg-violet-600 text-white'
+                    ? 'bg-blue-600 text-white'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
                 }`}
               >
@@ -3099,6 +3349,7 @@ function PostCard({
   const userReaction = getUserReaction(post, currentUserId)
   const reactionSummary = getReactionSummary(post.reactions || {}, post.reactionCounts || {})
   const saved = (post.savedBy || []).includes(currentUserId)
+  const saveCount = Array.isArray(post.savedBy) ? post.savedBy.length : 0
   const canDelete = post.authorId === currentUserId || ['admin', 'admin_dev'].includes(roleKey)
   const adminPost = isAdminAuthor(post.authorRole)
   const isEventPost = post.type === 'event'
@@ -3126,7 +3377,7 @@ function PostCard({
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={(event) => { event.stopPropagation(); onOpenUserProfile({ uid: post.authorId, name: post.authorName, role: post.authorRole, avatarUrl: post.authorPhotoURL, isAnonymous: post.isAnonymous }) }} disabled={post.isAnonymous || !post.authorId} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:cursor-default" aria-label="Mở hồ sơ tác giả"><ProfileAvatar src={authorProfile.photoURL || authorProfile.avatarUrl || authorProfile.avatarURL || authorProfile.avatar || authorProfile.profileImage || post.authorPhotoURL} initials={post.authorInitials || getInitials(post.authorName)} className="h-11 w-11 sm:h-12 sm:w-12" /></button>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onOpenUserProfile({ uid: post.authorId, name: post.authorName, role: post.authorRole, avatarUrl: post.authorPhotoURL, isAnonymous: post.isAnonymous }) }} disabled={post.isAnonymous || !post.authorId} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-default" aria-label="Mở hồ sơ tác giả">{post.isAnonymous ? <span className="grid h-11 w-11 place-items-center rounded-2xl border border-blue-400/25 bg-slate-900 text-cyan-300 shadow-lg shadow-blue-500/15 sm:h-12 sm:w-12"><UserRoundX className="h-6 w-6" /></span> : <ProfileAvatar src={authorProfile.photoURL || authorProfile.avatarUrl || authorProfile.avatarURL || authorProfile.avatar || authorProfile.profileImage || post.authorPhotoURL} initials={post.authorInitials || getInitials(post.authorName)} className="h-11 w-11 sm:h-12 sm:w-12" />}</button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-black text-slate-950 dark:text-white">{post.authorName || 'Người dùng ZUNY'}</h3>
@@ -3155,7 +3406,7 @@ function PostCard({
 
         {post.isPinned && <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-500/15 dark:text-amber-200"><Star className="h-3.5 w-3.5 fill-current" />Bài ghim</div>}
         <h2 className="text-xl font-black leading-snug text-slate-950 dark:text-white">{post.title}</h2>
-        <p className="mt-3 line-clamp-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">{post.content}</p>
+        <RichPostContent content={post.content} clamp />
 
         {(post.status || 'approved') === 'pending' && (
           <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
@@ -3183,7 +3434,7 @@ function PostCard({
         )}
 
         {post.teacherOnly && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-sky-500/15 dark:text-sky-200">
             🎓 Chỉ giáo viên được trả lời
           </div>
         )}
@@ -3260,7 +3511,7 @@ function PostCard({
         <ReactionButton reaction={userReaction} summary={reactionSummary} disabled={liking} onReact={(reaction) => onLike(post, reaction)} />
         <ActionButton onClick={() => onOpen(post)} icon={MessageCircle} label={Number(post.commentsCount || 0)} />
         <ActionButton icon={Eye} label={Number(post.viewsCount || 0)} />
-        <ActionButton active={saved} onClick={() => onSave(post)} icon={saved ? BookmarkCheck : Bookmark} label={saved ? 'Đã lưu' : 'Lưu'} />
+        <ActionButton active={saved} onClick={() => onSave(post)} icon={saved ? BookmarkCheck : Bookmark} label={saved ? 'Đã lưu' : 'Lưu'} count={saveCount} />
         <PostMoreMenu onReport={() => onReport(post)} />
         <button type="button" onClick={() => onShare(post)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"><Share2 className="h-5 w-5" /></button>
         {canDelete && <button type="button" onClick={() => onDelete(post)} className="rounded-xl p-2 text-rose-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"><Trash2 className="h-5 w-5" /></button>}
@@ -3290,7 +3541,7 @@ function PollBlock({ post, currentUserId, onVote }) {
   }, [])
 
   return (
-    <div className="mt-4 rounded-3xl border border-fuchsia-100 bg-fuchsia-50 p-4 dark:border-fuchsia-400/20 dark:bg-fuchsia-500/10">
+    <div className="mt-4 rounded-3xl border border-fuchsia-100 bg-fuchsia-50 p-4 dark:border-fuchsia-400/20 dark:bg-blue-500/10">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm font-black text-fuchsia-700 dark:text-fuchsia-200">📊 Bình chọn</p>
         <div className="flex items-center gap-2">
@@ -3304,11 +3555,11 @@ function PollBlock({ post, currentUserId, onVote }) {
       {(post.pollStartAt || post.pollEndAt) && (
         <div className="mb-3 grid gap-2 text-xs font-black sm:grid-cols-2">
           <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-white/10">
-            <p className="text-[10px] uppercase tracking-[0.14em] text-fuchsia-500/75 dark:text-fuchsia-200/80">Thời gian mở</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-blue-500/75 dark:text-fuchsia-200/80">Thời gian mở</p>
             <p className="mt-1 text-slate-900 dark:text-white">🟢 {formatEventDateTime(post.pollStartAt) || 'Chưa cập nhật'}</p>
           </div>
           <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-white/10">
-            <p className="text-[10px] uppercase tracking-[0.14em] text-fuchsia-500/75 dark:text-fuchsia-200/80">Thời gian đóng</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-blue-500/75 dark:text-fuchsia-200/80">Thời gian đóng</p>
             <p className="mt-1 text-slate-900 dark:text-white">🔴 {formatEventDateTime(post.pollEndAt) || 'Chưa cập nhật'}</p>
           </div>
         </div>
@@ -3350,7 +3601,7 @@ function PollBlock({ post, currentUserId, onVote }) {
                     : 'border-slate-200 bg-white hover:border-fuchsia-300 dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-fuchsia-400/50'
               }`}
             >
-              <span className="absolute inset-y-0 left-0 bg-fuchsia-500/15 transition-all" style={{ width: `${percent}%` }} />
+              <span className="absolute inset-y-0 left-0 bg-blue-500/15 transition-all" style={{ width: `${percent}%` }} />
               <span className="relative flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-sm font-black text-slate-800 dark:text-white">
                   {selected ? '✓ ' : ''}{option.text}
@@ -3450,7 +3701,7 @@ function ReactionButton({ reaction, summary, disabled = false, onReact = () => {
         }}
         className={`inline-flex touch-manipulation items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
           reaction
-            ? 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-200'
+            ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200'
             : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
         }`}
       >
@@ -3545,7 +3796,7 @@ function MiniReactionButton({ reaction, summary, onReact = () => {} }) {
         }}
         className={`inline-flex touch-manipulation items-center gap-1 rounded-full px-2 py-1 text-[11px] font-black transition ${
           reaction
-            ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200'
             : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10'
         }`}
       >
@@ -3575,7 +3826,7 @@ function PostMoreMenu({ onReport }) {
   )
 }
 
-function ActionButton({ icon: Icon, label, active, disabled = false, onClick = () => {} }) {
+function ActionButton({ icon: Icon, label, count, active, disabled = false, onClick = () => {} }) {
   return (
     <button
       type="button"
@@ -3588,13 +3839,18 @@ function ActionButton({ icon: Icon, label, active, disabled = false, onClick = (
       }`}
     >
       <Icon className={`h-4 w-4 ${active ? 'fill-current' : ''}`} />
-      {label}
+      <span>{label}</span>
+      {count !== undefined && (
+        <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-black tabular-nums ${active ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-100' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+          {Number(count || 0).toLocaleString('vi-VN')}
+        </span>
+      )}
     </button>
   )
 }
 
 function EmptyState({ icon, title, description, actionLabel, onAction }) {
-  return <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center dark:border-white/10 dark:bg-white/5"><div className="text-5xl">{icon}</div><h3 className="mt-4 text-xl font-black text-slate-950 dark:text-white">{title}</h3><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">{description}</p>{actionLabel && <button type="button" onClick={onAction} className="mt-5 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white">{actionLabel}</button>}</div>
+  return <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center dark:border-white/10 dark:bg-white/5"><div className="text-5xl">{icon}</div><h3 className="mt-4 text-xl font-black text-slate-950 dark:text-white">{title}</h3><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">{description}</p>{actionLabel && <button type="button" onClick={onAction} className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white">{actionLabel}</button>}</div>
 }
 
 function GroupsGrid({ groups, currentUserId, roleKey, onJoin, onOpenChat, onDelete }) {
@@ -3652,7 +3908,7 @@ function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSea
       <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-white/10 dark:bg-slate-900/70 dark:shadow-black/20">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
               <UserX className="h-4 w-4" /> Quản lý cá nhân
             </div>
             <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">Quyền hoạt động cộng đồng</h3>
@@ -3660,7 +3916,7 @@ function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSea
           </div>
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Tìm tên, email, lớp..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400/70 dark:focus:bg-slate-950" />
+            <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Tìm tên, email, lớp..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400/70 dark:focus:bg-slate-950" />
           </div>
         </div>
 
@@ -3674,10 +3930,10 @@ function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSea
             const avatar = user.photoURL || user.avatarUrl || user.avatarURL || user.avatar || user.profileImage || ''
             const protectedAdmin = role === 'admin_dev'
             return (
-              <div key={user.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-violet-200 hover:bg-white dark:border-white/10 dark:bg-slate-950/50 dark:hover:border-violet-400/30 dark:hover:bg-slate-900/90">
+              <div key={user.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-200 hover:bg-white dark:border-white/10 dark:bg-slate-950/50 dark:hover:border-blue-400/30 dark:hover:bg-slate-900/90">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-sm font-black text-white">
                       {avatar ? <img src={avatar} alt={name} className="h-full w-full object-cover" /> : <span className="grid h-full w-full place-items-center">{getInitials(name, user.email)}</span>}
                     </div>
                     <div className="min-w-0">
@@ -3705,7 +3961,7 @@ function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSea
 
 function RestrictionToggle({ icon: Icon, label, description, active, disabled, onChange }) {
   return (
-    <button type="button" disabled={disabled} onClick={() => onChange(!active)} className={`flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition-colors ${active ? 'border-rose-300 bg-rose-50 text-rose-950 hover:bg-rose-100 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-white dark:hover:bg-rose-500/15' : 'border-slate-200 bg-white text-slate-900 hover:border-violet-300 hover:bg-violet-50 dark:border-white/10 dark:bg-slate-900/80 dark:text-white dark:hover:border-violet-400/30 dark:hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-50`}>
+    <button type="button" disabled={disabled} onClick={() => onChange(!active)} className={`flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition-colors ${active ? 'border-rose-300 bg-rose-50 text-rose-950 hover:bg-rose-100 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-white dark:hover:bg-rose-500/15' : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300 hover:bg-blue-50 dark:border-white/10 dark:bg-slate-900/80 dark:text-white dark:hover:border-blue-400/30 dark:hover:bg-white/10'} disabled:cursor-not-allowed disabled:opacity-50`}>
       <div className="flex min-w-0 items-center gap-3">
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${active ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}><Icon className="h-4 w-4" /></span>
         <span className="min-w-0"><span className="block text-xs font-black text-slate-800 dark:text-white">{label}</span><span className="mt-0.5 block text-[10px] font-bold text-slate-400">{disabled ? 'Tài khoản được bảo vệ' : description}</span></span>
@@ -3766,7 +4022,7 @@ function GroupAdminPanel({ mode = 'stats', groups = [], reports = [], onJoinRepo
               </div>
 
               <div className="mt-5 flex flex-wrap justify-end gap-2">
-                <button type="button" onClick={() => onJoinReportedGroup(group)} className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-700">Tham gia nhóm</button>
+                <button type="button" onClick={() => onJoinReportedGroup(group)} className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700">Tham gia nhóm</button>
                 <button type="button" onClick={() => onWarnOwner(group, latest)} className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white transition hover:bg-amber-600">Viết cảnh báo</button>
                 <button type="button" onClick={() => onResolveGroupReport(group, item.reports.map((report) => report.id))} className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white transition hover:bg-emerald-700">Đã giải quyết</button>
                 <button type="button" onClick={() => onDeleteGroup(group)} className="rounded-2xl bg-rose-600 px-4 py-2 text-sm font-black text-white transition hover:bg-rose-700">Xóa nhóm</button>
@@ -3958,7 +4214,7 @@ function NotificationList({ notifications, onRead = () => {}, onDelete = () => {
                 : 'border-amber-300 bg-amber-50 shadow-lg shadow-amber-200/50 dark:border-amber-400/40 dark:bg-amber-500/15 dark:shadow-amber-500/10'
               : item.read
                 ? 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
-                : 'border-violet-300 bg-violet-50 dark:border-violet-400/30 dark:bg-violet-500/10'
+                : 'border-blue-300 bg-blue-50 dark:border-blue-400/30 dark:bg-blue-500/10'
           }`}
         >
           {!item.read ? (
@@ -3974,7 +4230,7 @@ function NotificationList({ notifications, onRead = () => {}, onDelete = () => {
                   ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200'
                   : item.category === 'admin' || item.type === 'admin'
                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
-                    : 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+                    : 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200'
               }`}>
                 {item.category === 'event' || item.type === 'event'
                   ? 'Sự kiện'
@@ -4034,12 +4290,12 @@ function NotificationPopup({ notification, onClose, onGoToPost = () => {} }) {
               ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-200'
               : isAdmin
                 ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-200'
-                : 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-200'
+                : 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-200'
           }`}>
             {isEvent ? '🗓️' : isAdmin ? '🛡️' : '🔔'}
           </div>
 
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-cyan-300">
             {isEvent ? 'Thông báo sự kiện' : isAdmin ? 'Thông báo quản trị viên' : 'Thông báo bài viết'}
           </p>
 
@@ -4061,7 +4317,7 @@ function NotificationPopup({ notification, onClose, onGoToPost = () => {} }) {
             <button
               type="button"
               onClick={onGoToPost}
-              className="rounded-2xl bg-violet-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700"
+              className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700"
             >
               Chuyển hướng
             </button>
@@ -4083,7 +4339,7 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
   const [eventsVisible, setEventsVisible] = useState(4)
 
 
-  const listScrollClass = 'pr-2 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(139,92,246,0.65)_rgba(15,23,42,0.35)] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-800/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-violet-500/70 [&::-webkit-scrollbar-thumb:hover]:bg-violet-400'
+  const listScrollClass = 'pr-2 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(139,92,246,0.65)_rgba(15,23,42,0.35)] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-800/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-500/70 [&::-webkit-scrollbar-thumb:hover]:bg-blue-400'
 
   const hotTopics = useMemo(() => {
     const counts = new Map()
@@ -4132,7 +4388,7 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
         id: post.id,
         title: post.title,
         time: `${formatEventDateTime(post.eventStartAt || post.eventDate)}${post.eventEndAt ? ` → ${formatEventDateTime(post.eventEndAt)}` : ''}`,
-        color: adminEvent ? 'bg-amber-400' : interested ? 'bg-emerald-400' : ['bg-rose-500', 'bg-indigo-500', 'bg-amber-500', 'bg-cyan-500'][index % 4],
+        color: adminEvent ? 'bg-amber-400' : interested ? 'bg-emerald-400' : ['bg-rose-500', 'bg-sky-500', 'bg-amber-500', 'bg-cyan-500'][index % 4],
         adminEvent,
         interested,
         post,
@@ -4158,7 +4414,7 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
 >          {visibleHotTopics.length ? visibleHotTopics.map((topic, index) => (
             <div key={topic.name} className="flex items-center gap-3">
               <span className="w-4 text-center text-xs font-black text-slate-400">{index + 1}</span>
-              <span className="max-w-[130px] truncate rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
+              <span className="max-w-[130px] truncate rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
                 {topic.name}
               </span>
 <span className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-slate-400">
@@ -4171,7 +4427,7 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
         </div>
 
         {hotTopics.length > hotVisible && (
-          <button type="button" onClick={() => setHotVisible((value) => value + 6)} className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-400">
+          <button type="button" onClick={() => setHotVisible((value) => value + 6)} className="mt-4 text-sm font-bold text-blue-500 hover:text-blue-400">
             Xem thêm ›
           </button>
         )}
@@ -4209,7 +4465,7 @@ function RightSidebar({ posts, groups, profile, currentUserId = '', onOpenPost }
         </div>
 
         {upcomingEvents.length > eventsVisible && (
-          <button type="button" onClick={() => setEventsVisible((value) => value + 6)} className="mt-4 text-sm font-bold text-violet-500 hover:text-violet-400">
+          <button type="button" onClick={() => setEventsVisible((value) => value + 6)} className="mt-4 text-sm font-bold text-blue-500 hover:text-blue-400">
             Xem thêm ›
           </button>
         )}
@@ -4224,7 +4480,7 @@ function ProfileAvatar({ src, initials, className = 'h-12 w-12' }) {
   if (src && !failed) {
     return <img src={src} alt="Ảnh đại diện" onError={() => setFailed(true)} className={`${className} rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-white/10`} />
   }
-  return <span className={`${className} flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white`}>{initials || 'U'}</span>
+  return <span className={`${className} flex items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-sm font-black text-white`}>{initials || 'U'}</span>
 }
 
 function UserProfilePopup({ user, onClose, onOpenLibrary, onOpenLeaderboard }) {
@@ -4240,7 +4496,7 @@ function UserProfilePopup({ user, onClose, onOpenLibrary, onOpenLeaderboard }) {
           <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><X className="h-5 w-5" /></button>
         </div>
         <div className="mt-6 grid gap-3">
-          <button type="button" onClick={() => onOpenLibrary(user.uid)} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700">Tài khoản trong Thư viện</button>
+          <button type="button" onClick={() => onOpenLibrary(user.uid)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">Tài khoản trong Thư viện</button>
           <button type="button" onClick={() => onOpenLeaderboard(user.uid)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-cyan-500/10">Vị trí trong Bảng xếp hạng</button>
         </div>
       </div>
@@ -4252,540 +4508,236 @@ function MobileNav({ activeSection, unreadNotificationsCount = 0, onChange, onCo
   const items = [
     { id: SECTIONS.HALL, icon: Globe2, label: 'Sảnh' },
     { id: SECTIONS.GROUPS, icon: Users, label: 'Nhóm' },
-    { id: SECTIONS.NOTIFICATIONS, icon: Bell, label: 'Tin', badge: unreadNotificationsCount },
+    { id: SECTIONS.ACCOUNT, icon: FileText, label: 'Tài khoản', badge: unreadNotificationsCount },
   ]
 
-  return <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 lg:hidden">{items.map((item) => { const Icon = item.icon; const active = activeSection === item.id; return <button key={item.id} type="button" onClick={() => onChange(item.id)} className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-black ${active ? 'text-violet-600 dark:text-violet-200' : 'text-slate-400'}`}><span className="relative"><Icon className="h-5 w-5" />{item.badge > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-black text-white">{item.badge > 999 ? '999+' : item.badge}</span>}</span>{item.label}</button> })}<button type="button" onClick={onCompose} className="flex flex-col items-center gap-1 rounded-2xl bg-violet-600 px-3 py-2 text-[11px] font-black text-white"><Plus className="h-5 w-5" />Đăng</button></div>
+  return <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 lg:hidden">{items.map((item) => { const Icon = item.icon; const active = activeSection === item.id; return <button key={item.id} type="button" onClick={() => onChange(item.id)} className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-black ${active ? 'text-blue-600 dark:text-blue-200' : 'text-slate-400'}`}><span className="relative"><Icon className="h-5 w-5" />{item.badge > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-black text-white">{item.badge > 999 ? '999+' : item.badge}</span>}</span>{item.label}</button> })}<button type="button" onClick={onCompose} className="flex flex-col items-center gap-1 rounded-2xl bg-blue-600 px-3 py-2 text-[11px] font-black text-white"><Plus className="h-5 w-5" />Đăng</button></div>
 }
 
 function PostModal({ open, onClose, onSubmit, groups, roleKey, displayName, initials, avatarUrl = '' }) {
   const initialForm = {
-    title: '',
-    content: '',
-    type: 'discuss',
-    tags: [],
-    tagDraft: '#',
-    scope: 'hall',
-    groupId: '',
-    attachmentUrl: '',
-    attachmentName: '',
-    imageUrl: '',
-    imageFileName: '',
-    showImageInput: false,
-    isAnonymous: false,
-    teacherOnly: false,
-    eventStartAt: '',
-    eventEndAt: '',
-    eventDate: '',
-    eventLocation: '',
-    pollStartAt: '',
-    pollEndAt: '',
-    pollOptions: ['', ''],
+    title: '', content: '', type: 'discuss', tags: [], tagDraft: '#', scope: 'hall', groupId: '',
+    attachmentUrl: '', attachmentName: '', imageUrl: '', imageFileName: '', showImageInput: false,
+    isAnonymous: false, teacherOnly: false, eventStartAt: '', eventEndAt: '', eventDate: '', eventLocation: '',
+    pollStartAt: '', pollEndAt: '', pollOptions: ['', ''],
   }
   const [form, setForm] = useState(initialForm)
-  const imageFileInputRef = useRef(null)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkForm, setLinkForm] = useState({ url: '', label: '' })
+  const [activeEditorTools, setActiveEditorTools] = useState(['align-left'])
+  const [assetUrl, setAssetUrl] = useState('')
+  const editorRef = useRef(null)
+  const uploadInputRef = useRef(null)
 
+  useEffect(() => {
+    if (!open) return undefined
+
+    const updateToolbarFromSelection = () => {
+      const editor = editorRef.current
+      const selection = window.getSelection?.()
+      if (!editor || !selection || selection.rangeCount === 0) return
+
+      const anchorNode = selection.anchorNode
+      const focusNode = selection.focusNode
+      if (!editor.contains(anchorNode) && !editor.contains(focusNode)) return
+
+      const next = []
+      if (document.queryCommandState('bold')) next.push('bold')
+      if (document.queryCommandState('italic')) next.push('italic')
+      if (document.queryCommandState('underline')) next.push('underline')
+
+      if (document.queryCommandState('justifyCenter')) next.push('align-center')
+      else if (document.queryCommandState('justifyRight')) next.push('align-right')
+      else next.push('align-left')
+
+      setActiveEditorTools((current) => {
+        if (linkOpen) next.push('link')
+        return current.length === next.length && current.every((item, index) => item === next[index]) ? current : next
+      })
+    }
+
+    document.addEventListener('selectionchange', updateToolbarFromSelection)
+    return () => document.removeEventListener('selectionchange', updateToolbarFromSelection)
+  }, [open, linkOpen])
+
+  useEffect(() => {
+    if (!open) return
+    setActiveEditorTools(['align-left'])
+    window.setTimeout(() => {
+      if (!editorRef.current || editorRef.current.innerHTML.trim()) return
+      editorRef.current.focus()
+      document.execCommand('removeFormat', false)
+      document.execCommand('justifyLeft', false)
+      editorRef.current.blur()
+    }, 0)
+  }, [open])
 
   if (!open) return null
-
-  const resetForm = () => setForm({ ...initialForm })
-
+  const resetForm = () => { setForm({ ...initialForm }); setLinkOpen(false); setLinkForm({ url: '', label: '' }); setActiveEditorTools(['align-left']); setAssetUrl('') }
   const typeButtons = [
-    {
-      value: 'discuss',
-      label: 'Thảo luận',
-      icon: '💬',
-      helper: 'Trao đổi mở, chia sẻ quan điểm và cùng nhau phân tích vấn đề.',
-      activeClass: 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25',
-      panelClass: 'border-emerald-200 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-500/10',
-    },
-    {
-      value: 'question',
-      label: 'Hỏi đáp',
-      icon: '❓',
-      helper: 'Đặt câu hỏi rõ ràng để giáo viên hoặc bạn học hỗ trợ nhanh hơn.',
-      activeClass: 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/25',
-      panelClass: 'border-cyan-200 bg-cyan-50 dark:border-cyan-400/20 dark:bg-cyan-500/10',
-    },
-    {
-      value: 'announce',
-      label: 'Thông báo',
-      icon: '📢',
-      helper: 'Thông tin quan trọng, ngắn gọn, dễ đọc và có hành động rõ ràng.',
-      activeClass: 'bg-amber-500 text-white shadow-lg shadow-amber-500/25',
-      panelClass: 'border-amber-200 bg-amber-50 dark:border-amber-400/20 dark:bg-amber-500/10',
-    },
-    {
-      value: 'event',
-      label: 'Sự kiện',
-      icon: '🗓️',
-      helper: 'Tạo sự kiện có ngày bắt đầu để hiển thị trong Sự kiện sắp tới.',
-      activeClass: 'bg-rose-600 text-white shadow-lg shadow-rose-500/25',
-      panelClass: 'border-rose-200 bg-rose-50 dark:border-rose-400/20 dark:bg-rose-500/10',
-    },
-    {
-      value: 'poll',
-      label: 'Bình chọn',
-      icon: '📊',
-      helper: 'Tạo câu hỏi bình chọn với ít nhất hai lựa chọn.',
-      activeClass: 'bg-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/25',
-      panelClass: 'border-fuchsia-200 bg-fuchsia-50 dark:border-fuchsia-400/20 dark:bg-fuchsia-500/10',
-    },
+    { value: 'discuss', label: 'Thảo luận', icon: '💬', short: 'Trao đổi, chia sẻ', helper: 'Trao đổi mở, chia sẻ quan điểm và cùng nhau phân tích vấn đề.' },
+    { value: 'question', label: 'Hỏi đáp', icon: '❓', short: 'Đặt câu hỏi', helper: 'Đặt câu hỏi rõ ràng để giáo viên hoặc bạn học hỗ trợ nhanh hơn.' },
+    { value: 'announce', label: 'Thông báo', icon: '📢', short: 'Thông tin quan trọng', helper: 'Thông tin quan trọng, ngắn gọn, dễ đọc và có hành động rõ ràng.' },
+    { value: 'event', label: 'Sự kiện', icon: '🗓️', short: 'Khởi tạo sự kiện', helper: 'Tạo sự kiện có thời gian mở, đóng và địa điểm tham gia.' },
+    { value: 'poll', label: 'Bình chọn', icon: '📊', short: 'Tạo bình chọn', helper: 'Tạo câu hỏi bình chọn với ít nhất hai lựa chọn.' },
   ]
-
   const currentType = typeButtons.find((item) => item.value === form.type) || typeButtons[0]
-  const availableGroups = groups || []
+  const inputClass = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 dark:border-blue-300/15 dark:bg-[#08162d] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400/70 dark:focus:bg-[#0a1a35]'
+  const panelClass = 'rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm dark:border-blue-300/15 dark:bg-[#07142a]/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]'
 
-  const inputClass = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400/60'
-  const sectionClass = 'rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5'
+  const syncEditor = () => setForm((prev) => ({ ...prev, content: editorRef.current?.innerHTML || '' }))
+  const updateToolbarFromCurrentSelection = () => {
+    const next = []
+    if (document.queryCommandState('bold')) next.push('bold')
+    if (document.queryCommandState('italic')) next.push('italic')
+    if (document.queryCommandState('underline')) next.push('underline')
+    if (document.queryCommandState('justifyCenter')) next.push('align-center')
+    else if (document.queryCommandState('justifyRight')) next.push('align-right')
+    else next.push('align-left')
+    if (linkOpen) next.push('link')
+    setActiveEditorTools(next)
+  }
+  const toggleEditorTool = (key, command) => {
+    const editor = editorRef.current
+    if (!editor) return
 
+    editor.focus()
+    const isActive = activeEditorTools.includes(key)
+    const isAlignment = key.startsWith('align-')
+
+    if (isAlignment) {
+      if (isActive && key !== 'align-left') document.execCommand('justifyLeft', false)
+      else if (key === 'align-left') document.execCommand('justifyLeft', false)
+      else if (key === 'align-center') document.execCommand('justifyCenter', false)
+      else document.execCommand('justifyRight', false)
+    } else {
+      document.execCommand(command, false)
+    }
+
+    syncEditor()
+    window.setTimeout(updateToolbarFromCurrentSelection, 0)
+  }
+  const insertLink = () => {
+    const url = String(linkForm.url || '').trim()
+    const label = String(linkForm.label || '').trim()
+    if (!url || !label) return toast.error('Vui lòng nhập tên và đường dẫn liên kết')
+    if (!/^https:\/\/[^\s]+$/i.test(url)) return toast.error('Liên kết phải bắt đầu đúng bằng https://')
+    try {
+      const parsedUrl = new URL(url)
+      if (parsedUrl.protocol !== 'https:') throw new Error('INVALID_PROTOCOL')
+    } catch {
+      return toast.error('Đường dẫn liên kết không hợp lệ')
+    }
+    editorRef.current?.focus()
+    document.execCommand('insertHTML', false, `<a href="${url.replace(/"/g, '&quot;')}" rel="noopener noreferrer">${label.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a>&nbsp;`)
+    syncEditor()
+    setLinkOpen(false)
+    setActiveEditorTools((current) => current.filter((item) => item !== 'link'))
+    setLinkForm({ url: '', label: '' })
+  }
   const addTag = () => {
     const tag = form.tagDraft.replace(/^#+/, '').trim()
-    if (!tag) return setForm({ ...form, tagDraft: '#' })
-    if (form.tags.includes(tag)) return setForm({ ...form, tagDraft: '#' })
+    if (!tag || form.tags.includes(tag)) return setForm({ ...form, tagDraft: '#' })
     setForm({ ...form, tags: [...form.tags, tag].slice(0, 8), tagDraft: '#' })
   }
-
   const updatePollOption = (index, value) => {
-    const nextOptions = [...(form.pollOptions || [])]
-    nextOptions[index] = value
-    setForm({ ...form, pollOptions: nextOptions })
+    const nextOptions = [...form.pollOptions]; nextOptions[index] = value; setForm({ ...form, pollOptions: nextOptions })
   }
-
-  const handleImageFile = (event) => {
+  const handleUpload = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-
-    if (!file.type?.startsWith('image/')) {
-      toast.error('Vui lòng chọn đúng file ảnh')
-      event.target.value = ''
-      return
-    }
-
+    const isImage = file.type?.startsWith('image/')
+    const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.toLowerCase().endsWith('.zip')
+    if (!isImage && !isZip) { toast.error('Chỉ hỗ trợ hình ảnh hoặc file ZIP'); event.target.value = ''; return }
     const reader = new FileReader()
     reader.onload = () => {
-      setForm((prev) => ({
-        ...prev,
-        imageUrl: String(reader.result || ''),
-        imageFileName: file.name,
-        showImageInput: true,
-      }))
-      toast.success(`Đã tải ảnh: ${file.name}`)
+      if (isImage) setForm((prev) => ({ ...prev, imageUrl: String(reader.result || ''), imageFileName: file.name, showImageInput: true }))
+      else setForm((prev) => ({ ...prev, attachmentUrl: String(reader.result || ''), attachmentName: file.name }))
+      toast.success(`Đã tải lên: ${file.name}`)
     }
-    reader.onerror = () => toast.error('Không thể đọc file ảnh')
+    reader.onerror = () => toast.error('Không thể đọc tệp đã chọn')
     reader.readAsDataURL(file)
   }
-
+  const addAssetFromUrl = () => {
+    const url = String(assetUrl || '').trim()
+    if (!/^https:\/\/[^\s]+$/i.test(url)) return toast.error('Đường dẫn phải bắt đầu đúng bằng https://')
+    try { new URL(url) } catch { return toast.error('Đường dẫn không hợp lệ') }
+    const cleanUrl = url.split('?')[0].toLowerCase()
+    const isImageUrl = /\.(png|jpe?g|webp|gif|avif|svg)$/.test(cleanUrl)
+    const isZipUrl = cleanUrl.endsWith('.zip')
+    if (!isImageUrl && !isZipUrl) return toast.error('Chỉ hỗ trợ đường dẫn ảnh hoặc file ZIP')
+    if (isImageUrl) setForm((prev) => ({ ...prev, imageUrl: url, imageFileName: url.split('/').pop() || 'Hình ảnh', showImageInput: true }))
+    else setForm((prev) => ({ ...prev, attachmentUrl: url, attachmentName: url.split('/').pop() || 'Tài liệu ZIP' }))
+    setAssetUrl('')
+  }
+  const removeImageAsset = () => setForm((prev) => ({ ...prev, imageUrl: '', imageFileName: '', showImageInput: false }))
+  const removeZipAsset = () => setForm((prev) => ({ ...prev, attachmentUrl: '', attachmentName: '' }))
   const submit = (event) => {
     event.preventDefault()
-    if (!form.title.trim() || !form.content.trim()) {
-      toast.error('Vui lòng nhập tiêu đề và nội dung')
-      return
-    }
+    const plainContent = stripRichHtml(form.content).trim()
+    if (!form.title.trim() || !plainContent) return toast.error('Vui lòng nhập tiêu đề và nội dung')
     if (form.type === 'event') {
-      const startMs = new Date(form.eventStartAt).getTime()
-      const endMs = new Date(form.eventEndAt).getTime()
-
-      if (!form.eventStartAt || Number.isNaN(startMs)) {
-        toast.error('Vui lòng chọn thời gian mở sự kiện')
-        return
-      }
-
-      if (!form.eventEndAt || Number.isNaN(endMs)) {
-        toast.error('Vui lòng chọn thời gian đóng sự kiện')
-        return
-      }
-
-      if (endMs <= startMs) {
-        toast.error('Thời gian đóng phải sau thời gian mở')
-        return
-      }
+      const startMs = new Date(form.eventStartAt).getTime(), endMs = new Date(form.eventEndAt).getTime()
+      if (!form.eventStartAt || Number.isNaN(startMs)) return toast.error('Vui lòng chọn thời gian mở sự kiện')
+      if (!form.eventEndAt || Number.isNaN(endMs)) return toast.error('Vui lòng chọn thời gian đóng sự kiện')
+      if (endMs <= startMs) return toast.error('Thời gian đóng phải sau thời gian mở')
     }
     if (form.type === 'poll') {
-      const startMs = new Date(form.pollStartAt).getTime()
-      const endMs = new Date(form.pollEndAt).getTime()
-
-      if (!form.pollStartAt || Number.isNaN(startMs)) {
-        toast.error('Vui lòng chọn thời gian mở bình chọn')
-        return
-      }
-
-      if (!form.pollEndAt || Number.isNaN(endMs)) {
-        toast.error('Vui lòng chọn thời gian đóng bình chọn')
-        return
-      }
-
-      if (endMs <= startMs) {
-        toast.error('Thời gian đóng bình chọn phải sau thời gian mở')
-        return
-      }
-
-      if ((form.pollOptions || []).filter((option) => option.trim()).length < 2) {
-        toast.error('Bình chọn cần ít nhất 2 lựa chọn')
-        return
-      }
+      const startMs = new Date(form.pollStartAt).getTime(), endMs = new Date(form.pollEndAt).getTime()
+      if (!form.pollStartAt || Number.isNaN(startMs)) return toast.error('Vui lòng chọn thời gian mở bình chọn')
+      if (!form.pollEndAt || Number.isNaN(endMs)) return toast.error('Vui lòng chọn thời gian đóng bình chọn')
+      if (endMs <= startMs) return toast.error('Thời gian đóng bình chọn phải sau thời gian mở')
+      if (form.pollOptions.filter((option) => option.trim()).length < 2) return toast.error('Bình chọn cần ít nhất 2 lựa chọn')
     }
-
-    onSubmit(form)
+    onSubmit({ ...form, content: sanitizeRichHtml(form.content), scope: 'hall', groupId: '' })
     resetForm()
   }
-
-  const reactToComment = async (comment, reactionValue = 'love') => {
-    if (!currentUser?.uid) return toast.error('Bạn cần đăng nhập để thả cảm xúc')
-    if (!post?.id || !comment?.id) return
-
-    try {
-      const commentRef = doc(db, 'forumPosts', post.id, 'comments', comment.id)
-
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(commentRef)
-        if (!snap.exists()) return
-
-        const data = snap.data()
-        const currentReactions = data.reactions && typeof data.reactions === 'object' ? data.reactions : {}
-        const oldReaction = currentReactions[currentUser.uid]
-        const nextReactions = { ...currentReactions }
-
-        if (oldReaction === reactionValue) {
-          delete nextReactions[currentUser.uid]
-        } else {
-          nextReactions[currentUser.uid] = reactionValue
-        }
-
-        const nextCounts = buildReactionCounts(nextReactions)
-        const nextTotal = Object.values(nextCounts).reduce((sum, value) => sum + Number(value || 0), 0)
-
-        transaction.update(commentRef, {
-          reactions: nextReactions,
-          reactionCounts: nextCounts,
-          reactionsCount: nextTotal,
-          updatedAt: serverTimestamp(),
-        })
-      })
-    } catch (error) {
-      console.error('Không thể thả cảm xúc bình luận:', error)
-      toast.error('Không thể cập nhật cảm xúc bình luận')
-    }
-  }
+  const editorButtons = [
+    { key: 'bold', title: 'In đậm', icon: Bold, action: () => toggleEditorTool('bold', 'bold') },
+    { key: 'italic', title: 'In nghiêng', icon: Italic, action: () => toggleEditorTool('italic', 'italic') },
+    { key: 'underline', title: 'Gạch dưới', icon: Underline, action: () => toggleEditorTool('underline', 'underline') },
+    { key: 'link', title: 'Nhúng liên kết', icon: Link2, action: () => setLinkOpen((value) => !value) },
+    { key: 'align-left', title: 'Căn trái', icon: AlignLeft, action: () => toggleEditorTool('align-left', 'justifyLeft') },
+    { key: 'align-center', title: 'Căn giữa', icon: AlignCenter, action: () => toggleEditorTool('align-center', 'justifyCenter') },
+    { key: 'align-right', title: 'Căn phải', icon: AlignRight, action: () => toggleEditorTool('align-right', 'justifyRight') },
+  ]
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm dark:bg-slate-950/70" onMouseDown={onClose}>
-      <form
-        onSubmit={submit}
-        className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl shadow-violet-500/15 dark:border-white/10 dark:bg-slate-900 dark:shadow-[0_0_60px_rgba(124,58,237,0.35)]"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 dark:border-white/10">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">ZUNY Community</p>
-            <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Đăng bài mới ✍️</h2>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Đóng">
-            <X className="h-5 w-5" />
-          </button>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-2 backdrop-blur-xl dark:bg-[#010611]/90 sm:p-4" onMouseDown={onClose}>
+      <form onSubmit={submit} onMouseDown={(event) => event.stopPropagation()} className="flex max-h-[96vh] w-full max-w-6xl flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-blue-400/25 dark:bg-[#061126] dark:text-white dark:shadow-[0_0_70px_rgba(37,99,235,0.28)]">
+        <header className="relative border-b border-blue-400/15 px-5 py-5 sm:px-7"><div className="absolute inset-0 bg-[linear-gradient(rgba(37,99,235,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.055)_1px,transparent_1px)] bg-[size:24px_24px]" /><div className="relative flex items-start justify-between gap-4"><div><p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-cyan-300"><Globe2 className="h-3.5 w-3.5" />Cộng đồng ZUNY</p><h2 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">Đăng bài mới ✍️</h2><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-blue-100/55">Chia sẻ kiến thức, đặt câu hỏi và kết nối cùng nhau.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white p-3 text-slate-500 shadow-sm hover:bg-slate-100 hover:text-slate-800 dark:border-blue-300/20 dark:bg-blue-950/35 dark:text-slate-300 dark:hover:text-white"><X className="h-5 w-5" /></button></div></header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-7 sm:py-6">
+          <section className="mb-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-blue-300/15 dark:bg-[#07142a]/80">
+            {form.isAnonymous ? <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-400/25 bg-slate-950 text-cyan-300"><UserRoundX className="h-7 w-7" /></div> : <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-sm font-black text-white">{avatarUrl ? <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" /> : <span className="grid h-full w-full place-items-center">{initials}</span>}</div>}
+            <div><div className="flex flex-wrap items-center gap-2"><p className="font-black uppercase text-slate-950 dark:text-white">{form.isAnonymous ? 'Anonymous' : displayName}</p><span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[10px] font-black text-blue-200">{form.isAnonymous ? 'Ẩn danh' : roleText[roleKey] || 'Thành viên'}</span></div><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-blue-100/50">Bài viết sẽ được đăng trong Cộng đồng ZUNY.</p></div>
+          </section>
+          <section className={panelClass}><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-black uppercase tracking-wide text-slate-900 dark:text-white">1. Chọn chủ đề bài đăng</h3><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-blue-100/50">Chọn định dạng phù hợp với nội dung.</p></div><span className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 dark:border-blue-300/15 dark:bg-blue-950/35 dark:text-blue-100">{currentType.icon} {currentType.label}</span></div><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{typeButtons.map((item) => <button key={item.value} type="button" onClick={() => setForm({ ...form, type: item.value, teacherOnly: item.value === 'question' ? form.teacherOnly : false })} className={`rounded-2xl border p-4 text-center transition ${form.type === item.value ? 'border-blue-500 bg-blue-50 shadow-[0_0_22px_rgba(37,99,235,0.12)] dark:bg-blue-500/15 dark:shadow-[0_0_22px_rgba(37,99,235,0.18)]' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/50 dark:border-blue-300/15 dark:bg-[#08162d] dark:hover:border-blue-400/35'}`}><span className="text-2xl">{item.icon}</span><p className="mt-2 text-sm font-black text-slate-900 dark:text-white">{item.label}</p><p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-blue-100/45">{item.short}</p></button>)}</div></section>
+          <section className={`${panelClass} mt-5`}><h3 className="text-sm font-black uppercase tracking-wide text-slate-900 dark:text-white">2. Nội dung chính</h3><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Tiêu đề bài viết" className="mt-4 w-full border-0 border-b border-blue-300/15 bg-transparent px-1 py-3 text-2xl font-black text-slate-950 outline-none dark:text-white placeholder:text-slate-500 focus:border-blue-400" />
+            <div className="relative mt-4 overflow-visible rounded-2xl border border-slate-200 bg-white dark:border-blue-300/15 dark:bg-[#08162d]">
+              <div className="flex flex-wrap items-center gap-1 border-b border-blue-300/15 p-2">{editorButtons.map(({ key, title, icon: Icon, action }) => { const active = key === 'link' ? linkOpen : activeEditorTools.includes(key); return <button key={key} type="button" title={title} aria-pressed={active} onMouseDown={(event) => event.preventDefault()} onClick={action} className={`grid h-9 w-9 place-items-center rounded-xl transition ${active ? 'bg-blue-600 text-white shadow-[0_0_16px_rgba(37,99,235,0.45)]' : 'text-slate-500 hover:bg-blue-50 hover:text-blue-600 dark:text-slate-300 dark:hover:bg-blue-500/15 dark:hover:text-cyan-300'}`}><Icon className="h-4 w-4" /></button> })}</div>
+              {linkOpen && <div className="absolute left-3 top-14 z-30 w-[min(92vw,420px)] rounded-2xl border border-blue-400/30 bg-white p-4 shadow-2xl dark:bg-[#061126]"><p className="text-xs font-black uppercase tracking-wide text-cyan-300">Nhúng liên kết</p><div className="mt-3 grid gap-3"><input value={linkForm.url} onChange={(event) => setLinkForm({ ...linkForm, url: event.target.value })} placeholder="https://..." className={inputClass} /><input value={linkForm.label} onChange={(event) => setLinkForm({ ...linkForm, label: event.target.value })} placeholder="Tên hiển thị của liên kết" className={inputClass} /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setLinkOpen(false)} className="rounded-xl px-3 py-2 text-xs font-black text-slate-400">Hủy</button><button type="button" onClick={insertLink} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Chèn link</button></div></div>}
+              <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={syncEditor} data-placeholder="Chia sẻ nội dung của bạn tại đây..." className="min-h-52 px-4 py-4 text-sm font-normal leading-7 text-slate-900 outline-none dark:text-white empty:before:pointer-events-none empty:before:text-slate-500 empty:before:content-[attr(data-placeholder)] [&_a]:font-black [&_a]:text-blue-600 dark:[&_a]:text-cyan-300 [&_a]:underline [&_a]:underline-offset-2" />
+              <p className="px-4 pb-3 text-right text-[11px] font-bold text-blue-100/40">{stripRichHtml(form.content).length}/10.000</p>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]"><div><p className="text-xs font-black uppercase text-slate-600 dark:text-blue-100/70">Tags</p><div className="mt-2 flex flex-wrap gap-2">{form.tags.map((tag) => <button key={tag} type="button" onClick={() => setForm({ ...form, tags: form.tags.filter((item) => item !== tag) })} className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-500/15 dark:text-cyan-200">#{tag} ×</button>)}</div><input value={form.tagDraft} onChange={(event) => setForm({ ...form, tagDraft: event.target.value.startsWith('#') ? event.target.value : `#${event.target.value}` })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTag() } }} placeholder="#Nhập tag và nhấn Enter" className={`${inputClass} mt-3`} /></div><ToggleSwitch checked={form.isAnonymous} onChange={(checked) => setForm({ ...form, isAnonymous: checked })} icon="◎" label="Đăng ẩn danh" /></div>
+          </section>
+          <section className={`${panelClass} mt-5`}><h3 className="text-sm font-black uppercase tracking-wide text-slate-900 dark:text-white">3. Chức năng {currentType.label}</h3><p className="mt-2 text-xs font-semibold text-slate-500 dark:text-blue-100/50">{currentType.helper}</p>{form.type === 'question' && <div className="mt-4"><ToggleSwitch checked={form.teacherOnly} onChange={(checked) => setForm({ ...form, teacherOnly: checked })} icon="🎓" label="Chỉ giáo viên được trả lời" /></div>}{form.type === 'event' && <div className="mt-4 grid gap-3 sm:grid-cols-2"><input type="datetime-local" step="1" value={form.eventStartAt} onChange={(event) => setForm({ ...form, eventStartAt: event.target.value, eventDate: event.target.value })} className={inputClass} style={{ colorScheme: 'light dark' }} /><input type="datetime-local" step="1" value={form.eventEndAt} onChange={(event) => setForm({ ...form, eventEndAt: event.target.value })} className={inputClass} style={{ colorScheme: 'light dark' }} /><input value={form.eventLocation} onChange={(event) => setForm({ ...form, eventLocation: event.target.value })} placeholder="Địa điểm hoặc link tham gia" className={`${inputClass} sm:col-span-2`} /></div>}{form.type === 'poll' && <div className="mt-4 space-y-3"><div className="grid gap-3 sm:grid-cols-2"><input type="datetime-local" step="1" value={form.pollStartAt} onChange={(event) => setForm({ ...form, pollStartAt: event.target.value })} className={inputClass} style={{ colorScheme: 'light dark' }} /><input type="datetime-local" step="1" value={form.pollEndAt} onChange={(event) => setForm({ ...form, pollEndAt: event.target.value })} className={inputClass} style={{ colorScheme: 'light dark' }} /></div>{form.pollOptions.map((option, index) => <input key={index} value={option} onChange={(event) => updatePollOption(index, event.target.value)} placeholder={`Lựa chọn ${index + 1}`} className={inputClass} />)}<button type="button" onClick={() => setForm({ ...form, pollOptions: [...form.pollOptions, ''].slice(0, 8) })} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 dark:border-blue-400/25 dark:bg-blue-500/10 dark:text-blue-200">+ Thêm lựa chọn</button></div>}</section>
+          <section className={`${panelClass} mt-5`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h3 className="text-sm font-black uppercase tracking-wide text-slate-900 dark:text-white">4. Hình ảnh & tài liệu</h3><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-blue-100/50">Chỉ hỗ trợ hình ảnh hoặc file ZIP.</p></div>
+              <button type="button" onClick={() => uploadInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-xs font-black text-blue-700 hover:border-blue-400 dark:border-blue-300/20 dark:bg-blue-950/35 dark:text-blue-100 dark:hover:border-blue-300/40"><UploadCloud className="h-4 w-4" />Tải lên</button>
+            </div>
+            <input ref={uploadInputRef} type="file" accept="image/*,.zip,application/zip,application/x-zip-compressed" className="hidden" onChange={handleUpload} />
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <input value={assetUrl} onChange={(event) => setAssetUrl(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addAssetFromUrl() } }} placeholder="https://.../hinhanh.png hoặc https://.../tailieu.zip" className={inputClass} />
+              <button type="button" onClick={addAssetFromUrl} className="shrink-0 rounded-xl bg-blue-600 px-4 py-3 text-xs font-black text-white hover:bg-blue-700">Thêm đường dẫn</button>
+            </div>
+            {form.imageFileName && <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-black text-blue-700 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-cyan-200"><span className="min-w-0 truncate">Ảnh: {form.imageFileName}</span><button type="button" onClick={removeImageAsset} className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/15" aria-label="Xóa ảnh"><X className="h-4 w-4" /></button></div>}
+            {form.attachmentName && <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-black text-blue-700 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-cyan-200"><span className="min-w-0 truncate">ZIP: {form.attachmentName}</span><button type="button" onClick={removeZipAsset} className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-500/15" aria-label="Xóa tài liệu ZIP"><X className="h-4 w-4" /></button></div>}
+            {form.imageUrl && <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-blue-300/15"><img src={form.imageUrl} alt="Xem trước" className="max-h-72 w-full object-cover" /></div>}
+          </section>
         </div>
-
-        <div className="max-h-[68vh] overflow-y-auto px-6 py-6">
-          <div className="mb-5 flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white shadow-lg shadow-violet-500/20">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={displayName || 'Người dùng ZUNY'} className="h-full w-full object-cover" />
-              ) : (
-                <span className="grid h-full w-full place-items-center">{initials}</span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="font-black text-slate-950 dark:text-white">{displayName || 'Người dùng ZUNY'}</p>
-              <p className="text-xs font-bold text-slate-400">Chọn loại bài, nhập nội dung và thiết lập phần riêng bên dưới.</p>
-            </div>
-          </div>
-
-          <div className={sectionClass}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">1. Chọn chủ đề bài đăng</h3>
-                <p className="mt-1 text-xs font-bold text-slate-400">Mỗi chủ đề có phần nhập riêng để bài đăng dễ hiểu hơn.</p>
-              </div>
-              <span className="hidden rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-500 dark:bg-white/10 dark:text-slate-300 sm:inline-flex">
-                {currentType.icon} {currentType.label}
-              </span>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              {typeButtons.map((item) => {
-                const active = form.type === item.value
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setForm({ ...form, type: item.value, teacherOnly: item.value === 'question' ? form.teacherOnly : false })}
-                    className={`rounded-2xl px-4 py-3 text-left text-sm font-black transition ${
-                      active
-                        ? item.activeClass
-                        : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
-                    }`}
-                  >
-                    <span className="mr-2">{item.icon}</span>
-                    {item.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="space-y-5">
-              <div className={sectionClass}>
-                <h3 className="mb-3 text-sm font-black text-slate-800 dark:text-white">2. Nội dung chính</h3>
-                <input
-                  value={form.title}
-                  onChange={(event) => setForm({ ...form, title: event.target.value })}
-                  placeholder={form.type === 'event' ? 'Tiêu đề sự kiện...' : form.type === 'poll' ? 'Câu hỏi bình chọn...' : 'Tiêu đề bài viết...'}
-                  className="w-full border-0 border-b border-slate-200 bg-transparent px-0 py-3 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:text-white dark:placeholder:text-slate-500"
-                />
-
-                <textarea
-                  value={form.content}
-                  onChange={(event) => setForm({ ...form, content: event.target.value })}
-                  rows={6}
-                  placeholder={
-                    form.type === 'event'
-                      ? 'Mô tả sự kiện, đối tượng tham gia, nội dung chính...'
-                      : form.type === 'question'
-                        ? 'Mô tả câu hỏi, phần bạn chưa hiểu, dữ kiện bài toán...'
-                        : 'Nội dung bài viết...'
-                  }
-                  className="mt-4 w-full resize-none rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold leading-7 text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400 dark:border-white/10 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400/60"
-                />
-              </div>
-
-              <div className={`${sectionClass} ${currentType.panelClass}`}>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">3. Phần riêng của {currentType.label}</h3>
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-600 dark:text-slate-300">{currentType.helper}</p>
-
-                {form.type === 'question' && (
-                  <div className="mt-4 space-y-3">
-                    <ToggleSwitch checked={form.teacherOnly} onChange={(checked) => setForm({ ...form, teacherOnly: checked })} icon="🎓" label="Chỉ giáo viên được trả lời" />
-                    <div className="rounded-2xl bg-white/70 p-3 text-xs font-bold text-cyan-700 dark:bg-white/5 dark:text-cyan-200">
-                      Gợi ý: ghi rõ bạn đã thử cách nào và đang vướng ở bước nào.
-                    </div>
-                  </div>
-                )}
-
-                {form.type === 'share' && (
-                  <div className="mt-4 space-y-3">
-                    <div className="flex flex-wrap gap-3">
-
-                      <button type="button" onClick={() => setForm({ ...form, showImageInput: !form.showImageInput })} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-violet-700 transition hover:bg-violet-100 dark:bg-white/10 dark:text-violet-200 dark:hover:bg-white/15">
-                        🖼️ Thêm ảnh/link
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-
-
-                {form.type === 'event' && (
-                  <div className="mt-4 space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-rose-200 bg-white/80 p-3 dark:border-rose-400/20 dark:bg-slate-900/45">
-                        <label className="text-xs font-black text-rose-600 dark:text-rose-200">Thời gian mở</label>
-                        <input
-                          type="datetime-local"
-                          step="1"
-                          value={form.eventStartAt}
-                          onChange={(event) => setForm({ ...form, eventStartAt: event.target.value, eventDate: event.target.value })}
-                          className={`${inputClass} mt-2 appearance-none focus:border-rose-300`}
-                          style={{ colorScheme: 'dark' }}
-                        />
-                      </div>
-
-                      <div className="rounded-2xl border border-rose-200 bg-white/80 p-3 dark:border-rose-400/20 dark:bg-slate-900/45">
-                        <label className="text-xs font-black text-rose-600 dark:text-rose-200">Thời gian đóng</label>
-                        <input
-                          type="datetime-local"
-                          step="1"
-                          value={form.eventEndAt}
-                          onChange={(event) => setForm({ ...form, eventEndAt: event.target.value })}
-                          className={`${inputClass} mt-2 appearance-none focus:border-rose-300`}
-                          style={{ colorScheme: 'dark' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-black text-rose-600 dark:text-rose-200">Địa điểm hoặc link tham gia</label>
-                      <input
-                        value={form.eventLocation}
-                        onChange={(event) => setForm({ ...form, eventLocation: event.target.value })}
-                        placeholder="VD: Phòng A1 / Google Meet..."
-                        className={`${inputClass} mt-2 focus:border-rose-300`}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {form.type === 'poll' && (
-                  <div className="mt-4 space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-fuchsia-200 bg-white/80 p-3 dark:border-fuchsia-400/20 dark:bg-slate-900/45">
-                        <label className="text-xs font-black text-fuchsia-600 dark:text-fuchsia-200">Thời gian mở bình chọn</label>
-                        <input
-                          type="datetime-local"
-                          step="1"
-                          value={form.pollStartAt}
-                          onChange={(event) => setForm({ ...form, pollStartAt: event.target.value })}
-                          className={`${inputClass} mt-2 appearance-none focus:border-fuchsia-300`}
-                          style={{ colorScheme: 'dark' }}
-                        />
-                      </div>
-
-                      <div className="rounded-2xl border border-fuchsia-200 bg-white/80 p-3 dark:border-fuchsia-400/20 dark:bg-slate-900/45">
-                        <label className="text-xs font-black text-fuchsia-600 dark:text-fuchsia-200">Thời gian đóng bình chọn</label>
-                        <input
-                          type="datetime-local"
-                          step="1"
-                          value={form.pollEndAt}
-                          onChange={(event) => setForm({ ...form, pollEndAt: event.target.value })}
-                          className={`${inputClass} mt-2 appearance-none focus:border-fuchsia-300`}
-                          style={{ colorScheme: 'dark' }}
-                        />
-                      </div>
-                    </div>
-
-                    {(form.pollOptions || []).map((option, index) => (
-                      <div key={index} className="flex gap-2">
-                        <input
-                          value={option}
-                          onChange={(event) => updatePollOption(index, event.target.value)}
-                          placeholder={`Lựa chọn ${index + 1}`}
-                          className={inputClass}
-                        />
-                        {(form.pollOptions || []).length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => setForm({ ...form, pollOptions: form.pollOptions.filter((_, optionIndex) => optionIndex !== index) })}
-                            className="rounded-2xl px-3 text-sm font-black text-rose-500 transition hover:bg-rose-100 dark:hover:bg-rose-500/10"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, pollOptions: [...(form.pollOptions || []), ''].slice(0, 8) })}
-                      className="rounded-2xl bg-fuchsia-600 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-700"
-                    >
-                      + Thêm lựa chọn
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className={sectionClass}>
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 dark:text-white">4. Hình ảnh minh họa</h3>
-                    <p className="mt-1 text-xs font-bold text-slate-400">Chức năng nào cũng có thể thêm ảnh bằng link hoặc tải file ảnh lên.</p>
-                  </div>
-                  {form.imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, imageUrl: '', imageFileName: '', showImageInput: false })}
-                      className="shrink-0 rounded-xl px-3 py-2 text-xs font-black text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
-                    >
-                      Xóa ảnh
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <input
-                    value={form.imageUrl && !form.imageUrl.startsWith('data:') ? form.imageUrl : ''}
-                    onChange={(event) => setForm({ ...form, imageUrl: event.target.value, imageFileName: '', showImageInput: Boolean(event.target.value) })}
-                    placeholder="Dán link ảnh minh họa..."
-                    className={inputClass}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => imageFileInputRef.current?.click()}
-                    className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700"
-                  >
-                    Tải ảnh lên
-                  </button>
-                </div>
-
-                <input
-                  ref={imageFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageFile}
-                />
-
-                {form.imageFileName && (
-                  <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-600 dark:bg-white/5 dark:text-slate-300">
-                    Ảnh đã chọn: {form.imageFileName}
-                  </p>
-                )}
-
-                {form.imageUrl && (
-                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
-                    <img src={form.imageUrl} alt="Xem trước ảnh minh họa" className="max-h-72 w-full object-cover" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <aside className="space-y-5">
-              <div className={sectionClass}>
-                <h3 className="mb-3 text-sm font-black text-slate-800 dark:text-white">Tags</h3>
-                <div className="flex flex-wrap gap-2">
-                  {form.tags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setForm({ ...form, tags: form.tags.filter((item) => item !== tag) })}
-                      className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/20 dark:text-violet-200"
-                    >
-                      #{tag} ×
-                    </button>
-                  ))}
-                </div>
-                <input
-                  value={form.tagDraft}
-                  onChange={(event) => {
-                    const value = event.target.value
-                    setForm({ ...form, tagDraft: value.startsWith('#') ? value : `#${value}` })
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addTag()
-                    }
-                  }}
-                  placeholder="#Nhập tag rồi bấm Enter"
-                  className={`${inputClass} mt-3`}
-                />
-              </div>
-
-              <ToggleSwitch checked={form.isAnonymous} onChange={(checked) => setForm({ ...form, isAnonymous: checked })} icon="⌘" label="Đăng ẩn danh" />
-            </aside>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4 dark:border-white/10">
-          <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Tối đa 10,000 ký tự</p>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="rounded-2xl px-5 py-3 text-sm font-black text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10">
-              Hủy
-            </button>
-            <button type="submit" className="rounded-2xl bg-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 disabled:opacity-50">
-              Đăng bài 🚀
-            </button>
-          </div>
-        </div>
+        <footer className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 dark:border-blue-400/15 dark:bg-[#051025] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7"><p className="text-xs font-bold text-slate-500 dark:text-blue-100/45">Tối đa 10.000 ký tự</p><div className="flex justify-end gap-3"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 hover:bg-slate-100 dark:border-blue-300/15 dark:bg-transparent dark:text-slate-300 dark:hover:bg-white/5">Hủy</button><button type="submit" className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-sm font-black text-white shadow-[0_0_24px_rgba(37,99,235,0.45)]">Đăng bài →</button></div></footer>
       </form>
     </div>
   )
@@ -4798,12 +4750,12 @@ function ToggleSwitch({ checked, onChange, icon, label }) {
       onClick={() => onChange(!checked)}
       className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition ${
         checked
-          ? 'border-violet-400 bg-violet-50 dark:border-violet-400/60 dark:bg-violet-500/15'
+          ? 'border-blue-400 bg-blue-50 dark:border-blue-400/60 dark:bg-blue-500/15'
           : 'border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
       }`}
     >
       <span className="flex items-center gap-3 text-sm font-black text-slate-700 dark:text-slate-200"><span>{icon}</span>{label}</span>
-      <span className={`flex h-7 w-12 items-center rounded-full p-1 transition ${checked ? 'bg-violet-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
+      <span className={`flex h-7 w-12 items-center rounded-full p-1 transition ${checked ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
         <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${checked ? 'translate-x-5' : ''}`} />
       </span>
     </button>
@@ -5043,9 +4995,9 @@ function PostDetailModal({ post, highlightedCommentId = '', currentUser, display
           </div>
         </div>
         <form onSubmit={addComment} className="flex items-center gap-3 border-t border-slate-200 p-4 dark:border-white/10">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white">{initials}</div>
-          <input ref={inputRef} value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder={!canComment ? 'Chỉ giáo viên được trả lời bài này' : 'Nhập bình luận...'} disabled={!canComment} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white" />
-          <button type="submit" disabled={!canComment} className="rounded-2xl bg-violet-600 p-3 text-white disabled:opacity-50"><Send className="h-5 w-5" /></button>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-xs font-black text-white">{initials}</div>
+          <input ref={inputRef} value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder={!canComment ? 'Chỉ giáo viên được trả lời bài này' : 'Nhập bình luận...'} disabled={!canComment} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white" />
+          <button type="submit" disabled={!canComment} className="rounded-2xl bg-blue-600 p-3 text-white disabled:opacity-50"><Send className="h-5 w-5" /></button>
         </form>
       </div>
     </div>
@@ -5061,7 +5013,7 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
   return (
     <div id={`forum-comment-${comment.id}`} className={`rounded-3xl transition ${highlighted ? 'bg-amber-100 p-2 ring-2 ring-amber-300 dark:bg-amber-500/15 dark:ring-amber-400/40' : ''}`}>
       <div className="flex gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 text-xs font-black text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-xs font-black text-white">
           {comment.authorInitials || getInitials(comment.authorName)}
         </div>
 
@@ -5070,7 +5022,7 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-black text-slate-950 dark:text-white">{comment.authorName}</span>
               <span className="text-[11px] font-bold text-slate-400">{formatRelativeTime(comment.createdAt)}</span>
-              {Number(comment.depth || level) > 1 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-600 dark:bg-violet-500/15 dark:text-violet-200">Trả lời</span>}
+              {Number(comment.depth || level) > 1 && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600 dark:bg-blue-500/15 dark:text-blue-200">Trả lời</span>}
             </div>
             <p className="mt-1 whitespace-pre-line text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{comment.content}</p>
           </div>
@@ -5089,7 +5041,7 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
                   if (!canComment) return toast.error('Bạn không có quyền trả lời bình luận này')
                   onReply(comment)
                 }}
-                className="rounded-full px-2 py-1 text-[11px] font-black text-violet-500 transition hover:bg-violet-50 dark:hover:bg-violet-500/10"
+                className="rounded-full px-2 py-1 text-[11px] font-black text-blue-500 transition hover:bg-blue-50 dark:hover:bg-blue-500/10"
               >
                 Trả lời
               </button>
@@ -5115,15 +5067,15 @@ function CommentItem({ comment, level = 1, highlightedCommentId = '', currentUse
                 value={replyText}
                 onChange={(event) => onChangeReplyText(event.target.value)}
                 placeholder={`Trả lời ${comment.authorName || 'bình luận'}...`}
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold outline-none focus:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
               <button type="button" onClick={onCancelReply} className="rounded-xl px-3 py-2 text-xs font-black text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10">Hủy</button>
-              <button type="submit" className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white">Gửi</button>
+              <button type="submit" className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white">Gửi</button>
             </form>
           )}
 
           {comment.replies?.length > 0 && (
-            <div className="mt-3 space-y-3 border-l-2 border-violet-100 pl-3 dark:border-violet-500/20">
+            <div className="mt-3 space-y-3 border-l-2 border-blue-100 pl-3 dark:border-blue-500/20">
               {comment.replies.map((reply) => (
                 <CommentItem
                   key={reply.id}
@@ -5269,14 +5221,14 @@ function CommunityChatModal({ chat, type, currentUser, displayName, initials, on
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" onMouseDown={onClose}>
       <div className="flex h-[min(88vh,760px)] w-[min(96vw,1100px)] overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950" onMouseDown={(event) => event.stopPropagation()}>
         <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-slate-100 p-4 dark:border-white/10 dark:bg-slate-900/80 md:block">
-          <div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 p-4 text-white">
+          <div className="rounded-3xl bg-gradient-to-br from-blue-600 to-blue-600 p-4 text-white">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">Nhóm học</p>
             <h3 className="mt-2 text-xl font-black">{chatName || 'Kênh trò chuyện'}</h3>
             <p className="mt-2 text-xs font-bold text-white/70">{getChatMembersText(safeChat)}</p>
           </div>
 
           <div className="mt-4 space-y-2">
-            <div className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-violet-600 shadow-sm dark:bg-white/10 dark:text-violet-200"># chat-chung</div>
+            <div className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-blue-600 shadow-sm dark:bg-white/10 dark:text-blue-200"># chat-chung</div>
             <div className="rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 dark:text-slate-400"># tài-liệu</div>
             <div className="rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 dark:text-slate-400"># hỏi-đáp</div>
           </div>
@@ -5296,7 +5248,7 @@ function CommunityChatModal({ chat, type, currentUser, displayName, initials, on
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             {messages.length ? messages.map((message) => (
               <div key={message.id} className="flex gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-violet-500 text-xs font-black text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-xs font-black text-white">
                   {message.authorInitials || getInitials(message.authorName)}
                 </div>
                 <div className="min-w-0">
@@ -5317,15 +5269,15 @@ function CommunityChatModal({ chat, type, currentUser, displayName, initials, on
           </div>
 
           <form onSubmit={sendMessage} className="flex items-center gap-3 border-t border-slate-200 p-4 dark:border-white/10">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-black text-white">{initials}</div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-500 text-xs font-black text-white">{initials}</div>
             <input
               ref={inputRef}
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder={`Nhắn vào ${chatName}...`}
-              className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
             />
-            <button type="submit" className="rounded-2xl bg-violet-600 p-3 text-white">
+            <button type="submit" className="rounded-2xl bg-blue-600 p-3 text-white">
               <Send className="h-5 w-5" />
             </button>
           </form>
@@ -5384,6 +5336,6 @@ function ModalShell({ title, onClose, children }) {
   )
 }
 
-const fieldClass = 'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-slate-900'
+const fieldClass = 'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-slate-900'
 
 export default Forum

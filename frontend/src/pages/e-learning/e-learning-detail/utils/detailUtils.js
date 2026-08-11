@@ -252,20 +252,9 @@ export function getUserClassName(userData) {
 export function normalizeClassName(value) {
   return String(value || '').trim().toLowerCase()
 }
-export function canAccessCourseByClass(course, studentClass) {
-  if (course?.visibility !== 'private') return true
-
-  const allowedClasses = [
-    course.className,
-    ...(Array.isArray(course.classNames) ? course.classNames : []),
-    ...(Array.isArray(course.allowedClasses) ? course.allowedClasses : []),
-  ].filter(Boolean)
-
-  if (!allowedClasses.length) return false
-
-  const normalizedStudentClass = normalizeClassName(studentClass)
-
-  return allowedClasses.some((classItem) => normalizeClassName(classItem) === normalizedStudentClass)
+export function canAccessCourseByClass() {
+  // Lớp của bài học hiện là tiêu chí lọc trên trang chủ, không phải cổng chặn truy cập.
+  return true
 }
 export function isStudentRole(role) {
   return String(role || '').trim().toUpperCase() === 'STUDENT'

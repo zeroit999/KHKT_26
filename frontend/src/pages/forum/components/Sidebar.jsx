@@ -43,13 +43,13 @@ function Sidebar({
     >
       <div className={`shrink-0 flex items-center gap-3 px-2 py-2 ${collapsed ? 'justify-center' : 'justify-between'}`}>
         <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-cyan-500 text-white shadow-lg shadow-indigo-500/25">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-500 to-cyan-500 text-white shadow-lg shadow-sky-500/25">
             <Globe2 className="h-6 w-6" />
           </div>
 
           {!collapsed && (
             <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">ZUNY Community</h1>
+              <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Cộng đồng ZUNY</h1>
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Cộng đồng học tập</p>
             </div>
           )}
@@ -74,7 +74,7 @@ function Sidebar({
                 collapsed ? 'justify-center' : 'gap-3'
               } ${
                 active
-                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25'
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-lg shadow-sky-500/25'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
               }`}
             >
@@ -97,7 +97,7 @@ function Sidebar({
           type="button"
           onClick={onToggleCollapsed}
           title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
-          className={`group hidden w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-500 shadow-sm transition-all duration-300 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200 lg:flex ${
+          className={`group hidden w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-500 shadow-sm transition-all duration-300 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-200 lg:flex ${
             collapsed ? 'h-12 px-0' : ''
           }`}
         >

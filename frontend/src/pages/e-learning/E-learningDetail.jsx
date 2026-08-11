@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, db } from '../../components/firebase'
-import { CourseGateState, DetailHeader, DescriptionBox, MainLearningViewer, DetailSidebar, PlaylistPanel, OverviewList, CBTStudyPanel, LessonDetailBlock, EmptyLearningState, CourseFileViewer, CourseCodeViewer, CourseRichDocumentViewer, NotesPanel, MiniQuizPanel, RatingStars, QAPanel, NextCoursePanel, CompletionModal, HonestyWarningModal } from './e-learning-detail/components/DetailComponents'
+import { CourseGateState, DetailHeader, DescriptionBox, MainLearningViewer, DetailSidebar, PlaylistPanel, OverviewList, CBTStudyPanel, LessonDetailBlock, EmptyLearningState, NotesPanel, MiniQuizPanel, RatingStars, QAPanel, NextCoursePanel, CompletionModal, HonestyWarningModal } from './e-learning-detail/components/DetailComponents'
 import { useDarkMode, isCourseLocked, canAccessCourseByClass, getUserClassName, isTeacherRole, getRatingAverage, normalizeTextList, normalizeChecklist, normalizeQuiz, getYoutubeVideoId, markAllChecklistDone, getLocalDateKey, canTrackLearningProgress, isStudentRole, getOpenAtMs, normalizeText, formatOpenAt, stripHtml } from './e-learning-detail/utils/detailUtils'
 
 function CourseDetail() {
@@ -66,11 +66,44 @@ function CourseDetail() {
   const [savingDestination, setSavingDestination] = useState('')
   const [saveNotice, setSaveNotice] = useState(null)
   const [playlistCourses, setPlaylistCourses] = useState([])
+  const [simulationFocusMode, setSimulationFocusMode] = useState(false)
   const isDarkMode = useDarkMode()
   const playlistParams = new URLSearchParams(window.location.search)
   const playlistCourseIds = String(playlistParams.get('playlist') || '').split(',').map((item) => item.trim()).filter(Boolean)
   const playlistIndex = Math.max(0, Number(playlistParams.get('playlistIndex') || 0))
   const playlistAutoplay = playlistParams.get('autoplay') === '1'
+  const isSimulationCourse = Boolean(
+    course?.contentType === 'simulation' ||
+    course?.attachMode === 'simulation' ||
+    course?.simulationUrl ||
+    course?.simulationHtml ||
+    course?.simulationCode ||
+    Object.values(course?.simulationCodes || {}).some((value) => String(value || '').trim()),
+  )
+  const simulationLanguageLabels = {
+    html: 'HTML / CSS / JavaScript',
+    javascript: 'JavaScript',
+    typescript: 'TypeScript',
+  }
+  const simulationLanguageLabel = simulationLanguageLabels[String(course?.simulationLanguage || 'html').toLowerCase()] || String(course?.simulationLanguage || 'HTML / CSS / JavaScript')
+
+  useEffect(() => {
+    if (!isSimulationCourse && simulationFocusMode) setSimulationFocusMode(false)
+  }, [isSimulationCourse, simulationFocusMode])
+
+  useEffect(() => {
+    if (!simulationFocusMode) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSimulationFocusMode(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [simulationFocusMode])
 
   useEffect(() => {
     let cancelled = false
@@ -230,7 +263,7 @@ function CourseDetail() {
           const status = String(item.status || item.moderationStatus || 'approved').toLowerCase()
           if (status !== 'approved' || status === 'deleted') return false
           if (completedCourseIds.has(String(item.id))) return false
-          if (isCourseLocked(item)) return false
+          if (!teacherCanViewAll && isCourseLocked(item)) return false
           if (!teacherCanViewAll && !canAccessCourseByClass(item, studentClass)) return false
           return true
         })
@@ -296,10 +329,14 @@ function CourseDetail() {
     const unsubscribe = onSnapshot(
       courseRef,
       (snapshot) => {
-        if (!snapshot.exists()) return
+        if (!snapshot.exists()) {
+          setCourse(null)
+          setLoading(false)
+          return
+        }
         setCourse((previous) => ({ ...(previous || {}), id: snapshot.id, ...snapshot.data() }))
       },
-      (error) => console.warn('Không thể đồng bộ lượt xem và đánh giá realtime:', error),
+      (error) => console.warn('Không thể đồng bộ lượt xem và đánh giá:', error),
     )
 
     return () => unsubscribe()
@@ -310,7 +347,7 @@ function CourseDetail() {
     const unsubscribe = onSnapshot(
       collection(db, 'courses', realCourseId, 'ratings'),
       (snapshot) => setRatingItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể đồng bộ danh sách đánh giá realtime:', error),
+      (error) => console.warn('Không thể đồng bộ danh sách đánh giá:', error),
     )
     return () => unsubscribe()
   }, [realCourseId])
@@ -336,7 +373,6 @@ function CourseDetail() {
 
   useEffect(() => {
     if (!currentUser || !realCourseId || !course || !canTrackLearningProgress(currentRole)) return
-    if (!isTeacherRole(currentRole) && !canAccessCourseByClass(course, getUserClassName(userProfile))) return
     async function saveLearningProgress() {
       try {
         const today = getLocalDateKey()
@@ -700,10 +736,11 @@ function CourseDetail() {
     .includes(String(currentUser?.uid || ''))
   const moderationStatus = String(course.status || course.moderationStatus || 'approved').toLowerCase()
   const deletedCourse = moderationStatus === 'deleted'
-  const deniedByModeration = moderationStatus !== 'approved' && !isAdminDev && !isCourseOwner
   const isTeacherOrAdmin = isTeacherRole(currentRole)
-  const locked = !isTeacherOrAdmin && isCourseLocked(course)
-  const deniedByPrivateClass = !isTeacherOrAdmin && !canAccessCourseByClass(course, getUserClassName(userProfile))
+  const deniedByModeration = moderationStatus !== 'approved' && !isTeacherOrAdmin && !isCourseOwner
+  const canBypassAccessGate = isTeacherOrAdmin || isCourseOwner
+  const locked = !canBypassAccessGate && isCourseLocked(course)
+  const deniedByPrivateClass = false
 
   if (deletedCourse) {
     return <CourseGateState icon="🗑️" title="Bài học đã bị xóa" description="Nội dung này không còn được hiển thị trong thư viện." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
@@ -807,6 +844,16 @@ function CourseDetail() {
   const ratingDistribution = [5, 4, 3, 2, 1].map((star) => ({ star, count: ratingItems.filter((item) => Number(item.rating) === star).length }))
   const teacherId = course.teacherId || course.createdByUid || course.createdBy || course.ownerId || course.userId || course.uid || ''
 
+  function openUserProfile(userId) {
+    const targetUserId = String(userId || '').trim()
+    if (!targetUserId) return
+    if (targetUserId === String(currentUser?.uid || '')) {
+      navigate('/e-learning?section=account')
+      return
+    }
+    navigate(`/e-learning?section=channel&user=${encodeURIComponent(targetUserId)}`)
+  }
+
   function openNextPlaylistCourse() {
     if (!playlistAutoplay || !playlistCourseIds.length) return false
     const nextIndex = playlistIndex + 1
@@ -862,7 +909,7 @@ function CourseDetail() {
 
 
   return (
-    <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-[#f6f8fc] pb-24 text-slate-950 dark:bg-[#07111f] dark:text-white [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_label]:cursor-pointer`}>
+    <main className={`${isDarkMode ? 'dark ' : ''}min-h-screen bg-[#f6f8fc] ${simulationFocusMode ? 'pb-0' : 'pb-24'} text-slate-950 dark:bg-[#07111f] dark:text-white [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_label]:cursor-pointer`}>
       {completionOpen && <CompletionModal onClose={() => setCompletionOpen(false)} nextCourse={nextCourse} onNext={(item) => navigate(`/e-learning/${item.id}`)} isDarkMode={isDarkMode} />}
       {skipWarning && <HonestyWarningModal warning={skipWarning} onClose={() => setSkipWarning(null)} isDarkMode={isDarkMode} />}
       {shareNotice && <div className="fixed bottom-24 left-1/2 z-[1000] -translate-x-1/2 rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-2xl dark:bg-white dark:text-slate-950">Đã sao chép liên kết bài học</div>}
@@ -870,19 +917,19 @@ function CourseDetail() {
       {reportOpen && <div className="fixed inset-0 z-[1050] grid place-items-center bg-slate-950/65 px-4 backdrop-blur-sm"><form onSubmit={submitDetailReport} className="w-full max-w-lg rounded-[26px] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-[#10203a]"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.16em] text-rose-500">Báo cáo nội dung</p><h2 className="mt-1 text-xl font-black">Điều gì chưa phù hợp?</h2></div><button type="button" onClick={() => setReportOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-xl dark:bg-white/10">×</button></div><div className="mt-5 grid gap-2">{['Nội dung không phù hợp','Thông tin sai lệch','Vi phạm bản quyền','Nội dung nguy hiểm','Spam hoặc quảng cáo','Lý do khác'].map((reason)=><button key={reason} type="button" onClick={() => setReportReason(reason)} className={`rounded-xl border px-4 py-3 text-left text-sm font-bold transition ${reportReason===reason?'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300':'border-slate-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5'}`}>{reason}</button>)}</div><textarea value={reportDetail} onChange={(event)=>setReportDetail(event.target.value)} rows="4" placeholder="Mô tả thêm để quản trị viên dễ kiểm tra..." className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-rose-500 dark:border-white/10 dark:bg-white/5"/><button disabled={reportSubmitting} className="mt-4 w-full rounded-xl bg-rose-600 px-5 py-3 text-sm font-black text-white hover:bg-rose-700 disabled:opacity-50">{reportSubmitting?'Đang gửi...':'Gửi báo cáo'}</button></form></div>}
 
       <div className="w-full">
-        <div className={`grid min-h-0 grid-cols-1 transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${detailSidebarCollapsed ? 'xl:grid-cols-[76px_minmax(0,1fr)]' : 'xl:grid-cols-[3fr_10fr]'}`}>
+        <div className={`grid min-h-0 grid-cols-1 transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${simulationFocusMode ? 'grid-cols-1' : detailSidebarCollapsed ? 'xl:grid-cols-[76px_minmax(0,1fr)]' : 'xl:grid-cols-[3fr_10fr]'}`}>
           <button type="button" aria-label="Đóng left sidebar" onClick={()=>setMobileDetailSidebarOpen(false)} className={`fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[2px] transition-opacity duration-300 xl:hidden ${mobileDetailSidebarOpen?'pointer-events-auto opacity-100':'pointer-events-none opacity-0'}`}/>
-          <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,360px)] min-h-0 flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-sm transition-[transform,width,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-white/10 dark:bg-[#0a1728]/95 ${mobileDetailSidebarOpen?'translate-x-0':'-translate-x-full pointer-events-none'} xl:sticky xl:top-0 xl:z-20 xl:h-dvh xl:w-auto xl:translate-x-0 xl:pointer-events-auto xl:shadow-[12px_0_32px_-24px_rgba(15,23,42,0.75)] xl:dark:shadow-[12px_0_34px_-22px_rgba(0,0,0,0.95)]`}>
+          {!simulationFocusMode && <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,360px)] min-h-0 flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-sm transition-[transform,width,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-white/10 dark:bg-[#0a1728]/95 ${mobileDetailSidebarOpen?'translate-x-0':'-translate-x-full pointer-events-none'} xl:sticky xl:top-0 xl:z-20 xl:h-dvh xl:w-auto xl:translate-x-0 xl:pointer-events-auto xl:shadow-[12px_0_32px_-24px_rgba(15,23,42,0.75)] xl:dark:shadow-[12px_0_34px_-22px_rgba(0,0,0,0.95)]`}>
             <div className={`flex items-center px-4 pb-3 pt-4 ${detailSidebarCollapsed?'xl:justify-center':'justify-between'}`}>
               <button type="button" onClick={()=>setDetailSidebarCollapsed((value)=>!value)} className="hidden h-10 w-10 place-items-center rounded-xl bg-slate-100 text-lg transition duration-300 hover:scale-105 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 xl:grid" aria-label={detailSidebarCollapsed?'Mở left sidebar':'Ẩn left sidebar'}>☰</button>
               <span className={`text-sm font-black transition-all duration-300 ${detailSidebarCollapsed?'xl:w-0 xl:translate-x-2 xl:opacity-0':'opacity-100'}`}>Học tập</span>
               <button type="button" onClick={()=>setMobileDetailSidebarOpen(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-xl transition hover:rotate-90 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 xl:hidden" aria-label="Đóng left sidebar">×</button>
             </div>
-            <div className={`min-h-0 flex-1 overflow-y-auto px-4 pb-6 transition-all duration-300 [scrollbar-color:#64748b_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/70 [&::-webkit-scrollbar-track]:bg-transparent xl:pb-24 ${detailSidebarCollapsed?'xl:pointer-events-none xl:translate-x-3 xl:opacity-0':'translate-x-0 opacity-100'}`}><div className="mb-3 rounded-2xl border border-slate-200 p-4 dark:border-white/10"><div className="flex items-center gap-3">{teacherAvatar?<img src={teacherAvatar} alt={teacherName} className="h-12 w-12 rounded-full object-cover"/>:<div className="grid h-12 w-12 place-items-center rounded-full bg-blue-600 font-black text-white">{teacherName.slice(0,2).toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-black">{teacherName}</p><p className="text-xs text-slate-500">Giáo viên {course.category || 'ZUNY'}</p></div></div><button type="button" onClick={()=>navigate(`/e-learning?channel=${encodeURIComponent(teacherId)}`)} className="mt-3 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-bold hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">Xem trang cá nhân</button></div><PlaylistPanel lessons={orderedLessons} selectedLessonIndex={selectedLessonIndex} learningRecord={learningRecord} onSelectLesson={handleSelectLesson} playlistCourses={playlistCourses} currentCourseId={realCourseId} currentPlaylistIndex={playlistIndex} onSelectPlaylistCourse={handleSelectPlaylistCourse} collapsed={playlistCollapsed} onToggleCollapsed={()=>setPlaylistCollapsed((value)=>!value)} autoPlayEnabled={autoPlayEnabled} onToggleAutoPlay={()=>setAutoPlayEnabled((value)=>!value)}/></div>
-          </aside>
+            <div className={`min-h-0 flex-1 overflow-y-auto px-4 pb-6 transition-all duration-300 [scrollbar-color:#64748b_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/70 [&::-webkit-scrollbar-track]:bg-transparent xl:pb-24 ${detailSidebarCollapsed?'xl:pointer-events-none xl:translate-x-3 xl:opacity-0':'translate-x-0 opacity-100'}`}><div className="mb-3 rounded-2xl border border-slate-200 p-4 dark:border-white/10"><div className="flex items-center gap-3"><button type="button" onClick={()=>openUserProfile(teacherId)} title={String(teacherId)===String(currentUser?.uid||'') ? "Mở tài khoản chính" : `Mở kênh của ${teacherName}`} className="shrink-0 rounded-full transition hover:scale-105">{teacherAvatar?<img src={teacherAvatar} alt={teacherName} className="h-12 w-12 rounded-full object-cover"/>:<span className="grid h-12 w-12 place-items-center rounded-full bg-blue-600 font-black text-white">{teacherName.slice(0,2).toUpperCase()}</span>}</button><div className="min-w-0"><p className="truncate font-black">{teacherName}</p><p className="text-xs text-slate-500">Giáo viên {course.category || 'ZUNY'}</p></div></div><button type="button" onClick={()=>openUserProfile(teacherId)} className="mt-3 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-bold hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">Xem trang cá nhân</button></div><PlaylistPanel lessons={orderedLessons} selectedLessonIndex={selectedLessonIndex} learningRecord={learningRecord} onSelectLesson={handleSelectLesson} playlistCourses={playlistCourses} currentCourseId={realCourseId} currentPlaylistIndex={playlistIndex} onSelectPlaylistCourse={handleSelectPlaylistCourse} collapsed={playlistCollapsed} onToggleCollapsed={()=>setPlaylistCollapsed((value)=>!value)} autoPlayEnabled={autoPlayEnabled} onToggleAutoPlay={()=>setAutoPlayEnabled((value)=>!value)}/></div>
+          </aside>}
 
-          <section className="relative z-0 min-w-0 px-3 py-4 sm:px-5 xl:px-6 xl:pb-28">
-            <header className="mb-5">
+          <section className={`relative z-0 min-w-0 ${simulationFocusMode ? 'fixed inset-0 z-[1200] overflow-y-auto bg-[#07111f] p-2 sm:p-4' : 'px-3 py-4 sm:px-5 xl:px-6 xl:pb-28'}`}>
+            {!simulationFocusMode && <header className="mb-5">
               <div className="relative flex min-h-12 min-w-0 items-start justify-center px-12 sm:px-24">
                 <button type="button" onClick={() => setMobileDetailSidebarOpen(true)} className="absolute left-0 top-0 grid h-11 w-11 place-items-center rounded-xl border border-slate-300 bg-slate-200 text-lg font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 xl:hidden" aria-label="Mở left sidebar" aria-expanded={mobileDetailSidebarOpen}>☰</button>
                 <h1 className="w-full min-w-0 max-w-4xl max-h-[3.75em] overflow-y-auto whitespace-normal break-words pr-1 text-center text-xl font-black leading-tight [overflow-wrap:anywhere] [word-break:break-word] sm:text-3xl lg:text-[34px]">{stripHtml(course.title)}</h1>
@@ -891,17 +938,17 @@ function CourseDetail() {
                   <span className="hidden sm:inline">Quay lại</span>
                 </button>
               </div>
-            </header><div className="overflow-visible rounded-2xl border border-slate-200 bg-black shadow-xl shadow-slate-950/15 dark:border-white/10 dark:shadow-black/40"><MainLearningViewer course={course} mainVideoLesson={mainVideoLesson} selectedLessonIndex={selectedLessonIndex} realCourseId={realCourseId} currentUser={currentUser} currentRole={currentRole} lessonCount={lessonCount} onSkipWarning={(warning)=>setSkipWarning(warning || {})} autoPlay={autoPlayEnabled} onEnded={handleAutoAdvance}/></div><div className="mt-3 flex items-center gap-2 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-md shadow-slate-900/5 backdrop-blur-sm [scrollbar-width:none] dark:border-white/10 dark:bg-[#0c1a2f]/90 dark:shadow-black/25 [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-end sm:p-2.5"><button type="button" disabled={Boolean(savingDestination)} onClick={handleToggleBookmark} className={`group relative h-10 cursor-pointer overflow-hidden rounded-full border px-4 text-xs font-black transition-all duration-300 active:scale-95 disabled:cursor-wait disabled:opacity-70 ${learningRecord.bookmarked?'border-emerald-500 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25':'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white'}`}><span className="mr-2">{savingDestination==='remove'?'◌':learningRecord.bookmarked?'★':'☆'}</span>{savingDestination==='remove'?'Đang hủy lưu...':learningRecord.bookmarked?'Đang lưu':'Lưu bài học'}</button><button type="button" onClick={handleShareCourse} className="h-10 rounded-full border border-slate-300 bg-white px-4 text-xs font-black shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-md dark:border-slate-600 dark:bg-slate-800">↗ Chia sẻ</button><button type="button" onClick={()=>setReportOpen(true)} className="h-10 rounded-full border border-rose-200 bg-white px-4 text-xs font-black text-rose-600 hover:bg-rose-50 dark:border-rose-400/20 dark:bg-white/5 dark:hover:bg-rose-500/10">⚑ Báo cáo</button></div>
+            </header>}<div className={`overflow-visible rounded-2xl border border-slate-200 bg-black shadow-xl shadow-slate-950/15 dark:border-white/10 dark:shadow-black/40 ${simulationFocusMode ? 'h-[calc(100dvh-84px)] rounded-xl border-white/10' : ''}`}><MainLearningViewer course={course} mainVideoLesson={mainVideoLesson} selectedLessonIndex={selectedLessonIndex} realCourseId={realCourseId} currentUser={currentUser} currentRole={currentRole} lessonCount={lessonCount} onSkipWarning={(warning)=>setSkipWarning(warning || {})} autoPlay={autoPlayEnabled} onEnded={handleAutoAdvance} focusMode={simulationFocusMode}/></div><div className={`mt-3 flex items-center gap-2 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-md shadow-slate-900/5 backdrop-blur-sm [scrollbar-width:none] dark:border-white/10 dark:bg-[#0c1a2f]/90 dark:shadow-black/25 [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-end sm:p-2.5 ${simulationFocusMode ? 'fixed right-3 top-3 z-[1210] mt-0 border-white/15 bg-black/75 shadow-2xl backdrop-blur-xl dark:bg-black/75' : ''}`}>{!simulationFocusMode && <button type="button" disabled={Boolean(savingDestination)} onClick={handleToggleBookmark} className={`group relative h-10 cursor-pointer overflow-hidden rounded-full border px-4 text-xs font-black transition-all duration-300 active:scale-95 disabled:cursor-wait disabled:opacity-70 ${learningRecord.bookmarked?'border-emerald-500 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25':'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white'}`}><span className="mr-2">{savingDestination==='remove'?'◌':learningRecord.bookmarked?'★':'☆'}</span>{savingDestination==='remove'?'Đang hủy lưu...':learningRecord.bookmarked?'Đang lưu':'Lưu bài học'}</button>}{isSimulationCourse && <button type="button" onClick={()=>setSimulationFocusMode((value)=>!value)} className={`h-10 rounded-full border px-4 text-xs font-black shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${simulationFocusMode?'border-violet-400 bg-violet-600 text-white':'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-400/25 dark:bg-violet-500/10 dark:text-violet-300 dark:hover:bg-violet-500/20'}`}><span className="mr-2">{simulationFocusMode?'↙':'⛶'}</span>{simulationFocusMode?'Thoát tập trung':'Chế độ tập trung'}</button>}{!simulationFocusMode && <button type="button" onClick={handleShareCourse} className="h-10 rounded-full border border-slate-300 bg-white px-4 text-xs font-black shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-md dark:border-slate-600 dark:bg-slate-800">↗ Chia sẻ</button>}{!simulationFocusMode && <button type="button" onClick={()=>setReportOpen(true)} className="h-10 rounded-full border border-rose-200 bg-white px-4 text-xs font-black text-rose-600 hover:bg-rose-50 dark:border-rose-400/20 dark:bg-white/5 dark:hover:bg-rose-500/10">⚑ Báo cáo</button>}</div>
 
-            <div className="mt-4 space-y-4">
+            {!simulationFocusMode && <div className="mt-4 space-y-4">
               <div className="sticky top-0 z-30 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 px-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#0c1a2f]/95 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div className="flex min-w-max gap-1">{detailTabs.map((tab)=><button key={tab.id} type="button" onClick={()=>setActiveDetailTab(tab.id)} className={`shrink-0 rounded-xl px-4 py-4 text-sm font-bold transition ${activeDetailTab===tab.id?'bg-blue-600 text-white shadow':'text-slate-600 hover:text-blue-700 dark:text-slate-300 dark:hover:text-sky-300'}`}>{tab.label}</button>)}</div></div>
 
-              {activeDetailTab==='overview' && <section id="detail-overview" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><h2 className="text-xl font-black">Tổng quát</h2><div className="mt-5 space-y-5"><section className="min-w-0"><h3 className="text-lg font-black">Mô tả bài học</h3><div className={`mt-3 w-full min-w-0 max-w-[900px] whitespace-normal break-words text-sm leading-7 text-slate-600 [overflow-wrap:anywhere] [&_*]:max-w-full [&_*]:whitespace-normal [&_*]:break-words dark:text-slate-300 ${descriptionExpanded?'':'line-clamp-3'}`} dangerouslySetInnerHTML={{__html:course.description||course.content||'Giáo viên chưa thêm mô tả bài học.'}}/><button type="button" onClick={()=>setDescriptionExpanded((value)=>!value)} className="mt-2 cursor-pointer text-sm font-bold text-blue-600">{descriptionExpanded?'Thu gọn':'Xem thêm'}</button></section><section className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><div className="grid min-w-0 gap-4 md:grid-cols-2"><OverviewList title="Bạn sẽ học được" items={learningObjectives} empty="Giáo viên chưa thêm mục tiêu học tập."/><OverviewList title="Kiến thức cần có" items={prerequisites} empty="Bài học này chưa yêu cầu kiến thức nền cụ thể."/></div><div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-4 text-sm dark:border-white/10"><div><p className="text-xs text-slate-500">Cấp lớp</p><b>{course.className||'Tất cả'}</b></div><div><p className="text-xs text-slate-500">Môn học</p><b>{course.category||'---'}</b></div><div className="min-w-0"><p className="text-xs text-slate-500">Chủ đề</p><b className="block w-full min-w-0 max-w-[220px] whitespace-normal break-words [overflow-wrap:anywhere]">{stripHtml(course.topic)||'---'}</b></div><div><p className="text-xs text-slate-500">Thời lượng</p><b>{course.duration||course.estimatedMinutes||'---'}</b></div><div><p className="text-xs text-slate-500">Lượt xem</p><b>{Number(course.views||0).toLocaleString('vi-VN')}</b></div><div><p className="text-xs text-slate-500">Mã thẻ bài học</p><b className="break-all">{course.courseCode||realCourseId||'---'}</b></div><div><p className="text-xs text-slate-500">Cập nhật</p><b>{course.updatedAt?'Gần đây':'---'}</b></div></div></section>{(course.wordFileUrl||course.codeContent||course.richDocument)&&<section><h3 className="text-lg font-black">Tài liệu đính kèm</h3>{course.wordFileUrl&&<CourseFileViewer course={course}/>} {course.codeContent&&<CourseCodeViewer course={course}/>} {course.richDocument&&<CourseRichDocumentViewer course={course}/>}</section>}<section className="rounded-2xl border border-slate-200 p-5 dark:border-white/10"><h3 className="font-black">Đánh giá từ học viên</h3><div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center"><div><div className="text-4xl font-black">{ratingAverage}</div><div className="text-amber-400">★★★★★</div><p className="mt-1 text-xs text-slate-500">({course.ratingCount||0} đánh giá realtime)</p></div><div className="flex-1 space-y-2">{ratingDistribution.map(({star,count})=><div key={star} className="flex items-center gap-2 text-xs"><span>{star}★</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-amber-400" style={{width:`${ratingItems.length?Math.round(count/ratingItems.length*100):0}%`}}/></div><span className="w-8 text-right">{count}</span></div>)}</div></div></section></div></section>}
+              {activeDetailTab==='overview' && <section id="detail-overview" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><h2 className="text-xl font-black">Tổng quát</h2><div className="mt-5 space-y-5"><section className="min-w-0"><h3 className="text-lg font-black">Mô tả bài học</h3><div className={`mt-3 w-full min-w-0 max-w-[900px] whitespace-normal break-words text-sm leading-7 text-slate-600 [overflow-wrap:anywhere] [&_*]:max-w-full [&_*]:whitespace-normal [&_*]:break-words dark:text-slate-300 ${descriptionExpanded?'':'line-clamp-3'}`} dangerouslySetInnerHTML={{__html:course.description||course.content||'Giáo viên chưa thêm mô tả bài học.'}}/><button type="button" onClick={()=>setDescriptionExpanded((value)=>!value)} className="mt-2 cursor-pointer text-sm font-bold text-blue-600">{descriptionExpanded?'Thu gọn':'Xem thêm'}</button></section><section className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><div className="grid min-w-0 gap-4 md:grid-cols-2"><OverviewList title="Bạn sẽ học được" items={learningObjectives} empty="Giáo viên chưa thêm mục tiêu học tập."/><OverviewList title="Kiến thức cần có" items={prerequisites} empty="Bài học này chưa yêu cầu kiến thức nền cụ thể."/></div><div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-4 text-sm dark:border-white/10"><div><p className="text-xs text-slate-500">Cấp lớp</p><b>{course.className||'Tất cả'}</b></div><div><p className="text-xs text-slate-500">Môn học</p><b>{course.category||'---'}</b></div><div className="min-w-0"><p className="text-xs text-slate-500">Chủ đề</p><b className="block w-full min-w-0 max-w-[220px] whitespace-normal break-words [overflow-wrap:anywhere]">{stripHtml(course.topic)||'---'}</b></div><div><p className="text-xs text-slate-500">{isSimulationCourse?'Ngôn ngữ':'Thời lượng'}</p><b>{isSimulationCourse?simulationLanguageLabel:(course.duration||course.estimatedMinutes||'---')}</b></div><div><p className="text-xs text-slate-500">Lượt xem</p><b>{Number(course.views||0).toLocaleString('vi-VN')}</b></div><div><p className="text-xs text-slate-500">Mã thẻ bài học</p><b className="break-all">{course.courseCode||realCourseId||'---'}</b></div><div><p className="text-xs text-slate-500">Cập nhật</p><b>{course.updatedAt?'Gần đây':'---'}</b></div></div></section><section className="rounded-2xl border border-slate-200 p-5 dark:border-white/10"><h3 className="font-black">Đánh giá từ học viên</h3><div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center"><div><div className="text-4xl font-black">{ratingAverage}</div><div className="text-amber-400">★★★★★</div><p className="mt-1 text-xs text-slate-500">({course.ratingCount||0} đánh giá)</p></div><div className="flex-1 space-y-2">{ratingDistribution.map(({star,count})=><div key={star} className="flex items-center gap-2 text-xs"><span>{star}★</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-amber-400" style={{width:`${ratingItems.length?Math.round(count/ratingItems.length*100):0}%`}}/></div><span className="w-8 text-right">{count}</span></div>)}</div></div></section></div></section>}
               {activeDetailTab==='notes' && <section id="detail-notes" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><NotesPanel noteDraft={noteDraft} setNoteDraft={setNoteDraft} noteColor={noteColor} setNoteColor={setNoteColor} savingNote={savingNote} onSave={handleSaveNotes}/></section>}
               {activeDetailTab==='quiz' && <section id="detail-quiz" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6">{quiz.length?<MiniQuizPanel quiz={quiz} answers={quizAnswers} submitted={quizSubmitted} savedResult={learningRecord.quizResult} onAnswer={handleQuizAnswer} onSubmit={()=>handleSubmitQuiz(quiz)}/>:<EmptyLearningState text="Bài học này chưa có quiz."/>}</section>}
               {activeDetailTab==='rating' && <section id="detail-rating" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><RatingStars selectedRating={selectedRating} ratingAverage={ratingAverage} ratingCount={course.ratingCount||0} ratingBurst={ratingBurst} onRate={handleRating}/></section>}
-              {activeDetailTab==='qa' && <section id="detail-qa" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><QAPanel courseId={realCourseId} currentUser={currentUser} userProfile={userProfile} currentRole={currentRole} courseOwnerId={teacherId} focusQuestionId={focusedQuestionId} focusReplyId={focusedReplyId} onOpenUser={(userId)=>navigate(`/e-learning?channel=${encodeURIComponent(userId)}`)}/></section>}
-            </div>
+              {activeDetailTab==='qa' && <section id="detail-qa" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><QAPanel courseId={realCourseId} currentUser={currentUser} userProfile={userProfile} currentRole={currentRole} courseOwnerId={teacherId} focusQuestionId={focusedQuestionId} focusReplyId={focusedReplyId} onOpenUser={openUserProfile}/></section>}
+            </div>}
           </section>
         </div>
       </div>
@@ -910,7 +957,7 @@ function CourseDetail() {
 
       {saveNotice && <div className={`fixed left-1/2 top-5 z-[180] -translate-x-1/2 animate-[fadeIn_.25s_ease-out] rounded-2xl border bg-white px-5 py-3 shadow-2xl dark:bg-[#0c1a2f] ${saveNotice.removed?'border-rose-300 dark:border-rose-400/30':'border-emerald-300 dark:border-emerald-400/30'}`}><div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-full text-lg text-white shadow-lg ${saveNotice.removed?'bg-rose-500 shadow-rose-500/30':'bg-emerald-500 shadow-emerald-500/30'}`}>{saveNotice.removed?'☆':'✓'}</span><div><p className={`font-black ${saveNotice.removed?'text-rose-700 dark:text-rose-300':'text-emerald-700 dark:text-emerald-300'}`}>{saveNotice.removed?'Đã hủy lưu bài học':'Đã lưu bài học'}</p><p className="text-xs text-slate-500 dark:text-slate-400">{saveNotice.removed?'Bài học đã được gỡ khỏi mục Đã lưu và các danh sách lưu.':`Đã thêm vào ${saveNotice.destination}.`}</p></div></div></div>}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-[#081528]/95 sm:px-3 sm:py-3"><div className="grid grid-cols-3 items-center gap-2 sm:flex sm:justify-between sm:gap-3"><button type="button" disabled={previousLessonIndex===null} onClick={()=>previousLessonIndex!==null&&handleSelectLesson(previousLessonIndex)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10 sm:px-4 sm:text-sm"><span className="sm:hidden">← Trước</span><span className="hidden sm:inline">← Bài trước</span></button><button type="button" onClick={()=>nextLessonIndex!==null?handleSelectLesson(nextLessonIndex):(openNextPlaylistCourse()||handleManualComplete())} className="min-w-0 rounded-xl bg-blue-600 px-2 py-3 text-xs font-black text-white sm:px-7 sm:text-sm">{nextLessonIndex!==null?'Tiếp tục học ▶':playlistAutoplay&&playlistCourseIds[playlistIndex+1]?'Phát bài tiếp ▶':'Hoàn thành ✓'}</button><button type="button" disabled={nextLessonIndex===null} onClick={()=>nextLessonIndex!==null&&handleSelectLesson(nextLessonIndex)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10 sm:px-4 sm:text-sm"><span className="sm:hidden">Tiếp →</span><span className="hidden sm:inline">Bài tiếp theo →</span></button></div></div>
+      {!simulationFocusMode && <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-[#081528]/95 sm:px-3 sm:py-3"><div className="grid grid-cols-3 items-center gap-2 sm:flex sm:justify-between sm:gap-3"><button type="button" disabled={previousLessonIndex===null} onClick={()=>previousLessonIndex!==null&&handleSelectLesson(previousLessonIndex)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10 sm:px-4 sm:text-sm"><span className="sm:hidden">← Trước</span><span className="hidden sm:inline">← Bài trước</span></button><button type="button" onClick={()=>nextLessonIndex!==null?handleSelectLesson(nextLessonIndex):(openNextPlaylistCourse()||handleManualComplete())} className="min-w-0 rounded-xl bg-blue-600 px-2 py-3 text-xs font-black text-white sm:px-7 sm:text-sm">{nextLessonIndex!==null?'Tiếp tục học ▶':playlistAutoplay&&playlistCourseIds[playlistIndex+1]?'Phát bài tiếp ▶':'Hoàn thành ✓'}</button><button type="button" disabled={nextLessonIndex===null} onClick={()=>nextLessonIndex!==null&&handleSelectLesson(nextLessonIndex)} className="min-w-0 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10 sm:px-4 sm:text-sm"><span className="sm:hidden">Tiếp →</span><span className="hidden sm:inline">Bài tiếp theo →</span></button></div></div>}
     </main>
   )
 }

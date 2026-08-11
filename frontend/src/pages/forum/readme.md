@@ -91,7 +91,7 @@
 ---
 > [!NOTE]
 # 💡 4. Ý Tưởng / Ghi Chú
-
+- làm chat riêng friend to friend
 
 
 
