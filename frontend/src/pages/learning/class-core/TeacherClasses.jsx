@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   addDoc,
   collection,
@@ -7,6 +8,7 @@ import {
   getDocs,
   increment,
   arrayUnion,
+  arrayRemove,
   limit,
   onSnapshot,
   orderBy,
@@ -29,6 +31,27 @@ import {
   StatCard,
 } from '../class-ui/ClassWidgets.jsx';
 import styles from './classStyles.js';
+import useExamsPage from '../../../hooks/exam/useExamsPage.js';
+import CreateExamModal from '../../../components/exam/CreateExamModal.jsx';
+import { CourseFormModal } from '../../e-learning/e-learning/components/CourseComponents.jsx';
+import { courseTextLimits } from '../../e-learning/e-learning/constants/courseConstants.js';
+import {
+  countWords as countELearningWords,
+  formatRelativeDate as formatELearningRelativeDate,
+  formatVideoDuration as formatELearningDuration,
+  formatViews as formatELearningViews,
+  generateLibraryCourseCode as generateELearningCourseCode,
+  getCourseFormat as getELearningCourseFormat,
+  getCourseFormatLabel as getELearningCourseFormatLabel,
+  getEmptyForm as getELearningEmptyForm,
+  getMp4DurationFromFile as getELearningMp4DurationFromFile,
+  getOpenAtMs as getELearningOpenAtMs,
+  getVideoDuration as getELearningVideoDuration,
+  normalizeChecklist as normalizeELearningChecklist,
+  normalizeQuiz as normalizeELearningQuiz,
+  normalizeTextList as normalizeELearningTextList,
+  stripHtml as stripELearningHtml,
+} from "../../e-learning/e-learning/utils/courseUtils.js";
 
 function getSchoolYear(date = new Date()) {
   const year = date.getFullYear();
@@ -66,7 +89,8 @@ const CLASS_WORKSPACE_SECTIONS = [
       { id: 'overview', label: 'Tổng quan', icon: '▦' },
       { id: 'students', label: 'Danh sách lớp', icon: '♟' },
       { id: 'attendance', label: 'Điểm danh', icon: '✓' },
-      { id: 'assignments', label: 'Bài tập', icon: '▤' },
+      { id: 'assignments', label: 'Đề thi', icon: '▤' },
+      { id: 'resources', label: 'Học liệu', icon: '▱' },
       { id: 'scores', label: 'Đánh giá', icon: '★' },
     ],
   },
@@ -77,7 +101,6 @@ const CLASS_WORKSPACE_SECTIONS = [
       { id: 'schedule', label: 'Lịch dạy', icon: '▦' },
       { id: 'notifications', label: 'Thông báo', icon: '♢' },
       { id: 'messages', label: 'Trao đổi', icon: '☵' },
-      { id: 'reports', label: 'Báo cáo', icon: '▥' },
     ],
   },
 ];
@@ -96,58 +119,162 @@ const CLASS_THEME_COLORS = [
   { id: 'purple', value: '#7c3aed', label: 'Tím' },
   { id: 'black', value: '#111827', label: 'Đen' },
   { id: 'gold', value: '#ca8a04', label: 'Vàng đậm' },
+  { id: 'pink', value: '#ff03f2', label: 'Hồng' },
+  { id: 'dark green', value: '#008915', label: 'Lục' },
+  { id: 'teal', value: '#0d9488', label: 'Xanh ngọc' },
+  { id: 'cyan', value: '#06b6d4', label: 'Xanh Cyan' },
+  { id: 'indigo', value: '#4f46e5', label: 'Xanh chàm' },
+  { id: 'rose', value: '#e11d48', label: 'Hồng đỏ' },
+  { id: 'yellow', value: '#eab308', label: 'Vàng' },
+  { id: 'lime', value: '#65a30d', label: 'Xanh chanh' },
+  { id: 'brown', value: '#92400e', label: 'Nâu' },
+  { id: 'gray', value: '#64748b', label: 'Xám' },
 ];
 
-const CLASS_COVER_PRESETS = [
+const CLASS_COVER_CATEGORY_DEFINITIONS = [
   {
-    id: 'animals-fox',
+    id: 'animals',
     category: 'Động vật',
-    label: 'Cáo trong rừng',
-    value: 'linear-gradient(135deg,rgba(15,23,42,.12),rgba(15,23,42,.06)), url("https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=1200&q=80")',
+    icon: '🐾',
+    description: 'Thế giới động vật',
+    photos: [
+      ['Cáo trong rừng', 'https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=1600&q=82', 'linear-gradient(135deg,rgba(15,23,42,.12),rgba(15,23,42,.06)), url("https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=1200&q=80")'],
+      ['Chim giữa thiên nhiên', 'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=1600&q=82', 'linear-gradient(135deg,rgba(15,23,42,.10),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=1200&q=80")'],
+      ['Mèo thư giãn', 'https://images.unsplash.com/photo-1504208434309-cb69f4fe52b0?auto=format&fit=crop&w=1600&q=82'],
+      ['Chó ngoài trời', 'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1600&q=82'],
+      ['Chó đồng hành', 'https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fit=crop&w=1600&q=82'],
+      ['Cún nhỏ', 'https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=1600&q=82'],
+      ['Mèo trong nhà', 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?auto=format&fit=crop&w=1600&q=82'],
+      ['Hươu giữa rừng', 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=1600&q=82'],
+      ['Sư tử hoang dã', 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=1600&q=82'],
+      ['Động vật hoang dã', 'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=1600&q=82'],
+    ],
   },
   {
-    id: 'animals-bird',
-    category: 'Động vật',
-    label: 'Chim thiên nhiên',
-    value: 'linear-gradient(135deg,rgba(15,23,42,.10),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=1200&q=80")',
+    id: 'sports',
+    category: 'Thể thao',
+    icon: '🏅',
+    description: 'Năng lượng và vận động',
+    photos: [
+      ['Chạy bộ', 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1600&q=82'],
+      ['Vận động viên', 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1600&q=82'],
+      ['Bóng đá', 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1600&q=82'],
+      ['Bóng rổ', 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=1600&q=82'],
+      ['Tập luyện', 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&w=1600&q=82'],
+      ['Phòng tập', 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1600&q=82'],
+      ['Đường chạy', 'https://images.unsplash.com/photo-1483721310020-03333e577078?auto=format&fit=crop&w=1600&q=82'],
+      ['Đạp xe', 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?auto=format&fit=crop&w=1600&q=82'],
+      ['Sân vận động', 'https://images.unsplash.com/photo-1526232761682-d26e03ac148e?auto=format&fit=crop&w=1600&q=82'],
+      ['Bơi lội', 'https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&w=1600&q=82'],
+    ],
   },
   {
-    id: 'nature-forest',
+    id: 'nature',
     category: 'Thiên nhiên',
-    label: 'Rừng xanh',
-    value: 'linear-gradient(135deg,rgba(22,101,52,.18),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80")',
+    icon: '🌿',
+    description: 'Rừng, núi và cảnh quan',
+    photos: [
+      ['Rừng xanh', 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1600&q=82', 'linear-gradient(135deg,rgba(22,101,52,.18),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80")'],
+      ['Núi và hồ', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=82', 'linear-gradient(135deg,rgba(30,64,175,.12),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80")'],
+      ['Hồ giữa núi', 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1600&q=82'],
+      ['Thung lũng xanh', 'https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&w=1600&q=82'],
+      ['Dãy núi', 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=82'],
+      ['Rừng sương', 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1600&q=82'],
+      ['Đồi xanh', 'https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=1600&q=82'],
+      ['Cảnh quan yên bình', 'https://images.unsplash.com/photo-1439853949127-fa647821eba0?auto=format&fit=crop&w=1600&q=82'],
+      ['Núi hùng vĩ', 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1600&q=82'],
+      ['Thiên nhiên rộng lớn', 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1600&q=82'],
+    ],
   },
   {
-    id: 'nature-mountain',
-    category: 'Thiên nhiên',
-    label: 'Núi và hồ',
-    value: 'linear-gradient(135deg,rgba(30,64,175,.12),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80")',
-  },
-  {
-    id: 'sea-ocean',
+    id: 'sea',
     category: 'Biển cả',
-    label: 'Biển xanh',
-    value: 'linear-gradient(135deg,rgba(14,165,233,.16),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80")',
+    icon: '🌊',
+    description: 'Đại dương và bờ biển',
+    photos: [
+      ['Biển xanh', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=82', 'linear-gradient(135deg,rgba(14,165,233,.16),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80")'],
+      ['Bờ biển', 'https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=1600&q=82', 'linear-gradient(135deg,rgba(14,116,144,.12),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=1200&q=80")'],
+      ['Sóng biển', 'https://images.unsplash.com/photo-1484291470158-b8f8d608850d?auto=format&fit=crop&w=1600&q=82'],
+      ['Mặt biển trong', 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=1600&q=82'],
+      ['Đường bờ biển', 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1600&q=82'],
+      ['Biển lúc hoàng hôn', 'https://images.unsplash.com/photo-1455729552865-3658a5d39692?auto=format&fit=crop&w=1600&q=82'],
+      ['Nước biển xanh ngọc', 'https://images.unsplash.com/photo-1471922694854-ff1b63b20054?auto=format&fit=crop&w=1600&q=82'],
+      ['Bãi biển nhiệt đới', 'https://images.unsplash.com/photo-1530053969600-caed2596d242?auto=format&fit=crop&w=1600&q=82'],
+      ['Biển và đá', 'https://images.unsplash.com/photo-1498623116890-37e912163d5d?auto=format&fit=crop&w=1600&q=82'],
+      ['Đại dương', 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=82'],
+    ],
   },
   {
-    id: 'sea-coast',
-    category: 'Biển cả',
-    label: 'Bờ biển',
-    value: 'linear-gradient(135deg,rgba(14,116,144,.12),rgba(15,23,42,.04)), url("https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=1200&q=80")',
+    id: 'sky',
+    category: 'Bầu trời',
+    icon: '☁️',
+    description: 'Mây, bình minh và hoàng hôn',
+    photos: [
+      ['Mây sáng', 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1600&q=82'],
+      ['Bầu trời trong', 'https://images.unsplash.com/photo-1499346030926-9a72daac6c63?auto=format&fit=crop&w=1600&q=82'],
+      ['Chân trời', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=82'],
+      ['Mây trên núi', 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1600&q=82'],
+      ['Bình minh', 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1600&q=82'],
+      ['Trời cao', 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1600&q=82'],
+      ['Mây chiều', 'https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?auto=format&fit=crop&w=1600&q=82'],
+      ['Bầu trời dịu', 'https://images.unsplash.com/photo-1504608524841-42fe6f032b4b?auto=format&fit=crop&w=1600&q=82'],
+      ['Ánh sáng qua mây', 'https://images.unsplash.com/photo-1494548162494-384bba4ab999?auto=format&fit=crop&w=1600&q=82'],
+      ['Hoàng hôn', 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=1600&q=82'],
+    ],
   },
   {
-    id: 'still-blue',
+    id: 'still',
     category: 'Ảnh tĩnh',
-    label: 'Xanh dịu',
-    value: 'linear-gradient(135deg,#dbeafe,#eff6ff)',
+    icon: '🎨',
+    description: 'Nền tối giản, nhẹ mắt',
+    photos: [
+      ['Xanh dịu', '', 'linear-gradient(135deg,#dbeafe,#eff6ff)'],
+      ['Tím dịu', '', 'linear-gradient(135deg,#ede9fe,#faf5ff)'],
+      ['Cam ấm', '', 'linear-gradient(135deg,#ffedd5 0%,#fff7ed 52%,#fed7aa 100%)'],
+      ['Xanh lá nhạt', '', 'linear-gradient(135deg,#dcfce7 0%,#f0fdf4 50%,#bbf7d0 100%)'],
+      ['Hồng pastel', '', 'linear-gradient(135deg,#fce7f3 0%,#fff1f2 52%,#fbcfe8 100%)'],
+      ['Xanh ngọc', '', 'linear-gradient(135deg,#ccfbf1 0%,#f0fdfa 48%,#99f6e4 100%)'],
+      ['Bầu trời pastel', '', 'linear-gradient(135deg,#e0f2fe 0%,#f0f9ff 45%,#bae6fd 100%)'],
+      ['Xám hiện đại', '', 'linear-gradient(135deg,#e2e8f0 0%,#f8fafc 52%,#cbd5e1 100%)'],
+      ['Đêm xanh', '', 'linear-gradient(135deg,#0f172a 0%,#1e3a8a 52%,#312e81 100%)'],
+      ['Hoàng hôn tối giản', '', 'linear-gradient(135deg,#f97316 0%,#fb7185 48%,#7c3aed 100%)'],
+    ],
   },
   {
-    id: 'still-violet',
-    category: 'Ảnh tĩnh',
-    label: 'Tím dịu',
-    value: 'linear-gradient(135deg,#ede9fe,#faf5ff)',
+    id: 'study',
+    category: 'Học tập',
+    icon: '📚',
+    description: 'Sách, lớp học và tri thức',
+    photos: [
+      ['Lớp học', 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1600&q=82'],
+      ['Giảng đường', 'https://images.unsplash.com/photo-1703680968885-22659eb00165?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8bGVjdHVyZSUyMGhhbGx8ZW58MHx8MHx8fDA%3D'],
+      ['Thư viện', 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1600&q=82'],
+      ['Học nhóm', 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1600&q=82'],
+      ['Sách và ghi chú', 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=1600&q=82'],
+      ['Không gian học tập', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1600&q=82'],
+      ['Học cùng máy tính', 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1600&q=82'],
+      ['Đọc sách', 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=1600&q=82'],
+      ['Bàn học', 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1600&q=82'],
+      ['Tri thức', 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=1600&q=82'],
+    ],
   },
 ];
+
+const CLASS_COVER_CATEGORIES = CLASS_COVER_CATEGORY_DEFINITIONS.map(({ id, category, icon, description }) => ({
+  id,
+  category,
+  icon,
+  description,
+}));
+
+const CLASS_COVER_PRESETS = CLASS_COVER_CATEGORY_DEFINITIONS.flatMap((group) =>
+  group.photos.map(([label, imageUrl, customValue], index) => ({
+    id: `${group.id}-${index + 1}`,
+    category: group.category,
+    label,
+    value: customValue || `linear-gradient(135deg,rgba(15,23,42,.14),rgba(15,23,42,.04)), url("${imageUrl}")`,
+  })),
+);
 
 function generateClassCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -161,6 +288,14 @@ function normalizeText(value) {
   return String(value || '')
     .trim()
     .toLowerCase();
+}
+
+function resizeChatTextarea(element, maxHeight = 140) {
+  if (!element) return;
+  element.style.height = 'auto';
+  const nextHeight = Math.min(element.scrollHeight, maxHeight);
+  element.style.height = `${Math.max(40, nextHeight)}px`;
+  element.style.overflowY = element.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
 function getInitial(name = '') {
@@ -247,10 +382,12 @@ function getTimeValue(value) {
 }
 
 function getMemberRole(member = {}) {
+  if (!member || typeof member !== 'object') return '';
   return normalizeText(member.role || member.userRole || member.memberRole || member.accountRole);
 }
 
 function isTeacherMember(member = {}) {
+  if (!member || typeof member !== 'object') return false;
   const role = getMemberRole(member);
   return ['teacher', 'giáo viên', 'giao vien', 'admin_teacher', 'homeroom_teacher'].includes(role);
 }
@@ -748,6 +885,8 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [checkInChoice, setCheckInChoice] = useState('present');
+  const [excusedNote, setExcusedNote] = useState('');
   const [clock, setClock] = useState(Date.now());
 
   useEffect(() => onAuthStateChanged(auth, (user) => setAuthUser(user || null)), []);
@@ -821,6 +960,7 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
       setError('Tài khoản giáo viên không được điểm danh như học sinh.');
       return;
     }
+    if (checkInChoice === 'excused' && !excusedNote.trim()) { setError('Vui lòng nhập lý do vắng có phép.'); return; }
     try {
       setConfirming(true);
       setError('');
@@ -830,7 +970,8 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
           uid: authUser.uid,
           email: authUser.email || studentRecord.email || '',
           name: getStudentDisplayName(studentRecord),
-          status: 'present',
+          status: checkInChoice,
+          note: checkInChoice === 'excused' ? excusedNote.trim() : '',
           confirmedAt: serverTimestamp(),
         },
         updatedAt: serverTimestamp(),
@@ -852,8 +993,8 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
         {status === 'loading' ? <p>Đang kiểm tra mã điểm danh...</p> : null}
         {!authUser ? <div className="qr-checkin-message warning"><strong>Bạn chưa đăng nhập</strong><span>Vui lòng đăng nhập tài khoản học sinh rồi quét lại mã QR.</span></div> : null}
         {authUser && !studentRecord && status !== 'loading' ? <div className="qr-checkin-message warning"><strong>Không tìm thấy bạn trong lớp</strong><span>Tài khoản hiện tại chưa có trong danh sách học sinh của lớp này.</span></div> : null}
-        {status === 'ready' && authUser && studentRecord ? <><div className="qr-checkin-student"><span>{getStudentAvatar(studentRecord) ? <img src={getStudentAvatar(studentRecord)} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(studentRecord))}</span><div><strong>{getStudentDisplayName(studentRecord)}</strong><small>{studentRecord.email || authUser.email || ''}</small></div></div><div className="qr-checkin-time">Mã còn hiệu lực <b>{minutes}:{String(seconds).padStart(2, '0')}</b></div><button type="button" className="qr-confirm-btn" onClick={confirmCheckIn} disabled={confirming}>{confirming ? 'Đang xác nhận...' : 'Xác nhận điểm danh'}</button></> : null}
-        {status === 'success' ? <div className="qr-checkin-success"><span>✓</span><strong>Điểm danh thành công</strong><p>Giáo viên sẽ thấy bạn ở trạng thái Có mặt theo thời gian thực.</p></div> : null}
+        {status === 'ready' && authUser && studentRecord ? <><div className="qr-checkin-student"><span>{getStudentAvatar(studentRecord) ? <img src={getStudentAvatar(studentRecord)} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(studentRecord))}</span><div><strong>{getStudentDisplayName(studentRecord)}</strong><small>{studentRecord.email || authUser.email || ''}</small></div></div><div className="qr-checkin-time">Mã còn hiệu lực <b>{minutes}:{String(seconds).padStart(2, '0')}</b></div><div className="qr-checkin-choice"><button type="button" className={checkInChoice === 'present' ? 'active' : ''} onClick={() => { setCheckInChoice('present'); setError(''); }}>✓ Có mặt</button><button type="button" className={checkInChoice === 'excused' ? 'active excused' : 'excused'} onClick={() => { setCheckInChoice('excused'); setError(''); }}>○ Vắng có phép</button></div>{checkInChoice === 'excused' ? <label className="qr-excused-note"><span>Lý do vắng có phép</span><textarea rows="3" value={excusedNote} onChange={(event) => setExcusedNote(event.target.value)} placeholder="Nhập lý do để giáo viên thấy trong ghi chú điểm danh..." /></label> : null}<button type="button" className="qr-confirm-btn" onClick={confirmCheckIn} disabled={confirming}>{confirming ? 'Đang xác nhận...' : 'Xác nhận điểm danh'}</button></> : null}
+        {status === 'success' ? <div className="qr-checkin-success"><span>✓</span><strong>Điểm danh thành công</strong><p>Giáo viên sẽ thấy trạng thái {checkInChoice === 'excused' ? 'Vắng có phép' : 'Có mặt'} theo thời gian thực.</p></div> : null}
         {error ? <p className="qr-checkin-error">{error}</p> : null}
       </section>
       <style>{styles}</style>
@@ -861,8 +1002,211 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
   );
 }
 
+
+function getClassExamTypeText(exam = {}) {
+  const questions = Array.isArray(exam.questions) ? exam.questions : [];
+  const hasEssay = questions.some((question) => question.type === 'essay');
+  const hasChoice = questions.some((question) => question.type !== 'essay');
+  if (hasEssay && hasChoice) return 'Trắc nghiệm + Tự luận';
+  if (hasEssay) return 'Tự luận';
+  return 'Trắc nghiệm';
+}
+
+function getClassExamStatus(exam = {}) {
+  if (exam.isActive) return { id: 'active', label: 'Đang mở' };
+  if (exam.isUpcoming) return { id: 'draft', label: 'Nháp' };
+  return { id: 'ended', label: 'Đã đóng' };
+}
+
+function formatClassExamDate(value) {
+  if (!value) return 'Chưa đặt hạn';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa đặt hạn';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+async function extractClassELearningDocxHtml(file) {
+  const lowerName = String(file?.name || '').toLowerCase();
+  if (!lowerName.endsWith('.docx') || typeof DecompressionStream === 'undefined') return '';
+
+  const buffer = await file.arrayBuffer();
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  let eocdOffset = -1;
+  for (let index = bytes.length - 22; index >= Math.max(0, bytes.length - 65557); index -= 1) {
+    if (view.getUint32(index, true) === 0x06054b50) {
+      eocdOffset = index;
+      break;
+    }
+  }
+  if (eocdOffset < 0) return '';
+
+  const centralOffset = view.getUint32(eocdOffset + 16, true);
+  const totalEntries = view.getUint16(eocdOffset + 10, true);
+  let cursor = centralOffset;
+  let entry = null;
+  const decoder = new TextDecoder();
+
+  for (let index = 0; index < totalEntries && cursor + 46 <= bytes.length; index += 1) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) break;
+    const method = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const fileNameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const fileName = decoder.decode(bytes.slice(cursor + 46, cursor + 46 + fileNameLength));
+    if (fileName === 'word/document.xml') {
+      entry = { method, compressedSize, localOffset };
+      break;
+    }
+    cursor += 46 + fileNameLength + extraLength + commentLength;
+  }
+  if (!entry || view.getUint32(entry.localOffset, true) !== 0x04034b50) return '';
+
+  const localNameLength = view.getUint16(entry.localOffset + 26, true);
+  const localExtraLength = view.getUint16(entry.localOffset + 28, true);
+  const dataStart = entry.localOffset + 30 + localNameLength + localExtraLength;
+  const compressed = bytes.slice(dataStart, dataStart + entry.compressedSize);
+  let xmlBytes = compressed;
+
+  if (entry.method === 8) {
+    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    xmlBytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  } else if (entry.method !== 0) {
+    return '';
+  }
+
+  const xml = decoder.decode(xmlBytes);
+  const parsedDocument = new DOMParser().parseFromString(xml, 'application/xml');
+  const paragraphs = Array.from(parsedDocument.getElementsByTagNameNS('*', 'p'))
+    .map((paragraph) => Array.from(paragraph.getElementsByTagNameNS('*', 't')).map((node) => node.textContent || '').join(''))
+    .map((text) => text.trim())
+    .filter(Boolean);
+  const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return paragraphs.map((text) => `<p>${escapeHtml(text)}</p>`).join('');
+}
+
+function ClassExamWorkspace({ selectedClass }) {
+  const page = useExamsPage();
+  const allExams = Array.isArray(page.exams) ? page.exams : [];
+  const visibleExams = Array.isArray(page.visibleExams) ? page.visibleExams : [];
+  const examCounts = useMemo(() => ({
+    total: allExams.length,
+    active: allExams.filter((exam) => exam.isActive).length,
+    draft: allExams.filter((exam) => exam.isUpcoming).length,
+    ended: allExams.filter((exam) => !exam.isActive && !exam.isUpcoming).length,
+  }), [allExams]);
+
+  if (page.roleLoading) {
+    return (
+      <div className="class-exam-page">
+        <section className="class-exam-head"><div><span>Đề thi · đồng bộ module Đề thi</span><h3>Đề thi</h3><p>Đang tải dữ liệu đề thi của giáo viên...</p></div></section>
+        <div className="class-exam-skeleton">{Array.from({ length: 5 }, (_, index) => <i key={index} />)}</div>
+      </div>
+    );
+  }
+
+  if (!page.canManage) {
+    return <div className="class-exam-page"><DataUnavailable icon="▤" text="Tài khoản hiện tại không có quyền quản lý đề thi." /></div>;
+  }
+
+  return (
+    <div className="class-exam-page">
+      <section className="class-exam-head">
+        <div>
+          <span>Đề thi · đồng bộ module Đề thi</span>
+          <h3>Đề thi</h3>
+          <p>Hiển thị trực tiếp các đề thi từ module Đề thi trong workspace lớp {selectedClass?.name || 'hiện tại'}.</p>
+        </div>
+        <div className="class-exam-head-actions">
+          <button type="button" className="class-exam-secondary-btn" onClick={() => window.location.assign('/exams')}>Mở trang Đề thi ↗</button>
+          <button type="button" className="class-exam-create-btn" onClick={page.openCreateModal}>＋ Tạo đề thi</button>
+        </div>
+      </section>
+
+      <section className="class-exam-stat-grid">
+        <article><span>▤</span><div><strong>{examCounts.total}</strong><small>Tổng đề thi</small></div></article>
+        <article className="active"><span>●</span><div><strong>{examCounts.active}</strong><small>Đang mở</small></div></article>
+        <article className="draft"><span>◷</span><div><strong>{examCounts.draft}</strong><small>Nháp / sắp mở</small></div></article>
+        <article className="ended"><span>✓</span><div><strong>{examCounts.ended}</strong><small>Đã đóng</small></div></article>
+      </section>
+
+      <section className="class-exam-toolbar">
+        <div className="class-exam-tabs" role="tablist" aria-label="Trạng thái đề thi">
+          {[['all','Tất cả'],['published','Đang mở'],['draft','Nháp'],['ended','Đã đóng']].map(([value, label]) => (
+            <button type="button" key={value} className={page.publishFilter === value ? 'active' : ''} onClick={() => page.setPublishFilter(value)}>{label}</button>
+          ))}
+        </div>
+        <div className="class-exam-filters">
+          <label className="class-exam-search"><span>⌕</span><input value={page.search || ''} onChange={(event) => page.setSearch(event.target.value)} placeholder="Tìm theo tên, môn học hoặc mã đề..." /></label>
+          <select value={page.privacyFilter || 'all'} onChange={(event) => page.setPrivacyFilter(event.target.value)} aria-label="Lọc quyền riêng tư">
+            <option value="all">Tất cả đề thi</option>
+            <option value="public">Công khai</option>
+            <option value="private">Riêng tư</option>
+          </select>
+        </div>
+      </section>
+
+      {visibleExams.length ? (
+        <section className="class-exam-table-wrap">
+          <div className="class-exam-table">
+            <div className="class-exam-row class-exam-row-head"><span>Tên đề thi</span><span>Môn</span><span>Loại</span><span>Thời gian</span><span>Hạn nộp</span><span>Trạng thái</span><span>Thao tác</span></div>
+            {visibleExams.map((exam) => {
+              const status = getClassExamStatus(exam);
+              return (
+                <div className="class-exam-row" key={exam.id}>
+                  <div className="class-exam-title"><strong>{exam.title || 'Đề thi chưa đặt tên'}</strong><small>{exam.questionCount || exam.questions?.length || 0} câu hỏi{Array.isArray(exam.studentResults) ? ` · ${exam.studentResults.length} học sinh` : ''}</small></div>
+                  <span>{exam.subject || '—'}</span>
+                  <span>{getClassExamTypeText(exam)}</span>
+                  <span>◷ {exam.duration || 45} phút</span>
+                  <span>{formatClassExamDate(exam.closeDate)}</span>
+                  <span><b className={`class-exam-status ${status.id}`}>{status.label}</b></span>
+                  <div className="class-exam-actions">
+                    <button type="button" title="Xem trước" aria-label="Xem trước đề thi" onClick={() => page.previewExam?.(exam)}>◉</button>
+                    <button type="button" title="Chỉnh sửa" aria-label="Chỉnh sửa đề thi" onClick={() => page.openEditModal?.(exam)}>✎</button>
+                    <button type="button" title="Sao chép liên kết" aria-label="Sao chép liên kết đề thi" onClick={() => page.copyExamLink?.(exam)}>⧉</button>
+                    <button type="button" className="danger" title="Xóa" aria-label="Xóa đề thi" onClick={() => page.setDeleteConfirmExam?.(exam)}>×</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <section className="class-exam-empty"><span>▤</span><strong>Không tìm thấy đề thi phù hợp</strong><p>Thử đổi trạng thái, quyền riêng tư hoặc từ khóa tìm kiếm.</p></section>
+      )}
+
+      <CreateExamModal
+        open={Boolean(page.createOpen)}
+        onClose={page.closeCreateModal}
+        onSave={page.saveExam}
+        editingExam={page.editingExam}
+        teacherSubject={page.teacherSubject}
+        teacherName={page.teacherName}
+        availableClasses={page.classes || []}
+      />
+
+      {page.deleteConfirmExam ? (
+        <div className="modal-backdrop" onMouseDown={page.closeDeleteConfirm}>
+          <div className="class-modal class-exam-delete-modal" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><p>Xác nhận xóa</p><h2>Xóa đề thi?</h2></div><button type="button" className="icon-btn" onClick={page.closeDeleteConfirm}>×</button></div>
+            <p className="class-exam-delete-copy">Bạn có chắc muốn xóa đề “{page.deleteConfirmExam.title || 'Chưa có tên'}” khỏi hệ thống Đề thi?</p>
+            <div className="modal-actions"><button type="button" className="ghost-btn" onClick={page.closeDeleteConfirm}>Hủy</button><button type="button" className="danger-btn" onClick={page.confirmDeleteExam}>Xóa đề thi</button></div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TeacherClasses() {
   const { userDetails } = useAuth();
+  const isAdminUser = ['admin', 'administrator', 'super_admin', 'superadmin'].includes(normalizeText(userDetails?.role));
   const [activeTab, setActiveTab] = useState('home');
   const [queryText, setQueryText] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -905,6 +1249,13 @@ function TeacherClasses() {
   const [menuClassId, setMenuClassId] = useState('');
   const [deletingClass, setDeletingClass] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(1);
+  const [deleteConfirmSeconds, setDeleteConfirmSeconds] = useState(10);
+  const [teacherRowMenuId, setTeacherRowMenuId] = useState('');
+  const [teacherDeleteOpen, setTeacherDeleteOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState(null);
+  const [deletingTeacher, setDeletingTeacher] = useState(false);
+  const [teacherDeleteError, setTeacherDeleteError] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsClassId, setSettingsClassId] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
@@ -916,17 +1267,38 @@ function TeacherClasses() {
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({ main: true, secondary: true });
+  const [workspaceMobileMenuOpen, setWorkspaceMobileMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [classSearch, setClassSearch] = useState('');
+  const [eLearningCourses, setELearningCourses] = useState([]);
+  const [eLearningTeacherProfiles, setELearningTeacherProfiles] = useState({});
+  const [eLearningResourcesLoading, setELearningResourcesLoading] = useState(false);
+  const [eLearningResourcesError, setELearningResourcesError] = useState('');
+  const [eLearningResourceSearch, setELearningResourceSearch] = useState('');
+  const [eLearningResourceScope, setELearningResourceScope] = useState('class');
+  const [eLearningResourceFormat, setELearningResourceFormat] = useState('all');
+  const [eLearningResourceSort, setELearningResourceSort] = useState('newest');
+  const [eLearningCreateTypeOpen, setELearningCreateTypeOpen] = useState(false);
+  const [eLearningCreateOpen, setELearningCreateOpen] = useState(false);
+  const [eLearningCreateType, setELearningCreateType] = useState('video');
+  const [eLearningCreateForm, setELearningCreateForm] = useState(() => getELearningEmptyForm());
+  const [eLearningCreateUploadingWord, setELearningCreateUploadingWord] = useState(false);
+  const [eLearningCreateUploadingVideo, setELearningCreateUploadingVideo] = useState(false);
+  const [eLearningCreateUploadingImage, setELearningCreateUploadingImage] = useState(false);
+  const [eLearningCreatePublishing, setELearningCreatePublishing] = useState(false);
+  const [eLearningCreateNotice, setELearningCreateNotice] = useState('');
+  const eLearningCreateLessonsRef = useRef(null);
   const [assignmentsByClass, setAssignmentsByClass] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [homeSettingsOpen, setHomeSettingsOpen] = useState(false);
   const [homeSettingsError, setHomeSettingsError] = useState('');
   const [homeSettingsForm, setHomeSettingsForm] = useState({ name: '', description: '', school: '', grade: '', coverPhotoUrl: '', themeColor: '#2563eb' });
+  const [coverLibraryOpen, setCoverLibraryOpen] = useState(false);
+  const [coverLibraryCategory, setCoverLibraryCategory] = useState(CLASS_COVER_CATEGORIES[0].category);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const [announcementBody, setAnnouncementBody] = useState('');
   const [announcementLinks, setAnnouncementLinks] = useState([]);
@@ -944,6 +1316,7 @@ function TeacherClasses() {
   const [deletingAllNotifications, setDeletingAllNotifications] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageSearch, setMessageSearch] = useState('');
+  const [messageMobileChatOpen, setMessageMobileChatOpen] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [messageDrafts, setMessageDrafts] = useState({});
   const [messageSending, setMessageSending] = useState(false);
@@ -953,6 +1326,7 @@ function TeacherClasses() {
   const [recallingMessageId, setRecallingMessageId] = useState('');
   const [messageRecallConfirm, setMessageRecallConfirm] = useState(null);
   const messageFileInputRef = useRef(null);
+  const messageTextareaRef = useRef(null);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceDate, setAttendanceDate] = useState(() => getLocalDateKey());
   const [attendanceDraft, setAttendanceDraft] = useState({});
@@ -1014,6 +1388,42 @@ function TeacherClasses() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const syncMobileWorkspaceSidebar = () => {
+      if (window.matchMedia('(max-width: 760px)').matches) {
+        setSidebarCollapsed(false);
+        setSectionOpen({ main: true, secondary: true });
+      }
+    };
+    syncMobileWorkspaceSidebar();
+    window.addEventListener('resize', syncMobileWorkspaceSidebar);
+    return () => window.removeEventListener('resize', syncMobileWorkspaceSidebar);
+  }, []);
+
+  useEffect(() => {
+    if (!coverLibraryOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setCoverLibraryOpen(false);
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [coverLibraryOpen]);
+
+  useEffect(() => {
+    if (!deleteOpen || deleteConfirmStep !== 2 || deleteConfirmSeconds <= 0) return undefined;
+    const timer = window.setTimeout(() => setDeleteConfirmSeconds((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [deleteConfirmSeconds, deleteConfirmStep, deleteOpen]);
+
+  useEffect(() => {
     if (!menuClassId) return undefined;
 
     const closeMenuOnOutsideClick = (event) => {
@@ -1040,13 +1450,16 @@ function TeacherClasses() {
   }, [studentSortOpen]);
 
   useEffect(() => {
-    if (!studentRowMenuId) return undefined;
+    if (!studentRowMenuId && !teacherRowMenuId) return undefined;
     const closeStudentMenuOnOutsideClick = (event) => {
-      if (!event.target.closest?.('.student-row-menu-wrap')) setStudentRowMenuId('');
+      if (!event.target.closest?.('.student-row-menu-wrap')) {
+        setStudentRowMenuId('');
+        setTeacherRowMenuId('');
+      }
     };
     window.addEventListener('mousedown', closeStudentMenuOnOutsideClick);
     return () => window.removeEventListener('mousedown', closeStudentMenuOnOutsideClick);
-  }, [studentRowMenuId]);
+  }, [studentRowMenuId, teacherRowMenuId]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) =>
@@ -1066,23 +1479,76 @@ function TeacherClasses() {
     document.documentElement.classList.add('class-workspace-fullscreen');
     document.body.classList.add('class-workspace-fullscreen');
 
-    const hiddenElements = [];
-    const externalLayoutSelectors = [
-      'body header',
-      'body footer',
-      'body nav',
-      'body [class*="navbar" i]',
-      'body [class*="topbar" i]',
-      'body [class*="footer" i]',
-    ];
+    const hiddenElements = Array.from(document.querySelectorAll('body footer'))
+      .filter((element) => !workspace.contains(element))
+      .map((element) => ({ element, display: element.style.display }));
+    hiddenElements.forEach(({ element }) => element.style.setProperty('display', 'none', 'important'));
 
-    document
-      .querySelectorAll(externalLayoutSelectors.join(','))
-      .forEach((element) => {
-        if (workspace.contains(element) || element.contains(workspace)) return;
-        hiddenElements.push({ element, display: element.style.display });
+    const mobileHiddenElements = new Map();
+    let mobileChromeFrame = 0;
+    const isOutsideWorkspace = (element) => element && !workspace.contains(element) && !element.contains(workspace);
+    const syncMobileWorkspaceChrome = () => {
+      const shouldHideNavbar = window.matchMedia('(max-width: 1024px)').matches;
+      const shouldHideChatbox = window.matchMedia('(max-width: 1024px)').matches;
+      const navbarCandidates = Array.from(document.querySelectorAll(
+        'body > header, body > nav, header[class*="navbar" i], nav[class*="navbar" i], [class*="navbar" i], [class*="topbar" i], [class*="app-header" i], [class*="main-header" i], [data-testid*="navbar" i], [role="banner"]'
+      )).filter(isOutsideWorkspace);
+      const mobileOnlyCandidates = Array.from(document.querySelectorAll(
+        '[class*="chatbot" i], [class*="chat-box" i], [class*="chatbox" i], [class*="chat-widget" i], [class*="floating-chat" i], [class*="ai-button" i], [class*="ai-chat" i], [class*="floating-ai" i], [id*="chatbot" i], [id*="zuny-ai" i], [data-testid*="chat" i], [aria-label*="AI" i], [aria-label*="chat" i], [title*="AI" i], [title*="chat" i]'
+      )).filter(isOutsideWorkspace);
+      const visualProbeCandidates = typeof document.elementsFromPoint === 'function'
+        ? [
+            ...document.elementsFromPoint(Math.max(1, window.innerWidth / 2), 24),
+            ...document.elementsFromPoint(Math.max(1, window.innerWidth - 28), Math.max(1, window.innerHeight - 28)),
+          ]
+        : [];
+      const visualChromeCandidates = (shouldHideNavbar || shouldHideChatbox)
+        ? Array.from(new Set([
+            ...document.querySelectorAll('.fixed, .sticky, [style*="position: fixed"], [style*="position:fixed"], [style*="position: sticky"], [style*="position:sticky"]'),
+            ...visualProbeCandidates,
+          ]))
+          .filter(isOutsideWorkspace)
+          .filter((element) => {
+            const computedStyle = window.getComputedStyle(element);
+            if (!['fixed', 'sticky'].includes(computedStyle.position)) return false;
+            const rect = element.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return false;
+            const nearTop = rect.top <= 24 && rect.bottom <= Math.min(window.innerHeight * 0.22, 160) && rect.width >= window.innerWidth * 0.45;
+            const compactBottomCorner = rect.width <= 180 && rect.height <= 180 && rect.right >= window.innerWidth - 40 && rect.bottom >= window.innerHeight - 40;
+            return (shouldHideNavbar && nearTop) || (shouldHideChatbox && compactBottomCorner);
+          })
+        : [];
+      const elementsToHide = new Set([
+        ...(shouldHideNavbar ? navbarCandidates : []),
+        ...(shouldHideChatbox ? mobileOnlyCandidates : []),
+        ...visualChromeCandidates,
+      ]);
+
+      mobileHiddenElements.forEach((display, element) => {
+        if (elementsToHide.has(element)) return;
+        if (display) element.style.display = display;
+        else element.style.removeProperty('display');
+        mobileHiddenElements.delete(element);
+      });
+
+      elementsToHide.forEach((element) => {
+        if (!mobileHiddenElements.has(element)) mobileHiddenElements.set(element, element.style.display);
         element.style.setProperty('display', 'none', 'important');
       });
+    };
+    const scheduleMobileWorkspaceChromeSync = () => {
+      if (mobileChromeFrame) window.cancelAnimationFrame(mobileChromeFrame);
+      mobileChromeFrame = window.requestAnimationFrame(() => {
+        mobileChromeFrame = 0;
+        syncMobileWorkspaceChrome();
+      });
+    };
+    syncMobileWorkspaceChrome();
+    window.addEventListener('resize', scheduleMobileWorkspaceChromeSync);
+    const mobileChromeObserver = typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(scheduleMobileWorkspaceChromeSync)
+      : null;
+    mobileChromeObserver?.observe(document.body, { childList: true, subtree: true });
 
     const adjustedAncestors = [];
     let ancestor = workspace.parentElement;
@@ -1104,6 +1570,14 @@ function TeacherClasses() {
     }
 
     return () => {
+      window.removeEventListener('resize', scheduleMobileWorkspaceChromeSync);
+      mobileChromeObserver?.disconnect();
+      if (mobileChromeFrame) window.cancelAnimationFrame(mobileChromeFrame);
+      mobileHiddenElements.forEach((display, element) => {
+        if (display) element.style.display = display;
+        else element.style.removeProperty('display');
+      });
+      mobileHiddenElements.clear();
       document.documentElement.classList.remove('class-workspace-fullscreen');
       document.body.classList.remove('class-workspace-fullscreen');
 
@@ -1157,6 +1631,27 @@ function TeacherClasses() {
     }
 
     setLoading(true);
+
+    if (isAdminUser) {
+      const unsubscribeAll = onSnapshot(
+        collection(db, 'classes'),
+        (snapshot) => {
+          const nextClasses = snapshot.docs
+            .map((classDoc) => ({ id: classDoc.id, ...classDoc.data() }))
+            .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+          setClasses(nextClasses);
+          setSelectedClassId((currentId) => nextClasses.some((item) => item.id === currentId) ? currentId : '');
+          setClassView((currentView) => nextClasses.length ? currentView : 'list');
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Không thể tải toàn bộ lớp cho admin:', error);
+          setLoading(false);
+        }
+      );
+      return () => unsubscribeAll();
+    }
+
     let owned = [];
     let joined = [];
     const syncClasses = () => {
@@ -1190,7 +1685,7 @@ function TeacherClasses() {
       unsubscribeOwned();
       unsubscribeJoined();
     };
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, isAdminUser]);
 
   useEffect(() => {
     if (!classes.length) {
@@ -1206,11 +1701,76 @@ function TeacherClasses() {
           [classItem.id]: snapshot.docs.map((assignmentDoc) => ({ id: assignmentDoc.id, classId: classItem.id, className: classItem.name, ...assignmentDoc.data() })),
         }));
       },
-      (error) => console.error('Không thể tải bài tập realtime:', error)
+      (error) => console.error('Không thể tải bài tập:', error)
     ));
 
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [classes]);
+
+  useEffect(() => {
+    if (classView !== 'detail' || activeTab !== 'resources' || !currentUser?.uid || !selectedClassId) {
+      setELearningResourcesLoading(false);
+      return undefined;
+    }
+
+    setELearningResourcesLoading(true);
+    setELearningResourcesError('');
+    setELearningCourses([]);
+
+    const unsubscribe = onSnapshot(
+      collection(db, 'courses'),
+      (snapshot) => {
+        setELearningCourses(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+        setELearningResourcesLoading(false);
+      },
+      (error) => {
+        console.error('Không thể tải học liệu E-learning:', error);
+        setELearningCourses([]);
+        setELearningResourcesError(error?.message || 'Không thể tải học liệu E-learning.');
+        setELearningResourcesLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [activeTab, classView, currentUser?.uid, selectedClassId]);
+
+  useEffect(() => {
+    if (classView !== 'detail' || activeTab !== 'resources' || !currentUser?.uid || !eLearningCourses.length) {
+      setELearningTeacherProfiles({});
+      return undefined;
+    }
+
+    const ownerIds = Array.from(new Set(eLearningCourses.flatMap((course) => [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]).filter(Boolean).map(String)));
+    const ownerEmails = Array.from(new Set(eLearningCourses.map((course) => String(course.teacherEmail || course.createdByEmail || course.ownerEmail || '').trim()).filter(Boolean)));
+    const profileMap = {};
+    const syncProfile = (id, profile = {}) => {
+      if (id) profileMap[`id:${id}`] = profile;
+      const email = normalizeText(profile.email);
+      if (email) profileMap[`email:${email}`] = profile;
+      setELearningTeacherProfiles({ ...profileMap });
+    };
+    const unsubs = [];
+
+    ownerIds.forEach((ownerId) => {
+      unsubs.push(onSnapshot(
+        doc(db, 'users', ownerId),
+        (snapshot) => { if (snapshot.exists()) syncProfile(snapshot.id, { id: snapshot.id, ...snapshot.data() }); },
+        (error) => console.warn('Không thể đồng bộ avatar người đăng E-learning:', ownerId, error)
+      ));
+    });
+
+    for (let index = 0; index < ownerEmails.length; index += 30) {
+      const emailChunk = ownerEmails.slice(index, index + 30);
+      if (!emailChunk.length) continue;
+      unsubs.push(onSnapshot(
+        query(collection(db, 'users'), where('email', 'in', emailChunk)),
+        (snapshot) => snapshot.docs.forEach((item) => syncProfile(item.id, { id: item.id, ...item.data() })),
+        (error) => console.warn('Không thể đồng bộ avatar E-learning theo email:', error)
+      ));
+    }
+
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [activeTab, classView, currentUser?.uid, eLearningCourses]);
 
   useEffect(() => {
     if (!selectedClassId) {
@@ -1220,7 +1780,7 @@ function TeacherClasses() {
     const unsubscribe = onSnapshot(
       query(collection(db, 'classes', selectedClassId, 'notifications'), orderBy('createdAt', 'desc')),
       (snapshot) => setNotifications(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.error('Không thể tải thông báo realtime:', error)
+      (error) => console.error('Không thể tải thông báo:', error)
     );
     return unsubscribe;
   }, [selectedClassId]);
@@ -1235,7 +1795,7 @@ function TeacherClasses() {
       query(collection(db, 'classes', selectedClassId, 'messages'), orderBy('createdAt', 'asc')),
       (snapshot) => setMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
       (error) => {
-        console.error('Không thể tải trao đổi realtime:', error);
+        console.error('Không thể tải trao đổi:', error);
         setMessageError(error?.message || 'Không thể tải dữ liệu trao đổi.');
       }
     );
@@ -1252,7 +1812,7 @@ function TeacherClasses() {
       collection(db, 'classes', selectedClassId, 'attendance'),
       (snapshot) => setAttendanceRecords(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
       (error) => {
-        console.error('Không thể tải điểm danh realtime:', error);
+        console.error('Không thể tải điểm danh:', error);
         setAttendanceRecords([]);
       }
     );
@@ -1273,7 +1833,7 @@ function TeacherClasses() {
       historyQuery,
       (snapshot) => setAttendanceHistoryEntries(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
       (error) => {
-        console.error('Không thể tải lịch sử điểm danh realtime:', error);
+        console.error('Không thể tải lịch sử điểm danh:', error);
         setAttendanceHistoryEntries([]);
       }
     );
@@ -1289,7 +1849,7 @@ function TeacherClasses() {
       collection(db, 'classes', selectedClassId, 'schedule'),
       (snapshot) => setScheduleItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
       (error) => {
-        console.error('Không thể tải lịch học realtime:', error);
+        console.error('Không thể tải lịch học:', error);
         setScheduleItems([]);
       }
     );
@@ -1329,8 +1889,10 @@ function TeacherClasses() {
   }, [selectedClassId]);
 
   useEffect(() => {
+    const selectedTeacherEmail = classes.find((item) => item.id === selectedClassId)?.teacherEmail || '';
     const emails = Array.from(new Set([
       ...students.map((student) => normalizeText(student.email)),
+      normalizeText(selectedTeacherEmail),
       normalizeText(currentUser?.email),
     ].filter(Boolean)));
     if (!emails.length) {
@@ -1358,7 +1920,7 @@ function TeacherClasses() {
       (error) => console.error('Không thể đồng bộ hồ sơ người dùng:', error)
     ));
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [currentUser?.email, students]);
+  }, [classes, currentUser?.email, selectedClassId, students]);
 
   useEffect(() => {
     if (!selectedClassId) return undefined;
@@ -1403,12 +1965,12 @@ function TeacherClasses() {
       unsubs.push(onSnapshot(
         collection(db, 'classes', selectedClassId, 'subjects', subject.id, 'scores'),
         (snapshot) => syncSubject(subject.id, 'scores', snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-        (error) => console.error(`Không thể tải điểm realtime môn ${subject.id}:`, error)
+        (error) => console.error(`Không thể tải điểm môn ${subject.id}:`, error)
       ));
       unsubs.push(onSnapshot(
         collection(db, 'classes', selectedClassId, 'subjects', subject.id, 'tests'),
         (snapshot) => syncSubject(subject.id, 'tests', snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-        (error) => console.error(`Không thể tải bài kiểm tra realtime môn ${subject.id}:`, error)
+        (error) => console.error(`Không thể tải bài kiểm tra môn ${subject.id}:`, error)
       ));
     });
 
@@ -1486,6 +2048,9 @@ function TeacherClasses() {
     [classes, selectedClassId]
   );
 
+  const isClassOwner = Boolean(selectedClass?.teacherId && selectedClass.teacherId === currentUser?.uid);
+  const canDeleteClass = isClassOwner || isAdminUser;
+
   const classMembers = useMemo(() => students.map((student) => {
     const profile = userProfilesByEmail[normalizeText(student.email)] || {};
     return {
@@ -1493,10 +2058,15 @@ function TeacherClasses() {
       uid: student.uid || profile.uid || profile.id || '',
       name: student.name || profile.displayName || profile.name || profile.fullName || '',
       role: profile.role || student.role || student.userRole || student.memberRole || '',
+      classRole: student.classRole || '',
       gender: student.gender || student.sex || profile.gender || profile.sex || '',
-      photoURL: student.photoURL || student.photoUrl || student.avatarUrl || student.avatar || profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || '',
+      photoURL: profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || student.photoURL || student.photoUrl || student.avatarUrl || student.avatar || '',
     };
   }), [students, userProfilesByEmail]);
+
+  const currentTeacherMember = useMemo(() => classMembers.find((member) => member.uid === currentUser?.uid || normalizeText(member.email) === normalizeText(currentUser?.email)) || null, [classMembers, currentUser?.email, currentUser?.uid]);
+  const isInternTeacher = Boolean(currentTeacherMember && currentTeacherMember.classRole === 'intern_teacher');
+  const canTeachClass = isClassOwner || isTeacherMember(currentTeacherMember);
 
   const attendanceStudents = useMemo(
     () => classMembers.filter((student) => !isTeacherMember(student) && student.uid !== selectedClass?.teacherId && normalizeText(student.email) !== normalizeText(selectedClass?.teacherEmail)),
@@ -1506,14 +2076,15 @@ function TeacherClasses() {
   const teacherMembers = useMemo(() => {
     const rows = [];
     if (selectedClass?.teacherId || selectedClass?.teacherEmail) {
+      const ownerProfile = userProfilesByEmail[normalizeText(selectedClass.teacherEmail)] || {};
       rows.push({
         id: selectedClass.teacherId || `owner-${selectedClass.id}`,
-        uid: selectedClass.teacherId || '',
-        name: selectedClass.teacherName || (selectedClass.teacherId === currentUser?.uid ? currentUser?.displayName : '') || selectedClass.teacherEmail || 'Giáo viên',
-        email: selectedClass.teacherEmail || '',
-        gender: selectedClass.teacherGender || '',
+        uid: selectedClass.teacherId || ownerProfile.uid || ownerProfile.id || '',
+        name: selectedClass.teacherName || ownerProfile.displayName || ownerProfile.name || ownerProfile.fullName || (selectedClass.teacherId === currentUser?.uid ? currentUser?.displayName : '') || selectedClass.teacherEmail || 'Giáo viên',
+        email: selectedClass.teacherEmail || ownerProfile.email || '',
+        gender: selectedClass.teacherGender || ownerProfile.gender || ownerProfile.sex || '',
         role: 'TEACHER',
-        photoURL: selectedClass.teacherPhotoURL || selectedClass.teacherAvatar || (selectedClass.teacherId === currentUser?.uid ? currentUser?.photoURL : '') || '',
+        photoURL: ownerProfile.photoURL || ownerProfile.photoUrl || ownerProfile.avatarUrl || ownerProfile.avatar || selectedClass.teacherPhotoURL || selectedClass.teacherAvatar || (selectedClass.teacherId === currentUser?.uid ? currentUser?.photoURL : '') || '',
         owner: true,
       });
     }
@@ -1521,7 +2092,515 @@ function TeacherClasses() {
       if (!rows.some((item) => item.id === teacher.id || (item.email && normalizeText(item.email) === normalizeText(teacher.email)))) rows.push(teacher);
     });
     return rows;
-  }, [classMembers, currentUser?.displayName, currentUser?.photoURL, currentUser?.uid, selectedClass]);
+  }, [classMembers, currentUser?.displayName, currentUser?.photoURL, currentUser?.uid, selectedClass, userProfilesByEmail]);
+
+  const internTeacherMembers = useMemo(() => teacherMembers.filter((teacher) => !teacher.owner && teacher.classRole === 'intern_teacher'), [teacherMembers]);
+
+  const getInternAttendanceMetrics = (teacher = {}) => {
+    let present = 0; let excused = 0; let total = 0;
+    attendanceRecords.forEach((record) => {
+      const rows = Array.isArray(record.internRecords) ? record.internRecords : [];
+      const row = rows.find((item) => item.teacherId === teacher.id || item.uid === teacher.uid || normalizeText(item.email) === normalizeText(teacher.email));
+      if (!row) return;
+      total += 1;
+      if (normalizeAttendanceStatus(row.status) === 'present') present += 1;
+      if (normalizeAttendanceStatus(row.status) === 'excused') excused += 1;
+    });
+    return { present, excused, total, rate: total ? Math.round((present / total) * 100) : null };
+  };
+
+  const setInternTeacherRole = async (teacher) => {
+    if (!isClassOwner || !selectedClassId || !teacher?.id || teacher.owner) return;
+    await updateDoc(doc(db, 'classes', selectedClassId, 'students', teacher.id), { classRole: 'intern_teacher', updatedAt: serverTimestamp() });
+    setTeacherRowMenuId('');
+  };
+
+  const removeInternTeacherRole = async (teacher) => {
+    if (!isClassOwner || !selectedClassId || !teacher?.id || teacher.owner) return;
+    await updateDoc(doc(db, 'classes', selectedClassId, 'students', teacher.id), { classRole: '', updatedAt: serverTimestamp() });
+    setTeacherRowMenuId('');
+  };
+
+  const openDeleteTeacher = (teacher) => {
+    if (!isClassOwner || !teacher?.id || teacher.owner) return;
+    setTeacherRowMenuId('');
+    setTeacherToDelete(teacher);
+    setTeacherDeleteError('');
+    setTeacherDeleteOpen(true);
+  };
+
+  const closeDeleteTeacher = () => {
+    if (deletingTeacher) return;
+    setTeacherDeleteOpen(false);
+    setTeacherToDelete(null);
+    setTeacherDeleteError('');
+  };
+
+  const handleDeleteTeacher = async () => {
+    if (!isClassOwner) {
+      setTeacherDeleteError('Chỉ giáo viên chủ lớp mới có thể xóa giáo viên khác khỏi lớp.');
+      return;
+    }
+    if (!selectedClassId || !teacherToDelete?.id || teacherToDelete.owner) {
+      setTeacherDeleteError('Không tìm thấy giáo viên cần xóa khỏi lớp.');
+      return;
+    }
+    const teacherUid = String(teacherToDelete.uid || '').trim();
+    if (!teacherUid) {
+      setTeacherDeleteError('Không xác định được UID của giáo viên này nên chưa thể xóa an toàn khỏi memberIds.');
+      return;
+    }
+
+    try {
+      setDeletingTeacher(true);
+      setTeacherDeleteError('');
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'classes', selectedClassId, 'students', teacherToDelete.id));
+      batch.update(doc(db, 'classes', selectedClassId), {
+        memberIds: arrayRemove(teacherUid),
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
+      setTeacherDeleteOpen(false);
+      setTeacherToDelete(null);
+    } catch (error) {
+      console.error('Không thể xóa giáo viên khỏi lớp:', error);
+      setTeacherDeleteError(error?.message || 'Không thể xóa giáo viên khỏi lớp. Vui lòng thử lại.');
+    } finally {
+      setDeletingTeacher(false);
+    }
+  };
+
+  const saveInternAttendanceStatus = async (teacher, status) => {
+    if (!isClassOwner || !selectedClassId || !teacher?.id) return;
+    const currentRows = Array.isArray(selectedAttendanceRecord?.internRecords) ? selectedAttendanceRecord.internRecords : [];
+    const nextRow = { teacherId: teacher.id, uid: teacher.uid || '', email: teacher.email || '', name: getStudentDisplayName(teacher), status, updatedAtMillis: Date.now() };
+    const nextRows = [...currentRows.filter((item) => item.teacherId !== teacher.id && item.uid !== teacher.uid && normalizeText(item.email) !== normalizeText(teacher.email)), nextRow];
+    await setDoc(doc(db, 'classes', selectedClassId, 'attendance', attendanceDate), { date: attendanceDate, classId: selectedClassId, internRecords: nextRows, updatedAt: serverTimestamp() }, { merge: true });
+  };
+
+  const leaveClassAsIntern = async () => {
+    if (!isInternTeacher || !selectedClassId || !currentUser?.uid || !currentTeacherMember?.id) return;
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'classes', selectedClassId, 'students', currentTeacherMember.id));
+    batch.update(doc(db, 'classes', selectedClassId), { memberIds: arrayRemove(currentUser.uid), updatedAt: serverTimestamp() });
+    await batch.commit();
+    goBackToClassList();
+  };
+
+  const classResources = useMemo(() => {
+    const rows = [];
+    (assignmentsByClass[selectedClassId] || []).forEach((assignment) => (Array.isArray(assignment.attachments) ? assignment.attachments : []).forEach((file, index) => rows.push({ id: `a-${assignment.id}-${index}`, name: file.name || file.title || `Tệp ${index + 1}`, url: file.url || file.href || '', source: getAssignmentTitle(assignment) })));
+    notifications.forEach((notification) => (Array.isArray(notification.attachments) ? notification.attachments : []).forEach((file, index) => rows.push({ id: `n-${notification.id}-${index}`, name: file.name || file.title || `Tệp ${index + 1}`, url: file.url || file.href || '', source: notification.title || 'Thông báo' })));
+    return rows;
+  }, [assignmentsByClass, notifications, selectedClassId]);
+
+
+  const eLearningResourceCounts = useMemo(() => {
+    const className = normalizeText(selectedClass?.name || selectedClass?.className || '');
+    const classId = String(selectedClassId || '');
+    const currentUid = String(currentUser?.uid || '');
+    const rows = eLearningCourses.map((course) => {
+      const ownerIds = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]
+        .filter(Boolean)
+        .map(String);
+      const visibility = normalizeText(course.visibility || 'public');
+      const courseClassName = normalizeText(course.className || course.class || course.lop || '');
+      const courseClassId = String(course.classId || '');
+      const status = normalizeText(course.status || course.moderationStatus || 'approved');
+      const isDirectClassPost = visibility === 'class' && Boolean((courseClassId && courseClassId === classId) || (!courseClassId && className && courseClassName === className));
+      const isLegacyDirectClassPost = visibility === 'private' && className && courseClassName === className && !['10', '11', '12'].includes(courseClassName);
+      return {
+        course,
+        isOwner: Boolean(currentUid && ownerIds.includes(currentUid)),
+        isForClass: Boolean(isDirectClassPost || isLegacyDirectClassPost),
+        isPublicApproved: visibility === 'public' && status === 'approved',
+        isApproved: status === 'approved',
+      };
+    });
+    return {
+      class: rows.filter((item) => item.isForClass).length,
+      mine: rows.filter((item) => item.isOwner).length,
+      public: rows.filter((item) => item.isPublicApproved).length,
+      approved: rows.filter((item) => item.isApproved).length,
+    };
+  }, [currentUser?.uid, eLearningCourses, selectedClass?.className, selectedClass?.name, selectedClassId]);
+
+  const visibleELearningResources = useMemo(() => {
+    const className = normalizeText(selectedClass?.name || selectedClass?.className || '');
+    const currentUid = String(currentUser?.uid || '');
+    const keyword = normalizeText(eLearningResourceSearch);
+
+    const filtered = eLearningCourses.filter((course) => {
+      const ownerIds = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]
+        .filter(Boolean)
+        .map(String);
+      const isOwner = Boolean(currentUid && ownerIds.includes(currentUid));
+      const status = normalizeText(course.status || course.moderationStatus || 'approved');
+      const visibility = normalizeText(course.visibility || 'public');
+      const courseClassName = normalizeText(course.className || course.class || course.lop || '');
+      const courseClassId = String(course.classId || '');
+      const isDirectClassPost = visibility === 'class' && Boolean((courseClassId && courseClassId === String(selectedClassId || '')) || (!courseClassId && className && courseClassName === className));
+      const isLegacyDirectClassPost = visibility === 'private' && className && courseClassName === className && !['10', '11', '12'].includes(courseClassName);
+      const isForClass = Boolean(isDirectClassPost || isLegacyDirectClassPost);
+
+      if (eLearningResourceScope === 'class' && !isForClass) return false;
+      if (eLearningResourceScope === 'mine' && !isOwner) return false;
+      if (eLearningResourceScope === 'public' && (visibility !== 'public' || status !== 'approved')) return false;
+
+      const format = getELearningCourseFormat(course);
+      if (eLearningResourceFormat !== 'all' && format !== eLearningResourceFormat) return false;
+
+      if (keyword) {
+        const haystack = [
+          stripELearningHtml(course.title),
+          stripELearningHtml(course.topic),
+          stripELearningHtml(course.description),
+          course.category,
+          course.teacherName,
+          course.teacherEmail,
+          course.courseCode,
+          course.className,
+        ].map((value) => normalizeText(value)).join(' ');
+        if (!haystack.includes(keyword)) return false;
+      }
+
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (eLearningResourceSort === 'oldest') return getTimeValue(a.createdAt || a.updatedAt) - getTimeValue(b.createdAt || b.updatedAt);
+      if (eLearningResourceSort === 'views') return Number(b.views || 0) - Number(a.views || 0) || getTimeValue(b.createdAt || b.updatedAt) - getTimeValue(a.createdAt || a.updatedAt);
+      return getTimeValue(b.createdAt || b.updatedAt) - getTimeValue(a.createdAt || a.updatedAt);
+    });
+  }, [currentUser?.uid, eLearningCourses, eLearningResourceFormat, eLearningResourceScope, eLearningResourceSearch, eLearningResourceSort, selectedClass?.className, selectedClass?.name, selectedClassId]);
+
+  const openELearningResource = (course) => {
+    if (!course?.id || typeof window === 'undefined') return;
+    window.location.assign(`/e-learning/${encodeURIComponent(course.id)}`);
+  };
+
+  const normalizedELearningPublisherRole = String(userDetails?.role || '')
+    .trim()
+    .replace(/[\s_-]/g, '')
+    .toUpperCase();
+  const canCreateClassELearning = Boolean(currentUser?.uid) && ['TEACHER', 'ADMINDEV'].includes(normalizedELearningPublisherRole);
+  const eLearningPublisherName =
+    userDetails?.fullName ||
+    userDetails?.name ||
+    userDetails?.displayName ||
+    currentUser?.displayName ||
+    currentUser?.email ||
+    'Giáo viên ZUNY';
+
+  const buildClassELearningCreateForm = (contentType = 'video') => {
+    const rawSubject = selectedClass?.subject || userDetails?.subject || userDetails?.teachingSubject || '';
+    const nextForm = getELearningEmptyForm(rawSubject && rawSubject !== 'Môn học' ? rawSubject : '');
+    const randomCode = String(Math.floor(1000 + Math.random() * 9000));
+    nextForm.attachMode = contentType === 'document' ? 'document' : contentType === 'simulation' ? 'simulation' : 'youtube';
+    nextForm.lessons = [];
+    nextForm.courseRandomCode = randomCode;
+    nextForm.courseCode = generateELearningCourseCode(eLearningPublisherName, nextForm.category, randomCode);
+    nextForm.visibility = 'class';
+    nextForm.classId = String(selectedClassId || '');
+    nextForm.className = selectedClass?.name || selectedClass?.className || '';
+    return nextForm;
+  };
+
+  const openClassELearningPublisher = () => {
+    if (!selectedClassId || !currentUser?.uid) return;
+    if (!canCreateClassELearning) {
+      window.alert('Tài khoản hiện tại không có quyền đăng bài E-learning.');
+      return;
+    }
+    setELearningCreateNotice('');
+    setELearningCreateTypeOpen(true);
+  };
+
+  const openClassELearningCreateForm = (contentType = 'video') => {
+    if (!selectedClassId || !canCreateClassELearning) return;
+    const nextType = ['document', 'simulation'].includes(contentType) ? contentType : 'video';
+    setELearningCreateType(nextType);
+    setELearningCreateForm(buildClassELearningCreateForm(nextType));
+    setELearningCreateTypeOpen(false);
+    setELearningCreateOpen(true);
+  };
+
+  const resetClassELearningCreateForm = () => {
+    setELearningCreateForm(buildClassELearningCreateForm(eLearningCreateType));
+  };
+
+  const handleClassELearningWordUpload = async (event) => {
+    const input = event?.target;
+    const file = input?.files?.[0];
+    if (!file || !currentUser?.uid || !canCreateClassELearning) return;
+    try {
+      setELearningCreateUploadingWord(true);
+      const lowerName = String(file.name || '').toLowerCase();
+      if (file.size > 20 * 1024 * 1024) {
+        window.alert('Tài liệu vượt quá giới hạn 20 MB.');
+        return;
+      }
+      if (!lowerName.endsWith('.pdf') && !lowerName.endsWith('.doc') && !lowerName.endsWith('.docx')) {
+        window.alert('Chỉ hỗ trợ file Word (.doc, .docx) hoặc PDF.');
+        return;
+      }
+      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const fileRef = ref(getStorage(), `course-files/${currentUser.uid}/${safeName}`);
+      const extractedHtml = lowerName.endsWith('.docx') ? await extractClassELearningDocxHtml(file).catch(() => '') : '';
+      const snapshot = await uploadBytes(fileRef, file, { contentType: file.type || undefined });
+      const fileUrl = await getDownloadURL(snapshot.ref);
+      const documentFileType = lowerName.endsWith('.pdf') ? 'pdf' : lowerName.endsWith('.docx') ? 'docx' : 'doc';
+      setELearningCreateForm((current) => ({
+        ...current,
+        documentMode: 'upload',
+        documentFileType,
+        wordFileName: file.name,
+        wordFileUrl: fileUrl,
+        documentFileSize: Number(file.size || 0),
+        richDocument: extractedHtml || current.richDocument || '',
+      }));
+    } catch (firebaseError) {
+      console.error('Không thể tải tài liệu E-learning từ lớp:', firebaseError);
+      window.alert('Không thể tải file. Vui lòng thử lại.');
+    } finally {
+      if (input) input.value = '';
+      setELearningCreateUploadingWord(false);
+    }
+  };
+
+  const handleClassELearningImageUpload = async (event, target = 'thumbnail') => {
+    const input = event?.target;
+    const file = input?.files?.[0];
+    if (!file || !currentUser?.uid || !canCreateClassELearning) return;
+    const extension = String(file.name || '').toLowerCase().split('.').pop();
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    if (!allowedMime.includes(file.type) && !allowedExtensions.includes(extension)) {
+      window.alert('Chỉ hỗ trợ ảnh JPG, PNG, WEBP hoặc GIF.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      window.alert('Ảnh vượt quá giới hạn 5 MB.');
+      return;
+    }
+    try {
+      setELearningCreateUploadingImage(true);
+      const safeName = `${Date.now()}-${String(file.name || 'image').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const imageRef = ref(getStorage(), `course-images/${currentUser.uid}/${safeName}`);
+      const contentType = file.type || ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[extension]) || 'application/octet-stream';
+      const snapshot = await uploadBytes(imageRef, file, {
+        contentType,
+        customMetadata: { originalName: file.name, ownerUid: currentUser.uid },
+      });
+      const imageUrl = await getDownloadURL(snapshot.ref);
+      setELearningCreateForm((current) => target === 'document'
+        ? {
+          ...current,
+          documentMode: 'image',
+          documentImageUrl: imageUrl,
+          documentImageName: file.name,
+          documentImageSize: Number(file.size || 0),
+          wordFileName: '',
+          wordFileUrl: '',
+          documentFileSize: 0,
+          richDocument: '',
+        }
+        : { ...current, thumbnail: imageUrl, thumbnailFileName: file.name });
+    } catch (firebaseError) {
+      console.error('Không thể tải ảnh E-learning từ lớp:', firebaseError);
+      window.alert(`Không thể tải ảnh${firebaseError?.message ? `: ${firebaseError.message}` : '.'}`);
+    } finally {
+      if (input) input.value = '';
+      setELearningCreateUploadingImage(false);
+    }
+  };
+
+  const handleClassELearningVideoUpload = async (event, lessonIndex = null) => {
+    const input = event?.target;
+    const file = input?.files?.[0];
+    if (!file || !currentUser?.uid || !canCreateClassELearning) return;
+    const fileName = String(file.name || '');
+    if (file.type !== 'video/mp4' && !fileName.toLowerCase().endsWith('.mp4')) {
+      window.alert('Chỉ hỗ trợ file MP4.');
+      return;
+    }
+    if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
+      window.alert(file.size <= 0 ? 'File video không hợp lệ hoặc đang rỗng.' : `Video có dung lượng ${(file.size / 1024 / 1024).toFixed(2)} MB, vượt giới hạn 5 MB.`);
+      return;
+    }
+    try {
+      setELearningCreateUploadingVideo(true);
+      const durationSeconds = await Promise.race([
+        getELearningMp4DurationFromFile(file),
+        new Promise((resolve) => window.setTimeout(() => resolve(0), 8000)),
+      ]);
+      const safeBaseName = fileName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const videoRef = ref(getStorage(), `course-videos/${currentUser.uid}/${Date.now()}-${safeBaseName || 'video.mp4'}`);
+      const snapshot = await uploadBytes(videoRef, file, {
+        contentType: 'video/mp4',
+        customMetadata: { originalName: fileName, ownerUid: currentUser.uid },
+      });
+      const videoUrl = await getDownloadURL(snapshot.ref);
+      const duration = formatELearningDuration(durationSeconds);
+      if (lessonIndex === null) {
+        setELearningCreateForm((current) => ({
+          ...current,
+          videoSourceType: 'upload',
+          attachMode: 'mp4',
+          youtubeUrl: '',
+          mp4FileName: fileName,
+          mp4FileUrl: videoUrl,
+          durationSeconds: Number(durationSeconds || 0),
+          duration,
+          estimatedMinutes: durationSeconds ? Math.ceil(durationSeconds / 60) : 0,
+        }));
+      } else {
+        setELearningCreateForm((current) => {
+          const lessons = Array.isArray(current.lessons) ? [...current.lessons] : [];
+          lessons[lessonIndex] = {
+            ...(lessons[lessonIndex] || {}),
+            videoSourceType: 'upload',
+            attachMode: 'mp4',
+            youtubeUrl: '',
+            mp4FileName: fileName,
+            mp4FileUrl: videoUrl,
+            durationSeconds: Number(durationSeconds || 0),
+            duration,
+          };
+          return { ...current, lessons };
+        });
+      }
+    } catch (firebaseError) {
+      console.error('Không thể tải video E-learning từ lớp:', firebaseError);
+      const code = String(firebaseError?.code || '');
+      if (code.includes('storage/unauthorized')) window.alert('Hệ thống đang từ chối quyền tải video. Hãy kiểm tra Storage Rules cho course-videos/{uid}.');
+      else if (code.includes('storage/retry-limit-exceeded')) window.alert('Kết nối tải video bị gián đoạn. Vui lòng kiểm tra mạng và thử lại.');
+      else window.alert(`Không thể tải video lên hệ thống${firebaseError?.message ? `: ${firebaseError.message}` : '.'}`);
+    } finally {
+      if (input) input.value = '';
+      setELearningCreateUploadingVideo(false);
+    }
+  };
+
+  const publishClassELearningCourse = async () => {
+    if (!selectedClassId || !currentUser?.uid || !canCreateClassELearning || eLearningCreatePublishing) return;
+    if (!stripELearningHtml(eLearningCreateForm.title).trim() || !stripELearningHtml(eLearningCreateForm.topic).trim()) {
+      window.alert('Vui lòng nhập tên bài học và chủ đề.');
+      return;
+    }
+    const titleWords = countELearningWords(eLearningCreateForm.title);
+    const topicWords = countELearningWords(eLearningCreateForm.topic);
+    const descriptionWords = countELearningWords(eLearningCreateForm.description);
+    if (titleWords > courseTextLimits.titleWords || topicWords > courseTextLimits.topicWords || descriptionWords > courseTextLimits.descriptionWords) {
+      window.alert(`Giới hạn nội dung: tên bài tối đa ${courseTextLimits.titleWords} từ, chủ đề tối đa ${courseTextLimits.topicWords} từ và mô tả tối đa ${courseTextLimits.descriptionWords} từ.`);
+      return;
+    }
+    if (eLearningCreateForm.visibility === 'private' && !eLearningCreateForm.className) {
+      window.alert('Vui lòng chọn khối được xem bài học.');
+      return;
+    }
+    if (eLearningCreateForm.visibility === 'class' && !eLearningCreateForm.classId) {
+      window.alert('Vui lòng chọn lớp được xem bài học.');
+      return;
+    }
+    if (eLearningCreateType === 'video' && !(Array.isArray(eLearningCreateForm.lessons) && eLearningCreateForm.lessons.some((lesson) => String(lesson.youtubeUrl || lesson.lumiUrl || lesson.mp4FileUrl || '').trim()))) {
+      window.alert('Vui lòng thêm ít nhất một video trong tab Danh sách bài trước khi đăng.');
+      return;
+    }
+
+    try {
+      setELearningCreatePublishing(true);
+      const lessons = Array.isArray(eLearningCreateForm.lessons) ? eLearningCreateForm.lessons : [];
+      const firstLesson = lessons[0] || {};
+      const totalDurationSeconds = Number(firstLesson.durationSeconds || eLearningCreateForm.durationSeconds || 0);
+      const duration = firstLesson.duration || eLearningCreateForm.duration || formatELearningDuration(totalDurationSeconds);
+      const approved = normalizedELearningPublisherRole === 'ADMINDEV';
+      await addDoc(collection(db, 'courses'), {
+        title: eLearningCreateForm.title,
+        topic: eLearningCreateForm.topic,
+        description: eLearningCreateForm.description,
+        content: eLearningCreateForm.content,
+        category: eLearningCreateForm.category,
+        thumbnail: eLearningCreateForm.thumbnail,
+        thumbnailFileName: eLearningCreateForm.thumbnailFileName || '',
+        documentImageUrl: eLearningCreateForm.documentImageUrl || '',
+        documentImageName: eLearningCreateForm.documentImageName || '',
+        documentImageSize: Number(eLearningCreateForm.documentImageSize || 0),
+        documentFileSize: Number(eLearningCreateForm.documentFileSize || 0),
+        contentType: eLearningCreateType,
+        simulationMode: eLearningCreateForm.simulationMode || '',
+        simulationUrl: eLearningCreateForm.simulationUrl || '',
+        simulationHtml: eLearningCreateForm.simulationHtml || '',
+        simulationLanguage: eLearningCreateForm.simulationLanguage || 'html',
+        simulationCode: eLearningCreateForm.simulationCode || '',
+        simulationCodes: eLearningCreateForm.simulationCodes || {},
+        simulationInstructions: eLearningCreateForm.simulationInstructions || '',
+        youtubeUrl: firstLesson.youtubeUrl || '',
+        lumiUrl: firstLesson.lumiUrl || '',
+        wordFileName: eLearningCreateForm.wordFileName,
+        wordFileUrl: eLearningCreateForm.wordFileUrl,
+        richDocument: eLearningCreateForm.richDocument,
+        documentMode: eLearningCreateForm.documentMode || '',
+        documentFileType: eLearningCreateForm.documentFileType || '',
+        learningObjectives: normalizeELearningTextList(eLearningCreateForm.learningObjectives),
+        prerequisites: normalizeELearningTextList(eLearningCreateForm.prerequisites),
+        difficulty: eLearningCreateForm.difficulty || 'medium',
+        estimatedMinutes: Number(eLearningCreateForm.estimatedMinutes || 0),
+        checklist: normalizeELearningChecklist(eLearningCreateForm.checklist),
+        quiz: normalizeELearningQuiz(eLearningCreateForm.quiz),
+        teacherCode: '',
+        courseCode: eLearningCreateForm.courseCode || generateELearningCourseCode(eLearningPublisherName, eLearningCreateForm.category, eLearningCreateForm.courseRandomCode),
+        visibility: eLearningCreateForm.visibility,
+        className: ['private', 'class'].includes(eLearningCreateForm.visibility) ? eLearningCreateForm.className : '',
+        classId: eLearningCreateForm.visibility === 'class' ? eLearningCreateForm.classId || '' : '',
+        openAt: eLearningCreateForm.openAt,
+        openAtMs: getELearningOpenAtMs(eLearningCreateForm.openAt),
+        attachMode: firstLesson.attachMode || eLearningCreateForm.attachMode,
+        codeLanguage: eLearningCreateForm.codeLanguage || 'javascript',
+        codeContent: eLearningCreateForm.codeContent,
+        lessonTopics: Array.isArray(eLearningCreateForm.lessonTopics) ? eLearningCreateForm.lessonTopics : [],
+        lessons,
+        lessonCount: lessons.length,
+        mp4FileName: firstLesson.mp4FileName || '',
+        mp4FileUrl: firstLesson.mp4FileUrl || '',
+        videoSourceType: firstLesson.videoSourceType || '',
+        durationSeconds: totalDurationSeconds,
+        duration: duration || '---',
+        youtubeDuration: duration || '---',
+        videoSources: Array.isArray(eLearningCreateForm.videoSources) ? eLearningCreateForm.videoSources : [],
+        publishConfirmed: Boolean(eLearningCreateForm.publishConfirmed),
+        teacherId: currentUser.uid,
+        createdByUid: currentUser.uid,
+        teacherEmail: currentUser.email || '',
+        teacherName: eLearningPublisherName,
+        teacherSubject: eLearningCreateForm.category,
+        createdByRole: userDetails?.role || 'TEACHER',
+        studentCount: 0,
+        rating: 0,
+        ratingTotal: 0,
+        ratingCount: 0,
+        views: 0,
+        isFeatured: false,
+        status: approved ? 'approved' : 'pending',
+        moderationStatus: approved ? 'approved' : 'pending',
+        submittedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setELearningCreateOpen(false);
+      setELearningCreateForm(buildClassELearningCreateForm(eLearningCreateType));
+      setELearningResourceScope('class');
+      setELearningCreateNotice(eLearningCreateForm.visibility === 'class'
+        ? 'Đã đăng bài E-learning cho lớp. Bài đang đồng bộ vào danh sách Học liệu.'
+        : approved ? 'Đã xuất bản bài E-learning.' : 'Đã gửi bài E-learning vào quy trình kiểm duyệt hiện tại.');
+    } catch (firebaseError) {
+      console.error('Không thể tạo bài E-learning từ workspace lớp:', firebaseError);
+      window.alert(firebaseError?.message || 'Không thể tạo bài học. Vui lòng thử lại.');
+    } finally {
+      setELearningCreatePublishing(false);
+    }
+  };
 
   const joinedClassMemberCount = attendanceStudents.length;
 
@@ -1668,7 +2747,7 @@ function TeacherClasses() {
     const pendingQr = record?.qrCheckIns && typeof record.qrCheckIns === 'object' ? record.qrCheckIns : {};
     attendanceStudents.forEach((student) => {
       if (!next[student.id]) next[student.id] = { status: '', note: '' };
-      if (pendingQr[student.id]) next[student.id] = { ...next[student.id], status: 'present' };
+      if (pendingQr[student.id]) { const checkIn = pendingQr[student.id]; next[student.id] = { ...next[student.id], status: normalizeAttendanceStatus(checkIn?.status) || 'present', note: checkIn?.note || next[student.id]?.note || '' }; }
     });
     setAttendanceDraft(next);
     setAttendanceDirty(Object.keys(pendingQr).some((studentId) => attendanceStudents.some((student) => student.id === studentId)));
@@ -2068,14 +3147,9 @@ function TeacherClasses() {
     };
   }, [attendanceStudents, rankedScoreRows, scoreTests.length]);
 
-  const gradingData = useMemo(() => {
+  const publishedAssignmentCount = useMemo(() => {
     const classAssignments = assignmentsByClass[selectedClassId] || [];
-    const rowsWithUngradedCount = classAssignments.filter((item) => toNumber(item.ungradedCount) !== null);
-    if (!rowsWithUngradedCount.length) return { count: null, sourceCount: classAssignments.length };
-    return {
-      count: rowsWithUngradedCount.reduce((sum, item) => sum + (toNumber(item.ungradedCount) || 0), 0),
-      sourceCount: classAssignments.length,
-    };
+    return classAssignments.filter((item) => !isAssignmentDraft(item)).length;
   }, [assignmentsByClass, selectedClassId]);
 
   const scoreDistribution = useMemo(() => {
@@ -2841,11 +3915,22 @@ function TeacherClasses() {
         startTime, endTime, title: scheduleEditorForm.title.trim(), lessonContent: scheduleEditorForm.lessonContent.trim(), room: ensureScheduleRoomPrefix(scheduleEditorForm.room),
         note: scheduleEditorForm.note.trim(), important: Boolean(scheduleEditorForm.important), teacherId: currentUser.uid, updatedAt: serverTimestamp(),
       };
-      if (scheduleEditorTargetId) await setDoc(doc(db, 'classes', selectedClassId, 'schedule', scheduleEditorTargetId), payload, { merge: true });
-      else await addDoc(collection(db, 'classes', selectedClassId, 'schedule'), { ...payload, createdAt: serverTimestamp() });
+      let writePromise;
+      if (scheduleEditorTargetId) {
+        writePromise = setDoc(doc(db, 'classes', selectedClassId, 'schedule', scheduleEditorTargetId), payload, { merge: true });
+      } else {
+        const scheduleRef = doc(collection(db, 'classes', selectedClassId, 'schedule'));
+        writePromise = setDoc(scheduleRef, { ...payload, createdAt: serverTimestamp() });
+      }
+
+      // Firestore áp dụng local write ngay; đóng editor trước khi chờ server xác nhận
+      // để thao tác lưu nội dung lịch phản hồi tức thì trên giao diện.
       setScheduleEditorOpen(false);
+      setScheduleEditorSaving(false);
+      await writePromise;
     } catch (error) {
       console.error('Không thể lưu lịch dạy:', error);
+      setScheduleEditorOpen(true);
       setScheduleEditorError(error?.message || 'Không thể lưu lịch dạy.');
     } finally {
       setScheduleEditorSaving(false);
@@ -2856,13 +3941,36 @@ function TeacherClasses() {
   const topStudents = useMemo(() => rankedScoreRows.filter((row) => row.average !== null).slice(0, 3), [rankedScoreRows]);
 
   const automaticNotificationCandidates = useMemo(() => {
-    if (!selectedClassId) return [];
+    if (!selectedClassId || !currentUser?.uid) return [];
     const candidates = [];
-    const pushCandidate = (sourceKey, type, severity, title, message, extra = {}) => candidates.push({ id: makeNotificationDocId(sourceKey), sourceKey, type, severity, title, message, classId: selectedClassId, systemGenerated: true, ...extra });
+    const pushCandidate = (sourceKey, type, severity, title, message, extra = {}) => {
+      const scopedSourceKey = `${sourceKey}-recipient-${currentUser.uid}`;
+      candidates.push({
+        id: makeNotificationDocId(scopedSourceKey), sourceKey: scopedSourceKey, type, severity, title, message, classId: selectedClassId,
+        systemGenerated: true, automaticLabel: 'Thông báo tự động', recipientType: 'teacher', recipientUid: currentUser.uid,
+        recipientEmail: normalizeText(currentUser.email), ...extra,
+      });
+    };
+    const pushStudentCandidate = (student, sourceKey, type, severity, title, message, extra = {}) => {
+      if (!student?.id) return;
+      const recipientUid = student.uid || '';
+      const recipientEmail = normalizeText(student.email);
+      if (!recipientUid && !recipientEmail) return;
+      const recipientKey = recipientUid || recipientEmail || student.id;
+      const scopedSourceKey = `${sourceKey}-recipient-${recipientKey}`;
+      candidates.push({
+        id: makeNotificationDocId(scopedSourceKey), sourceKey: scopedSourceKey, type, severity, title, message, classId: selectedClassId,
+        systemGenerated: true, automaticLabel: 'Thông báo tự động', recipientType: 'student', recipientUid, recipientEmail,
+        recipientStudentId: student.id, ...extra,
+      });
+    };
 
     attendanceStudents.forEach((student) => {
       const metrics = getStudentAttendanceMetrics(student);
-      if (metrics.absent >= 3) pushCandidate(`absence-${student.id}`, 'attendance', 'critical', 'Cảnh báo nghỉ học', `${getStudentDisplayName(student)} đã vắng ${metrics.absent} buổi. Cần cảnh báo phụ huynh.`, { studentId: student.id });
+      if (metrics.absent >= 3) {
+        pushCandidate(`absence-${student.id}`, 'attendance', 'critical', 'Cảnh báo nghỉ học', `${getStudentDisplayName(student)} đã vắng ${metrics.absent} buổi. Cần cảnh báo phụ huynh.`, { studentId: student.id });
+        pushStudentCandidate(student, `absence-${student.id}`, 'attendance', 'critical', 'Cảnh báo chuyên cần', `Bạn đã vắng không phép ${metrics.absent} buổi trong lớp ${selectedClass?.name || ''}.`, { studentId: student.id });
+      }
     });
 
     (assignmentsByClass[selectedClassId] || []).forEach((assignment) => {
@@ -2873,7 +3981,10 @@ function TeacherClasses() {
         const student = attendanceStudents.find((item) => item.id === studentId);
         const submittedAt = getTimeValue(submission?.submittedAt || submission?.createdAt);
         const lateState = ['late', 'nộp trễ', 'nop tre', 'overdue'].includes(normalizeText(submission?.status || submission?.state));
-        if ((due && submittedAt && submittedAt > due) || lateState) pushCandidate(`late-assignment-${assignment.id}-${studentId}`, 'assignment', 'medium', 'Bài tập nộp trễ', `${student ? getStudentDisplayName(student) : submission?.studentName || studentId} nộp trễ ${getAssignmentTitle(assignment)}.`, { studentId, assignmentId: assignment.id });
+        if ((due && submittedAt && submittedAt > due) || lateState) {
+          pushCandidate(`late-assignment-${assignment.id}-${studentId}`, 'assignment', 'medium', 'Bài tập nộp trễ', `${student ? getStudentDisplayName(student) : submission?.studentName || studentId} nộp trễ ${getAssignmentTitle(assignment)}.`, { studentId, assignmentId: assignment.id });
+          if (student) pushStudentCandidate(student, `late-assignment-${assignment.id}-${studentId}`, 'assignment', 'medium', 'Bài tập nộp trễ', `Bài “${getAssignmentTitle(assignment)}” của bạn được ghi nhận là nộp trễ.`, { studentId, assignmentId: assignment.id });
+        }
       });
     });
 
@@ -2884,48 +3995,99 @@ function TeacherClasses() {
         const student = attendanceStudents.find((item) => item.id === (row.studentId || row.id));
         if (!student) return;
         const values = tests.map((test) => ({ test, value: toNumber(row.scores?.[test.id]) })).filter((entry) => entry.value !== null);
-        values.filter((entry) => entry.value < 5).forEach((entry) => pushCandidate(`low-score-${subject.id}-${student.id}-${entry.test.id}`, 'score', 'critical', 'Điểm thấp cảnh báo', `${getStudentDisplayName(student)} đạt ${formatScore(entry.value)} điểm môn ${subject.name || 'Môn học'} ở ${entry.test.name || entry.test.code || 'bài đánh giá'}.`, { studentId: student.id, subjectId: subject.id }));
+        values.filter((entry) => entry.value < 5).forEach((entry) => {
+          pushCandidate(`low-score-${subject.id}-${student.id}-${entry.test.id}`, 'score', 'critical', 'Điểm thấp cảnh báo', `${getStudentDisplayName(student)} đạt ${formatScore(entry.value)} điểm môn ${subject.name || 'Môn học'} ở ${entry.test.name || entry.test.code || 'bài đánh giá'}.`, { studentId: student.id, subjectId: subject.id });
+          pushStudentCandidate(student, `low-score-${subject.id}-${student.id}-${entry.test.id}`, 'score', 'critical', 'Điểm thấp cảnh báo', `Bạn đạt ${formatScore(entry.value)} điểm môn ${subject.name || 'Môn học'} ở ${entry.test.name || entry.test.code || 'bài đánh giá'}.`, { studentId: student.id, subjectId: subject.id });
+        });
         const subjectAverage = toNumber(row.average) ?? averageFromScores(values.map((entry) => entry.value));
-        if (subjectAverage !== null && subjectAverage < 5) pushCandidate(`low-average-${subject.id}-${student.id}`, 'average', 'critical', 'ĐTB dưới 5', `${getStudentDisplayName(student)} có ĐTB môn ${subject.name || 'Môn học'} là ${formatScore(subjectAverage)}.`, { studentId: student.id, subjectId: subject.id });
+        if (subjectAverage !== null && subjectAverage < 5) {
+          pushCandidate(`low-average-${subject.id}-${student.id}`, 'average', 'critical', 'ĐTB dưới 5', `${getStudentDisplayName(student)} có ĐTB môn ${subject.name || 'Môn học'} là ${formatScore(subjectAverage)}.`, { studentId: student.id, subjectId: subject.id });
+          pushStudentCandidate(student, `low-average-${subject.id}-${student.id}`, 'average', 'critical', 'ĐTB dưới 5', `Điểm trung bình môn ${subject.name || 'Môn học'} của bạn hiện là ${formatScore(subjectAverage)}.`, { studentId: student.id, subjectId: subject.id });
+        }
         const latest = values.slice(-3);
-        if (latest.length === 3 && latest[0].value < latest[1].value && latest[1].value < latest[2].value) pushCandidate(`improvement-${subject.id}-${student.id}-${latest.map((entry) => entry.test.id).join('-')}`, 'reward', 'reward', 'Đề xuất khen thưởng', `${getStudentDisplayName(student)} có điểm môn ${subject.name || 'Môn học'} tăng liên tục: ${latest.map((entry) => formatScore(entry.value)).join(' → ')}.`, { studentId: student.id, subjectId: subject.id });
+        if (latest.length === 3 && latest[0].value < latest[1].value && latest[1].value < latest[2].value) {
+          pushCandidate(`improvement-${subject.id}-${student.id}-${latest.map((entry) => entry.test.id).join('-')}`, 'reward', 'reward', 'Đề xuất khen thưởng', `${getStudentDisplayName(student)} có điểm môn ${subject.name || 'Môn học'} tăng liên tục: ${latest.map((entry) => formatScore(entry.value)).join(' → ')}.`, { studentId: student.id, subjectId: subject.id });
+          pushStudentCandidate(student, `improvement-${subject.id}-${student.id}-${latest.map((entry) => entry.test.id).join('-')}`, 'reward', 'reward', 'Khen thưởng tiến bộ', `Điểm môn ${subject.name || 'Môn học'} của bạn tăng liên tục: ${latest.map((entry) => formatScore(entry.value)).join(' → ')}.`, { studentId: student.id, subjectId: subject.id });
+        }
       });
     });
 
     scheduleItems.filter((item) => item.kind !== 'persistentImportant' && Boolean(item.important || item.isImportant || item.pinned)).forEach((item) => {
       const days = getDaysUntilDate(getScheduleDateFromItem(item), now);
-      if (days !== null && days >= 0 && days <= 2) pushCandidate(`schedule-important-${item.id}`, 'schedule', 'medium', 'Lịch dạy quan trọng sắp tới', `${item.title || item.subjectName || item.subject || 'Nội dung quan trọng'} diễn ra ${days === 0 ? 'hôm nay' : `sau ${days} ngày`}.`, { scheduleId: item.id });
+      if (days !== null && days >= 0 && days <= 2) {
+        const teacherMessage = `${item.title || item.subjectName || item.subject || 'Nội dung quan trọng'} diễn ra ${days === 0 ? 'hôm nay' : `sau ${days} ngày`}.`;
+        pushCandidate(`schedule-important-${item.id}`, 'schedule', 'medium', 'Lịch dạy quan trọng sắp tới', teacherMessage, { scheduleId: item.id });
+        attendanceStudents.forEach((student) => pushStudentCandidate(student, `schedule-important-${item.id}`, 'schedule', 'medium', 'Lịch học quan trọng sắp tới', teacherMessage, { scheduleId: item.id }));
+      }
     });
 
     persistentImportantItems.forEach((item) => {
       const days = getDaysUntilDate(item.date, now);
       if (days === null || days < 0 || days > 7) return;
       const milestone = days <= 3 ? 3 : days <= 5 ? 5 : 7;
-      pushCandidate(`persistent-important-${item.id}-${milestone}`, 'schedulePersistent', 'important', 'Nhắc nội dung quan trọng', `${item.title} còn ${days === 0 ? 'hôm nay' : `${days} ngày`} trước khi hết thời gian.`, { scheduleId: item.id });
+      const message = `${item.title} còn ${days === 0 ? 'hôm nay' : `${days} ngày`} trước khi hết thời gian.`;
+      pushCandidate(`persistent-important-${item.id}-${milestone}`, 'schedulePersistent', 'important', 'Nhắc nội dung quan trọng', message, { scheduleId: item.id });
+      attendanceStudents.forEach((student) => pushStudentCandidate(student, `persistent-important-${item.id}-${milestone}`, 'schedulePersistent', 'important', 'Nhắc nội dung quan trọng', message, { scheduleId: item.id }));
     });
     return candidates;
-  }, [allSubjectScores, assignmentsByClass, attendanceRecords, attendanceStudents, now, persistentImportantItems, scheduleItems, selectedClassId, subjects]);
+  }, [allSubjectScores, assignmentsByClass, attendanceRecords, attendanceStudents, currentUser?.email, currentUser?.uid, now, persistentImportantItems, scheduleItems, selectedClass?.name, selectedClassId, subjects]);
+
+  const teacherNotifications = useMemo(() => notifications.filter((item) => {
+    const recipientUid = item.recipientUid || item.recipientUserId || item.targetUid || '';
+    const recipientEmail = normalizeText(item.recipientEmail || item.targetEmail);
+    const recipientType = normalizeText(item.recipientType);
+    const hasRecipient = Boolean(recipientUid || recipientEmail || recipientType);
+    if (!hasRecipient) return !item.systemGenerated || item.authorId === currentUser?.uid;
+    if (recipientType === 'class') return !item.systemGenerated;
+    if (recipientType && !['teacher', 'user'].includes(recipientType)) return false;
+    return Boolean(
+      (recipientUid && recipientUid === currentUser?.uid) ||
+      (recipientEmail && recipientEmail === normalizeText(currentUser?.email))
+    );
+  }), [currentUser?.email, currentUser?.uid, notifications]);
+
+  const teacherCreatedAnnouncements = useMemo(
+    () => teacherNotifications.filter((item) => !item.systemGenerated),
+    [teacherNotifications]
+  );
 
   useEffect(() => {
     if (!selectedClassId || !currentUser?.uid || !automaticNotificationCandidates.length) return undefined;
+    // Kiểm tra trên toàn bộ notification của lớp, không chỉ notification dành cho giáo viên.
+    // Nếu chỉ dùng teacherNotifications thì notification dành cho học sinh luôn bị coi là thiếu
+    // và bị ghi lại hàng loạt sau mỗi thay đổi lịch.
     const existing = new Set(notifications.map((item) => item.sourceKey).filter(Boolean));
     const dismissed = new Set(Array.isArray(selectedClass?.dismissedNotificationSourceKeys) ? selectedClass.dismissedNotificationSourceKeys : []);
     const missing = automaticNotificationCandidates.filter((item) => !existing.has(item.sourceKey) && !dismissed.has(item.sourceKey));
     if (!missing.length) return undefined;
     let cancelled = false;
     const syncAutomaticNotifications = async () => {
-      for (const item of missing) {
-        if (cancelled) return;
-        try { await setDoc(doc(db, 'classes', selectedClassId, 'notifications', item.id), { ...item, readBy: [], authorId: currentUser.uid, authorName: 'Hệ thống lớp học', createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true }); }
-        catch (error) { console.error('Không thể tạo thông báo tự động:', error); }
+      try {
+        for (let index = 0; index < missing.length; index += 430) {
+          if (cancelled) return;
+          const batch = writeBatch(db);
+          missing.slice(index, index + 430).forEach((item) => {
+            batch.set(doc(db, 'classes', selectedClassId, 'notifications', item.id), {
+              ...item,
+              readBy: [],
+              authorId: currentUser.uid,
+              authorName: 'Hệ thống lớp học',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+          });
+          await batch.commit();
+        }
+      } catch (error) {
+        console.error('Không thể tạo thông báo tự động:', error);
       }
     };
     syncAutomaticNotifications();
     return () => { cancelled = true; };
   }, [automaticNotificationCandidates, currentUser?.uid, notifications, selectedClass?.dismissedNotificationSourceKeys, selectedClassId]);
 
-  const unreadNotifications = useMemo(() => notifications.filter((item) => !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid)), [currentUser?.uid, notifications]);
-  const visibleNotifications = useMemo(() => notificationFilter === 'unread' ? unreadNotifications : notifications, [notificationFilter, notifications, unreadNotifications]);
+  const unreadNotifications = useMemo(() => teacherNotifications.filter((item) => !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid)), [currentUser?.uid, teacherNotifications]);
+  const visibleNotifications = useMemo(() => notificationFilter === 'unread' ? unreadNotifications : teacherNotifications, [notificationFilter, teacherNotifications, unreadNotifications]);
 
   const markNotificationRead = async (item) => {
     if (!selectedClassId || !item?.id || !currentUser?.uid) return;
@@ -2943,26 +4105,26 @@ function TeacherClasses() {
   };
 
   const deleteAllNotifications = async () => {
-    if (!selectedClassId || !currentUser?.uid || !notifications.length || deletingAllNotifications) return;
-    if (selectedClass?.teacherId !== currentUser.uid) {
-      setNotificationActionError('Chỉ giáo viên sở hữu lớp mới có thể xóa toàn bộ thông báo.');
+    if (!selectedClassId || !currentUser?.uid || !teacherNotifications.length || deletingAllNotifications) return;
+    if (!canTeachClass) {
+      setNotificationActionError('Bạn không có quyền quản lý thông báo của lớp.');
       return;
     }
     try {
       setDeletingAllNotifications(true);
       setNotificationActionError('');
       const storage = getStorage();
-      const attachments = notifications.flatMap((item) => (item.attachments || []).filter((attachment) => attachment?.type === 'file' && attachment?.url));
+      const attachments = teacherNotifications.flatMap((item) => (item.attachments || []).filter((attachment) => attachment?.type === 'file' && attachment?.url));
       await Promise.all(attachments.map(async (attachment) => {
         try { await deleteObject(ref(storage, attachment.url)); }
         catch (error) { if (error?.code !== 'storage/object-not-found') throw error; }
       }));
-      const sourceKeys = notifications.map((item) => item.sourceKey).filter(Boolean);
+      const sourceKeys = teacherNotifications.map((item) => item.sourceKey).filter(Boolean);
       if (sourceKeys.length) {
         await updateDoc(doc(db, 'classes', selectedClassId), { dismissedNotificationSourceKeys: arrayUnion(...sourceKeys), updatedAt: serverTimestamp() });
       }
       const chunks = [];
-      for (let index = 0; index < notifications.length; index += 430) chunks.push(notifications.slice(index, index + 430));
+      for (let index = 0; index < teacherNotifications.length; index += 430) chunks.push(teacherNotifications.slice(index, index + 430));
       for (const chunk of chunks) {
         const batch = writeBatch(db);
         chunk.forEach((item) => batch.delete(doc(db, 'classes', selectedClassId, 'notifications', item.id)));
@@ -3011,6 +4173,14 @@ function TeacherClasses() {
     setSelectedConversationId(conversationRows[0]?.conversationId || '');
   }, [conversationRows, selectedConversationId]);
 
+  useEffect(() => {
+    if (activeTab !== 'messages') setMessageMobileChatOpen(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setMessageMobileChatOpen(false);
+  }, [selectedClassId]);
+
   const selectedConversation = useMemo(() => conversationRows.find((item) => item.conversationId === selectedConversationId) || null, [conversationRows, selectedConversationId]);
 
 
@@ -3033,6 +4203,12 @@ function TeacherClasses() {
 
   const activeMessageDraft = selectedConversationId ? (messageDrafts[selectedConversationId] || '') : '';
   const activeMessageAttachment = selectedConversationId ? (messageAttachments[selectedConversationId] || null) : null;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const frame = window.requestAnimationFrame(() => resizeChatTextarea(messageTextareaRef.current, 140));
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeMessageDraft, selectedConversationId]);
 
   const setActiveMessageDraft = (value) => {
     if (!selectedConversationId) return;
@@ -3103,6 +4279,7 @@ function TeacherClasses() {
     if (!selectedClassId || !currentUser?.uid || !selectedConversation || messageSending) return;
     const conversationId = selectedConversation.conversationId;
     const content = (messageDrafts[conversationId] || '').trim();
+    if (content.length > 2000) { setMessageError('Tin nhắn tối đa 2000 ký tự.'); return; }
     const pendingAttachment = messageAttachments[conversationId] || null;
     if (!content && !pendingAttachment) return;
     try {
@@ -3602,7 +4779,7 @@ function TeacherClasses() {
       }
       const existingStudent = currentUser.email ? await getDocs(query(collection(db, 'classes', classDoc.id, 'students'), where('email', '==', currentUser.email.toLowerCase()), limit(1))) : null;
       const batch = writeBatch(db);
-      batch.update(classDoc.ref, { memberIds: arrayUnion(currentUser.uid), updatedAt: serverTimestamp(), ...(existingStudent && existingStudent.empty ? { studentCount: increment(1) } : {}) });
+      batch.update(classDoc.ref, { memberIds: arrayUnion(currentUser.uid), updatedAt: serverTimestamp(), ...(existingStudent && existingStudent.empty && !normalizeText(userDetails?.role).includes('teacher') ? { studentCount: increment(1) } : {}) });
       if (existingStudent && existingStudent.empty) {
         const studentRef = doc(collection(db, 'classes', classDoc.id, 'students'));
         batch.set(studentRef, {
@@ -3634,7 +4811,7 @@ function TeacherClasses() {
   };
 
   const openHomeSettings = () => {
-    if (selectedClass?.teacherId && selectedClass.teacherId !== currentUser?.uid) return;
+    if (!canTeachClass) return;
     setHomeSettingsForm({
       name: selectedClass?.name || '',
       description: selectedClass?.description || '',
@@ -3644,6 +4821,8 @@ function TeacherClasses() {
       themeColor: selectedClass?.themeColor || '#2563eb',
     });
     setHomeSettingsError('');
+    setCoverLibraryOpen(false);
+    setCoverLibraryCategory(CLASS_COVER_CATEGORIES[0].category);
     setHomeSettingsOpen(true);
   };
 
@@ -3673,6 +4852,7 @@ function TeacherClasses() {
         themeColor: homeSettingsForm.themeColor,
         updatedAt: serverTimestamp(),
       });
+      setCoverLibraryOpen(false);
       setHomeSettingsOpen(false);
     } catch (error) {
       setHomeSettingsError(error?.message || 'Không thể lưu tùy chỉnh lớp.');
@@ -3745,7 +4925,7 @@ function TeacherClasses() {
 
   const handleDeleteNotification = async () => {
     if (!selectedClassId || !notificationToDelete?.id || !currentUser?.uid) return;
-    const canDelete = selectedClass?.teacherId === currentUser.uid || notificationToDelete.authorId === currentUser.uid;
+    const canDelete = canTeachClass || notificationToDelete.authorId === currentUser.uid;
     if (!canDelete) {
       setNotificationDeleteError('B\u1ea1n kh\u00f4ng c\u00f3 quy\u1ec1n x\u00f3a th\u00f4ng b\u00e1o n\u00e0y.');
       return;
@@ -3810,6 +4990,9 @@ function TeacherClasses() {
       await addDoc(collection(db, 'classes', selectedClassId, 'notifications'), {
         contentHtml: announcementBody,
         attachments: [...announcementLinks, ...(fileAttachment ? [fileAttachment] : [])],
+        systemGenerated: false,
+        notificationKind: 'teacherAnnouncement',
+        recipientType: 'class',
         authorId: currentUser.uid,
         authorName: currentUser.displayName || currentUser.email || 'Giáo viên',
         createdAt: serverTimestamp(),
@@ -4288,6 +5471,7 @@ function TeacherClasses() {
   };
 
   const handleDeleteStudent = async () => {
+    if (!isClassOwner) { setStudentDeleteError('Giáo viên thực tập không thể xóa thành viên.'); return; }
     if (!selectedClassId || !studentToDelete?.id) {
       setStudentDeleteError('Không tìm thấy học sinh cần xóa.');
       return;
@@ -4442,6 +5626,8 @@ function TeacherClasses() {
     setMenuClassId('');
     setSettingsOpen(false);
     setDeleteError('');
+    setDeleteConfirmStep(1);
+    setDeleteConfirmSeconds(10);
     setDeleteOpen(true);
   };
 
@@ -4450,6 +5636,8 @@ function TeacherClasses() {
     setDeleteOpen(false);
     setDeleteClassId('');
     setDeleteError('');
+    setDeleteConfirmStep(1);
+    setDeleteConfirmSeconds(10);
   };
 
   const deleteQuerySnapshot = async (snapshot) => {
@@ -4475,6 +5663,7 @@ function TeacherClasses() {
   };
 
   const handleDeleteClass = async () => {
+    if (!canDeleteClass) { setDeleteError('Chỉ giáo viên chủ lớp hoặc admin mới có thể xóa lớp.'); return; }
     const targetClassId = deleteClassId || selectedClassId;
 
     if (!targetClassId) {
@@ -4519,6 +5708,10 @@ function TeacherClasses() {
           );
         })
       );
+
+      for (const subcollectionName of ['assignments', 'attendance', 'schedule', 'notifications', 'messages']) {
+        await deleteQuerySnapshot(await getDocs(collection(db, 'classes', targetClassId, subcollectionName)));
+      }
 
       await deleteQuerySnapshot(
         await getDocs(collection(db, 'classes', targetClassId, 'students'))
@@ -4635,6 +5828,75 @@ function TeacherClasses() {
     </div>
   ) : null;
 
+  const activeCoverCategory = CLASS_COVER_CATEGORIES.find((item) => item.category === coverLibraryCategory) || CLASS_COVER_CATEGORIES[0];
+  const activeCoverPresets = CLASS_COVER_PRESETS.filter((cover) => cover.category === activeCoverCategory.category);
+
+  const coverLibraryModal = coverLibraryOpen && typeof document !== 'undefined' ? createPortal(
+    <div className="cover-library-modal" role="dialog" aria-modal="true" aria-label="Thư viện hình ảnh tiêu đề" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="cover-library-shell">
+        <header className="cover-library-header">
+          <div className="cover-library-heading">
+            <button type="button" className="cover-library-close" onClick={() => setCoverLibraryOpen(false)} aria-label="Đóng thư viện ảnh">×</button>
+            <div>
+              <span>Thư viện ảnh tiêu đề</span>
+              <h2>Chọn hình ảnh cho lớp học</h2>
+            </div>
+          </div>
+          <button type="button" className="cover-library-done" onClick={() => setCoverLibraryOpen(false)}>Xong</button>
+        </header>
+
+        <nav className="cover-library-sort" aria-label="Lọc ảnh theo chủ đề">
+          {CLASS_COVER_CATEGORIES.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              className={activeCoverCategory.category === category.category ? 'active' : ''}
+              onClick={() => setCoverLibraryCategory(category.category)}
+            >
+              <span>{category.icon}</span>
+              <b>{category.category}</b>
+            </button>
+          ))}
+        </nav>
+
+        <main className="cover-library-content">
+          <div className="cover-library-section-head">
+            <div>
+              <span>{activeCoverCategory.icon}</span>
+              <div>
+                <h3>{activeCoverCategory.category}</h3>
+                <p>{activeCoverCategory.description}</p>
+              </div>
+            </div>
+            <b>{activeCoverPresets.length} ảnh</b>
+          </div>
+
+          <div className="cover-library-grid">
+            {activeCoverPresets.map((cover, index) => {
+              const selected = homeSettingsForm.coverPhotoUrl === cover.value;
+              return (
+                <button
+                  key={cover.id}
+                  type="button"
+                  className={selected ? 'active' : ''}
+                  onClick={() => setHomeSettingsForm((current) => ({ ...current, coverPhotoUrl: cover.value }))}
+                  aria-label={`Chọn ${cover.label}`}
+                >
+                  <span className="cover-library-image" style={{ backgroundImage: cover.value }} />
+                  <span className="cover-library-image-shade" />
+                  <span className="cover-library-number">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="cover-library-label">{cover.label}</span>
+                  {selected ? <i className="cover-library-check">✓</i> : null}
+                </button>
+              );
+            })}
+          </div>
+        </main>
+      </div>
+    </div>,
+    document.body,
+  ) : null;
+
   const homeSettingsModal = homeSettingsOpen ? (
     <div className="modal-backdrop" role="presentation" onMouseDown={() => setHomeSettingsOpen(false)}>
       <div className="class-modal home-settings-modal" onMouseDown={(event) => event.stopPropagation()}>
@@ -4649,12 +5911,47 @@ function TeacherClasses() {
             <label className="home-settings-field-wide">Trường<input value={homeSettingsForm.school} onChange={(event) => setHomeSettingsForm((current) => ({ ...current, school: event.target.value }))} placeholder="Tên trường của lớp" /></label>
             <label className="home-settings-field-wide">Mô tả<textarea rows="3" value={homeSettingsForm.description} onChange={(event) => setHomeSettingsForm((current) => ({ ...current, description: event.target.value }))} placeholder="Mô tả ngắn về lớp học" /></label>
           </div>
-          <section className="preset-section"><div className="preset-section-head"><strong>Chọn hình ảnh tiêu đề</strong><span>Ảnh có sẵn theo chủ đề</span></div>{['Động vật','Thiên nhiên','Biển cả','Ảnh tĩnh'].map((category) => <div className="cover-category" key={category}><span>{category}</span><div className="cover-preset-grid">{CLASS_COVER_PRESETS.filter((cover) => cover.category === category).map((cover) => <button key={cover.id} type="button" title={cover.label} className={homeSettingsForm.coverPhotoUrl === cover.value ? 'active' : ''} style={{ backgroundImage: cover.value }} onClick={() => setHomeSettingsForm((current) => ({ ...current, coverPhotoUrl: cover.value }))}><i>{homeSettingsForm.coverPhotoUrl === cover.value ? '✓' : ''}</i></button>)}</div></div>)}</section>
+          <section className="preset-section cover-topic-section">
+            <div className="preset-section-head">
+              <strong>Chọn hình ảnh tiêu đề</strong>
+              <span>Chọn chủ đề để mở thư viện ảnh</span>
+            </div>
+            <div className="cover-topic-grid">
+              {CLASS_COVER_CATEGORIES.map((category) => {
+                const previewCover = CLASS_COVER_PRESETS.find((cover) => cover.category === category.category);
+                const isSelectedCategory = CLASS_COVER_PRESETS.some(
+                  (cover) => cover.category === category.category && cover.value === homeSettingsForm.coverPhotoUrl,
+                );
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={isSelectedCategory ? 'active' : ''}
+                    onClick={() => {
+                      setCoverLibraryCategory(category.category);
+                      setCoverLibraryOpen(true);
+                    }}
+                    aria-label={`Mở ảnh chủ đề ${category.category}`}
+                  >
+                    <span className="cover-topic-image" style={{ backgroundImage: previewCover?.value || 'none' }} />
+                    <span className="cover-topic-overlay" />
+                    <span className="cover-topic-copy">
+                      <b>{category.icon}</b>
+                      <strong>{category.category}</strong>
+                      <small>10 ảnh</small>
+                    </span>
+                    {isSelectedCategory ? <i className="cover-topic-selected">✓</i> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
           <section className="preset-section"><div className="preset-section-head"><strong>Màu giao diện</strong><span>Màu này dùng cho viền thẻ lớp</span></div><div className="theme-color-grid">{CLASS_THEME_COLORS.map((color) => <button key={color.id} type="button" title={color.label} aria-label={color.label} className={homeSettingsForm.themeColor === color.value ? 'active' : ''} style={{ backgroundColor: color.value }} onClick={() => setHomeSettingsForm((current) => ({ ...current, themeColor: color.value }))} />)}</div></section>
         </div>
         {homeSettingsError ? <p className="form-error">{homeSettingsError}</p> : null}
         <div className="modal-actions sticky-modal-actions"><button type="button" className="ghost-btn" onClick={() => setHomeSettingsOpen(false)}>Hủy</button><button type="button" className="primary-btn modal-submit" onClick={saveHomeSettings}>Lưu tùy chỉnh</button></div>
       </div>
+      {coverLibraryModal}
     </div>
   ) : null;
 
@@ -4740,7 +6037,7 @@ function TeacherClasses() {
     <div className="modal-backdrop nested-modal-backdrop" role="presentation" onMouseDown={() => !deletingAllNotifications && setNotificationDeleteAllOpen(false)}>
       <div className="class-modal delete-modal notification-delete-modal" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head"><div><p>Xóa tất cả thông báo</p><h2>Xác nhận xóa vĩnh viễn</h2></div><button type="button" className="icon-btn" onClick={() => setNotificationDeleteAllOpen(false)} disabled={deletingAllNotifications}>×</button></div>
-        <p className="delete-warning">Toàn bộ {notifications.length} thông báo của lớp sẽ bị xóa vĩnh viễn khỏi. Thao tác này không thể hoàn tác.</p>
+        <p className="delete-warning">Toàn bộ {teacherNotifications.length} thông báo đang hiển thị cho tài khoản này sẽ bị xóa vĩnh viễn. Thao tác này không thể hoàn tác.</p>
         <div className="modal-actions"><button type="button" className="ghost-btn" onClick={() => setNotificationDeleteAllOpen(false)} disabled={deletingAllNotifications}>Hủy</button><button type="button" className="danger-btn" onClick={deleteAllNotifications} disabled={deletingAllNotifications}>{deletingAllNotifications ? 'ĐANG XÓA...' : 'XÓA TẤT CẢ'}</button></div>
       </div>
     </div>
@@ -5042,7 +6339,7 @@ function TeacherClasses() {
           Thao tác này sẽ xóa lớp đang chọn cùng danh sách học sinh, môn học,
           bài kiểm tra và điểm số liên quan trên hệ thống.
         </p>
-        <p className="modal-note">Hành động này không thể hoàn tác.</p>
+        <p className="modal-note">{deleteConfirmStep === 1 ? 'Xác nhận lớp 1/2. Sau khi tiếp tục, bạn phải chờ 10 giây trước xác nhận cuối.' : 'Xác nhận lớp 2/2. Hành động này không thể hoàn tác.'}</p>
         {deleteError ? <p className="form-error">{deleteError}</p> : null}
 
         <div className="modal-actions">
@@ -5054,13 +6351,62 @@ function TeacherClasses() {
           >
             Hủy
           </button>
+          <button type="button" className="danger-btn" onClick={() => { if (deleteConfirmStep === 1) { setDeleteConfirmStep(2); setDeleteConfirmSeconds(10); } else handleDeleteClass(); }} disabled={deletingClass || (deleteConfirmStep === 2 && deleteConfirmSeconds > 0)}>{deletingClass ? 'ĐANG XÓA...' : deleteConfirmStep === 1 ? 'TIẾP TỤC XÁC NHẬN' : deleteConfirmSeconds > 0 ? `CHỜ ${deleteConfirmSeconds}s` : 'XÁC NHẬN XÓA VĨNH VIỄN'}</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const deleteTeacherModal = teacherDeleteOpen ? (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={closeDeleteTeacher}
+    >
+      <div
+        className="class-modal delete-modal teacher-delete-modal"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="modal-head">
+          <div>
+            <p>Xóa giáo viên khỏi lớp</p>
+            <h2>{getStudentDisplayName(teacherToDelete || {})}</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={closeDeleteTeacher}
+            aria-label="Đóng"
+            disabled={deletingTeacher}
+          >
+            ×
+          </button>
+        </div>
+
+        <p className="delete-warning">
+          Giáo viên này sẽ bị xóa khỏi danh sách thành viên của lớp và không còn thấy lớp qua memberIds.
+        </p>
+        <p className="modal-note">
+          Dữ liệu lịch sử như điểm danh đã lưu trước đó được giữ nguyên. Giáo viên chủ lớp không thể bị xóa tại đây.
+        </p>
+        {teacherDeleteError ? <p className="form-error">{teacherDeleteError}</p> : null}
+
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={closeDeleteTeacher}
+            disabled={deletingTeacher}
+          >
+            Hủy
+          </button>
           <button
             type="button"
             className="danger-btn"
-            onClick={handleDeleteClass}
-            disabled={deletingClass}
+            onClick={handleDeleteTeacher}
+            disabled={deletingTeacher}
           >
-            {deletingClass ? 'ĐANG XÓA...' : 'XÓA LỚP'}
+            {deletingTeacher ? 'ĐANG XÓA...' : 'XÓA KHỎI LỚP'}
           </button>
         </div>
       </div>
@@ -5249,6 +6595,7 @@ function TeacherClasses() {
 
         <section className="class-hub">
           <div className="class-card-grid">
+            {!loading && !visibleClasses.length ? <section className="hub-empty-state compact-empty-state"><h1>Bạn chưa tham gia một lớp học nào</h1><p>Tạo lớp mới hoặc tham gia lớp bằng mã lớp để bắt đầu.</p></section> : null}
             {visibleClasses.map((classItem, index) => (
               <article
                 className="class-tile"
@@ -5288,34 +6635,6 @@ function TeacherClasses() {
                   </p>
                   <p className="class-tile-school">⌂ {classItem.school || classItem.schoolName || (classItem.teacherId === currentUser?.uid ? teacherSchool : '') || 'Chưa có dữ liệu trường'}</p>
                 </div>
-                <button
-                  className="tile-menu"
-                  type="button"
-                  aria-label="Tùy chọn"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setMenuClassId((currentId) =>
-                      currentId === classItem.id ? '' : classItem.id
-                    );
-                  }}
-                >
-                  ...
-                </button>
-                {menuClassId === classItem.id ? (
-                  <div
-                    className="tile-menu-popover"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {classItem.teacherId === currentUser?.uid ? <button type="button" onClick={() => openClassSettings(classItem)}>✎ Chỉnh sửa lớp</button> : null}
-                    {classItem.teacherId === currentUser?.uid ? <button
-                      type="button"
-                      className="delete-menu-item"
-                      onClick={() => openDeleteClass(classItem.id)}
-                    >
-                      🗑 Xóa lớp
-                    </button> : null}
-                  </div>
-                ) : null}
               </article>
             ))}
           </div>
@@ -5345,19 +6664,21 @@ function TeacherClasses() {
   return (
     <main className="classes-page class-workspace-page">
       <div className={`workspace-shell ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
-        <aside className={`workspace-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Quản lý lớp học">
+        <aside className={`workspace-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${workspaceMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Quản lý lớp học">
           <div className="workspace-brand workspace-collapse-row"><button type="button" className="sidebar-collapse-btn" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'} title={sidebarCollapsed ? 'Mở rộng' : 'Thu gọn'}><span>{sidebarCollapsed ? '›' : '‹'}</span>{!sidebarCollapsed ? <b>Thu gọn</b> : null}</button></div>
           <div className="sidebar-class-chip" style={{ '--class-accent': selectedClass?.themeColor || '#2563eb' }}><i />{!sidebarCollapsed ? <div><span>Lớp đang mở</span><strong>{selectedClass?.name || 'Lớp học'} — {overviewData.studentCount} học sinh</strong></div> : null}</div>
           <nav className="workspace-nav">
-            <button type="button" className={activeTab === 'home' ? 'active' : ''} onClick={() => setActiveTab('home')}><span className="workspace-nav-icon">⌂</span>{!sidebarCollapsed ? <span>Trang chủ</span> : null}</button>
-            {CLASS_WORKSPACE_SECTIONS.map((section) => <div className="workspace-nav-section" key={section.id}><button type="button" className="workspace-section-toggle" onClick={() => setSectionOpen((current) => ({ ...current, [section.id]: !current[section.id] }))}><span>{sidebarCollapsed ? '⋯' : section.label}</span>{!sidebarCollapsed ? <b>{sectionOpen[section.id] ? '⌃' : '⌄'}</b> : null}</button>{sectionOpen[section.id] ? <div className="workspace-section-items">{section.items.map((item) => <button key={item.id} type="button" className={activeTab === item.id ? 'active' : ''} onClick={() => setActiveTab(item.id)} title={sidebarCollapsed ? item.label : undefined}><span className="workspace-nav-icon">{item.icon}</span>{!sidebarCollapsed ? <span>{item.label}</span> : null}</button>)}</div> : null}</div>)}
+            <button type="button" className={activeTab === 'home' ? 'active' : ''} onClick={() => { setActiveTab('home'); setWorkspaceMobileMenuOpen(false); }}><span className="workspace-nav-icon">⌂</span>{!sidebarCollapsed ? <span>Trang chủ</span> : null}</button>
+            {CLASS_WORKSPACE_SECTIONS.map((section) => <div className="workspace-nav-section" key={section.id}><button type="button" className="workspace-section-toggle" onClick={() => { if (typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches) return; setSectionOpen((current) => ({ ...current, [section.id]: !current[section.id] })); }}><span>{sidebarCollapsed ? '⋯' : section.label}</span>{!sidebarCollapsed ? <b>{sectionOpen[section.id] ? '⌃' : '⌄'}</b> : null}</button>{sectionOpen[section.id] ? <div className="workspace-section-items">{section.items.map((item) => <button key={item.id} type="button" className={activeTab === item.id ? 'active' : ''} onClick={() => { setActiveTab(item.id); setWorkspaceMobileMenuOpen(false); }} title={sidebarCollapsed ? item.label : undefined}><span className="workspace-nav-icon">{item.icon}</span>{!sidebarCollapsed ? <span>{item.label}</span> : null}</button>)}</div> : null}</div>)}
           </nav>
-          <div className="workspace-user-card"><div className="workspace-user-avatar">{getInitial(currentUser?.displayName || currentUser?.email || 'GV')}</div>{!sidebarCollapsed ? <div><strong>{currentUser?.displayName || currentUser?.email || 'Giáo viên'}</strong><span>Giáo viên</span></div> : null}</div>
+          <div className="workspace-user-card"><div className={`workspace-user-avatar ${(currentTeacherMember?.photoURL || currentUser?.photoURL || userDetails?.photoURL || userDetails?.avatarUrl) ? 'has-image' : ''}`}>{(currentTeacherMember?.photoURL || currentUser?.photoURL || userDetails?.photoURL || userDetails?.avatarUrl) ? <img src={currentTeacherMember?.photoURL || currentUser?.photoURL || userDetails?.photoURL || userDetails?.avatarUrl} alt="" referrerPolicy="no-referrer" /> : getInitial(currentUser?.displayName || userDetails?.displayName || currentUser?.email || 'GV')}</div>{!sidebarCollapsed ? <div><strong>{currentUser?.displayName || userDetails?.displayName || currentUser?.email || 'Giáo viên'}</strong><span>{isInternTeacher ? 'Giáo viên thực tập' : 'Giáo viên'}</span></div> : null}</div>
         </aside>
+        {workspaceMobileMenuOpen ? <button type="button" className="workspace-mobile-menu-backdrop" onClick={() => setWorkspaceMobileMenuOpen(false)} aria-label="Đóng menu lớp học" /> : null}
 
         <section className={`workspace-main ${activeTab === 'attendance' ? 'attendance-workspace-main' : ''}`}>
           <div className="workspace-content-head">
             <div className="workspace-content-title">
+              <button type="button" className="workspace-mobile-menu-btn" onClick={() => { setSidebarCollapsed(false); setSectionOpen({ main: true, secondary: true }); setWorkspaceMobileMenuOpen(true); }} aria-label="Mở menu lớp học">☰</button>
               <button
                 className="workspace-back-btn"
                 type="button"
@@ -5378,13 +6699,13 @@ function TeacherClasses() {
 
           {activeTab === 'home' ? (
             <div className="class-home" style={{ '--class-accent': selectedClass?.themeColor || '#2563eb' }}>
-              <section className="class-home-hero" style={{ backgroundImage: getClassCoverStyle(selectedClass || {}, 0) }}><div className="class-home-overlay"><div><span>Lớp học</span><h3>{selectedClass?.name || 'Lớp học'}</h3><p>{selectedClass?.school || selectedClass?.schoolName || 'Chưa có trường'} · {selectedClass?.grade ? `Khối ${selectedClass.grade}` : 'Chưa có khối'}</p>{selectedClass?.description ? <small>{selectedClass.description}</small> : null}</div>{selectedClass?.teacherId === currentUser?.uid ? <button type="button" onClick={openHomeSettings}>⚙ Tùy chỉnh</button> : null}</div></section>
+              <section className="class-home-hero" style={{ backgroundImage: getClassCoverStyle(selectedClass || {}, 0) }}><div className="class-home-overlay"><div><span>Lớp học</span><h3>{selectedClass?.name || 'Lớp học'}</h3><p>{selectedClass?.school || selectedClass?.schoolName || 'Chưa có trường'} · {selectedClass?.grade ? `Khối ${selectedClass.grade}` : 'Chưa có khối'}</p>{selectedClass?.description ? <small>{selectedClass.description}</small> : null}</div><div className="class-home-actions">{canTeachClass ? <button type="button" onClick={openHomeSettings}>⚙ Tùy chỉnh</button> : null}{canDeleteClass ? <button type="button" className="danger-home-action" onClick={() => openDeleteClass(selectedClassId)}>🗑 Xóa lớp</button> : null}{isInternTeacher ? <button type="button" className="leave-home-action" onClick={leaveClassAsIntern}>↪ Rời khỏi lớp</button> : null}</div></div></section>
               <section className="home-dashboard-grid">
                 <div className="home-left-stack">
                   <article className="home-info-card class-code-card"><div className="class-code-head"><span>Mã lớp</span>{selectedClass?.classCode ? <button type="button" className={classCodeCopied ? 'class-code-copy copied' : 'class-code-copy'} onClick={copyClassCode} aria-label="Sao chép mã lớp" title={classCodeCopied ? 'Đã sao chép' : 'Sao chép mã lớp'}><span>{classCodeCopied ? '✓' : '⧉'}</span></button> : null}</div><strong>{selectedClass?.classCode || 'Chưa có mã lớp'}</strong><p>{classCodeCopied ? 'Đã sao chép mã lớp vào clipboard.' : 'Mã gồm 8 ký tự dùng để tham gia lớp.'}</p></article>
                   <article className="home-info-card due-card"><div className="home-card-head"><div><span>Sắp đến hạn đóng</span><strong>{selectedUpcomingAssignments.length} bài học</strong></div></div>{selectedUpcomingAssignments.length ? <div className="home-simple-list">{selectedUpcomingAssignments.slice(0, 4).map((item) => <div key={item.id}><strong>{getAssignmentTitle(item)}</strong><span>{formatDateTime(item.startAt || item.createdAt)} → {formatDateTime(item.dueAt || item.endAt || item.deadline || item.closeAt)}</span></div>)}</div> : <p>Chưa có bài học sắp tới hạn đóng.</p>}</article>
                 </div>
-                <section className="home-notification-panel"><div className="home-panel-head"><div><span>Thông báo mới</span></div>{selectedClass?.teacherId === currentUser?.uid ? <button type="button" onClick={() => setAnnouncementOpen(true)}>＋ Tạo thông báo mới</button> : null}</div>{notifications.length ? <div className="notification-feed">{notifications.slice(0, 6).map((item) => <article key={item.id}><div className="notification-item-head"><small>{item.authorName || 'Giáo viên'} · {formatDateTime(item.createdAt)}</small>{(selectedClass?.teacherId === currentUser?.uid || item.authorId === currentUser?.uid) ? <button type="button" className="notification-delete-btn" onClick={() => openDeleteNotification(item)} title="Xóa thông báo" aria-label="Xóa thông báo">×</button> : null}</div><div className="notification-content" dangerouslySetInnerHTML={{ __html: item.contentHtml || item.content || '' }} />{item.attachments?.length ? <div className="notification-links">{item.attachments.map((attachment, index) => <a key={index} href={attachment.url} target="_blank" rel="noreferrer">{attachment.name || attachment.type || 'Tệp đính kèm'}</a>)}</div> : null}</article>)}</div> : <p className="home-panel-empty">Chưa có thông báo.</p>}</section>
+                <section className="home-notification-panel"><div className="home-panel-head"><div><span>Thông báo mới</span></div>{canTeachClass ? <button type="button" onClick={() => setAnnouncementOpen(true)}>＋ Tạo thông báo mới</button> : null}</div>{teacherCreatedAnnouncements.length ? <div className="notification-feed">{teacherCreatedAnnouncements.slice(0, 6).map((item) => <article key={item.id}><div className="notification-item-head"><small>{item.authorName || 'Giáo viên'} · {formatDateTime(item.createdAt)}</small>{(selectedClass?.teacherId === currentUser?.uid || item.authorId === currentUser?.uid) ? <button type="button" className="notification-delete-btn" onClick={() => openDeleteNotification(item)} title="Xóa thông báo" aria-label="Xóa thông báo">×</button> : null}</div><div className="notification-content" dangerouslySetInnerHTML={{ __html: item.contentHtml || item.content || '' }} />{item.attachments?.length ? <div className="notification-links">{item.attachments.map((attachment, index) => <a key={index} href={attachment.url} target="_blank" rel="noreferrer">{attachment.name || attachment.type || 'Tệp đính kèm'}</a>)}</div> : null}</article>)}</div> : <p className="home-panel-empty">Chưa có thông báo.</p>}</section>
               </section>
             </div>
           ) : activeTab === 'overview' ? (
@@ -5398,10 +6719,12 @@ function TeacherClasses() {
 
               <section className="figma-stat-grid overview-stat-grid">
                 <OverviewStat icon="👥" tone="blue" value={joinedClassMemberCount} title="Sĩ số hiện tại" subtitle={`${joinedClassMemberCount} thành viên đã vào lớp`} />
-                <OverviewStat icon="📝" tone="amber" value={gradingData.count === null ? '—' : gradingData.count} title="Số bài cần chấm" subtitle={gradingData.count === null ? 'Chưa có dữ liệu cần chấm' : `Từ ${gradingData.sourceCount} bài tập`} />
+                <OverviewStat icon="📝" tone="amber" value={publishedAssignmentCount} title="Số bài đã đăng" subtitle={publishedAssignmentCount ? `${publishedAssignmentCount} bài tập đã đăng` : 'Chưa có bài tập đã đăng'} />
                 <OverviewStat icon="⭐" tone="purple" value={overviewData.classAverage || '—'} title="Điểm trung bình" subtitle={overviewData.classAverage ? 'Điểm trung bình toàn lớp' : 'Chưa có dữ liệu điểm'} />
-                <OverviewStat icon="🔔" tone="red" value={notifications.length} title="Thông báo" subtitle={`${notifications.length} thông báo realtime`} />
+                <OverviewStat icon="🔔" tone="red" value={teacherNotifications.length} title="Thông báo" subtitle={`${teacherNotifications.length} thông báo dành cho tài khoản hiện tại`} />
               </section>
+
+              {internTeacherMembers.length ? <section className="intern-overview-panel"><div className="figma-panel-head"><div><h4>Giáo viên thực tập</h4><p>Điểm danh thực tập được tính riêng, không ảnh hưởng chuyên cần học sinh.</p></div><span>{internTeacherMembers.length} giáo viên</span></div><div className="intern-overview-grid">{internTeacherMembers.map((teacher) => { const metrics = getInternAttendanceMetrics(teacher); return <article key={teacher.id}><span className="mini-avatar">{getInitial(getStudentDisplayName(teacher))}</span><div><strong>{getStudentDisplayName(teacher)}</strong><small>{metrics.total ? `${metrics.present}/${metrics.total} buổi có mặt` : 'Chưa có dữ liệu điểm danh'}</small><i><b style={{ width: `${metrics.rate ?? 0}%` }} /></i></div><b>{metrics.rate === null ? '—' : `${metrics.rate}%`}</b></article>; })}</div></section> : null}
 
               <section className="overview-chart-grid">
                 <article className="overview-chart-card">
@@ -5428,7 +6751,7 @@ function TeacherClasses() {
                 </article>
 
                 <article className="overview-detail-card today-schedule-card">
-                  <div className="figma-panel-head"><div><h4>Lịch hôm nay</h4><p>Lịch học realtime của lớp</p></div></div>
+                  <div className="figma-panel-head"><div><h4>Lịch hôm nay</h4><p>Lịch học của lớp</p></div></div>
                   {todaySchedule.length ? <div className="today-schedule-list">{todaySchedule.slice(0, 6).map((item) => { const activeNow = isTodayScheduleItemActive(item); return <div className={`schedule-row ${activeNow ? 'active-now' : ''}`} key={item.id}><i /><div><small>{formatClock(item.startAt || item.startTime)}{item.endAt || item.endTime ? ` - ${formatClock(item.endAt || item.endTime)}` : ''}{activeNow ? <b className="schedule-live-badge">Đang diễn ra</b> : null}</small><strong>{item.subjectName || item.subject || item.title || 'Tiết học'}</strong><span>{item.lessonContent || item.lessonName || item.lesson || item.topic || item.room || ''}</span></div></div>; })}</div> : <DataUnavailable icon="📅" text="Chưa có lịch học hôm nay." />}
                 </article>
 
@@ -5446,7 +6769,7 @@ function TeacherClasses() {
 
                 <div className="overview-right-stack">
                   <article className="overview-detail-card assignment-status-card">
-                    <div className="figma-panel-head"><div><h4>Tình trạng bài tập</h4><p>Realtime từ bài tập của lớp</p></div></div>
+                    <div className="figma-panel-head"><div><h4>Tình trạng bài tập</h4><p>từ bài tập của lớp</p></div></div>
                     <div className="assignment-status-grid"><div className="status-open"><b>{assignmentStatus.open}</b><span>Đang mở</span></div><div className="status-grading"><b>{assignmentStatus.needsGrading}</b><span>Cần chấm</span></div><div className="status-draft"><b>{assignmentStatus.draft}</b><span>Nháp</span></div><div className="status-closed"><b>{assignmentStatus.closed}</b><span>Đã đóng</span></div></div>
                     <button type="button" className="assignment-manage-btn" onClick={() => setActiveTab('assignments')}>Quản lý bài tập →</button>
                   </article>
@@ -5472,12 +6795,18 @@ function TeacherClasses() {
                 </div>
               </section>
             </div>
+          ) : activeTab === 'assignments' ? (
+            <ClassExamWorkspace selectedClass={selectedClass} />
           ) : activeTab === 'attendance' ? (
             <div className="attendance-page">
               <section className="attendance-page-head">
-                <div>
+                <div className="attendance-title-with-back">
+                  <button type="button" className="workspace-mobile-menu-btn attendance-mobile-menu-btn" onClick={() => { setSidebarCollapsed(false); setSectionOpen({ main: true, secondary: true }); setWorkspaceMobileMenuOpen(true); }} aria-label="Mở menu lớp học">☰</button>
+                  <button type="button" className="workspace-back-btn attendance-back-btn" onClick={goBackToClassList} aria-label="Quay lại danh sách lớp">←</button>
+                  <div>
                   <h3>Điểm danh</h3>
                   <p>Lớp {selectedClass?.name || ''}{selectedSubject?.name || selectedClass?.subject || teacherSubject ? ` · ${selectedSubject?.name || selectedClass?.subject || teacherSubject}` : ''}</p>
+                  </div>
                 </div>
                 <div className="attendance-head-actions">
                   <label className="attendance-date-picker"><input type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></label>
@@ -5558,7 +6887,7 @@ function TeacherClasses() {
                     const displayLevel = ['emergency','urgent','khẩn cấp','khan cap','critical'].includes(level) ? 'Khẩn cấp' : ['watch','warning','cần theo dõi','can theo doi','cảnh báo','canh bao'].includes(level) ? 'Cảnh báo' : ['normal','bình thường','binh thuong','ok'].includes(level) ? 'Bình thường' : 'Chưa phân loại';
                     const isSelected = selectedStudentIds.includes(student.id);
                     const avatarUrl = getStudentAvatar(student);
-                    return <tr key={student.id} className={isSelected ? 'selected' : ''}><td className="student-check-col"><input type="checkbox" aria-label={`Chọn ${getStudentDisplayName(student)}`} checked={isSelected} onChange={(event) => setSelectedStudentIds((current) => event.target.checked ? Array.from(new Set([...current, student.id])) : current.filter((id) => id !== student.id))} /></td><td><div className="student-name-cell"><span className={`student-list-avatar ${avatarUrl ? 'has-image' : ''}`}>{avatarUrl ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(student))}</span><div><strong>{getStudentDisplayName(student)}</strong><small>{rank ? `Hạng #${rank} · ` : ''}{student.birthDate || student.dob || getStudentCode(student, index)}</small></div></div></td><td><span className="student-gender">{student.gender || student.sex || '—'}</span></td><td><strong className="student-parent-name">{parentName}</strong>{parentPhone ? <small className="student-parent-phone">{parentPhone}</small> : null}</td><td>{attendance.rate === null ? <span className="student-no-data">—</span> : <div className={`student-attendance-rate ${attendance.rate < 75 ? 'danger' : attendance.rate < 90 ? 'warn' : ''}`}><i><b style={{ width: `${attendance.rate}%` }} /></i><strong>{attendance.rate}%</strong></div>}</td><td><strong className={`student-average ${average !== null && average < 6 ? 'danger' : average !== null && average < 8 ? 'warn' : ''}`}>{average === null ? '—' : average.toFixed(1)}</strong></td><td><span className="student-conduct">{conduct}</span></td><td><span className={`student-status-pill ${displayLevel === 'Khẩn cấp' ? 'emergency' : displayLevel === 'Cảnh báo' ? 'watch' : displayLevel === 'Bình thường' ? 'normal' : 'unknown'}`}><i />{displayLevel}</span></td><td className="student-row-actions" onClick={(event) => event.stopPropagation()}><button type="button" className="student-view-profile-btn" onClick={(event) => { event.stopPropagation(); setStudentRowMenuId(''); openStudentProfile(student); }}>Xem hồ sơ</button><div className="student-row-menu-wrap"><button type="button" className="student-row-menu-btn" aria-label={`Mở thao tác cho ${getStudentDisplayName(student)}`} aria-expanded={studentRowMenuId === student.id} onClick={(event) => { event.stopPropagation(); setStudentRowMenuId((current) => current === student.id ? '' : student.id); }}>•••</button>{studentRowMenuId === student.id ? <div className="student-row-menu" onClick={(event) => event.stopPropagation()}><button type="button" className="danger" onClick={() => { setStudentRowMenuId(''); openDeleteStudent(student); }}>Xóa học sinh</button></div> : null}</div></td></tr>;
+                    return <tr key={student.id} className={isSelected ? 'selected' : ''}><td className="student-check-col"><input type="checkbox" aria-label={`Chọn ${getStudentDisplayName(student)}`} checked={isSelected} onChange={(event) => setSelectedStudentIds((current) => event.target.checked ? Array.from(new Set([...current, student.id])) : current.filter((id) => id !== student.id))} /></td><td><div className="student-name-cell"><span className={`student-list-avatar ${avatarUrl ? 'has-image' : ''}`}>{avatarUrl ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(student))}</span><div><strong>{getStudentDisplayName(student)}</strong><small>{rank ? `Hạng #${rank} · ` : ''}{student.birthDate || student.dob || getStudentCode(student, index)}</small></div></div></td><td><span className="student-gender">{student.gender || student.sex || '—'}</span></td><td><strong className="student-parent-name">{parentName}</strong>{parentPhone ? <small className="student-parent-phone">{parentPhone}</small> : null}</td><td>{attendance.rate === null ? <span className="student-no-data">—</span> : <div className={`student-attendance-rate ${attendance.rate < 75 ? 'danger' : attendance.rate < 90 ? 'warn' : ''}`}><i><b style={{ width: `${attendance.rate}%` }} /></i><strong>{attendance.rate}%</strong></div>}</td><td><strong className={`student-average ${average !== null && average < 6 ? 'danger' : average !== null && average < 8 ? 'warn' : ''}`}>{average === null ? '—' : average.toFixed(1)}</strong></td><td><span className="student-conduct">{conduct}</span></td><td><span className={`student-status-pill ${displayLevel === 'Khẩn cấp' ? 'emergency' : displayLevel === 'Cảnh báo' ? 'watch' : displayLevel === 'Bình thường' ? 'normal' : 'unknown'}`}><i />{displayLevel}</span></td><td className="student-row-actions" onClick={(event) => event.stopPropagation()}><button type="button" className="student-view-profile-btn" onClick={(event) => { event.stopPropagation(); setStudentRowMenuId(''); openStudentProfile(student); }}>Xem hồ sơ</button><div className="student-row-menu-wrap"><button type="button" className="student-row-menu-btn" aria-label={`Mở thao tác cho ${getStudentDisplayName(student)}`} aria-expanded={studentRowMenuId === student.id} onClick={(event) => { event.stopPropagation(); setTeacherRowMenuId(''); setStudentRowMenuId((current) => current === student.id ? '' : student.id); }}>•••</button>{studentRowMenuId === student.id ? <div className="student-row-menu" onClick={(event) => event.stopPropagation()}><button type="button" className="danger" onClick={() => { setStudentRowMenuId(''); openDeleteStudent(student); }}>Xóa học sinh</button></div> : null}</div></td></tr>;
                   }) : <tr><td colSpan="9" className="table-empty">Chưa có học sinh phù hợp.</td></tr>}
                 </tbody></table>
                 <div className="student-table-footer"><span>Hiển thị {studentListRows.length} / {attendanceStudents.length} học sinh</span>{selectedStudentIds.length ? <b>Đã chọn {selectedStudentIds.length}</b> : null}</div>
@@ -5566,8 +6895,8 @@ function TeacherClasses() {
               <section className="teacher-directory-section">
                 <div className="teacher-directory-head"><div><h4>Giáo viên</h4><p>Thành viên có vai trò giáo viên trong lớp</p></div><span>{teacherMembers.length} giáo viên</span></div>
                 <div className="teacher-directory-table-wrap">
-                  <table className="teacher-directory-table"><thead><tr><th>Giáo viên</th><th>Giới tính</th><th>Vai trò</th></tr></thead><tbody>
-                    {teacherMembers.length ? teacherMembers.map((teacher) => { const avatar = getStudentAvatar(teacher); return <tr key={teacher.id}><td><div className="teacher-name-cell"><span className={avatar ? 'has-image' : ''}>{avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(teacher))}</span><strong>{getStudentDisplayName(teacher)}</strong></div></td><td>{teacher.gender || teacher.sex || '—'}</td><td><span className="teacher-role-pill">{teacher.owner ? 'Giáo viên chủ lớp' : teacher.role || teacher.memberRole || 'Giáo viên'}</span></td></tr>; }) : <tr><td colSpan="3" className="table-empty">Chưa có dữ liệu giáo viên trong lớp.</td></tr>}
+                  <table className="teacher-directory-table"><thead><tr><th>Giáo viên</th><th>Giới tính</th><th>Vai trò</th>{internTeacherMembers.length ? <th>Điểm danh thực tập</th> : null}<th /></tr></thead><tbody>
+                    {teacherMembers.length ? teacherMembers.map((teacher) => { const avatar = getStudentAvatar(teacher); const metrics = teacher.classRole === 'intern_teacher' ? getInternAttendanceMetrics(teacher) : null; const todayIntern = (Array.isArray(selectedAttendanceRecord?.internRecords) ? selectedAttendanceRecord.internRecords : []).find((item) => item.teacherId === teacher.id || item.uid === teacher.uid || normalizeText(item.email) === normalizeText(teacher.email)); return <tr key={teacher.id}><td><div className="teacher-name-cell"><span className={avatar ? 'has-image' : ''}>{avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(teacher))}</span><strong>{getStudentDisplayName(teacher)}</strong></div></td><td>{teacher.gender || teacher.sex || '—'}</td><td><span className="teacher-role-pill">{teacher.owner ? 'Giáo viên chủ lớp' : teacher.classRole === 'intern_teacher' ? 'Giáo viên thực tập' : 'Giáo viên'}</span></td>{internTeacherMembers.length ? <td>{teacher.classRole === 'intern_teacher' ? <div className="intern-attendance-cell"><div className="student-attendance-rate"><i><b style={{ width: `${metrics?.rate ?? 0}%` }} /></i><strong>{metrics?.rate === null ? '—' : `${metrics.rate}%`}</strong></div>{isClassOwner ? <div className="intern-attendance-actions"><button type="button" className={normalizeAttendanceStatus(todayIntern?.status) === 'present' ? 'active' : ''} onClick={() => saveInternAttendanceStatus(teacher, 'present')}>Có mặt</button><button type="button" className={normalizeAttendanceStatus(todayIntern?.status) === 'excused' ? 'active excused' : 'excused'} onClick={() => saveInternAttendanceStatus(teacher, 'excused')}>Vắng phép</button></div> : null}</div> : <span className="student-no-data">—</span>}</td> : null}<td>{isClassOwner && !teacher.owner ? <div className="student-row-menu-wrap"><button type="button" className="student-row-menu-btn" aria-label={`Mở thao tác cho ${getStudentDisplayName(teacher)}`} aria-expanded={teacherRowMenuId === teacher.id} onClick={() => { setStudentRowMenuId(''); setTeacherRowMenuId((id) => id === teacher.id ? '' : teacher.id); }}>•••</button>{teacherRowMenuId === teacher.id ? <div className="student-row-menu" onClick={(event) => event.stopPropagation()}>{teacher.classRole === 'intern_teacher' ? <button type="button" onClick={() => removeInternTeacherRole(teacher)}>Bỏ chức vụ thực tập</button> : <button type="button" onClick={() => setInternTeacherRole(teacher)}>Làm giáo viên thực tập</button>}<button type="button" className="danger" onClick={() => openDeleteTeacher(teacher)}>Xóa khỏi lớp</button></div> : null}</div> : null}</td></tr>; }) : <tr><td colSpan={internTeacherMembers.length ? 5 : 4} className="table-empty">Chưa có dữ liệu giáo viên trong lớp.</td></tr>}
                   </tbody></table>
                 </div>
               </section>
@@ -5641,6 +6970,88 @@ function TeacherClasses() {
                 </div>
               </section>
             </div>
+          ) : activeTab === 'resources' ? (
+            <div className="class-resources-page elearning-resources-page">
+              <section className="elearning-resources-head">
+                <div>
+                  <span className="elearning-resources-kicker">E-learning</span>
+                  <h3>Học liệu</h3>
+                  <p>Các bài đăng E-learning dành cho lớp {selectedClass?.name || 'hiện tại'}, bài của bạn và thư viện công khai.</p>
+                </div>
+                <button type="button" className="elearning-open-library-btn" onClick={openClassELearningPublisher} disabled={!canCreateClassELearning}>+ Đăng bài <span>＋</span></button>
+              </section>
+              {eLearningCreateNotice ? <div className="class-elearning-create-notice"><span>✓</span><p>{eLearningCreateNotice}</p><button type="button" onClick={() => setELearningCreateNotice('')} aria-label="Đóng thông báo">×</button></div> : null}
+
+              <section className="elearning-resource-stats">
+                <article><span>▣</span><div><strong>{eLearningResourceCounts.class}</strong><small>Dành cho lớp</small></div></article>
+                <article><span>✦</span><div><strong>{eLearningResourceCounts.mine}</strong><small>Bài của tôi</small></div></article>
+                <article><span>◎</span><div><strong>{eLearningResourceCounts.public}</strong><small>Công khai</small></div></article>
+                <article><span>✓</span><div><strong>{eLearningResourceCounts.approved}</strong><small>Đã duyệt</small></div></article>
+              </section>
+
+              <section className="elearning-resource-toolbar">
+                <label className="elearning-resource-search"><span>⌕</span><input value={eLearningResourceSearch} onChange={(event) => setELearningResourceSearch(event.target.value)} placeholder="Tìm tên bài, chủ đề, môn học, mã bài..." /></label>
+                <div className="elearning-resource-scope" role="tablist" aria-label="Phạm vi học liệu">
+                  <button type="button" className={eLearningResourceScope === 'class' ? 'active' : ''} onClick={() => setELearningResourceScope('class')}>Dành cho lớp <b>{eLearningResourceCounts.class}</b></button>
+                  <button type="button" className={eLearningResourceScope === 'mine' ? 'active' : ''} onClick={() => setELearningResourceScope('mine')}>Bài của tôi <b>{eLearningResourceCounts.mine}</b></button>
+                  <button type="button" className={eLearningResourceScope === 'public' ? 'active' : ''} onClick={() => setELearningResourceScope('public')}>Công khai <b>{eLearningResourceCounts.public}</b></button>
+                </div>
+                <label className="elearning-resource-scope-mobile">
+                  <span className="elearning-resource-scope-mobile-label">Phạm vi học liệu</span>
+                  <span className="elearning-resource-scope-mobile-control">
+                    <span className="elearning-resource-scope-mobile-icon" aria-hidden="true">▣</span>
+                    <select value={eLearningResourceScope} onChange={(event) => setELearningResourceScope(event.target.value)} aria-label="Phạm vi học liệu">
+                      <option value="class">Dành cho lớp ({eLearningResourceCounts.class})</option>
+                      <option value="mine">Bài của tôi ({eLearningResourceCounts.mine})</option>
+                      <option value="public">Công khai ({eLearningResourceCounts.public})</option>
+                    </select>
+                    <span className="elearning-resource-scope-mobile-arrow" aria-hidden="true">⌄</span>
+                  </span>
+                </label>
+                <div className="elearning-resource-selects">
+                  <label><span>Định dạng</span><select value={eLearningResourceFormat} onChange={(event) => setELearningResourceFormat(event.target.value)}><option value="all">Tất cả</option><option value="video">Video</option><option value="document">Tài liệu</option><option value="simulation">Mô phỏng</option><option value="code">Code</option><option value="lesson">Bài học</option></select></label>
+                  <label><span>Sắp xếp</span><select value={eLearningResourceSort} onChange={(event) => setELearningResourceSort(event.target.value)}><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option><option value="views">Nhiều lượt xem</option></select></label>
+                </div>
+              </section>
+
+              {eLearningResourcesError ? <div className="elearning-resource-error">{eLearningResourcesError}</div> : null}
+              {eLearningResourcesLoading ? (
+                <div className="elearning-resource-grid" aria-label="Đang tải học liệu">{Array.from({ length: 6 }, (_, index) => <article className="elearning-resource-card skeleton" key={index}><div className="elearning-resource-thumb" /><div className="elearning-resource-card-body"><i /><i /><i /></div></article>)}</div>
+              ) : visibleELearningResources.length ? (
+                <div className="elearning-resource-grid">
+                  {visibleELearningResources.map((course) => {
+                    const format = getELearningCourseFormat(course);
+                    const formatLabel = getELearningCourseFormatLabel(course);
+                    const status = normalizeText(course.status || course.moderationStatus || 'approved');
+                    const statusLabel = status === 'approved' ? 'Đã duyệt' : status === 'pending' ? 'Chờ duyệt' : status === 'rejected' ? 'Từ chối' : (course.status || course.moderationStatus || 'Đã đăng');
+                    const title = stripELearningHtml(course.title) || 'Bài học E-learning';
+                    const thumbnail = String(course.thumbnail || course.documentImageUrl || '').trim();
+                    const ownerId = String(course.teacherId || course.createdByUid || course.createdBy || course.ownerId || course.userId || course.uid || '');
+                    const ownerEmail = normalizeText(course.teacherEmail || course.createdByEmail || course.ownerEmail || '');
+                    const teacherProfile = eLearningTeacherProfiles[`id:${ownerId}`] || eLearningTeacherProfiles[`email:${ownerEmail}`] || {};
+                    const teacherName = teacherProfile.fullName || teacherProfile.displayName || teacherProfile.name || course.teacherName || course.teacherEmail || 'Giáo viên ZUNY';
+                    const teacherAvatar = teacherProfile.photoURL || teacherProfile.photoUrl || teacherProfile.avatarUrl || teacherProfile.avatar || teacherProfile.profileImage || teacherProfile.profilePicture || teacherProfile.imageUrl || '';
+                    return <article className={`elearning-resource-card format-${format}`} key={course.id}>
+                      <button type="button" className="elearning-resource-card-open" onClick={() => openELearningResource(course)} aria-label={`Mở ${title}`} />
+                      <div className="elearning-resource-thumb" style={thumbnail ? { backgroundImage: `url(${JSON.stringify(thumbnail)})` } : undefined}>
+                        <span className="elearning-resource-format-badge">{format === 'video' ? '▶' : format === 'document' ? '▤' : format === 'simulation' ? '✦' : format === 'code' ? '</>' : '▱'} {formatLabel}</span>
+                        <span className={`elearning-resource-status ${status}`}>{statusLabel}</span>
+                        {!thumbnail ? <strong>{format === 'video' ? 'VIDEO' : format === 'document' ? 'TÀI LIỆU' : format === 'simulation' ? 'MÔ PHỎNG' : format === 'code' ? 'CODE' : 'LEARNING'}</strong> : null}
+                        <small>{getELearningVideoDuration(course)}</small>
+                      </div>
+                      <div className="elearning-resource-card-body">
+                        <div className="elearning-resource-card-title"><div><span>{course.category || 'Môn học'}</span><h4 title={title}>{title}</h4></div><b>↗</b></div>
+                        <p>{stripELearningHtml(course.topic || course.description) || 'Chưa có mô tả cho bài học này.'}</p>
+                        <div className="elearning-resource-teacher"><span>{teacherAvatar ? <img src={teacherAvatar} alt={teacherName} referrerPolicy="no-referrer" /> : getInitial(teacherName)}</span><div><strong>{teacherName}</strong><small>{course.courseCode || course.className || 'E-learning ZUNY'}</small></div></div>
+                        <footer><span>{formatELearningViews(course.views)} lượt xem</span><span>•</span><span>{formatELearningRelativeDate(course.createdAt || course.updatedAt)}</span><span>•</span><span>{Number(course.lessonCount || 0) || 1} bài</span></footer>
+                      </div>
+                    </article>;
+                  })}
+                </div>
+              ) : (
+                <div className="elearning-resource-empty"><span>▱</span><h4>Chưa có bài E-learning phù hợp</h4><p>{eLearningResourceScope === 'class' ? `Chưa có bài E-learning đặt quyền xem cho lớp ${selectedClass?.name || 'này'}.` : eLearningResourceScope === 'mine' ? 'Tài khoản giáo viên hiện chưa có bài E-learning phù hợp với bộ lọc.' : 'Chưa có bài công khai phù hợp với bộ lọc hiện tại.'}</p><button type="button" onClick={openClassELearningPublisher}>+ Đăng bài cho lớp</button></div>
+              )}
+            </div>
           ) : activeTab === 'schedule' ? (
             <div className="schedule-page">
               <section className="schedule-page-head">
@@ -5690,23 +7101,24 @@ function TeacherClasses() {
             </div>
           ) : activeTab === 'notifications' ? (
             <div className="notification-center-page">
-              <section className="notification-center-head"><div><div className="notification-title-line"><h3>Thông báo</h3>{unreadNotifications.length ? <b>{unreadNotifications.length}</b> : null}</div></div><div className="notification-center-actions"><div className="notification-filter-tabs"><button type="button" className={notificationFilter === 'all' ? 'active' : ''} onClick={() => setNotificationFilter('all')}>Tất cả</button><button type="button" className={notificationFilter === 'unread' ? 'active' : ''} onClick={() => setNotificationFilter('unread')}>Chưa đọc ({unreadNotifications.length})</button></div>{selectedClass?.teacherId === currentUser?.uid ? <button type="button" className="notification-delete-all" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!notifications.length}>⌫ Xóa hết</button> : null}</div></section>
+              <section className="notification-center-head"><div><div className="notification-title-line"><h3>Thông báo</h3>{unreadNotifications.length ? <b>{unreadNotifications.length}</b> : null}{selectedClass?.teacherId === currentUser?.uid ? <button type="button" className="notification-delete-all notification-delete-all-mobile" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!teacherNotifications.length}>⌫ Xóa hết</button> : null}</div></div><div className="notification-center-actions"><div className="notification-filter-tabs"><button type="button" className={notificationFilter === 'all' ? 'active' : ''} onClick={() => setNotificationFilter('all')}>Tất cả</button><button type="button" className={notificationFilter === 'unread' ? 'active' : ''} onClick={() => setNotificationFilter('unread')}>Chưa đọc ({unreadNotifications.length})</button></div>{selectedClass?.teacherId === currentUser?.uid ? <button type="button" className="notification-delete-all notification-delete-all-desktop" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!teacherNotifications.length}>⌫ Xóa hết</button> : null}</div></section>
               {notificationActionError ? <p className="form-error">{notificationActionError}</p> : null}
               <section className="notification-center-list">
-                {visibleNotifications.length ? visibleNotifications.map((item) => { const unread = !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid); const severity = item.severity || (item.systemGenerated ? 'medium' : 'normal'); const icon = item.type === 'attendance' ? '!' : item.type === 'assignment' ? '▤' : item.type === 'score' || item.type === 'average' ? '▥' : item.type === 'reward' ? '★' : item.type?.startsWith('schedule') ? '◆' : '●'; const text = item.message || stripHtmlText(item.contentHtml || item.content || item.body || ''); return <article role="button" tabIndex={0} className={`notification-center-card ${unread ? 'unread' : ''} ${severity}`} key={item.id} onClick={() => unread && markNotificationRead(item)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && unread) markNotificationRead(item); }}><div className="notification-center-icon">{icon}</div><div className="notification-center-content"><div><strong>{item.title || (item.systemGenerated ? 'Thông báo tự động' : 'Thông báo lớp học')}</strong>{severity === 'critical' ? <em>Khẩn cấp</em> : severity === 'reward' ? <em className="reward">Khen thưởng</em> : severity === 'important' ? <em className="important">Quan trọng</em> : null}{unread ? <i /> : null}</div><p>{text || 'Thông báo từ lớp học.'}</p><small>{formatDateTime(item.createdAt || item.updatedAt)}</small></div><div className="notification-card-actions">{(selectedClass?.teacherId === currentUser?.uid || item.authorId === currentUser?.uid) ? <button type="button" className="notification-trash-btn" onClick={(event) => { event.stopPropagation(); openDeleteNotification(item); }} title="Xóa thông báo" aria-label="Xóa thông báo">⌫</button> : null}</div></article>; }) : <div className="notification-center-empty">{notificationFilter === 'unread' ? 'Không còn thông báo chưa đọc.' : 'Chưa có thông báo.'}</div>}
+                {visibleNotifications.length ? visibleNotifications.map((item) => { const unread = !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid); const severity = item.severity || (item.systemGenerated ? 'medium' : 'normal'); const icon = item.type === 'attendance' ? '!' : item.type === 'assignment' ? '▤' : item.type === 'score' || item.type === 'average' ? '▥' : item.type === 'reward' ? '★' : item.type?.startsWith('schedule') ? '◆' : '●'; const text = item.message || stripHtmlText(item.contentHtml || item.content || item.body || ''); return <article role="button" tabIndex={0} className={`notification-center-card ${unread ? 'unread' : ''} ${severity}`} key={item.id} onClick={() => unread && markNotificationRead(item)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && unread) markNotificationRead(item); }}><div className="notification-center-icon">{icon}</div><div className="notification-center-content"><div><strong>{item.title || (item.systemGenerated ? 'Thông báo tự động' : 'Thông báo lớp học')}</strong>{item.systemGenerated ? <em className="automatic">Thông báo tự động</em> : null}{severity === 'critical' ? <em>Khẩn cấp</em> : severity === 'reward' ? <em className="reward">Khen thưởng</em> : severity === 'important' ? <em className="important">Quan trọng</em> : null}{unread ? <i /> : null}</div><p>{text || 'Thông báo từ lớp học.'}</p><small>{formatDateTime(item.createdAt || item.updatedAt)}</small></div><div className="notification-card-actions">{(selectedClass?.teacherId === currentUser?.uid || item.authorId === currentUser?.uid) ? <button type="button" className="notification-trash-btn" onClick={(event) => { event.stopPropagation(); openDeleteNotification(item); }} title="Xóa thông báo" aria-label="Xóa thông báo">⌫</button> : null}</div></article>; }) : <div className="notification-center-empty">{notificationFilter === 'unread' ? 'Không còn thông báo chưa đọc.' : 'Chưa có thông báo.'}</div>}
               </section>
             </div>
           ) : activeTab === 'messages' ? (
             <div className="class-messages-page">
               <div className="messages-page-head"><div><h3>Trao đổi</h3></div></div>
-              <div className="messages-layout">
+              <div className={`messages-layout ${messageMobileChatOpen ? 'mobile-chat-open' : ''}`}>
                 <aside className="messages-sidebar">
                   <label className="messages-search"><span>⌕</span><input value={messageSearch} onChange={(event) => setMessageSearch(event.target.value)} placeholder="Tìm kiếm..." /></label>
-                  <div className="conversation-list">{filteredConversationRows.length ? filteredConversationRows.map((item) => <button type="button" key={item.conversationId} className={`conversation-item ${selectedConversationId === item.conversationId ? 'active' : ''}`} onClick={() => setSelectedConversationId(item.conversationId)}><span className="conversation-avatar">{item.avatar ? <img src={item.avatar} alt="" referrerPolicy="no-referrer" /> : getInitial(item.name)}</span><span className="conversation-copy"><strong>{item.name}</strong><small>{item.label}</small><em>{item.last?.recalled ? 'Tin nhắn đã thu hồi' : (item.last?.content || (item.last?.attachment ? `Đã gửi tệp: ${item.last.attachment.name}` : 'Chưa có tin nhắn'))}</em></span>{item.last?.createdAt ? <time>{formatClock(item.last.createdAt)}</time> : null}</button>) : <div className="conversation-empty">Chưa có phụ huynh hoặc học sinh có email để trao đổi.</div>}</div>
+                  <div className="conversation-list">{filteredConversationRows.length ? filteredConversationRows.map((item) => <button type="button" key={item.conversationId} className={`conversation-item ${selectedConversationId === item.conversationId ? 'active' : ''}`} onClick={() => { setSelectedConversationId(item.conversationId); setMessageMobileChatOpen(true); }}><span className="conversation-avatar">{item.avatar ? <img src={item.avatar} alt="" referrerPolicy="no-referrer" /> : getInitial(item.name)}</span><span className="conversation-copy"><strong>{item.name}</strong><small>{item.label}</small><em>{item.last?.recalled ? 'Tin nhắn đã thu hồi' : (item.last?.content || (item.last?.attachment ? `Đã gửi tệp: ${item.last.attachment.name}` : 'Chưa có tin nhắn'))}</em></span>{item.last?.createdAt ? <time>{formatClock(item.last.createdAt)}</time> : null}</button>) : <div className="conversation-empty">Chưa có phụ huynh hoặc học sinh có email để trao đổi.</div>}</div>
                 </aside>
                 <section className="messages-chat">
                   {selectedConversation ? <>
                     <header className="messages-chat-head">
+                      <button type="button" className="messages-mobile-back-btn" onClick={() => setMessageMobileChatOpen(false)} aria-label="Quay lại danh sách thành viên">←</button>
                       <div className="message-person">
                         <span>{selectedConversation.avatar ? <img src={selectedConversation.avatar} alt="" referrerPolicy="no-referrer" /> : getInitial(selectedConversation.name)}</span>
                         <div><strong>{selectedConversation.name}</strong><small>{selectedConversation.label} · {selectedConversation.email}</small></div>
@@ -5738,10 +7150,10 @@ function TeacherClasses() {
                     </div>
                     <footer className="messages-composer">
                       <input ref={messageFileInputRef} type="file" hidden onChange={(event) => { const file = event.target.files?.[0] || null; setActiveMessageAttachment(file); event.target.value = ''; }} />
-                      <button type="button" className="message-attach-btn" onClick={() => messageFileInputRef.current?.click()} title="Đính kèm tệp">⌕</button>
+                      <button type="button" className="message-attach-btn" onClick={() => messageFileInputRef.current?.click()} title="Đính kèm tệp" aria-label="Đính kèm tệp">📎</button>
                       <div className="message-input-wrap">
                         {activeMessageAttachment ? <div className="message-attachment-draft"><span>📎</span><strong>{activeMessageAttachment.name}</strong><button type="button" onClick={() => setActiveMessageAttachment(null)} title="Bỏ tệp đính kèm" aria-label="Bỏ tệp đính kèm">×</button></div> : null}
-                        <input value={activeMessageDraft} onChange={(event) => setActiveMessageDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }} placeholder="Nhập tin nhắn..." />
+                        <textarea ref={messageTextareaRef} rows={1} maxLength={2000} value={activeMessageDraft} onChange={(event) => { setActiveMessageDraft(event.target.value); resizeChatTextarea(event.currentTarget, 140); }} onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); sendMessage(); } }} placeholder="Nhập tin nhắn..." />
                       </div>
                       <button type="button" className="message-send-btn" onClick={sendMessage} disabled={messageSending || (!activeMessageDraft.trim() && !activeMessageAttachment)}>{messageSending ? 'Đang gửi...' : 'Gửi →'}</button>
                     </footer>
@@ -5770,6 +7182,7 @@ function TeacherClasses() {
       {deleteClassModal}
       {editStudentModal}
       {deleteStudentModal}
+      {deleteTeacherModal}
       {classSettingsModal}
       {joinClassModal}
       {homeSettingsModal}
@@ -5801,10 +7214,55 @@ function TeacherClasses() {
           const parentPhone = studentProfile.parentPhone || studentProfile.guardianPhone || studentProfile.emergencyPhone || '';
           const parentEmail = studentProfile.parentEmail || studentProfile.guardianEmail || '';
           const conduct = studentProfile.conduct || studentProfile.behavior || studentProfile.hanhKiem || 'Chưa có dữ liệu';
-          const subjectRows = subjects.map((subject) => { const source = allSubjectScores[subject.id] || {}; const scoreRow = (source.scores || []).find((item) => (item.studentId || item.id) === studentProfile.id); const tests = source.tests || []; const avg = scoreRow ? (toNumber(scoreRow.average) ?? averageFromScores(tests.map((test) => scoreRow.scores?.[test.id]))) : null; return { subject, avg, scoreRow, tests }; }).filter((row) => row.avg !== null || row.scoreRow);
-          const attendanceHistory = attendanceRecords.filter((record) => { const directId = record.studentId || record.uid || record.userId; const rows = Array.isArray(record.students) ? record.students : Array.isArray(record.records) ? record.records : []; return directId === studentProfile.id || rows.some((item) => (item.studentId || item.id || item.uid) === studentProfile.id); }).sort((a,b) => getRecordDateValue(b)-getRecordDateValue(a));
-          const studentAssignments = (assignmentsByClass[selectedClassId] || []).filter((assignment) => { const ids = assignment.studentIds || assignment.assigneeIds || assignment.assignedStudentIds; const submissions = assignment.submissions || assignment.studentSubmissions; return Array.isArray(ids) ? ids.includes(studentProfile.id) : submissions && typeof submissions === 'object' ? Boolean(submissions[studentProfile.id]) : false; });
+          const profileUser = userProfilesByEmail[normalizeText(studentProfile.email)] || {};
+          const studentUid = studentProfile.uid || profileUser.uid || profileUser.id || '';
+          const studentKeys = new Set([studentProfile.id, studentProfile.studentId, studentUid, normalizeText(studentProfile.email)].filter(Boolean));
+          const subjectRows = subjects.map((subject) => {
+            const source = allSubjectScores[subject.id] || {};
+            const tests = source.tests || [];
+            const scoreRow = (source.scores || []).find((item) => {
+              const rowId = item.studentId || item.id || item.uid;
+              return studentKeys.has(rowId) || studentKeys.has(normalizeText(item.email));
+            });
+            const scoredTests = scoreRow ? tests.map((test) => ({ test, value: toNumber(scoreRow.scores?.[test.id]) })).filter((item) => item.value !== null) : [];
+            const avg = scoreRow ? (toNumber(scoreRow.average) ?? averageFromScores(scoredTests.map((item) => item.value))) : null;
+            return { subject, avg, scoreRow, tests, scoredTests };
+          }).filter((row) => row.scoredTests.length);
+          const attendanceHistory = attendanceRecords.filter((record) => { const directId = record.studentId || record.uid || record.userId; const rows = Array.isArray(record.students) ? record.students : Array.isArray(record.records) ? record.records : []; return studentKeys.has(directId) || rows.some((item) => studentKeys.has(item.studentId || item.id || item.uid) || studentKeys.has(normalizeText(item.email))); }).sort((a,b) => getRecordDateValue(b)-getRecordDateValue(a));
+          const findStudentSubmission = (assignment) => {
+            const submissions = assignment.submissions || assignment.studentSubmissions || {};
+            if (submissions?.[studentProfile.id]) return submissions[studentProfile.id];
+            if (!submissions || typeof submissions !== 'object') return null;
+            return Object.values(submissions).find((submission) => submission && typeof submission === 'object' && (studentKeys.has(submission.studentId || submission.uid || submission.id) || studentKeys.has(normalizeText(submission.email)))) || null;
+          };
+          const studentAssignments = (assignmentsByClass[selectedClassId] || []).filter((assignment) => {
+            if (isAssignmentDraft(assignment)) return false;
+            const ids = assignment.studentIds || assignment.assigneeIds || assignment.assignedStudentIds;
+            if (!Array.isArray(ids) || !ids.length) return true;
+            return ids.some((value) => studentKeys.has(value));
+          }).sort((a, b) => (getAssignmentDueValue(a) || Number.MAX_SAFE_INTEGER) - (getAssignmentDueValue(b) || Number.MAX_SAFE_INTEGER));
+          const assignmentRows = studentAssignments.map((assignment) => {
+            const submission = findStudentSubmission(assignment);
+            const due = getAssignmentDueValue(assignment);
+            const submittedAt = getTimeValue(submission?.submittedAt);
+            const normalizedSubmissionStatus = normalizeText(submission?.status || submission?.state);
+            const submitted = Boolean(submittedAt || ['submitted', 'graded', 'đã nộp', 'đã chấm', 'late'].includes(normalizedSubmissionStatus));
+            const late = submitted && Boolean(submission?.isLate || normalizedSubmissionStatus === 'late' || (due && submittedAt && submittedAt > due));
+            const soon = Boolean(due && due >= now.getTime() && due - now.getTime() <= 3 * 24 * 60 * 60 * 1000);
+            let label = 'Chưa nộp';
+            let tone = 'neutral';
+            if (submitted) {
+              if (late) { label = 'Nộp trễ'; tone = 'late'; }
+              else if (due && submittedAt) { label = 'Đúng hạn'; tone = 'ontime'; }
+              else { label = 'Đã nộp'; tone = 'submitted'; }
+            } else if (due && due < now.getTime()) { label = 'Quá hạn'; tone = 'overdue'; }
+            else if (soon) { label = 'Sắp tới hạn'; tone = 'warning'; }
+            return { assignment, submission, due, submittedAt, label, tone };
+          });
           const profileEvents = Array.isArray(studentProfile.profileEvents) ? studentProfile.profileEvents : Array.isArray(studentProfile.behaviorRecords) ? studentProfile.behaviorRecords : [];
+          const autoRewards = [];
+          if (average !== null && average >= 9) autoRewards.push({ icon: '★', title: 'Thành tích học tập xuất sắc', note: `Điểm trung bình hiện tại ${average.toFixed(1)}. Kết quả nổi bật, nên tiếp tục duy trì phong độ học tập.` });
+          else if (average !== null && average >= 8) autoRewards.push({ icon: '✓', title: 'Kết quả học tập tốt', note: `Điểm trung bình hiện tại ${average.toFixed(1)}. Học sinh đang có kết quả tốt và xứng đáng được ghi nhận.` });
           return <div className="student-profile-backdrop" onMouseDown={() => setStudentProfileId('')}><aside className="student-profile-drawer" onMouseDown={(event) => event.stopPropagation()}>
             <header className="student-profile-header"><span className={`student-profile-avatar ${getStudentAvatar(studentProfile) ? 'has-image' : ''}`}>{getStudentAvatar(studentProfile) ? <img src={getStudentAvatar(studentProfile)} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(studentProfile))}</span><div><h3>{getStudentDisplayName(studentProfile)}</h3><p>{studentProfile.gender || studentProfile.sex || 'Chưa có giới tính'}{studentProfile.birthDate || studentProfile.dob ? ` · Sinh ${studentProfile.birthDate || studentProfile.dob}` : ''}{average !== null ? ` · Hạng theo điểm` : ''}</p></div>{profileEditing ? <div className="student-profile-edit-actions"><button type="button" className="student-profile-cancel" onClick={() => { setProfileEditing(false); setProfileEditError(''); }} disabled={profileSaving}>Hủy</button><button type="button" className="student-profile-save" onClick={saveProfileEdit} disabled={profileSaving}>{profileSaving ? 'Đang lưu...' : 'Lưu'}</button></div> : <button type="button" className="student-profile-edit" onClick={() => startProfileEdit(studentProfile)}>✎ Chỉnh sửa</button>}<button type="button" className="student-profile-close" onClick={() => { setStudentProfileId(''); setProfileEditing(false); }}>×</button></header>
             <div className="student-profile-strip"><span>Điểm danh: <b>{attendance.rate === null ? '—' : `${attendance.rate}%`}</b></span><span>ĐTB: <b>{average === null ? '—' : average.toFixed(1)}</b></span><span>Hạnh kiểm: <b>{conduct}</b></span></div>
@@ -5812,9 +7270,9 @@ function TeacherClasses() {
             <div className="student-profile-body">
               {studentProfileTab === 'info' ? <>{profileEditError ? <p className="profile-edit-error">{profileEditError}</p> : null}<section><h4>Thông tin cơ bản</h4>{profileEditing ? <div className="student-profile-edit-grid"><label><small>Họ và tên</small><input value={profileEditForm.name} onChange={(event) => setProfileEditForm((current) => ({ ...current, name: event.target.value }))} /></label><label><small>Giới tính</small><select value={profileEditForm.gender} onChange={(event) => setProfileEditForm((current) => ({ ...current, gender: event.target.value }))}><option value="">Chưa chọn</option><option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option></select></label><label><small>Ngày sinh</small><input type="date" value={profileEditForm.birthDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, birthDate: event.target.value }))} /></label><label><small>Email</small><input type="email" value={profileEditForm.email} onChange={(event) => setProfileEditForm((current) => ({ ...current, email: event.target.value }))} /></label><label><small>Số điện thoại</small><input value={profileEditForm.phone} onChange={(event) => setProfileEditForm((current) => ({ ...current, phone: event.target.value }))} /></label><div className="profile-readonly-field"><small>Mã học sinh</small><strong>{getStudentCode(studentProfile, profileIndex)}</strong></div><div className="profile-readonly-field"><small>Lớp</small><strong>{selectedClass?.name || '—'}</strong></div></div> : <div className="student-profile-info-grid"><div><small>Họ và tên</small><strong>{getStudentDisplayName(studentProfile)}</strong></div><div><small>Giới tính</small><strong>{studentProfile.gender || studentProfile.sex || 'Chưa có dữ liệu'}</strong></div><div><small>Ngày sinh</small><strong>{studentProfile.birthDate || studentProfile.dob || 'Chưa có dữ liệu'}</strong></div><div><small>Lớp</small><strong>{selectedClass?.name || '—'}</strong></div><div><small>Mã học sinh</small><strong>{getStudentCode(studentProfile, profileIndex)}</strong></div><div><small>Email</small><strong>{studentProfile.email || 'Chưa có dữ liệu'}</strong></div></div>}</section><section><h4>Phụ huynh / Liên hệ khẩn cấp</h4>{profileEditing ? <div className="student-profile-edit-grid student-contact-edit-grid"><label><small>Tên phụ huynh</small><input value={profileEditForm.parentName} onChange={(event) => setProfileEditForm((current) => ({ ...current, parentName: event.target.value }))} /></label><label><small>Số điện thoại</small><input value={profileEditForm.parentPhone} onChange={(event) => setProfileEditForm((current) => ({ ...current, parentPhone: event.target.value }))} /></label><label><small>Email</small><input type="email" value={profileEditForm.parentEmail} onChange={(event) => setProfileEditForm((current) => ({ ...current, parentEmail: event.target.value }))} /></label><label><small>Quan hệ</small><input value={profileEditForm.parentRelation} onChange={(event) => setProfileEditForm((current) => ({ ...current, parentRelation: event.target.value }))} /></label></div> : <div className="student-contact-card"><div><small>Tên phụ huynh</small><strong>{parentName || 'Chưa có dữ liệu'}</strong></div><div><small>Số điện thoại</small><strong>{parentPhone || 'Chưa có dữ liệu'}</strong></div><div><small>Email</small><strong>{parentEmail || 'Chưa có dữ liệu'}</strong></div><div><small>Quan hệ</small><strong>{studentProfile.parentRelation || studentProfile.guardianRelation || 'Chưa có dữ liệu'}</strong></div></div>}</section><section><h4>Ghi chú y tế</h4>{profileEditing ? <textarea className="student-medical-edit" rows="4" value={profileEditForm.medicalNote} onChange={(event) => setProfileEditForm((current) => ({ ...current, medicalNote: event.target.value }))} placeholder="Ghi chú y tế..." /> : <div className="student-medical-note">{studentProfile.medicalNote || studentProfile.medicalNotes || studentProfile.healthNote || 'Chưa có ghi chú y tế.'}</div>}</section></> : null}
               {studentProfileTab === 'attendance' ? <section><h4>Lịch sử điểm danh</h4><div className="student-profile-stat-grid"><div><b>{attendance.present}</b><span>Có mặt</span></div><div><b>{attendance.late}</b><span>Trễ</span></div><div><b>{attendance.absent}</b><span>Vắng</span></div><div><b>{attendance.total}</b><span>Tổng lượt</span></div></div>{attendanceHistory.length ? <div className="student-profile-list">{attendanceHistory.slice(0,20).map((record) => <div key={record.id}><time>{formatDateTime(record.date || record.attendanceDate || record.createdAt)}</time><strong>{record.status || record.attendanceStatus || 'Đã ghi nhận'}</strong><span>{record.note || record.subjectName || record.subject || ''}</span></div>)}</div> : <DataUnavailable icon="✓" text="Chưa có lịch sử điểm danh riêng của học sinh." />}</section> : null}
-              {studentProfileTab === 'scores' ? <section><h4>Điểm số theo môn</h4>{subjectRows.length ? <div className="student-subject-score-list">{subjectRows.map(({subject,avg}) => <div key={subject.id}><span>{subject.name || 'Môn học'}</span><strong>{avg === null ? '—' : avg.toFixed(1)}</strong></div>)}</div> : <DataUnavailable icon="★" text="Chưa có dữ liệu điểm của học sinh." />}</section> : null}
-              {studentProfileTab === 'assignments' ? <section><h4>Bài tập</h4>{studentAssignments.length ? <div className="student-profile-list">{studentAssignments.map((assignment) => { const submission = assignment.submissions?.[studentProfile.id] || assignment.studentSubmissions?.[studentProfile.id] || {}; return <div key={assignment.id}><strong>{getAssignmentTitle(assignment)}</strong><span>{submission.status || submission.state || (submission.submittedAt ? 'Đã nộp' : 'Chưa có trạng thái')}</span><time>{formatDateTime(submission.submittedAt || assignment.dueAt || assignment.deadline)}</time></div>; })}</div> : <DataUnavailable icon="▤" text="Bài tập hiện tại chưa có dữ liệu gán/nộp theo từng học sinh." />}</section> : null}
-              {studentProfileTab === 'profile' ? <section><h4>Hành vi & khen thưởng</h4>{profileEvents.length ? <div className="student-profile-timeline">{profileEvents.map((event,index) => <div key={event.id || index}><span>•</span><div><time>{formatDateTime(event.date || event.createdAt)}</time><strong>{event.title || event.type || 'Ghi nhận'}</strong><p>{event.note || event.description || ''}</p></div></div>)}</div> : <DataUnavailable icon="◌" text="Chưa có dữ liệu hành vi, khen thưởng hoặc nhận xét trong hồ sơ của học sinh." />}</section> : null}
+              {studentProfileTab === 'scores' ? <section><h4>Điểm số các bài thi đã làm</h4>{subjectRows.length ? <div className="student-profile-score-groups">{subjectRows.map(({subject,avg,scoredTests}) => <article key={subject.id}><header><div><strong>{subject.name || 'Môn học'}</strong><small>{scoredTests.length} bài có điểm</small></div><b>{avg === null ? '—' : avg.toFixed(1)}</b></header>{scoredTests.length ? <div className="student-profile-test-scores">{scoredTests.map(({test,value}) => <div key={test.id}><span><strong>{test.name || test.title || test.code || 'Bài kiểm tra'}</strong><small>{test.type || test.category || 'Bài thi'}{test.date || test.testDate || test.createdAt ? ` · ${formatDateTime(test.date || test.testDate || test.createdAt)}` : ''}</small></span><b>{formatScore(value)}</b></div>)}</div> : <p className="student-profile-score-empty">Môn này chưa có bài thi nào được nhập điểm cho học sinh.</p>}</article>)}</div> : <DataUnavailable icon="★" text="Chưa có điểm bài thi nào của học sinh trong dữ liệu hiện tại." />}</section> : null}
+              {studentProfileTab === 'assignments' ? <section><h4>Bài tập & trạng thái</h4>{assignmentRows.length ? <div className="student-profile-assignment-list">{assignmentRows.map(({assignment,submission,due,submittedAt,label,tone}) => <article key={assignment.id}><div><strong>{getAssignmentTitle(assignment)}</strong><small>{assignment.subjectName || assignment.subject || selectedClass?.subject || 'Bài tập'}{due ? ` · Hạn ${formatDateTime(due)}` : ' · Chưa có hạn nộp'}</small></div><span className={`student-profile-assignment-status ${tone}`}>{label}</span><time>{submittedAt ? `Nộp ${formatDateTime(submittedAt)}` : submission?.updatedAt ? `Cập nhật ${formatDateTime(submission.updatedAt)}` : 'Chưa có bài nộp'}</time></article>)}</div> : <DataUnavailable icon="▤" text="Lớp hiện chưa có bài tập phù hợp cho học sinh này." />}</section> : null}
+              {studentProfileTab === 'profile' ? <section><h4>Khen thưởng & nhận xét</h4><div className="student-auto-reward-note">Đánh giá tự động bên dưới chỉ được suy ra từ điểm trung bình hiện có.</div>{autoRewards.length ? <div className="student-auto-reward-list">{autoRewards.map((reward,index) => <article key={`${reward.title}-${index}`}><span>{reward.icon}</span><div><strong>{reward.title}</strong><p>{reward.note}</p></div></article>)}</div> : <div className="student-auto-reward-empty">{average === null ? 'Chưa có đủ dữ liệu điểm để tạo khen thưởng tự động.' : 'Điểm trung bình hiện tại chưa đạt ngưỡng khen thưởng tự động từ 8.0 trở lên.'}</div>}{profileEvents.length ? <><h4 className="student-profile-firebase-title">Ghi nhận đã lưu trong hồ sơ</h4><div className="student-profile-timeline">{profileEvents.map((event,index) => <div key={event.id || index}><span>•</span><div><time>{formatDateTime(event.date || event.createdAt)}</time><strong>{event.title || event.type || 'Ghi nhận'}</strong><p>{event.note || event.description || ''}</p></div></div>)}</div></> : null}</section> : null}
             </div>
           </aside></div>;
         })() : null}
@@ -5841,6 +7299,10 @@ function TeacherClasses() {
       {scheduleImportantOpen ? <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setScheduleImportantOpen(false); }}><section className="class-modal schedule-important-modal"><div className="modal-head"><div><p>Lịch dạy</p><h2>Thêm nội dung quan trọng</h2></div><button type="button" className="icon-btn" onClick={() => setScheduleImportantOpen(false)}>×</button></div><label>Nội dung <span>*</span><input value={scheduleImportantForm.title} onChange={(event) => setScheduleImportantForm((current) => ({ ...current, title: event.target.value }))} placeholder="Ví dụ: Họp phụ huynh toàn lớp" /></label><label>Ghi chú<textarea rows="4" value={scheduleImportantForm.note} onChange={(event) => setScheduleImportantForm((current) => ({ ...current, note: event.target.value }))} placeholder="Thông tin chi tiết, địa điểm, yêu cầu chuẩn bị..." /></label><div className="modal-grid"><label>Ngày hết hạn <span>*</span><input type="date" value={scheduleImportantForm.expiresDate} onChange={(event) => setScheduleImportantForm((current) => ({ ...current, expiresDate: event.target.value }))} /></label><label>Giờ hết hạn<input type="time" value={scheduleImportantForm.expiresTime} onChange={(event) => setScheduleImportantForm((current) => ({ ...current, expiresTime: event.target.value }))} /></label></div>{scheduleImportantError ? <p className="form-error">{scheduleImportantError}</p> : null}<div className="modal-actions"><button type="button" className="ghost-btn" onClick={() => setScheduleImportantOpen(false)}>Hủy</button><button type="button" className="primary-btn modal-submit" onClick={savePersistentImportant} disabled={scheduleImportantSaving}>{scheduleImportantSaving ? 'Đang lưu...' : 'Lưu quan trọng'}</button></div></section></div> : null}
 
       {scheduleGoogleGuideOpen ? <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setScheduleGoogleGuideOpen(false); }}><section className="class-modal google-calendar-guide-modal"><div className="modal-head"><div><p>Google Calendar</p><h2>Nhập thời khóa biểu vào Google</h2></div><button type="button" className="icon-btn" onClick={() => setScheduleGoogleGuideOpen(false)}>×</button></div><div className="google-calendar-guide"><div className="google-guide-success">✓ File <b>.ics</b> đã được tải tự động xuống thiết bị.</div><ol><li>Mở trang cài đặt Google Calendar bằng đường dẫn bên dưới.</li><li>Trong menu bên trái chọn <b>Nhập và xuất</b>.</li><li>Ở phần <b>Nhập</b>, chọn file <b>LichDay_...ics</b> vừa tải xuống.</li><li>Chọn lịch Google muốn lưu rồi bấm <b>Nhập</b>.</li><li>Kiểm tra lại các tiết học trong tuần trước khi đóng trang Google Calendar.</li></ol><a href="https://calendar.google.com/calendar/u/0/r/settings/export" target="_blank" rel="noreferrer">Mở trang Nhập và xuất của Google Calendar ↗</a><small>Hệ thống không tự chuyển trang. Bạn chủ động mở đường dẫn khi sẵn sàng.</small></div><div className="modal-actions"><button type="button" className="primary-btn modal-submit" onClick={() => setScheduleGoogleGuideOpen(false)}>Đã hiểu</button></div></section></div> : null}
+
+      {eLearningCreateTypeOpen ? <div className="modal-backdrop class-elearning-create-type-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setELearningCreateTypeOpen(false); }}><section className="class-elearning-create-type-modal"><header><div><span>E-learning</span><h2>Chọn loại bài đăng</h2><p>Bài mới được preset quyền truy cập cho lớp {selectedClass?.name || 'hiện tại'}.</p></div><button type="button" onClick={() => setELearningCreateTypeOpen(false)} aria-label="Đóng">×</button></header><div className="class-elearning-create-type-grid"><button type="button" onClick={() => openClassELearningCreateForm('video')}><i>▶</i><strong>Video bài học</strong><span>YouTube, Lumi hoặc MP4 và danh sách bài.</span></button><button type="button" onClick={() => openClassELearningCreateForm('document')}><i>▤</i><strong>Tài liệu</strong><span>Soạn trực tiếp, Word/PDF hoặc ảnh tài liệu.</span></button><button type="button" onClick={() => openClassELearningCreateForm('simulation')}><i>✦</i><strong>Mô phỏng</strong><span>Nhúng mô phỏng hoặc tạo nội dung tương tác bằng code.</span></button></div></section></div> : null}
+
+      {eLearningCreateOpen ? <CourseFormModal form={eLearningCreateForm} setForm={setELearningCreateForm} editingCourse={null} contentType={eLearningCreateType} teacherClasses={classes.map((item) => item.name || item.className || '').filter(Boolean)} participatingClasses={classes} uploadingWord={eLearningCreateUploadingWord} uploadingVideo={eLearningCreateUploadingVideo} uploadingImage={eLearningCreateUploadingImage} lessonsRef={eLearningCreateLessonsRef} publisherName={eLearningPublisherName} onClose={() => { if (!eLearningCreatePublishing) setELearningCreateOpen(false); }} onReset={resetClassELearningCreateForm} onSubmit={publishClassELearningCourse} onWordUpload={handleClassELearningWordUpload} onVideoUpload={handleClassELearningVideoUpload} onImageUpload={handleClassELearningImageUpload} /> : null}
       <style>{styles}</style>
     </main>
   );

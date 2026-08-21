@@ -50,7 +50,6 @@ import {
 import toast from 'react-hot-toast'
 
 import { db } from '../../../components/firebase'
-import VoiceChannelRoom from './VoiceChannelRoom'
 import {
   formatRelativeTime,
   getInitials,
@@ -64,7 +63,8 @@ import {
 // Default channels when creating a new group
 const DEFAULT_CHANNEL_IDS = ['thong-bao', 'thao-luan']
 const MAX_TEXT_CHANNELS = 10
-const MAX_VOICE_CHANNELS = 10
+const SUPPORTED_CHANNEL_TYPES = new Set(['announce', 'info', 'chat', 'files'])
+const DEPRECATED_CHANNEL_IDS = new Set(['phong-hoc-thoai'])
 
 const normalizeInviteCode = (value = '') => {
   const cleaned = String(value || '').replace(/[^a-zA-Z0-9!@#$%^&*_]/g, '')
@@ -84,7 +84,6 @@ const ALL_POSSIBLE_CHANNELS = [
   { id: 'tai-lieu', label: 'tài-liệu', icon: '📚', type: 'files' },
   { id: 'thanh-tich', label: 'thành-tích', icon: '🏆', type: 'info' },
   { id: 'ai-hoc-tap', label: 'AI-học-tập', icon: '🧠', type: 'chat' },
-  { id: 'phong-hoc-thoai', label: 'phòng-học-thoại', icon: '🔊', type: 'voice' },
 ]
 
 const DEFAULT_CHANNELS = DEFAULT_CHANNEL_IDS
@@ -741,11 +740,8 @@ useEffect(() => {
   setActiveChannelId(firstChannel?.id || 'thao-luan')
 }, [initialActiveGroupId, groups])
   const [activeChannelId, setActiveChannelId] = useState('thao-luan')
-  const [lastTextChannelId, setLastTextChannelId] = useState('thao-luan')
   const [textChannelsCollapsed, setTextChannelsCollapsed] = useState(false)
-  const [voiceChannelsCollapsed, setVoiceChannelsCollapsed] = useState(false)
   const [settingsTextChannelsCollapsed, setSettingsTextChannelsCollapsed] = useState(false)
-  const [settingsVoiceChannelsCollapsed, setSettingsVoiceChannelsCollapsed] = useState(false)
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const [search, setSearch] = useState('')
@@ -809,7 +805,6 @@ useEffect(() => {
   const [groupChannels, setGroupChannels] = useState({})
   // Channel management (inline inside settings now)
   const [newChannelName, setNewChannelName] = useState('')
-  const [newChannelType, setNewChannelType] = useState('chat')
   const [editingChannelId, setEditingChannelId] = useState(null)
   const [editingChannelLabel, setEditingChannelLabel] = useState('')
   // Message reactions: { [msgId]: { [userId]: emoji } }
@@ -1023,11 +1018,15 @@ useEffect(() => {
   const normalizeChannel = (raw) => {
     if (!raw) return null
     if (typeof raw === 'string') {
+      if (DEPRECATED_CHANNEL_IDS.has(raw)) return null
       const preset = ALL_POSSIBLE_CHANNELS.find((ch) => ch.id === raw)
       return preset ? { ...preset } : { id: raw, label: raw, icon: '#️⃣', type: 'chat' }
     }
     if (typeof raw === 'object') {
-      return { id: raw.id, label: raw.label || raw.id, icon: Object.prototype.hasOwnProperty.call(raw, 'icon') ? raw.icon : '#️⃣', type: raw.type || 'chat' }
+      if (!raw.id || DEPRECATED_CHANNEL_IDS.has(raw.id)) return null
+      const type = raw.type || 'chat'
+      if (!SUPPORTED_CHANNEL_TYPES.has(type)) return null
+      return { id: raw.id, label: raw.label || raw.id, icon: Object.prototype.hasOwnProperty.call(raw, 'icon') ? raw.icon : '#️⃣', type }
     }
     return null
   }
@@ -1041,12 +1040,18 @@ useEffect(() => {
   const DISCORD_CHANNELS = useMemo(() => {
     const raw = activeGroupId ? groupChannels[activeGroupId] : null
     const list = Array.isArray(raw) && raw.length ? raw : DEFAULT_CHANNELS
-    return list.map(normalizeChannel).filter(Boolean)
+    const normalizedChannels = list.map(normalizeChannel).filter(Boolean)
+    return normalizedChannels.length ? normalizedChannels : DEFAULT_CHANNELS
   }, [activeGroupId, groupChannels])
 
+  useEffect(() => {
+    if (!activeGroupId || !DISCORD_CHANNELS.length) return
+    if (DISCORD_CHANNELS.some((channel) => channel.id === activeChannelId)) return
+    setActiveChannelId(DISCORD_CHANNELS[0].id)
+  }, [activeGroupId, activeChannelId, DISCORD_CHANNELS])
+
   const activeChannel = DISCORD_CHANNELS.find((c) => c.id === activeChannelId) || DISCORD_CHANNELS[0]
-  const textChannels = DISCORD_CHANNELS.filter((channel) => channel.type !== 'voice')
-  const voiceChannels = DISCORD_CHANNELS.filter((channel) => channel.type === 'voice')
+  const textChannels = DISCORD_CHANNELS
   const activeGroupAdminIds = activeGroup?.adminIds || []
   const isActiveGroupOwner = Boolean(activeGroup && activeGroup.ownerId === currentUser?.uid)
   const isActiveGroupDeputy = Boolean(activeGroup && activeGroupAdminIds.includes(currentUser?.uid))
@@ -2114,19 +2119,21 @@ const handleLeaveGroup = async () => {
   const saveChannels = async (newChannels) => {
     if (!activeGroup?.id || !canManageActiveGroup) return false
 
-    const nextTextCount = Array.isArray(newChannels) ? newChannels.filter((channel) => channel?.type !== 'voice').length : 0
-    const nextVoiceCount = Array.isArray(newChannels) ? newChannels.filter((channel) => channel?.type === 'voice').length : 0
-    if (!Array.isArray(newChannels) || nextTextCount > MAX_TEXT_CHANNELS || nextVoiceCount > MAX_VOICE_CHANNELS) {
-      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản và ${MAX_VOICE_CHANNELS} kênh âm thanh`)
+    const safeChannels = Array.isArray(newChannels)
+      ? newChannels.map(normalizeChannel).filter(Boolean)
+      : []
+
+    if (!Array.isArray(newChannels) || safeChannels.length > MAX_TEXT_CHANNELS) {
+      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       return false
     }
 
     try {
       await updateDoc(doc(db, 'forumGroups', activeGroup.id), {
-        channels: newChannels,
+        channels: safeChannels,
         updatedAt: serverTimestamp(),
       })
-      setGroupChannels((prev) => ({ ...prev, [activeGroup.id]: newChannels }))
+      setGroupChannels((prev) => ({ ...prev, [activeGroup.id]: safeChannels }))
       return true
     } catch {
       toast.error('Không thể cập nhật kênh')
@@ -2142,10 +2149,8 @@ const handleLeaveGroup = async () => {
       return
     }
 
-    const currentTypeCount = newChannelType === 'voice' ? voiceChannels.length : textChannels.length
-    const currentTypeLimit = newChannelType === 'voice' ? MAX_VOICE_CHANNELS : MAX_TEXT_CHANNELS
-    if (currentTypeCount >= currentTypeLimit) {
-      toast.error(newChannelType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+    if (textChannels.length >= MAX_TEXT_CHANNELS) {
+      toast.error(`Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       return
     }
 
@@ -2158,23 +2163,19 @@ const handleLeaveGroup = async () => {
     }
 
     const id = slugifyChannelId(label)
-    const nextChannels = [...DISCORD_CHANNELS, { id, label, icon: newChannelType === 'voice' ? '🔊' : '#️⃣', type: newChannelType }]
+    const nextChannels = [...DISCORD_CHANNELS, { id, label, icon: '#️⃣', type: 'chat' }]
     const saved = await saveChannels(nextChannels)
     if (!saved) return
 
     setNewChannelName('')
-    setNewChannelType('chat')
-    toast.success(newChannelType === 'voice' ? 'Đã thêm kênh thoại' : 'Đã thêm kênh mới')
+    toast.success('Đã thêm kênh mới')
   }
 
   // Quick-add from a preset suggestion (still optional, not required)
   const addPresetChannel = async (preset) => {
     if (DISCORD_CHANNELS.some((ch) => ch.id === preset.id)) return
-    const presetType = preset?.type === 'voice' ? 'voice' : 'chat'
-    const currentTypeCount = presetType === 'voice' ? voiceChannels.length : textChannels.length
-    const currentTypeLimit = presetType === 'voice' ? MAX_VOICE_CHANNELS : MAX_TEXT_CHANNELS
-    if (currentTypeCount >= currentTypeLimit) {
-      toast.error(presetType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+    if (textChannels.length >= MAX_TEXT_CHANNELS) {
+      toast.error(`Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       return
     }
 
@@ -2366,8 +2367,8 @@ const handleLeaveGroup = async () => {
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 dark:bg-slate-950">
-          <section className="relative overflow-hidden border-b border-blue-200 bg-white px-4 py-5 text-slate-950 shadow-[0_18px_50px_rgba(37,99,235,0.12)] dark:border-blue-400/15 dark:bg-[#061126] dark:text-white dark:shadow-[0_18px_50px_rgba(2,6,23,0.28)] sm:px-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50 pb-28 dark:bg-slate-950 lg:pb-0">
+          <section className="relative min-h-[210px] overflow-hidden border-b border-blue-200 bg-white px-4 py-7 text-slate-950 shadow-[0_18px_50px_rgba(37,99,235,0.12)] dark:border-blue-400/15 dark:bg-[#061126] dark:text-white dark:shadow-[0_18px_50px_rgba(2,6,23,0.28)] sm:min-h-[220px] sm:px-6 sm:py-8">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.055)_1px,transparent_1px)] bg-[size:26px_26px]" />
             <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-cyan-400/10 blur-3xl" />
@@ -2375,7 +2376,7 @@ const handleLeaveGroup = async () => {
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300"><span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />Không gian nhóm học</div>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">Học cùng nhau, kết nối hiệu quả</h2>
+                  <h2 className="mt-0 text-2xl font-black tracking-tight sm:text-3xl">Học cùng nhau, kết nối hiệu quả</h2>
                   <p className="mt-1 max-w-2xl text-sm font-semibold text-slate-500 dark:text-blue-100/55">Tìm nhóm phù hợp, nhập mã mời hoặc tạo không gian học tập riêng của bạn.</p>
                 </div>
                 <button type="button" onClick={onCreate} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_28px_rgba(37,99,235,0.42)] transition hover:-translate-y-0.5 hover:brightness-110"><Plus className="h-4 w-4" />Tạo nhóm mới</button>
@@ -2619,8 +2620,7 @@ const handleLeaveGroup = async () => {
   }
 
   const channelDescription =
-    activeChannel?.type === 'voice' ? 'Trò chuyện trực tiếp với các thành viên bằng microphone.'
-    : activeChannel?.type === 'chat' ? 'Đặt câu hỏi, trao đổi bài tập và cùng nhau giải quyết vấn đề học tập.'
+    activeChannel?.type === 'chat' ? 'Đặt câu hỏi, trao đổi bài tập và cùng nhau giải quyết vấn đề học tập.'
     : activeChannel?.type === 'files' ? 'Chia sẻ tài liệu, link học tập, đề ôn thi và ghi chú quan trọng.'
     : activeChannel?.type === 'announce' ? 'Nơi đăng thông báo quan trọng để mọi thành viên không bỏ lỡ.'
     : 'Thông tin nền tảng giúp nhóm học hoạt động rõ ràng và có tổ chức.'
@@ -2629,27 +2629,13 @@ const handleLeaveGroup = async () => {
 
   const openChannel = (channel) => {
     if (!channel) return
-    if (channel.type !== 'voice') setLastTextChannelId(channel.id)
     setActiveChannelId(channel.id)
-  }
-
-  const returnFromVoiceChannel = () => {
-    const fallback = textChannels.find((channel) => channel.id === lastTextChannelId) || textChannels[0]
-    if (fallback) setActiveChannelId(fallback.id)
-  }
-
-  if (activeChannel?.type === 'voice') {
-    return (
-      <div className="fixed inset-0 z-[85] min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
-        <VoiceChannelRoom groupId={activeGroup.id} channel={activeChannel} currentUser={currentUser} displayName={displayName} initials={initials} avatarUrl={avatarUrl} onBack={returnFromVoiceChannel} />
-      </div>
-    )
   }
 
   return (
     <div className="relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-1 overflow-hidden bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-white">
       {/* Group avatar sidebar */}
-      <div className="hidden w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-slate-200 bg-white py-3 dark:border-white/10 dark:bg-slate-950 sm:flex">
+      <div className="hidden w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-slate-200 bg-white py-3 dark:border-white/10 dark:bg-slate-950 lg:flex">
         <button type="button" title="Khám phá nhóm" onClick={() => { setGroupMenuOpen(false); setGroupSettingsOpen(false); setActiveGroupId(null); setActiveChannelId('thao-luan') }} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-xl text-white shadow-lg transition hover:rounded-[14px]">🌍</button>
         <div className="my-1 h-px w-8 bg-slate-200 dark:bg-white/15" />
         {orderedJoinedGroups.map((g, i) => {
@@ -2688,12 +2674,12 @@ const handleLeaveGroup = async () => {
           type="button"
           aria-label="Đóng danh sách kênh"
           onClick={() => setMobileChannelSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm lg:hidden"
         />
       )}
 
       {/* Channel sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,350px)] shrink-0 flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 dark:border-white/10 dark:bg-slate-900 md:static md:z-auto md:w-[320px] md:translate-x-0 md:shadow-none xl:w-[350px] ${mobileChannelSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,350px)] shrink-0 flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 dark:border-white/10 dark:bg-slate-900 lg:static lg:z-auto lg:w-[320px] lg:translate-x-0 lg:shadow-none xl:w-[350px] ${mobileChannelSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
           <div className="relative flex h-[88px] items-center gap-3 px-4">
             <div className="text-3xl">{activeGroup.emoji || '🏆'}</div>
@@ -2771,7 +2757,7 @@ const handleLeaveGroup = async () => {
                     const docId = `${activeGroupId}_${ch.id}`
                     const unread = unreadCounts[docId] || 0
                     return (
-                      <button key={ch.id} type="button" onClick={() => { setLastTextChannelId(ch.id); setActiveChannelId(ch.id); setMobileChannelSidebarOpen(false) }} className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 pr-10 text-lg transition ${activeChannelId === ch.id ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}>
+                      <button key={ch.id} type="button" onClick={() => { setActiveChannelId(ch.id); setMobileChannelSidebarOpen(false) }} className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 pr-10 text-lg transition ${activeChannelId === ch.id ? 'bg-blue-50 text-blue-700 dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}>
                         {ch.icon ? <span className="text-xl">{ch.icon}</span> : null}
                         <span className="text-lg font-black text-slate-400 dark:text-slate-500">#</span>
                         <span className="truncate font-black">{ch.label}</span>
@@ -2783,24 +2769,6 @@ const handleLeaveGroup = async () => {
               )}
             </div>
 
-            <div>
-              <button type="button" onClick={() => setVoiceChannelsCollapsed((value) => !value)} className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-black uppercase tracking-[0.14em] text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-200">
-                <span className="flex items-center gap-2"><span>🔊</span>Kênh âm thanh <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] dark:bg-white/10">{voiceChannels.length}</span></span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${voiceChannelsCollapsed ? '-rotate-90' : ''}`} />
-              </button>
-              {!voiceChannelsCollapsed && (
-                <div className="mt-1 space-y-1">
-                  {voiceChannels.map((ch) => (
-                    <button key={ch.id} type="button" onClick={() => { setActiveChannelId(ch.id); setMobileChannelSidebarOpen(false) }} className={`relative flex w-full items-center gap-3 rounded-xl px-4 py-3 text-lg transition ${activeChannelId === ch.id ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'}`}>
-                      {ch.icon ? <span className="text-xl">{ch.icon}</span> : null}
-                      <span className="text-lg">🔊</span>
-                      <span className="truncate font-black">{ch.label}</span>
-                    </button>
-                  ))}
-                  {voiceChannels.length === 0 && <p className="px-4 py-2 text-xs font-bold text-slate-400">Chưa có kênh âm thanh.</p>}
-                </div>
-              )}
-            </div>
           </div>
 
           {canManageActiveGroup && (
@@ -2838,13 +2806,13 @@ const handleLeaveGroup = async () => {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950">
         {/* Channel header */}
         <div className="flex h-[64px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-slate-950 sm:h-[72px] sm:gap-4 sm:px-5 lg:px-6">
-          <button type="button" onClick={() => setMobileChannelSidebarOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-blue-50 hover:text-blue-600 dark:bg-white/10 dark:text-slate-200 md:hidden" aria-label="Mở danh sách kênh"><Menu className="h-5 w-5" /></button>
+          <button type="button" onClick={() => setMobileChannelSidebarOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-blue-50 hover:text-blue-600 dark:bg-white/10 dark:text-slate-200 lg:hidden" aria-label="Mở danh sách kênh"><Menu className="h-5 w-5" /></button>
           <span className="hidden text-xl sm:inline sm:text-2xl">{activeChannel?.icon}</span>
-          <span className="text-xl font-black text-slate-400 dark:text-slate-500 sm:text-2xl">{activeChannel?.type === 'voice' ? '🔊' : '#'}</span>
+          <span className="text-xl font-black text-slate-400 dark:text-slate-500 sm:text-2xl">#</span>
           <h2 className="min-w-0 truncate text-base font-black text-slate-950 dark:text-white sm:text-xl lg:text-2xl">{activeChannel?.label}</h2>
           <div className="hidden h-8 w-px bg-slate-200 dark:bg-white/10 md:block" />
           <p className="hidden min-w-0 truncate text-sm font-semibold text-slate-400 dark:text-slate-400 md:block">
-            {activeChannel?.type === 'voice' ? 'Trò chuyện trực tiếp bằng microphone' : activeChannel?.type === 'chat' ? 'Nơi trò chuyện và đặt câu hỏi' : activeChannel?.type === 'files' ? 'Chia sẻ tài liệu học tập' : 'Thông tin quan trọng của nhóm'}
+            {activeChannel?.type === 'chat' ? 'Nơi trò chuyện và đặt câu hỏi' : activeChannel?.type === 'files' ? 'Chia sẻ tài liệu học tập' : 'Thông tin quan trọng của nhóm'}
           </p>
           <div className="ml-auto flex shrink-0 items-center gap-2 text-slate-400 dark:text-slate-400 sm:gap-3">
             <span className="hidden items-center gap-2 text-lg font-semibold xl:flex">
@@ -2859,8 +2827,37 @@ const handleLeaveGroup = async () => {
             </button>
             {/* Member list button */}
             <button type="button" title="Danh sách thành viên" onClick={() => setShowMemberList(true)} className="transition hover:text-slate-900 dark:hover:text-white"><Users className="h-5 w-5 sm:h-6 sm:w-6" /></button>
+            {/* Mobile: return to group lobby without leaving the group */}
+            <button
+              type="button"
+              title="Ra ngoài"
+              aria-label="Ra ngoài"
+              onClick={() => {
+                setGroupMenuOpen(false)
+                setGroupSettingsOpen(false)
+                setMobileChannelSidebarOpen(false)
+                setActiveGroupId(null)
+                setActiveChannelId('thao-luan')
+              }}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-300 bg-white text-slate-600 shadow-sm transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 dark:border-white/20 dark:bg-white/5 dark:text-slate-200 dark:hover:border-blue-400/60 dark:hover:bg-blue-500/10 dark:hover:text-blue-200 md:hidden"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
             <button type="button" title="Cảnh báo / báo cáo nhóm" onClick={() => openGroupReportModal(activeGroup)} className="transition hover:text-amber-600 dark:hover:text-amber-300"><Flag className="hidden h-5 w-5 sm:block sm:h-6 sm:w-6" /></button>
             <button type="button" title="Cài đặt nhóm" onClick={() => { setGroupSettingsTab('overview'); setGroupSettingsOpen(true) }} className="transition hover:text-slate-900 dark:hover:text-white"><Settings className="hidden h-5 w-5 sm:block sm:h-6 sm:w-6" /></button>
+            <button type="button" title="Quay lại danh sách nhóm học"
+  aria-label="Quay lại danh sách nhóm học"
+  onClick={() => {
+    setGroupMenuOpen(false)
+    setGroupSettingsOpen(false)
+    setMobileChannelSidebarOpen(false)
+    setActiveGroupId(null)
+    setActiveChannelId('thao-luan')
+  }}
+  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-blue-400/50 hover:bg-blue-500/10 hover:text-blue-400 lg:hidden"
+>
+  <ChevronLeft className="h-4 w-4" />
+</button>
           </div>
         </div>
 
@@ -3435,11 +3432,10 @@ const handleLeaveGroup = async () => {
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h4 className="text-2xl font-black text-slate-950 dark:text-white">Quản lý kênh</h4>
-                        <p className="mt-1 text-sm font-bold text-slate-400">Kênh văn bản và kênh âm thanh được quản lý độc lập.</p>
+                        <p className="mt-1 text-sm font-bold text-slate-400">Quản lý các kênh văn bản của nhóm.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <span className={`rounded-full px-3 py-1 text-xs font-black ${textChannels.length >= MAX_TEXT_CHANNELS ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-200' : 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-200'}`}># {textChannels.length}/{MAX_TEXT_CHANNELS}</span>
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ${voiceChannels.length >= MAX_VOICE_CHANNELS ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-200' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-200'}`}>🔊 {voiceChannels.length}/{MAX_VOICE_CHANNELS}</span>
                       </div>
                     </div>
 
@@ -3447,17 +3443,13 @@ const handleLeaveGroup = async () => {
                       {canManageActiveGroup && (
                         <div className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950/40">
                           <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Thêm kênh tùy chỉnh</p>
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <button type="button" onClick={() => setNewChannelType('chat')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${newChannelType === 'chat' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}># Kênh văn bản</button>
-                            <button type="button" onClick={() => setNewChannelType('voice')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${newChannelType === 'voice' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}>🔊 Kênh âm thanh</button>
-                          </div>
                           <div className="mt-3 flex items-center gap-2">
-                            <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomChannel() } }} placeholder={newChannelType === 'voice' ? 'Tên kênh âm thanh...' : 'Tên kênh văn bản...'} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
-                            <button type="button" onClick={addCustomChannel} className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition ${newChannelType === 'voice' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}><Plus className="h-4 w-4" />Thêm</button>
+                            <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomChannel() } }} placeholder="Tên kênh văn bản..." className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400 dark:border-white/10 dark:bg-slate-950/40 dark:text-white dark:placeholder:text-slate-500" />
+                            <button type="button" onClick={addCustomChannel} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700"><Plus className="h-4 w-4" />Thêm</button>
                           </div>
-                          {availablePresetChannels.filter((preset) => newChannelType === 'voice' ? preset.type === 'voice' : preset.type !== 'voice').length > 0 && (
+                          {availablePresetChannels.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
-                              {availablePresetChannels.filter((preset) => newChannelType === 'voice' ? preset.type === 'voice' : preset.type !== 'voice').map((preset) => (
+                              {availablePresetChannels.map((preset) => (
                                 <button key={preset.id} type="button" onClick={() => addPresetChannel(preset)} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300"><span>{preset.icon}</span>{preset.label}</button>
                               ))}
                             </div>
@@ -3468,7 +3460,6 @@ const handleLeaveGroup = async () => {
                       <div className="mt-5 space-y-4">
                         {[
                           { key: 'text', label: 'Kênh văn bản', icon: '#', channels: textChannels, collapsed: settingsTextChannelsCollapsed, toggle: () => setSettingsTextChannelsCollapsed((value) => !value) },
-                          { key: 'voice', label: 'Kênh âm thanh', icon: '🔊', channels: voiceChannels, collapsed: settingsVoiceChannelsCollapsed, toggle: () => setSettingsVoiceChannelsCollapsed((value) => !value) },
                         ].map((section) => (
                           <div key={section.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
                             <button type="button" onClick={section.toggle} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-white/5">
@@ -3480,7 +3471,7 @@ const handleLeaveGroup = async () => {
                                 {section.channels.map((ch) => (
                                   <div key={ch.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
                                     {ch.icon ? <span className="text-xl">{ch.icon}</span> : null}
-                                    <span className="text-sm font-black text-slate-400 dark:text-slate-500">{ch.type === 'voice' ? 'VOICE' : '#'}</span>
+                                    <span className="text-sm font-black text-slate-400 dark:text-slate-500">#</span>
                                     {editingChannelId === ch.id ? (
                                       <input autoFocus value={editingChannelLabel} onChange={(e) => setEditingChannelLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commitRenameChannel(); if (e.key === 'Escape') setEditingChannelId(null) }} className="min-w-0 flex-1 rounded-xl border border-blue-300 bg-blue-50/50 px-3 py-1.5 text-sm font-black text-slate-900 outline-none dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-white" />
                                     ) : (
@@ -3746,7 +3737,7 @@ const handleLeaveGroup = async () => {
                         <div className="mt-3 space-y-2">
                           {DISCORD_CHANNELS.slice(0, 5).map((channel) => (
                             <div key={channel.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 dark:bg-white/5 dark:text-slate-300">
-                              <span>{channel.type === 'voice' ? '🔊' : '#'}</span>
+                              <span>#</span>
                               <span className="truncate">{channel.label}</span>
                             </div>
                           ))}
@@ -3774,7 +3765,7 @@ const handleLeaveGroup = async () => {
               <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">Rời khỏi {activeGroup.name || 'nhóm học'}?</h3>
             </div>
             <div className="p-6">
-              <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">Bạn sẽ không còn truy cập kênh chat, kênh âm thanh và thông báo của nhóm này. Bạn có chắc chắn muốn tiếp tục?</p>
+              <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">Bạn sẽ không còn truy cập kênh chat và thông báo của nhóm này. Bạn có chắc chắn muốn tiếp tục?</p>
               <div className="mt-6 flex justify-end gap-3">
                 <button type="button" onClick={() => setLeaveGroupConfirm(false)} className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15">Hủy</button>
                 <button type="button" onClick={async () => { setLeaveGroupConfirm(false); await handleLeaveGroup() }} className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white transition hover:bg-rose-700">Rời nhóm</button>

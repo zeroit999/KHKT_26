@@ -720,6 +720,7 @@ function Forum({ onChannelViewChange = () => {} }) {
   const [groupOpen, setGroupOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [groupChannelOpen, setGroupChannelOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [confirmModal, setConfirmModal] = useState(null)
   const [shareModal, setShareModal] = useState(null)
@@ -2611,7 +2612,22 @@ setCreatedGroupPopup({
   groupReports={groupReports}
   onReportGroup={submitGroupReport}
   onAdminJoinReportedGroup={adminJoinReportedGroup}
-  onChannelViewChange={onChannelViewChange}
+  onChannelViewChange={(open) => {
+    setGroupChannelOpen(open)
+    onChannelViewChange(open)
+
+    if (typeof window !== 'undefined') {
+      const mobileChannelOpen = Boolean(
+        open && window.matchMedia('(max-width: 1023px)').matches,
+      )
+
+      window.dispatchEvent(
+        new CustomEvent('zuny:forum-channel-view', {
+          detail: { open: mobileChannelOpen },
+        }),
+      )
+    }
+  }}
 />
               ) : (
 <section className="min-h-full min-w-0 flex-1 overflow-visible pb-24 lg:pb-8">            
@@ -2793,7 +2809,9 @@ setCreatedGroupPopup({
         </div>
         </div>
 
-        <MobileNav activeSection={activeSection} unreadNotificationsCount={unreadNotificationsCount} onChange={(section) => { setActiveSection(section); setFilter('all') }} onCompose={openComposer} />
+        {!groupChannelOpen && (
+          <MobileNav activeSection={activeSection} unreadNotificationsCount={unreadNotificationsCount} onChange={(section) => { setActiveSection(section); setFilter('all') }} onCompose={openComposer} />
+        )}
       </main>
 
       <UserProfilePopup
@@ -2933,7 +2951,7 @@ function Sidebar({
 
   const content = (
     <aside
-      className={`flex h-full max-h-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-4 shadow-xl shadow-slate-200/60 transition-all duration-300 dark:border-blue-950/80 dark:bg-[#030b1d] dark:shadow-black/30 ${
+      className={`flex h-full max-h-full shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 pb-4 pt-1 shadow-xl shadow-slate-200/60 transition-all duration-300 dark:border-blue-950/80 dark:bg-[#030b1d] dark:shadow-black/30 ${
         collapsed ? 'w-24' : 'w-72'
       }`}
     >
@@ -3010,7 +3028,7 @@ function Sidebar({
 
   return (
     <>
-      <div className="fixed left-0 top-[80px] z-40 hidden h-[calc(100vh-80px)] lg:block">{content}</div>
+      <div className="fixed left-0 top-[4%] z-40 hidden h-[calc(100vh-80px)] lg:block">{content}</div>
       {mobileOpen && <div className="fixed inset-0 z-[80] bg-slate-950/60 backdrop-blur-sm lg:hidden" onMouseDown={onClose}><div className="h-full" onMouseDown={(event) => event.stopPropagation()}>{content}</div></div>}
     </>
   )
@@ -3099,7 +3117,7 @@ function AccountHero({ displayName, avatarUrl, initials, accountTab, onChange, m
       <div className="absolute inset-0 bg-[linear-gradient(rgba(37,99,235,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.09)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <ProfileAvatar src={avatarUrl} initials={initials} className="h-16 w-16 rounded-2xl ring-1 ring-cyan-300/30" />
+          <ProfileAvatar src={avatarUrl} initials={initials} className="h-20 w-16 rounded-2xl ring-1 ring-cyan-300/30" />
           <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Trung tâm tài khoản</p><h2 className="mt-1 truncate text-2xl font-black">{displayName}</h2><p className="mt-1 text-xs font-semibold text-slate-500 dark:text-blue-100/55">Quản lý nội dung, mục đã lưu và thông báo tại một nơi.</p></div>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -4497,7 +4515,6 @@ function UserProfilePopup({ user, onClose, onOpenLibrary, onOpenLeaderboard }) {
         </div>
         <div className="mt-6 grid gap-3">
           <button type="button" onClick={() => onOpenLibrary(user.uid)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">Tài khoản trong Thư viện</button>
-          <button type="button" onClick={() => onOpenLeaderboard(user.uid)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-cyan-500/10">Vị trí trong Bảng xếp hạng</button>
         </div>
       </div>
     </div>

@@ -28,6 +28,8 @@ function CourseDetail() {
   const [currentUser, setCurrentUser] = useState(null)
   const [currentRole, setCurrentRole] = useState('STUDENT')
   const [userProfile, setUserProfile] = useState(null)
+  const [userClassMemberships, setUserClassMemberships] = useState([])
+  const [userClassMembershipsLoading, setUserClassMembershipsLoading] = useState(false)
   const [courseTeacherProfile, setCourseTeacherProfile] = useState(null)
   const [course, setCourse] = useState(null)
   const [realCourseId, setRealCourseId] = useState(courseId)
@@ -165,8 +167,11 @@ function CourseDetail() {
       if (!user) {
         setCurrentRole('STUDENT')
         setUserProfile(null)
+        setUserClassMemberships([])
+        setUserClassMembershipsLoading(false)
         return
       }
+      setUserClassMembershipsLoading(true)
       try {
         const userSnap = await getDoc(doc(db, 'users', user.uid))
         if (userSnap.exists()) {
@@ -185,6 +190,31 @@ function CourseDetail() {
     })
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setUserClassMemberships([])
+      setUserClassMembershipsLoading(false)
+      return undefined
+    }
+
+    setUserClassMembershipsLoading(true)
+    const membershipQuery = query(collection(db, 'classes'), where('memberIds', 'array-contains', currentUser.uid))
+    const unsubscribe = onSnapshot(
+      membershipQuery,
+      (snapshot) => {
+        setUserClassMemberships(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
+        setUserClassMembershipsLoading(false)
+      },
+      (error) => {
+        console.warn('Không thể đồng bộ lớp để kiểm tra quyền xem E-learning:', error)
+        setUserClassMemberships([])
+        setUserClassMembershipsLoading(false)
+      },
+    )
+
+    return () => unsubscribe()
+  }, [currentUser?.uid])
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -737,13 +767,32 @@ function CourseDetail() {
   const moderationStatus = String(course.status || course.moderationStatus || 'approved').toLowerCase()
   const deletedCourse = moderationStatus === 'deleted'
   const isTeacherOrAdmin = isTeacherRole(currentRole)
-  const deniedByModeration = moderationStatus !== 'approved' && !isTeacherOrAdmin && !isCourseOwner
   const canBypassAccessGate = isTeacherOrAdmin || isCourseOwner
   const locked = !canBypassAccessGate && isCourseLocked(course)
-  const deniedByPrivateClass = false
+  const visibility = String(course.visibility || 'public').toLowerCase()
+  const normalizedMembershipNames = new Set(userClassMemberships.map((item) => String(item.name || item.className || item.title || '').trim().toLowerCase()).filter(Boolean))
+  const membershipIds = new Set(userClassMemberships.map((item) => String(item.id || '')).filter(Boolean))
+  const membershipGrades = new Set()
+  const addMembershipGrade = (value) => {
+    const match = String(value || '').match(/(?:^|\D)(10|11|12)(?:\D|$)/)
+    if (match) membershipGrades.add(match[1])
+  }
+  userClassMemberships.forEach((item) => { addMembershipGrade(item.grade); addMembershipGrade(item.name); addMembershipGrade(item.className) })
+  addMembershipGrade(getUserClassName(userProfile))
+  const targetClassName = String(course.className || '').trim().toLowerCase()
+  const targetClassId = String(course.classId || '')
+  const allowedByClass = visibility !== 'class' || Boolean((targetClassId && membershipIds.has(targetClassId)) || (targetClassName && normalizedMembershipNames.has(targetClassName)))
+  const allowedByGrade = visibility !== 'private' || Boolean(targetClassName && membershipGrades.has(targetClassName))
+  const canStudentOpenPendingClassPost = visibility === 'class' && allowedByClass && moderationStatus === 'pending'
+  const deniedByModeration = moderationStatus !== 'approved' && !canStudentOpenPendingClassPost && !isTeacherOrAdmin && !isCourseOwner
+  const deniedByPrivateClass = !canBypassAccessGate && !userClassMembershipsLoading && (!allowedByClass || !allowedByGrade)
 
   if (deletedCourse) {
     return <CourseGateState icon="🗑️" title="Bài học đã bị xóa" description="Nội dung này không còn được hiển thị trong thư viện." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
+  }
+
+  if (!canBypassAccessGate && userClassMembershipsLoading && ['class', 'private'].includes(visibility)) {
+    return <CourseGateState icon="⌛" title="Đang kiểm tra quyền truy cập" description="ZUNY đang đồng bộ lớp học của bạn từ Firebase." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} />
   }
 
   if (deniedByModeration) {
@@ -751,7 +800,8 @@ function CourseDetail() {
   }
 
   if (deniedByPrivateClass) {
-    return <CourseGateState icon="🚫" title="Bạn không thuộc lớp được xem bài này" description={`Bài học này chỉ dành cho lớp ${course.className || 'được giáo viên chỉ định'}.`} onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
+    const audienceLabel = visibility === 'private' ? `khối ${course.className || 'được giáo viên chỉ định'}` : `lớp ${course.className || 'được giáo viên chỉ định'}`
+    return <CourseGateState icon="🚫" title={visibility === 'private' ? 'Bạn không thuộc khối được xem bài này' : 'Bạn không thuộc lớp được xem bài này'} description={`Bài học này chỉ dành cho ${audienceLabel}.`} onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
   }
 
   if (locked) {

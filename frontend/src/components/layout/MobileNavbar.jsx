@@ -72,7 +72,7 @@ export default function MobileNavbar({
       return {
         label: 'Lớp học',
         shortLabel: 'Lớp học',
-        path: '/classes',
+        path: '/LearningPage',
         icon: GraduationCap,
       }
     }

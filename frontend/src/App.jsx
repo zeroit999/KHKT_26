@@ -56,10 +56,16 @@ function applyDarkModeToDocument(isDark) {
   document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 
   const favicon = document.getElementById('favicon');
-
   if (favicon) {
     favicon.setAttribute('href', isDark ? '/dark-mode.png' : '/light-mode.png');
   }
+}
+
+function normalizeAppRole(role) {
+  return String(role || '')
+    .trim()
+    .replace(/[\s_-]/g, '')
+    .toUpperCase();
 }
 
 function ScrollToTop() {
@@ -76,17 +82,23 @@ function ScrollToTop() {
 }
 
 function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <LoadingSkeleton />
-    </div>
-  );
+  return <LoadingSkeleton />;
 }
 
 function RouteAwareChatbot() {
   const { pathname } = useLocation();
+  const [forumChannelOpen, setForumChannelOpen] = useState(false);
 
-  if (pathname.toLowerCase() === '/setup') {
+  useEffect(() => {
+    const handleForumChannelView = (event) => {
+      setForumChannelOpen(Boolean(event?.detail?.open));
+    };
+
+    window.addEventListener('zuny:forum-channel-view', handleForumChannelView);
+    return () => window.removeEventListener('zuny:forum-channel-view', handleForumChannelView);
+  }, []);
+
+  if (pathname.toLowerCase() === '/setup' || (pathname.toLowerCase() === '/forum' && forumChannelOpen)) {
     return null;
   }
 
@@ -98,6 +110,33 @@ function ProtectedRoute({ children }) {
 
   if (isLoading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
+
+  return children;
+}
+
+function TeacherRoute({ children }) {
+  const { user, userDetails, isLoading } = useAuth();
+
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
+
+  const normalizedRole = normalizeAppRole(userDetails?.role);
+  const allowed = normalizedRole === 'TEACHER' || normalizedRole === 'ADMINDEV';
+
+  if (!allowed) return <Navigate to="/" replace />;
+
+  return children;
+}
+
+function AdminDevRoute({ children }) {
+  const { user, userDetails, isLoading } = useAuth();
+
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
+
+  const allowed = normalizeAppRole(userDetails?.role) === 'ADMINDEV';
+
+  if (!allowed) return <Navigate to="/" replace />;
 
   return children;
 }
@@ -130,7 +169,6 @@ function ProfileRoute() {
 
 function LegacyCourseDetailRedirect() {
   const { id } = useParams();
-
   return <Navigate to={`/e-learning/${id}`} replace />;
 }
 
@@ -147,10 +185,6 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   useEffect(() => {
     if (!isForumRoute) setIsForumChannelOpen(false);
   }, [isForumRoute]);
-
-  const isExamsRoute = location.pathname.toLowerCase() === '/exams';
-
-  const isProfileRoute = location.pathname.toLowerCase() === '/profile';
 
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
@@ -175,22 +209,10 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
-            initial={{
-              opacity: 0,
-              y: 16,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            exit={{
-              opacity: 0,
-              y: -12,
-            }}
-            transition={{
-              duration: 0.28,
-              ease: 'easeOut',
-            }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
           >
             <Routes location={location}>
               <Route
@@ -236,13 +258,9 @@ function AppContent({ darkMode, onToggleDarkMode }) {
       <AppLayout
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
-        mainClassName={isForumRoute || isProfileRoute ? 'pt-0' : 'pt-20'}
-        showFooter={!isForumRoute && !isExamsRoute && !isProfileRoute}
-        showNavbar={!isForumRoute}
-        lockPageScroll={isForumRoute || isProfileRoute}
         mainClassName={
           isForumRoute
-            ? (isForumChannelOpen ? 'h-screen pt-0' : 'min-h-[calc(100vh-80px)] pt-0')
+            ? (isForumChannelOpen ? 'h-screen pt-0' : 'min-h-[calc(100vh-80px)] pt-10')
             : (isELearningDetailRoute ? 'pt-0' : 'pt-20')
         }
         showFooter={!isForumRoute && !isELearningLibraryRoute && !isELearningDetailRoute}
@@ -252,30 +270,16 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
-            initial={{
-              opacity: 0,
-              y: 16,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            exit={{
-              opacity: 0,
-              y: -12,
-            }}
-            transition={{
-              duration: 0.28,
-              ease: 'easeOut',
-            }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
           >
             <Routes location={location}>
               <Route path="/" element={<Home />} />
-
               <Route path="/home" element={<Navigate to="/" replace />} />
 
               <Route path="/login" element={<Login />} />
-
               <Route path="/register" element={<Register />} />
 
               <Route
@@ -304,6 +308,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                   </ProtectedRoute>
                 }
               />
+
 
               <Route
                 path="/courses"
@@ -393,9 +398,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
     const initialDarkMode = getInitialDarkMode();
-
     applyDarkModeToDocument(initialDarkMode);
-
     return initialDarkMode;
   });
 
@@ -405,7 +408,6 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('darkMode', String(darkMode));
-
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
@@ -415,15 +417,11 @@ function App() {
 
       style: {
         border: '1px solid rgba(34, 211, 238, 0.28)',
-
         background: darkMode
           ? 'rgba(6, 12, 30, 0.92)'
           : 'rgba(255, 255, 255, 0.95)',
-
         color: darkMode ? '#e5faff' : '#0f172a',
-
         boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
-
         backdropFilter: 'blur(18px)',
       },
 
@@ -443,6 +441,20 @@ function App() {
     }),
     [darkMode]
   );
+
+  const [showInitialLoading, setShowInitialLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowInitialLoading(false);
+    }, 2500);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (showInitialLoading) {
+    return <LoadingSkeleton />;
+  }
 
   return (
     <AuthProvider>

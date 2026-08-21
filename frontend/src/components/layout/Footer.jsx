@@ -15,7 +15,7 @@ import lightLogo from '../../assets/favicon-light-mode.png'
 const quickLinks = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Kho đề thi', href: '/exams' },
-  { label: 'Thư viện', href: '/courses' },
+  { label: 'E-learning', href: '/courses' },
   { label: 'Cộng đồng', href: '/Forum' },
 ]
 
@@ -108,12 +108,12 @@ function Footer({ darkMode }) {
 
             <p className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-cyan-500" />
-              zero169209@gmail.com
+              zero169209@gmail.com / namvnups@gmail.com
             </p>
 
             <p className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-cyan-500" />
-              0938 213 826
+              0938 213 826 / 0936 273 869
             </p>
 
             <p className="flex items-center gap-2">

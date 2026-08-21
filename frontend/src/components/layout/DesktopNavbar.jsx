@@ -71,7 +71,7 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
       return {
         label: 'Lớp học',
         shortLabel: 'Lớp học',
-        path: '/classes',
+        path: '/LearningPage',
         icon: GraduationCap,
       };
     }

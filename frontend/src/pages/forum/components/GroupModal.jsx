@@ -20,7 +20,6 @@ import {
 
 const DRAFT_KEY = 'zuny_group_modal_draft'
 const MAX_TEXT_CHANNELS = 10
-const MAX_VOICE_CHANNELS = 10
 
 const GROUP_COVER_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
@@ -189,7 +188,7 @@ function ChannelSortRow({ channel, idx, dragOverIdx, handleDragStart, handleDrag
     >
       <GripVertical className="h-4 w-4 shrink-0 text-slate-500" />
       {channel.icon ? <span className="text-base">{channel.icon}</span> : null}
-      <span className="flex-1 text-sm font-black text-white">{channel.type === 'voice' ? '🔊' : '#'} {channel.label}</span>
+      <span className="flex-1 text-sm font-black text-white"># {channel.label}</span>
       <button type="button" onClick={onRemove} className="rounded-lg p-1 text-slate-500 transition hover:bg-white/10 hover:text-rose-300" aria-label={`Xóa kênh ${channel.label}`}><X className="h-4 w-4" /></button>
     </div>
   )
@@ -229,7 +228,6 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     { id: 'meo-hoc', label: 'mẹo-học', icon: '💡', type: 'chat' },
     { id: 'thanh-tich', label: 'thành-tích', icon: '🏆', type: 'info' },
     { id: 'noi-quy', label: 'nội-quy', icon: '📌', type: 'info' },
-    { id: 'phong-hoc-thoai', label: 'phòng-học-thoại', icon: '🔊', type: 'voice' },
   ]
 
   const defaultChannelIds = ['thong-bao', 'thao-luan']
@@ -241,6 +239,19 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     { value: '30d', label: '30 ngày' },
     { value: 'unlimited', label: 'Không giới hạn' },
   ]
+
+  const sanitizeCustomChannels = (channels = []) =>
+    (Array.isArray(channels) ? channels : [])
+      .filter((channel) => channel?.id && (!channel.type || channel.type === 'chat'))
+      .map((channel) => ({ ...channel, type: 'chat' }))
+
+  const sanitizeChannelIds = (channelIds = [], customChannels = []) => {
+    const allowedChannelIds = new Set([
+      ...channelOptions.map((channel) => channel.id),
+      ...customChannels.map((channel) => channel.id),
+    ])
+    return (Array.isArray(channelIds) ? channelIds : []).filter((id) => allowedChannelIds.has(id))
+  }
 
   const existingGroupCodes = useMemo(
     () => new Set((existingGroups || []).map((group) => normalizeGroupCode(group.groupCode)).filter(Boolean)),
@@ -311,8 +322,6 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   const [customChannelIcon, setCustomChannelIcon] = useState('')
   const [customChannelIconOpen, setCustomChannelIconOpen] = useState(false)
   const [textChannelListCollapsed, setTextChannelListCollapsed] = useState(false)
-  const [voiceChannelListCollapsed, setVoiceChannelListCollapsed] = useState(false)
-  const [customChannelType, setCustomChannelType] = useState('chat')
   const dragIdxRef = useRef(null)
   const coverImageInputRef = useRef(null)
   const [coverImageUploading, setCoverImageUploading] = useState(false)
@@ -332,9 +341,12 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
       if (raw) {
         const draft = JSON.parse(raw)
         // regenerate unique codes in case they conflict now
+        const safeCustomChannels = sanitizeCustomChannels(draft.customChannels)
         setForm({
           ...initialForm(),
           ...draft,
+          channelIds: sanitizeChannelIds(draft.channelIds, safeCustomChannels),
+          customChannels: safeCustomChannels,
           groupCode: generateUniqueGroupCode(),
           inviteCode: generateUniqueInviteCode(),
         })
@@ -350,7 +362,13 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   useEffect(() => {
     if (!open) return
     try {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(form))
+      const safeCustomChannels = sanitizeCustomChannels(form.customChannels)
+      const safeForm = {
+        ...form,
+        channelIds: sanitizeChannelIds(form.channelIds, safeCustomChannels),
+        customChannels: safeCustomChannels,
+      }
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(safeForm))
     } catch {
       // ignore
     }
@@ -367,7 +385,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     { value: 'none', label: 'Không' },
   ]
 
-  const customChannelIcons = ['📢', '💬', '❓', '📚', '🎯', '💡', '📌', '🧠', '🏆', '🔊']
+  const customChannelIcons = ['📢', '💬', '❓', '📚', '🎯', '💡', '📌', '🧠', '🏆']
   const customChannelIconText = customChannelIcon || ''
 
   const handleCoverImageUpload = async (event) => {
@@ -408,10 +426,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     })
     .filter(Boolean)
 
-  const selectedTextChannels = selectedChannels.filter((channel) => channel.type !== 'voice')
-  const selectedVoiceChannels = selectedChannels.filter((channel) => channel.type === 'voice')
-  const channelLimitForType = (type) => type === 'voice' ? MAX_VOICE_CHANNELS : MAX_TEXT_CHANNELS
-  const channelCountForType = (type) => type === 'voice' ? selectedVoiceChannels.length : selectedTextChannels.length
+  const selectedTextChannels = selectedChannels
 
   const inviteCode = form.inviteCode
 
@@ -457,11 +472,9 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   const toggleChannel = (id) => {
     const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
     const isRemoving = currentIds.includes(id)
-    const channel = channelOptions.find((item) => item.id === id)
-    const channelType = channel?.type === 'voice' ? 'voice' : 'chat'
 
-    if (!isRemoving && channelCountForType(channelType) >= channelLimitForType(channelType)) {
-      toast.error(channelType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+    if (!isRemoving && selectedTextChannels.length >= MAX_TEXT_CHANNELS) {
+      toast.error(`Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       return
     }
 
@@ -480,8 +493,8 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     }
 
     const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
-    if (channelCountForType(customChannelType) >= channelLimitForType(customChannelType)) {
-      toast.error(customChannelType === 'voice' ? `Chỉ được tạo tối đa ${MAX_VOICE_CHANNELS} kênh âm thanh` : `Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
+    if (selectedTextChannels.length >= MAX_TEXT_CHANNELS) {
+      toast.error(`Chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       return
     }
 
@@ -499,7 +512,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
       id,
       label,
       icon: customChannelIconText,
-      type: customChannelType,
+      type: 'chat',
     }
     setForm({
       ...form,
@@ -509,7 +522,6 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
     setCustomChannelName('')
     setCustomChannelIcon('')
     setCustomChannelIconOpen(false)
-    setCustomChannelType('chat')
   }
 
   // Drag-and-drop for channel ordering
@@ -625,8 +637,8 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
       return
     }
 
-    if (selectedTextChannels.length > MAX_TEXT_CHANNELS || selectedVoiceChannels.length > MAX_VOICE_CHANNELS) {
-      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản và ${MAX_VOICE_CHANNELS} kênh âm thanh`)
+    if (selectedTextChannels.length > MAX_TEXT_CHANNELS) {
+      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       setActivePanel('channels')
       return
     }
@@ -676,8 +688,8 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
   }
 
   const submit = () => {
-    if (selectedTextChannels.length > MAX_TEXT_CHANNELS || selectedVoiceChannels.length > MAX_VOICE_CHANNELS) {
-      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản và ${MAX_VOICE_CHANNELS} kênh âm thanh`)
+    if (selectedTextChannels.length > MAX_TEXT_CHANNELS) {
+      toast.error(`Mỗi nhóm chỉ được tạo tối đa ${MAX_TEXT_CHANNELS} kênh văn bản`)
       setActivePanel('channels')
       return
     }
@@ -739,7 +751,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
 
   return (
     <div
-      className="zuny-group-modal fixed inset-0 z-[90] flex items-center justify-center overflow-hidden bg-slate-950/75 backdrop-blur-md dark:bg-black/80"
+      className="zuny-group-modal fixed inset-0 z-[2147483000] flex items-center justify-center overflow-hidden bg-slate-950/75 backdrop-blur-md dark:bg-black/80"
       onMouseDown={handleClose}
     >
       <style>{`
@@ -1123,17 +1135,12 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                 <div className="mb-4 flex justify-end">
                   <div className="flex flex-wrap gap-2">
                     <span className={`rounded-full px-3 py-1 text-xs font-black ${selectedTextChannels.length >= MAX_TEXT_CHANNELS ? 'bg-rose-500/15 text-rose-300' : 'bg-blue-500/15 text-blue-300'}`}># {selectedTextChannels.length}/{MAX_TEXT_CHANNELS} văn bản</span>
-                    <span className={`rounded-full px-3 py-1 text-xs font-black ${selectedVoiceChannels.length >= MAX_VOICE_CHANNELS ? 'bg-rose-500/15 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'}`}>🔊 {selectedVoiceChannels.length}/{MAX_VOICE_CHANNELS} âm thanh</span>
                   </div>
                 </div>
 
                 {/* Custom channel input */}
                 <div>
                   <label className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-400">Thêm kênh tùy chỉnh</label>
-                  <div className="mb-3 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setCustomChannelType('chat')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${customChannelType === 'chat' ? 'bg-blue-600 text-white' : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}># Kênh văn bản</button>
-                    <button type="button" onClick={() => setCustomChannelType('voice')} className={`rounded-2xl px-4 py-3 text-xs font-black transition ${customChannelType === 'voice' ? 'bg-emerald-600 text-white' : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}>🔊 Kênh thoại</button>
-                  </div>
                   <div className="grid items-start gap-3 md:grid-cols-[190px_minmax(0,1fr)]">
                     <div className="relative">
                       <button
@@ -1189,12 +1196,12 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                       </button>
                     </div>
                   </div>
-                  <p className="mt-2 text-xs font-bold text-slate-500">Kênh văn bản hiển thị dấu #; kênh thoại hiển thị biểu tượng 🔊 và cho phép thành viên nói chuyện bằng microphone.</p>
+                  <p className="mt-2 text-xs font-bold text-slate-500">Mỗi nhóm có thể tạo tối đa 10 kênh văn bản để trao đổi và chia sẻ tài liệu.</p>
                 </div>
 
                 {/* Preset channel selector */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {channelOptions.filter((channel) => customChannelType === 'voice' ? channel.type === 'voice' : channel.type !== 'voice').map((channel) => {
+                  {channelOptions.map((channel) => {
                     const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds
                     const active = currentIds.includes(channel.id)
                     return (
@@ -1208,7 +1215,7 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                             : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                         }`}
                       >
-                        <p className="text-sm font-black">{channel.icon} {channel.type === 'voice' ? '🔊' : '#'} {channel.label}</p>
+                        <p className="text-sm font-black">{channel.icon} # {channel.label}</p>
                         <p className="mt-1 text-xs font-semibold text-slate-500">{channel.type}</p>
                       </button>
                     )
@@ -1235,20 +1242,6 @@ function GroupModal({ open, onClose, onSubmit, existingGroups = [] }) {
                         </div>}
                       </div>
 
-                      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-                        <button type="button" onClick={() => setVoiceChannelListCollapsed((value) => !value)} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-white/5">
-                          <span className="text-sm font-black text-white">🔊 Kênh âm thanh <span className="ml-2 text-xs text-slate-500">{selectedVoiceChannels.length}</span></span>
-                          <ChevronDown className={`h-4 w-4 text-slate-400 transition ${voiceChannelListCollapsed ? '-rotate-90' : ''}`} />
-                        </button>
-                        {!voiceChannelListCollapsed && <div className="space-y-2 border-t border-white/10 p-3">
-                          {selectedVoiceChannels.length ? selectedVoiceChannels.map((channel) => {
-                            const idx = selectedChannels.findIndex((item) => item.id === channel.id)
-                            return (
-                              <ChannelSortRow key={channel.id} channel={channel} idx={idx} dragOverIdx={dragOverIdx} handleDragStart={handleDragStart} handleDragOver={handleDragOver} handleDrop={handleDrop} handleDragEnd={handleDragEnd} onRemove={() => { const currentIds = form.channelIds.length ? form.channelIds : defaultChannelIds; setForm({ ...form, channelIds: currentIds.filter((id) => id !== channel.id) }) }} />
-                            )
-                          }) : <p className="px-2 py-3 text-xs font-bold text-slate-500">Chưa có kênh âm thanh.</p>}
-                        </div>}
-                      </div>
                     </div>
                   </div>
                 )}

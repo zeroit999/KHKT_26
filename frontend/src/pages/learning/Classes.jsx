@@ -1,6 +1,6 @@
 ﻿import { useAuth } from '../../contexts/AuthContext.jsx';
-import MaintenanceState from '../../components/ui/MaintenanceState.jsx';
 import TeacherClasses, { AttendanceQrCheckIn } from './class-core/TeacherClasses.jsx';
+import LearningPage from './LearningPage.jsx';
 
 function Classes() {
   const { userDetails } = useAuth();
@@ -20,14 +20,7 @@ function Classes() {
   }
 
   if (userDetails?.role === 'STUDENT') {
-    return (
-      <MaintenanceState
-        badge="Lớp học"
-        title="Tính năng đang bảo trì"
-        subtitle="Lớp học dành cho học sinh đang được phát triển"
-        description="Chúng tôi đang hoàn thiện trải nghiệm lớp học. Vui lòng quay lại trong thời gian sớm nhất."
-      />
-    );
+    return <LearningPage />;
   }
 
   return <TeacherClasses />;

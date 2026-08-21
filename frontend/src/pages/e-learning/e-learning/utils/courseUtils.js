@@ -52,6 +52,7 @@ export function getEmptyForm(defaultSubject = '') {
     courseCode: '',
     visibility: 'public',
     className: '',
+    classId: '',
     openAt: getCurrentLocalDateTimeValue(),
     attachMode: 'youtube',
     codeLanguage: 'javascript',
@@ -138,8 +139,8 @@ export function getUserClassName(userData = {}) {
   return userData?.className || userData?.class || userData?.lop || userData?.studentClass || ''
 }
 export function canAccessCourseByClass() {
-  // Quyền 'Dành cho lớp' chỉ dùng để phân loại thẻ theo bộ lọc lớp,
-  // không còn khóa người học theo lớp lưu trong hồ sơ tài khoản.
+  // Quyền theo khối/lớp được lọc ở danh sách bài học theo dữ liệu lớp hiện tại.
+  // Hàm này vẫn giữ hành vi cũ để không làm thay đổi cổng truy cập chi tiết ngoài phạm vi.
   return true
 }
 export function getCourseCreatedTime(course) {

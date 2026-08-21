@@ -173,12 +173,15 @@ function Courses() {
   const lessonsRef = useRef(null)
   const sortBoxRef = useRef(null)
   const createMenuRef = useRef(null)
+  const classCreateRequestHandledRef = useRef(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [role, setRole] = useState('STUDENT')
   const [teacherProfile, setTeacherProfile] = useState(null)
   const [teacherProfilesById, setTeacherProfilesById] = useState({})
   const [teacherSubject, setTeacherSubject] = useState('')
   const [teacherClasses, setTeacherClasses] = useState([])
+  const [participatingClasses, setParticipatingClasses] = useState([])
+  const [classCreatePreset, setClassCreatePreset] = useState(null)
   const [courses, setCourses] = useState([])
   const [learningProgress, setLearningProgress] = useState({})
   const [learningError, setLearningError] = useState('')
@@ -335,6 +338,7 @@ function Courses() {
         setTeacherProfilesById({})
         setTeacherSubject('')
         setTeacherClasses([])
+        setParticipatingClasses([])
         setLearningProgress({})
         await fetchCourses()
         return
@@ -350,11 +354,21 @@ function Courses() {
           setTeacherSubject(subjectFromFirebase)
           try {
             const classSnapshot = await getDocs(collection(db, 'classes'))
+            const classRows = classSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+            const userEmail = String(user.email || '').trim().toLowerCase()
+            const joinedClasses = classRows.filter((item) => {
+              const memberIds = Array.isArray(item.memberIds) ? item.memberIds.map(String) : []
+              const teacherIds = [item.teacherId, item.createdByUid, item.ownerId].filter(Boolean).map(String)
+              const teacherEmails = [item.teacherEmail, item.ownerEmail].filter(Boolean).map((email) => String(email).trim().toLowerCase())
+              return memberIds.includes(String(user.uid)) || teacherIds.includes(String(user.uid)) || (userEmail && teacherEmails.includes(userEmail))
+            })
+            setParticipatingClasses(joinedClasses)
             const classesFromUser = resolveClassesFromUserData(userData)
             const classesFromCollection = resolveClassesFromClassDocs(classSnapshot.docs, user, userData)
-            setTeacherClasses(uniqueValues([...classesFromUser, ...classesFromCollection]))
+            setTeacherClasses(uniqueValues([...classesFromUser, ...classesFromCollection, ...joinedClasses.map((item) => item.name || item.className || item.title)]))
           } catch (classError) {
             console.warn('Không thể lấy danh sách lớp:', classError)
+            setParticipatingClasses([])
             setTeacherClasses(resolveClassesFromUserData(userData))
           }
           if (subjectFromFirebase) setForm((prev) => ({ ...prev, category: subjectFromFirebase }))
@@ -374,6 +388,29 @@ function Courses() {
     })
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!currentUser?.uid || !canCreateELearning || classCreateRequestHandledRef.current || typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('create') !== 'class') return
+    const requestedClassId = String(params.get('classId') || '').trim()
+    if (!requestedClassId) return
+    const targetClass = participatingClasses.find((item) => String(item.id) === requestedClassId)
+    if (!targetClass) return
+
+    classCreateRequestHandledRef.current = true
+    setClassCreatePreset({
+      visibility: 'class',
+      classId: targetClass.id,
+      className: targetClass.name || targetClass.className || targetClass.title || '',
+    })
+    setShowCreateTypeMenu(true)
+
+    params.delete('create')
+    params.delete('classId')
+    const nextQuery = params.toString()
+    window.history.replaceState({}, '', `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`)
+  }, [canCreateELearning, currentUser?.uid, participatingClasses])
 
   useEffect(() => {
     if (!currentUser) return undefined
@@ -683,7 +720,7 @@ function Courses() {
         }
         if (selectedChannel?.id) {
           setChannelPlaylists(items
-            .filter((item) => String(item.ownerId || '') === String(selectedChannel.id) && item.visibility !== 'private')
+            .filter((item) => String(item.ownerId || '') === String(selectedChannel.id) && !['private', 'class'].includes(String(item.visibility || 'public').toLowerCase()))
             .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt)))
         }
       },
@@ -769,7 +806,8 @@ function Courses() {
         setShowTypeMenu(false)
         setShowClassMenu(false)
       }
-      if (createMenuRef.current && !createMenuRef.current.contains(event.target)) {
+      const clickedInsideCreateTypePortal = event.target instanceof Element && event.target.closest('[data-create-type-portal]')
+      if (createMenuRef.current && !createMenuRef.current.contains(event.target) && !clickedInsideCreateTypePortal) {
         setShowCreateTypeMenu(false)
       }
     }
@@ -928,7 +966,7 @@ function Courses() {
     try {
       const snapshot = await getDocs(collection(db, 'coursePlaylists'))
       const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => String(item.ownerId || '') === String(ownerId) && item.visibility !== 'private')
+        .filter((item) => String(item.ownerId || '') === String(ownerId) && !['private', 'class'].includes(String(item.visibility || 'public').toLowerCase()))
         .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt))
       setChannelPlaylists(items)
     } catch (error) {
@@ -1517,6 +1555,10 @@ function Courses() {
       return
     }
     if (form.visibility === 'private' && !form.className) {
+      alert('Vui lòng chọn khối được xem bài học.')
+      return
+    }
+    if (form.visibility === 'class' && !form.classId) {
       alert('Vui lòng chọn lớp được xem bài học.')
       return
     }
@@ -1566,7 +1608,8 @@ function Courses() {
         teacherCode: '',
         courseCode: form.courseCode || generateLibraryCourseCode(teacherName, form.category, form.courseRandomCode),
         visibility: form.visibility,
-        className: form.visibility === 'private' ? form.className : '',
+        className: ['private', 'class'].includes(form.visibility) ? form.className : '',
+        classId: form.visibility === 'class' ? form.classId || '' : '',
         openAt: form.openAt,
         openAtMs: getOpenAtMs(form.openAt),
         attachMode: firstLesson.attachMode || form.attachMode,
@@ -1604,7 +1647,7 @@ function Courses() {
       if (draftStorageKey) window.localStorage.removeItem(draftStorageKey)
       setForm(getEmptyForm(teacherSubject))
       setShowCreateForm(false)
-      if (!isAdminDev) setSubmissionNotice(true)
+      if (!isAdminDev) setSubmissionNotice(form.visibility === 'class' ? 'class' : 'review')
       await fetchCourses()
     } catch (error) {
       console.error('Lỗi khi tạo bài e-learning:', error)
@@ -1630,6 +1673,10 @@ function Courses() {
       return
     }
     if (form.visibility === 'private' && !form.className) {
+      alert('Vui lòng chọn khối được xem bài học.')
+      return
+    }
+    if (form.visibility === 'class' && !form.classId) {
       alert('Vui lòng chọn lớp được xem bài học.')
       return
     }
@@ -1679,7 +1726,8 @@ function Courses() {
         teacherCode: '',
         courseCode: form.courseCode || generateLibraryCourseCode(teacherName, form.category, form.courseRandomCode),
         visibility: form.visibility,
-        className: form.visibility === 'private' ? form.className : '',
+        className: ['private', 'class'].includes(form.visibility) ? form.className : '',
+        classId: form.visibility === 'class' ? form.classId || '' : '',
         openAt: form.openAt,
         openAtMs: getOpenAtMs(form.openAt),
         attachMode: firstLesson.attachMode || form.attachMode,
@@ -1707,7 +1755,7 @@ function Courses() {
       setForm(getEmptyForm(teacherSubject))
       setEditingCourse(null)
       setShowCreateForm(false)
-      if (!isAdminDev) setSubmissionNotice(true)
+      if (!isAdminDev) setSubmissionNotice(form.visibility === 'class' ? 'class' : 'review')
       await fetchCourses()
     } catch (error) {
       console.error('Lỗi khi cập nhật bài e-learning:', error)
@@ -1796,7 +1844,9 @@ function Courses() {
     return block
   }
 
-  function requestCreateModal(contentType = 'video') {
+  function requestCreateModal(contentType = 'video', preset = null) {
+    const resolvedPreset = preset || classCreatePreset
+    if (classCreatePreset) setClassCreatePreset(null)
     const block = getActivePostingBlock()
     if (block) {
       setPostingBlockNotice(block)
@@ -1805,11 +1855,11 @@ function Courses() {
     }
     const warning = teacherProfile?.elearningPostingWarning
     if (warning?.active && !warning?.acknowledgedAt) {
-      setPostingWarningNotice({ ...warning, requestedType: contentType })
+      setPostingWarningNotice({ ...warning, requestedType: contentType, requestedPreset: resolvedPreset })
       setShowCreateTypeMenu(false)
       return
     }
-    openCreateModal(contentType)
+    openCreateModal(contentType, resolvedPreset)
   }
 
   function resetCreateCourseForm() {
@@ -1825,7 +1875,7 @@ function Courses() {
     }
   }
 
-  function openCreateModal(contentType = 'video') {
+  function openCreateModal(contentType = 'video', preset = null) {
     const nextType = ['document', 'simulation'].includes(contentType) ? contentType : 'video'
     const nextForm = getEmptyForm(teacherSubject)
     const randomCode = String(Math.floor(1000 + Math.random() * 9000))
@@ -1844,6 +1894,14 @@ function Courses() {
       else if (draft?.expiresAt && draft.expiresAt <= Date.now()) window.localStorage.removeItem(key)
     } catch (error) {
       console.warn('Không thể khôi phục bản nháp:', error)
+    }
+    if (preset?.visibility === 'class' && preset?.classId) {
+      restoredForm = {
+        ...restoredForm,
+        visibility: 'class',
+        classId: String(preset.classId),
+        className: preset.className || '',
+      }
     }
     setForm(restoredForm)
     setShowCreateForm(true)
@@ -1911,6 +1969,7 @@ function Courses() {
       courseCode: course.courseCode || '',
       visibility: course.visibility || 'public',
       className: course.className || '',
+      classId: course.classId || '',
       openAt: normalizeDateTimeLocal(course.openAt || ''),
       attachMode: course.attachMode || 'youtube',
       codeLanguage: course.codeLanguage || 'javascript',
@@ -1941,7 +2000,16 @@ function Courses() {
 
   const filteredCourses = useMemo(() => {
     const keyword = search.trim().toLowerCase()
-    const currentStudentClass = getUserClassName(teacherProfile)
+    const participatingClassIds = new Set(participatingClasses.map((item) => String(item.id || '')).filter(Boolean))
+    const participatingClassNames = new Set(participatingClasses.map((item) => String(item.name || item.className || item.title || '').trim().toLowerCase()).filter(Boolean))
+    const participatingGrades = new Set()
+    const addGrade = (value) => {
+      const match = String(value || '').match(/(?:^|\D)(10|11|12)(?:\D|$)/)
+      if (match) participatingGrades.add(match[1])
+    }
+    participatingClasses.forEach((item) => { addGrade(item.grade); addGrade(item.name); addGrade(item.className) })
+    addGrade(getUserClassName(teacherProfile))
+
     const filtered = courses.filter((course) => {
       const matchSearch =
         !keyword ||
@@ -1953,8 +2021,17 @@ function Courses() {
       const status = String(course.status || course.moderationStatus || 'approved').toLowerCase()
       const isOwner = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid].filter(Boolean).map(String).includes(String(currentUser?.uid || ''))
       const canSeeModeration = isTeacherOrAdmin || status === 'approved' || (activeLibrarySection === 'account' && isOwner) || (activeLibrarySection === 'manage' && isAdminDev)
-      const isManagementContext = activeLibrarySection === 'account' || activeLibrarySection === 'manage'
-      const canSeeByVisibility = true
+      const visibility = String(course.visibility || 'public').toLowerCase()
+      let canSeeByVisibility = visibility === 'public' || isTeacherOrAdmin || isOwner
+      if (!canSeeByVisibility && visibility === 'private') {
+        const targetGrade = getCourseGrade(course)
+        canSeeByVisibility = Boolean(targetGrade && participatingGrades.has(targetGrade))
+      }
+      if (!canSeeByVisibility && visibility === 'class') {
+        const targetClassId = String(course.classId || '')
+        const targetClassName = String(course.className || '').trim().toLowerCase()
+        canSeeByVisibility = Boolean((targetClassId && participatingClassIds.has(targetClassId)) || (targetClassName && participatingClassNames.has(targetClassName)))
+      }
       return canSeeModeration && canSeeByVisibility && matchSearch
     })
     return [...filtered].sort((a, b) => {
@@ -1968,7 +2045,7 @@ function Courses() {
       }
       return getCourseCreatedTime(b) - getCourseCreatedTime(a)
     })
-  }, [courses, search, sortBy, teacherProfile, currentUser, isAdminDev, isTeacherOrAdmin, activeLibrarySection])
+  }, [courses, search, sortBy, teacherProfile, currentUser, isAdminDev, isTeacherOrAdmin, activeLibrarySection, participatingClasses])
 
   const coursesWithProgress = useMemo(() => {
     return filteredCourses.map((course) => {
@@ -2647,7 +2724,10 @@ function Courses() {
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation()
-                      setShowCreateTypeMenu((value) => !value)
+                      setShowCreateTypeMenu((value) => {
+                        if (value && classCreatePreset) setClassCreatePreset(null)
+                        return !value
+                      })
                     }}
                     className={`inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/20 ${showCreateTypeMenu ? 'ring-4 ring-blue-500/15' : ''}`}
                     aria-expanded={showCreateTypeMenu}
@@ -2942,7 +3022,7 @@ function Courses() {
                       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">ZUNY Creator</p>
                       <p className="mt-1 truncate text-sm font-black text-white">Chia sẻ bài học của bạn</p>
                     </div>
-                    <button type="button" onClick={() => requestCreateModal('video')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-cyan-200/40 bg-white px-4 py-2.5 text-sm font-black text-blue-700 shadow-lg shadow-black/20 transition active:scale-[0.97]"><PlusIcon /> Đăng bài</button>
+                    <button type="button" onClick={() => setShowCreateTypeMenu(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-cyan-200/40 bg-white px-4 py-2.5 text-sm font-black text-blue-700 shadow-lg shadow-black/20 transition active:scale-[0.97]" aria-haspopup="dialog" aria-expanded={showCreateTypeMenu}><PlusIcon /> Đăng bài</button>
                   </div>
                 </div>
               )}
@@ -3045,13 +3125,47 @@ function Courses() {
                 ))}
               </VideoGrid>
             ) : (
-              <EmptyLibraryState canCreate={canCreateELearning} search={search} onReset={resetRightFilters} onCreate={requestCreateModal} />
+              <EmptyLibraryState canCreate={canCreateELearning} search={search} onReset={resetRightFilters} onCreate={() => { if (typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) setShowCreateTypeMenu(true); else requestCreateModal('video') }} />
             )}
           </VideoSection>
             </>
           )}
         </main>
       </div>
+
+      {showCreateTypeMenu && typeof document !== 'undefined' && createPortal(
+        <div data-create-type-portal className="fixed inset-0 z-[500] flex items-end bg-slate-950/60 p-3 backdrop-blur-sm sm:hidden" onClick={() => { setShowCreateTypeMenu(false); if (classCreatePreset) setClassCreatePreset(null) }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="mobile-create-type-title" className="w-full min-w-0 max-h-[calc(100dvh-24px)] overflow-y-auto rounded-[26px] border border-slate-200 bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl dark:border-white/10 dark:bg-[#111827]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex min-w-0 items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-white/10">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">Đăng bài E-learning</p>
+                <h2 id="mobile-create-type-title" className="mt-1 break-words text-xl font-black text-slate-950 dark:text-white">Bạn muốn đăng loại nội dung nào?</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Chọn một loại để mở đúng biểu mẫu đăng bài hiện tại.</p>
+              </div>
+              <button type="button" onClick={() => { setShowCreateTypeMenu(false); if (classCreatePreset) setClassCreatePreset(null) }} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600 transition active:scale-95 dark:bg-white/10 dark:text-slate-200" aria-label="Đóng chọn loại bài đăng"><CloseIcon /></button>
+            </div>
+
+            <div className="mt-3 grid gap-2">
+              <button type="button" onClick={() => requestCreateModal('video')} className="flex min-w-0 items-center gap-3 rounded-2xl border border-red-100 bg-red-50/70 p-3 text-left transition active:scale-[0.99] dark:border-red-500/20 dark:bg-red-500/10">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-red-600 text-white shadow-sm"><PlayIcon filled /></span>
+                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-black text-slate-950 dark:text-white">Video</span><span className="mt-0.5 block break-words text-xs leading-5 text-slate-500 dark:text-slate-400">YouTube, MP4 hoặc playlist bài giảng.</span></span>
+                <span className="shrink-0 text-lg text-slate-400">›</span>
+              </button>
+              <button type="button" onClick={() => requestCreateModal('document')} className="flex min-w-0 items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 text-left transition active:scale-[0.99] dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-600 text-xl font-black text-white shadow-sm">▤</span>
+                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-black text-slate-950 dark:text-white">Tài liệu</span><span className="mt-0.5 block break-words text-xs leading-5 text-slate-500 dark:text-slate-400">Word, PDF và nội dung đọc học tập.</span></span>
+                <span className="shrink-0 text-lg text-slate-400">›</span>
+              </button>
+              <button type="button" onClick={() => requestCreateModal('simulation')} className="flex min-w-0 items-center gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-3 text-left transition active:scale-[0.99] dark:border-violet-500/20 dark:bg-violet-500/10">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-600 text-xl text-white shadow-sm">🧪</span>
+                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-black text-slate-950 dark:text-white">Mô phỏng</span><span className="mt-0.5 block break-words text-xs leading-5 text-slate-500 dark:text-slate-400">Mô phỏng tương tác hoặc HTML/CSS/JS/TS.</span></span>
+                <span className="shrink-0 text-lg text-slate-400">›</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {showFilters && (
         <FilterModal
@@ -3082,6 +3196,7 @@ function Courses() {
           editingCourse={editingCourse}
           contentType={createContentType}
           teacherClasses={teacherClasses}
+          participatingClasses={participatingClasses}
           uploadingWord={uploadingWord}
           uploadingVideo={uploadingVideo}
           uploadingImage={uploadingImage}
@@ -3099,7 +3214,7 @@ function Courses() {
       {deleteTarget && <ConfirmModal title="Xóa vĩnh viễn bài học?" courseTitle={stripHtml(deleteTarget.title)} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDeleteCourse} />}
       {showAchievement && <AchievementModal achievement={achievement} stats={learningDashboardStats} onClose={() => setShowAchievement(false)} />}
       {copySuccessCourse && <CopySuccessModal course={copySuccessCourse} onClose={() => setCopySuccessCourse(null)} />}
-      {submissionNotice && <SubmissionSuccessModal onClose={() => setSubmissionNotice(false)} />}
+      {submissionNotice && <SubmissionSuccessModal mode={submissionNotice} onClose={() => setSubmissionNotice(false)} />}
       {reportTarget && <CourseReportModal course={reportTarget} onClose={() => setReportTarget(null)} onSubmit={submitCourseReport} />}
       {reportNotice && <ReportNoticeModal notice={reportNotice} onClose={() => setReportNotice(null)} />}
       {rejectCourseTarget && <ReasonModal title="Từ chối bài đăng" description="Nhập lý do để người đăng biết nội dung cần điều chỉnh." presets={["Nội dung chưa đầy đủ","Thông tin chưa chính xác","Tài liệu không phù hợp","Vi phạm quy định cộng đồng"]} confirmLabel="Xác nhận từ chối" tone="danger" onClose={() => setRejectCourseTarget(null)} onConfirm={({ reason, detail }) => confirmRejectCourse(detail ? `${reason}: ${detail}` : reason)} />}
@@ -3120,7 +3235,7 @@ function Courses() {
       {deleteSuccessNotice && <SuccessNoticeModal icon="🗑️" title="Đã xóa bài học" description={`“${deleteSuccessNotice.title}” đã được xóa khỏi thư viện.`} onClose={()=>setDeleteSuccessNotice(null)} />}
       {saveSuccessNotice && <SuccessNoticeModal icon={saveSuccessNotice.destination==='removed'?'☆':'★'} title={saveSuccessNotice.destination==='removed'?'Đã hủy lưu bài học':'Đã lưu bài học'} description={saveSuccessNotice.destination==='removed'?`“${saveSuccessNotice.courseTitle}” đã được gỡ khỏi bài đã lưu và các danh sách lưu.`:`“${saveSuccessNotice.courseTitle}” đã được lưu vào ${saveSuccessNotice.destination}.`} onClose={()=>setSaveSuccessNotice(null)} />}
       {channelReportTarget && <ChannelReportModal channel={channelReportTarget} onClose={() => setChannelReportTarget(null)} onSubmit={submitChannelReport} />}
-      {postingWarningNotice && <PostingWarningModal warning={postingWarningNotice} onClose={() => setPostingWarningNotice(null)} onConfirm={async () => { if (currentUser?.uid) await updateDoc(doc(db, 'users', currentUser.uid), { 'elearningPostingWarning.acknowledgedAt': serverTimestamp() }); const type=postingWarningNotice.requestedType||''; setTeacherProfile((prev)=>({...prev,elearningPostingWarning:{...(prev?.elearningPostingWarning||{}),acknowledgedAt:new Date().toISOString()}})); setPostingWarningNotice(null); if (type) openCreateModal(type) }} />}
+      {postingWarningNotice && <PostingWarningModal warning={postingWarningNotice} onClose={() => setPostingWarningNotice(null)} onConfirm={async () => { if (currentUser?.uid) await updateDoc(doc(db, 'users', currentUser.uid), { 'elearningPostingWarning.acknowledgedAt': serverTimestamp() }); const type=postingWarningNotice.requestedType||''; const preset=postingWarningNotice.requestedPreset||null; setTeacherProfile((prev)=>({...prev,elearningPostingWarning:{...(prev?.elearningPostingWarning||{}),acknowledgedAt:new Date().toISOString()}})); setPostingWarningNotice(null); if (type) openCreateModal(type,preset) }} />}
       {blockTarget && <UserActionModal user={blockTarget} mode="block" onClose={() => setBlockTarget(null)} onSave={async ({reason,startAt,endAt}) => { await updateDoc(doc(db,'users',blockTarget.id), { elearningPostingBlock:{active:true,reason,startAt:new Date(`${startAt}T00:00:00`).toISOString(),endAt:new Date(`${endAt}T23:59:59`).toISOString(),blockedBy:currentUser?.uid||'',createdAt:new Date().toISOString()} }); setBlockTarget(null); await fetchAdminData() }} />}
       {warningTarget && <UserActionModal user={warningTarget} mode="warning" onClose={() => setWarningTarget(null)} onSave={async ({reason}) => { const count=Math.max(1,adminReports.filter((report)=>String(report.reportedUserId||report.courseOwnerId||'')===String(warningTarget.id)).length); await updateDoc(doc(db,'users',warningTarget.id), { elearningPostingWarning:{active:true,reason,count,acknowledgedAt:null,warnedBy:currentUser?.uid||'',createdAt:new Date().toISOString()} }); setWarningTarget(null); await fetchAdminData() }} />}
     </div>
@@ -3194,13 +3309,14 @@ function CopySuccessModal({ course, onClose }) {
   )
 }
 
-function SubmissionSuccessModal({ onClose }) {
+function SubmissionSuccessModal({ onClose, mode = 'review' }) {
+  const directClass = mode === 'class'
   return (
     <div className="fixed inset-0 z-[1000] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div onClick={(event) => event.stopPropagation()} className="w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-2xl dark:bg-[#171717]">
-        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-amber-100 text-4xl dark:bg-amber-500/15">📨</div>
-        <h2 className="mt-5 text-2xl font-black text-slate-950 dark:text-white">Đã gửi quản trị viên</h2>
-        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">Bài đăng của bạn đã được gửi đến quản trị viên. Vui lòng đợi duyệt trước khi nội dung xuất hiện công khai trong thư viện.</p>
+        <div className={`mx-auto grid h-20 w-20 place-items-center rounded-full text-4xl ${directClass ? 'bg-emerald-100 dark:bg-emerald-500/15' : 'bg-amber-100 dark:bg-amber-500/15'}`}>{directClass ? '✓' : '📨'}</div>
+        <h2 className="mt-5 text-2xl font-black text-slate-950 dark:text-white">{directClass ? 'Đã đăng vào lớp' : 'Đã gửi quản trị viên'}</h2>
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{directClass ? 'Bài học đã xuất hiện trong Học liệu của lớp được chọn. Trạng thái kiểm duyệt E-learning vẫn được giữ để quản trị viên quản lý nội dung.' : 'Bài đăng của bạn đã được gửi đến quản trị viên. Vui lòng đợi duyệt trước khi nội dung xuất hiện công khai trong thư viện.'}</p>
         <button type="button" onClick={onClose} className="mt-6 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700">Đã hiểu</button>
       </div>
     </div>
@@ -3373,7 +3489,52 @@ function NotificationCenter({ notifications = [], onRead, onDelete, onClearAll, 
   const unread = notifications.filter((item) => !item.read).length
   const tone = (type) => ({ approved:'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', rejected:'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300', report_resolved:'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300', report_deleted:'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300', verified:'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', follow_course:'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300' }[type] || 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300')
   const icon = (type) => ({ approved:'✓', rejected:'!', report_resolved:'⚑', report_deleted:'🗑', verified:'✓', follow_course:'▶' }[type] || '🔔')
-  return <section className="py-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Trung tâm sự kiện</p><h1 className="mt-2 text-3xl font-black">Thông báo</h1></div><div className="flex items-center gap-3"><span className="rounded-full bg-red-50 px-4 py-2 text-sm font-black text-red-600 dark:bg-red-500/10 dark:text-red-300">{unread} chưa đọc</span>{notifications.length>0&&<button type="button" onClick={onClearAll} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-black hover:bg-slate-100 dark:border-white/15 dark:hover:bg-white/10">Xóa hết thông báo</button>}</div></div>{notifications.length?<div className="mt-6 grid gap-3">{notifications.map((item)=><article key={item.id} onClick={()=>onRead(item)} className={`group cursor-pointer rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${item.read?'border-slate-200 bg-white opacity-75 dark:border-white/10 dark:bg-[#111827]':'border-blue-300 bg-blue-50/60 ring-1 ring-blue-500/10 dark:border-blue-500/30 dark:bg-blue-500/[0.06]'}`}><div className="flex items-start gap-4"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-lg font-black ${tone(item.type)}`}>{icon(item.type)}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-black">{item.title||'Thông báo E-learning'}</h2><div className="flex items-center gap-2">{!item.read&&<span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-black text-white">MỚI</span>}<button type="button" onClick={(event)=>{event.stopPropagation();onDelete?.(item)}} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10" aria-label="Xóa thông báo">×</button></div></div><p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.message||'Có một sự kiện mới liên quan đến tài khoản của bạn.'}</p><div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400"><span>{formatReportDate(item.createdAt)}</span>{item.courseId&&<button type="button" onClick={(event)=>{event.stopPropagation();onRead(item);onOpenCourse(item.courseId)}} className="font-black text-blue-600 hover:underline dark:text-blue-400">Xem nội dung</button>}</div></div></div></article>)}</div>:<div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-20 text-center dark:border-white/15 dark:bg-[#111827]"><div className="text-5xl">🔔</div><h2 className="mt-4 text-xl font-black">Chưa có thông báo</h2><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Các sự kiện mới sẽ xuất hiện tại đây.</p></div>}</section>
+  return (
+    <section className="min-w-0 max-w-full overflow-x-hidden py-4 sm:py-6">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="break-words text-xs font-black uppercase tracking-[0.2em] text-blue-600 [overflow-wrap:anywhere] dark:text-blue-400">Trung tâm sự kiện</p>
+          <h1 className="mt-2 break-words text-2xl font-black [overflow-wrap:anywhere] sm:text-3xl">Thông báo</h1>
+        </div>
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">
+          <span className="max-w-full rounded-full bg-red-50 px-3 py-2 text-center text-xs font-black text-red-600 dark:bg-red-500/10 dark:text-red-300 sm:px-4 sm:text-sm">{unread} chưa đọc</span>
+          {notifications.length > 0 && <button type="button" onClick={onClearAll} className="max-w-full whitespace-normal rounded-full border border-slate-300 px-3 py-2 text-center text-xs font-black leading-5 hover:bg-slate-100 dark:border-white/15 dark:hover:bg-white/10 sm:px-4 sm:text-sm">Xóa hết thông báo</button>}
+        </div>
+      </div>
+
+      {notifications.length ? (
+        <div className="mt-5 grid min-w-0 max-w-full gap-3 sm:mt-6">
+          {notifications.map((item) => (
+            <article key={item.id} onClick={() => onRead(item)} className={`group min-w-0 max-w-full cursor-pointer overflow-hidden rounded-2xl border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg sm:p-4 ${item.read?'border-slate-200 bg-white opacity-75 dark:border-white/10 dark:bg-[#111827]':'border-blue-300 bg-blue-50/60 ring-1 ring-blue-500/10 dark:border-blue-500/30 dark:bg-blue-500/[0.06]'}`}>
+              <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-base font-black sm:h-11 sm:w-11 sm:rounded-2xl sm:text-lg ${tone(item.type)}`}>{icon(item.type)}</span>
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <h2 className="min-w-0 flex-1 break-words text-sm font-black leading-5 [overflow-wrap:anywhere] sm:text-base">{item.title || 'Thông báo E-learning'}</h2>
+                    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                      {!item.read && <span className="rounded-full bg-red-600 px-2 py-1 text-[9px] font-black text-white sm:px-2.5 sm:text-[10px]">MỚI</span>}
+                      <button type="button" onClick={(event) => { event.stopPropagation(); onDelete?.(item) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10" aria-label="Xóa thông báo">×</button>
+                    </div>
+                  </div>
+                  <p className="mt-1 max-w-full break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere] dark:text-slate-300">{item.message || 'Có một sự kiện mới liên quan đến tài khoản của bạn.'}</p>
+                  <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-400">
+                    <span className="min-w-0 break-words [overflow-wrap:anywhere]">{formatReportDate(item.createdAt)}</span>
+                    {item.courseId && <button type="button" onClick={(event) => { event.stopPropagation(); onRead(item); onOpenCourse(item.courseId) }} className="max-w-full break-words text-left font-black text-blue-600 [overflow-wrap:anywhere] hover:underline dark:text-blue-400">Xem nội dung</button>}
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-8 min-w-0 max-w-full overflow-hidden rounded-3xl border border-dashed border-slate-300 bg-white px-4 py-16 text-center dark:border-white/15 dark:bg-[#111827] sm:px-6 sm:py-20">
+          <div className="text-5xl">🔔</div>
+          <h2 className="mt-4 break-words text-xl font-black [overflow-wrap:anywhere]">Chưa có thông báo</h2>
+          <p className="mt-2 break-words text-sm text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">Các sự kiện mới sẽ xuất hiện tại đây.</p>
+        </div>
+      )}
+    </section>
+  )
 }
 
 function AccountPanel({ profile, followerHistory = [], user, role, classes, courses, stats, canManageCourse, teacherProfilesById, openMenuId, onToggleMenu, onOpen, onUpdate, onDelete, onCopy, onReport, onOpenChannel, playlists = [], onOpenPlaylist, onCreatePlaylist, onEditPlaylist, savedLists = [], onOpenSavedList, onCreateSavedList, onImportSavedList, onEditSavedList, onShareSavedList, onDeleteSavedList, onUnsave, unsavingCourseId = '', reports = [], reportsLoading = false }) {
