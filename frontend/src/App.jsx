@@ -339,7 +339,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
               />
 
               <Route
-                path="/learn/:id"
+                path="/LearningPage"
                 element={
                   <ProtectedRoute>
                     <LearningPage />
