@@ -2515,7 +2515,7 @@ function TeacherClasses() {
       const firstLesson = lessons[0] || {};
       const totalDurationSeconds = Number(firstLesson.durationSeconds || eLearningCreateForm.durationSeconds || 0);
       const duration = firstLesson.duration || eLearningCreateForm.duration || formatELearningDuration(totalDurationSeconds);
-      const approved = normalizedELearningPublisherRole === 'ADMINDEV';
+      const approved = normalizedELearningPublisherRole === 'ADMINDEV' || eLearningCreateForm.visibility === 'class';
       await addDoc(collection(db, 'courses'), {
         title: eLearningCreateForm.title,
         topic: eLearningCreateForm.topic,
@@ -5107,7 +5107,12 @@ function TeacherClasses() {
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         });
       });
-      batch.update(doc(db, 'classes', selectedClassId), { studentCount: increment(resolved.length), updatedAt: serverTimestamp() });
+      const resolvedMemberIds = Array.from(new Set(resolved.map(({ profile }) => String(profile.uid || profile.id || '')).filter(Boolean)));
+      batch.update(doc(db, 'classes', selectedClassId), {
+        studentCount: increment(resolved.length),
+        ...(resolvedMemberIds.length ? { memberIds: arrayUnion(...resolvedMemberIds) } : {}),
+        updatedAt: serverTimestamp(),
+      });
       await batch.commit();
       setStudentImportOpen(false);
       setStudentImportText('');
@@ -5228,8 +5233,10 @@ function TeacherClasses() {
       }
 
       if (committedCount > 0) {
+        const resolvedMemberIds = Array.from(new Set(resolved.map(({ profile }) => String(profile.uid || profile.id || '')).filter(Boolean)));
         await updateDoc(doc(db, 'classes', selectedClassId), {
           studentCount: increment(committedCount),
+          ...(resolvedMemberIds.length ? { memberIds: arrayUnion(...resolvedMemberIds) } : {}),
           updatedAt: serverTimestamp(),
         });
       }
@@ -5359,8 +5366,10 @@ function TeacherClasses() {
         )
       );
 
+      const resolvedMemberIds = Array.from(new Set(resolvedUsers.map(({ profile }) => String(profile.uid || profile.id || '')).filter(Boolean)));
       await updateDoc(doc(db, 'classes', selectedClassId), {
         studentCount: increment(validRows.length),
+        ...(resolvedMemberIds.length ? { memberIds: arrayUnion(...resolvedMemberIds) } : {}),
         updatedAt: serverTimestamp(),
       });
 

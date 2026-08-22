@@ -2845,19 +2845,7 @@ const handleLeaveGroup = async () => {
             </button>
             <button type="button" title="Cảnh báo / báo cáo nhóm" onClick={() => openGroupReportModal(activeGroup)} className="transition hover:text-amber-600 dark:hover:text-amber-300"><Flag className="hidden h-5 w-5 sm:block sm:h-6 sm:w-6" /></button>
             <button type="button" title="Cài đặt nhóm" onClick={() => { setGroupSettingsTab('overview'); setGroupSettingsOpen(true) }} className="transition hover:text-slate-900 dark:hover:text-white"><Settings className="hidden h-5 w-5 sm:block sm:h-6 sm:w-6" /></button>
-            <button type="button" title="Quay lại danh sách nhóm học"
-  aria-label="Quay lại danh sách nhóm học"
-  onClick={() => {
-    setGroupMenuOpen(false)
-    setGroupSettingsOpen(false)
-    setMobileChannelSidebarOpen(false)
-    setActiveGroupId(null)
-    setActiveChannelId('thao-luan')
-  }}
-  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-blue-400/50 hover:bg-blue-500/10 hover:text-blue-400 lg:hidden"
->
-  <ChevronLeft className="h-4 w-4" />
-</button>
+            
           </div>
         </div>
 

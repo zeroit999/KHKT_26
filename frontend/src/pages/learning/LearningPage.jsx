@@ -557,6 +557,7 @@ function LearningPage() {
   })
   const messageFileRef = useRef(null)
   const messageTextareaRef = useRef(null)
+  const membershipRepairUidRef = useRef('')
 
   useEffect(() => onAuthStateChanged(auth, (user) => setCurrentUser(user || null)), [])
 
@@ -589,6 +590,49 @@ function LearningPage() {
       setClasses(rows)
       setSelectedClassId((current) => rows.some((item) => item.id === current) ? current : (rows[0]?.id || ''))
       setLoadingClasses(false)
+
+      const normalizedEmail = normalizeText(currentUser.email)
+      if (normalizedEmail && membershipRepairUidRef.current !== currentUser.uid) {
+        membershipRepairUidRef.current = currentUser.uid
+        ;(async () => {
+          try {
+            const classSnapshot = await getDocs(collection(db, 'classes'))
+            const candidates = classSnapshot.docs.filter((classDoc) => {
+              const data = classDoc.data() || {}
+              const memberIds = Array.isArray(data.memberIds) ? data.memberIds.map(String) : []
+              return data.teacherId !== currentUser.uid && !memberIds.includes(String(currentUser.uid))
+            })
+
+            const matchedStudents = []
+            for (const classDoc of candidates) {
+              const studentSnapshot = await getDocs(query(
+                collection(db, 'classes', classDoc.id, 'students'),
+                where('email', '==', normalizedEmail),
+                limit(1),
+              ))
+              if (!studentSnapshot.empty) matchedStudents.push({ classDoc, studentDoc: studentSnapshot.docs[0] })
+            }
+
+            if (!matchedStudents.length) return
+
+            const batch = writeBatch(db)
+            matchedStudents.forEach(({ classDoc, studentDoc }) => {
+              batch.update(classDoc.ref, {
+                memberIds: arrayUnion(currentUser.uid),
+                updatedAt: serverTimestamp(),
+              })
+              batch.update(studentDoc.ref, {
+                uid: currentUser.uid,
+                status: 'active',
+                updatedAt: serverTimestamp(),
+              })
+            })
+            await batch.commit()
+          } catch (repairError) {
+            console.warn('Không thể đồng bộ lớp đã được giáo viên thêm bằng email:', repairError)
+          }
+        })()
+      }
     }, (firebaseError) => {
       console.error('Không thể tải lớp học của học sinh:', firebaseError)
       setError(firebaseError?.message || 'Không thể tải lớp học.')

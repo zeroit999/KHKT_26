@@ -291,7 +291,9 @@ function CourseDetail() {
         .map((item) => ({ id: item.id, ...item.data() }))
         .filter((item) => {
           const status = String(item.status || item.moderationStatus || 'approved').toLowerCase()
+          const visibility = String(item.visibility || 'public').toLowerCase()
           if (status !== 'approved' || status === 'deleted') return false
+          if (visibility === 'class') return false
           if (completedCourseIds.has(String(item.id))) return false
           if (!teacherCanViewAll && isCourseLocked(item)) return false
           if (!teacherCanViewAll && !canAccessCourseByClass(item, studentClass)) return false
@@ -768,6 +770,7 @@ function CourseDetail() {
   const deletedCourse = moderationStatus === 'deleted'
   const isTeacherOrAdmin = isTeacherRole(currentRole)
   const canBypassAccessGate = isTeacherOrAdmin || isCourseOwner
+  const canBypassClassGate = isAdminDev || isCourseOwner
   const locked = !canBypassAccessGate && isCourseLocked(course)
   const visibility = String(course.visibility || 'public').toLowerCase()
   const normalizedMembershipNames = new Set(userClassMemberships.map((item) => String(item.name || item.className || item.title || '').trim().toLowerCase()).filter(Boolean))
@@ -785,7 +788,10 @@ function CourseDetail() {
   const allowedByGrade = visibility !== 'private' || Boolean(targetClassName && membershipGrades.has(targetClassName))
   const canStudentOpenPendingClassPost = visibility === 'class' && allowedByClass && moderationStatus === 'pending'
   const deniedByModeration = moderationStatus !== 'approved' && !canStudentOpenPendingClassPost && !isTeacherOrAdmin && !isCourseOwner
-  const deniedByPrivateClass = !canBypassAccessGate && !userClassMembershipsLoading && (!allowedByClass || !allowedByGrade)
+  const deniedByPrivateClass = !userClassMembershipsLoading && (
+    (!allowedByClass && !canBypassClassGate) ||
+    (!allowedByGrade && !canBypassAccessGate)
+  )
 
   if (deletedCourse) {
     return <CourseGateState icon="🗑️" title="Bài học đã bị xóa" description="Nội dung này không còn được hiển thị trong thư viện." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} tone="danger" />
