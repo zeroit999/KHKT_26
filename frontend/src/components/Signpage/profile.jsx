@@ -14,18 +14,6 @@ import {
 } from 'lucide-react'
 
 import {
-  doc,
-  updateDoc,
-} from 'firebase/firestore'
-
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytes,
-} from 'firebase/storage'
-
-import {
   useEffect,
   useMemo,
   useRef,
@@ -34,11 +22,17 @@ import {
 
 import toast from 'react-hot-toast'
 
-import { db } from '../firebase'
-
 import {
   useAuth,
 } from '../../contexts/AuthContext'
+
+import {
+  authService,
+} from '../../services/auth'
+
+import {
+  saveUserProfile,
+} from '../../services/userService'
 
 import defaultAvatar from '../../assets/favicon-light-mode.png'
 
@@ -59,17 +53,18 @@ import {
 
 import './profile/profile.css'
 
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://127.0.0.1:5000'
+
+
 export default function Profile() {
   const {
     user,
     userDetails,
     refreshUserData,
   } = useAuth()
-
-  const storage = useMemo(
-    () => getStorage(),
-    []
-  )
 
   const coverInputRef =
     useRef(null)
@@ -176,7 +171,10 @@ export default function Profile() {
   )
 
   /* =====================================================
-     FIREBASE -> PROFILE
+     SQL -> PROFILE
+
+     Đồng bộ dữ liệu người dùng lấy từ Flask/PostgreSQL
+     thông qua AuthContext.
   ===================================================== */
 
   useEffect(() => {
@@ -215,7 +213,7 @@ export default function Profile() {
      AVATAR
 
      Google:
-       Firebase Auth user.photoURL
+       Ảnh đại diện Google nếu tài khoản có ảnh.
 
      Email/password:
        Logo ZUNY
@@ -254,6 +252,15 @@ export default function Profile() {
 
   /* =====================================================
      COVER PHOTO
+
+     Ảnh được upload:
+       Frontend
+         -> Flask
+         -> Cloudflare R2
+
+     Metadata ảnh:
+       Flask
+         -> PostgreSQL users.profile_data
   ===================================================== */
 
   const handleCoverChange =
@@ -299,47 +306,97 @@ export default function Profile() {
           true
         )
 
-        const extension =
-          file.name
-            .split('.')
-            .pop()
-            ?.toLowerCase() ||
-          'jpg'
+        const formData =
+          new FormData()
 
-        const storageRef =
-          ref(
-            storage,
-            `users/${user.uid}/profile/cover.${extension}`
+        formData.append(
+          'file',
+          file
+        )
+
+        let accessToken =
+          authService
+            .getAccessToken()
+
+        if (!accessToken) {
+          throw new Error(
+            'Phiên đăng nhập không hợp lệ.'
+          )
+        }
+
+        let response =
+          await fetch(
+            `${API_BASE_URL}/api/storage/profile/cover`,
+            {
+              method: 'POST',
+
+              headers: {
+                Authorization:
+                  `Bearer ${accessToken}`,
+              },
+
+              body:
+                formData,
+            }
           )
 
-        await uploadBytes(
-          storageRef,
-          file,
-          {
-            contentType:
-              file.type,
-          }
-        )
+        /*
+         * Nếu access token hết hạn,
+         * dùng refresh token hiện tại để lấy
+         * access token mới rồi upload lại.
+         */
+        if (
+          response.status ===
+            401 &&
+          authService
+            .getRefreshToken()
+        ) {
+          accessToken =
+            await authService
+              .refreshAccessToken()
+
+          response =
+            await fetch(
+              `${API_BASE_URL}/api/storage/profile/cover`,
+              {
+                method:
+                  'POST',
+
+                headers: {
+                  Authorization:
+                    `Bearer ${accessToken}`,
+                },
+
+                body:
+                  formData,
+              }
+            )
+        }
+
+        const data =
+          await response
+            .json()
+            .catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'Không thể cập nhật ảnh bìa'
+          )
+        }
 
         const downloadURL =
-          await getDownloadURL(
-            storageRef
-          )
+          data.coverPhoto ||
+          data.user
+            ?.coverPhoto ||
+          ''
 
-        const userRef =
-          doc(
-            db,
-            'users',
-            user.uid
+        if (!downloadURL) {
+          throw new Error(
+            'Backend không trả về URL ảnh bìa.'
           )
-
-        await updateDoc(
-          userRef,
-          {
-            coverPhoto:
-              downloadURL,
-          }
-        )
+        }
 
         setProfileData(
           (previous) => ({
@@ -365,6 +422,7 @@ export default function Profile() {
         )
 
         toast.error(
+          error?.message ||
           'Không thể cập nhật ảnh bìa'
         )
       } finally {
@@ -394,6 +452,12 @@ export default function Profile() {
      - avatar
 
      Học sinh không còn cập nhật className.
+
+     Dữ liệu được lưu:
+       Frontend
+         -> PATCH /auth/me
+         -> Flask
+         -> PostgreSQL
   ===================================================== */
 
   const handleSave =
@@ -408,13 +472,6 @@ export default function Profile() {
 
       try {
         setIsSaving(true)
-
-        const userRef =
-          doc(
-            db,
-            'users',
-            user.uid
-          )
 
         const dataToSave = {
           fullName:
@@ -455,8 +512,8 @@ export default function Profile() {
             grade
         }
 
-        await updateDoc(
-          userRef,
+        await saveUserProfile(
+          user.uid,
           dataToSave
         )
 
@@ -478,6 +535,7 @@ export default function Profile() {
         )
 
         toast.error(
+          error?.message ||
           'Cập nhật thông tin thất bại'
         )
       } finally {

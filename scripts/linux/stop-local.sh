@@ -2,20 +2,11 @@
 
 set -Eeuo pipefail
 
-# File nằm tại: PROJECT_ROOT/scripts/linux/stop-local.sh
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-# Các cổng được sử dụng bởi dự án KHKT_26
 PROJECT_PORTS=(
-    4000  # Firebase Emulator UI
-    4400  # Firebase Emulator Hub
-    4500  # Firebase Emulator Logging
     5000  # Flask backend
     5173  # Vite frontend
-    8080  # Firestore Emulator
-    9000  # Realtime Database Emulator
-    9099  # Firebase Auth Emulator
-    9199  # Firebase Storage Emulator
 )
 
 is_valid_pid() {
@@ -36,17 +27,14 @@ stop_process_tree() {
         return 0
     fi
 
-    # Lấy và dừng các tiến trình con trước
     children="$(pgrep -P "$pid" 2>/dev/null || true)"
 
     for child in $children; do
         stop_process_tree "$child"
     done
 
-    # Dừng nhẹ nhàng
     kill -TERM "$pid" 2>/dev/null || true
 
-    # Chờ tối đa khoảng 3 giây
     for _ in {1..10}; do
         if ! kill -0 "$pid" 2>/dev/null; then
             return 0
@@ -55,7 +43,6 @@ stop_process_tree() {
         sleep 0.3
     done
 
-    # Buộc dừng nếu vẫn còn
     kill -KILL "$pid" 2>/dev/null || true
 }
 
@@ -91,7 +78,6 @@ stop_port() {
     local port="$1"
     local pids pid
 
-    # Chỉ lấy các tiến trình đang LISTEN trên đúng cổng
     pids="$(
         lsof -t \
             -iTCP:"$port" \
@@ -114,19 +100,17 @@ stop_port() {
     done
 }
 
-echo "Đang dừng các dịch vụ local..."
+echo "Đang dừng các dịch vụ ZUNY local..."
 echo "Thư mục dự án: $PROJECT_ROOT"
 echo
 
-# Dừng bằng PID file trước
-for name in frontend backend emulators; do
+for name in frontend backend; do
     stop_from_pid_file "$name"
 done
 
 echo
 echo "Đang kiểm tra các cổng còn sót..."
 
-# Dọn các tiến trình còn giữ cổng của dự án
 for port in "${PROJECT_PORTS[@]}"; do
     stop_port "$port"
 done
@@ -144,7 +128,7 @@ for port in "${PROJECT_PORTS[@]}"; do
 done
 
 if (( remaining == 0 )); then
-    echo "Đã dừng toàn bộ dịch vụ local."
+    echo "Đã dừng toàn bộ dịch vụ ZUNY local."
 else
     echo "Một số dịch vụ chưa dừng hoàn toàn."
     echo "Kiểm tra bằng:"

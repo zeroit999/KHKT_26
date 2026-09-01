@@ -1,33 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import {
-  addDoc,
-  arrayRemove,
-  arrayUnion,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  onSnapshot,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-} from 'firebase/firestore'
-import { onAuthStateChanged } from 'firebase/auth'
-import { auth, db } from '../../components/firebase'
+import eLearningApi from '../../services/eLearningApi.js'
+import { useAuth } from '../../contexts/AuthContext.jsx'
 import { CourseGateState, DetailHeader, DescriptionBox, MainLearningViewer, DetailSidebar, PlaylistPanel, OverviewList, CBTStudyPanel, LessonDetailBlock, EmptyLearningState, NotesPanel, MiniQuizPanel, RatingStars, QAPanel, NextCoursePanel, CompletionModal, HonestyWarningModal } from './e-learning-detail/components/DetailComponents'
 import { useDarkMode, isCourseLocked, canAccessCourseByClass, getUserClassName, isTeacherRole, getRatingAverage, normalizeTextList, normalizeChecklist, normalizeQuiz, getYoutubeVideoId, markAllChecklistDone, getLocalDateKey, canTrackLearningProgress, isStudentRole, getOpenAtMs, normalizeText, formatOpenAt, stripHtml } from './e-learning-detail/utils/detailUtils'
+
+
+const getTime = (value) => {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'string') return new Date(value).getTime() || 0
+  return Number(value?.seconds || 0) * 1000
+}
+
+const normalizeCourses = (payload) => Array.isArray(payload?.courses) ? payload.courses : []
+const normalizeSavedLists = (payload) =>
+  (Array.isArray(payload?.lists) ? payload.lists : [])
+    .sort((a, b) => getTime(b.updatedAt || b.createdAt) - getTime(a.updatedAt || a.createdAt))
+
+const teacherIdFromCourse = (courseData) => String(
+  courseData?.teacherId ||
+  courseData?.createdByUid ||
+  courseData?.createdBy ||
+  courseData?.ownerId ||
+  courseData?.userId ||
+  courseData?.uid ||
+  ''
+)
 
 function CourseDetail() {
   const { id: courseId } = useParams()
   const navigate = useNavigate()
-  const [currentUser, setCurrentUser] = useState(null)
-  const [currentRole, setCurrentRole] = useState('STUDENT')
-  const [userProfile, setUserProfile] = useState(null)
+  const { user: currentUser, userDetails } = useAuth()
+  const userProfile = userDetails || null
+  const currentRole =
+    userProfile?.role ||
+    userProfile?.Role ||
+    userProfile?.accountType ||
+    userProfile?.userRole ||
+    userProfile?.type ||
+    'STUDENT'
   const [userClassMemberships, setUserClassMemberships] = useState([])
   const [userClassMembershipsLoading, setUserClassMembershipsLoading] = useState(false)
   const [courseTeacherProfile, setCourseTeacherProfile] = useState(null)
@@ -46,7 +59,35 @@ function CourseDetail() {
   const [quizSubmitted, setQuizSubmitted] = useState(false)
   const [completionOpen, setCompletionOpen] = useState(false)
   const [nextCourse, setNextCourse] = useState(null)
-  const [activeDetailTab, setActiveDetailTab] = useState('overview')
+  const validDetailTabIds = useMemo(
+    () => new Set([
+      'overview',
+      'notes',
+      'quiz',
+      'rating',
+      'qa',
+    ]),
+    [],
+  )
+
+  const getDetailTabFromUrl = () => {
+    if (typeof window === 'undefined') {
+      return 'overview'
+    }
+
+    const requestedTab =
+      new URLSearchParams(
+        window.location.search,
+      ).get('tab')
+
+    return requestedTab &&
+      validDetailTabIds.has(requestedTab)
+      ? requestedTab
+      : 'overview'
+  }
+
+  const [activeDetailTab, setActiveDetailTab] =
+    useState(getDetailTabFromUrl)
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [shareNotice, setShareNotice] = useState(false)
@@ -116,13 +157,19 @@ function CourseDetail() {
 
     async function loadPlaylistCourses() {
       try {
-        const items = await Promise.all(playlistCourseIds.map(async (id) => {
-          const snapshot = await getDoc(doc(db, 'courses', id))
-          if (!snapshot.exists()) return null
-          const data = { id: snapshot.id, ...snapshot.data() }
-          const status = String(data.status || data.moderationStatus || 'approved').toLowerCase()
-          return status === 'deleted' ? null : data
-        }))
+        const items = await Promise.all(
+          playlistCourseIds.map(async (id) => {
+            try {
+              const response = await eLearningApi.course(id)
+              const data = response?.course || null
+              if (!data) return null
+              const status = String(data.status || data.moderationStatus || 'approved').toLowerCase()
+              return status === 'deleted' ? null : data
+            } catch {
+              return null
+            }
+          }),
+        )
         if (!cancelled) setPlaylistCourses(items.filter(Boolean))
       } catch (error) {
         console.warn('Không thể tải danh sách phát trong trang chi tiết:', error)
@@ -137,7 +184,11 @@ function CourseDetail() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('tab') !== 'qa') return
-    setActiveDetailTab('qa')
+    setActiveDetailTab(
+      validDetailTabIds.has('qa')
+        ? 'qa'
+        : 'overview',
+    )
     setFocusedQuestionId(String(params.get('questionId') || ''))
     setFocusedReplyId(String(params.get('replyId') || ''))
     window.setTimeout(() => document.getElementById('detail-qa')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
@@ -162,59 +213,60 @@ function CourseDetail() {
   }, [])
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user)
-      if (!user) {
-        setCurrentRole('STUDENT')
-        setUserProfile(null)
-        setUserClassMemberships([])
-        setUserClassMembershipsLoading(false)
-        return
-      }
-      setUserClassMembershipsLoading(true)
-      try {
-        const userSnap = await getDoc(doc(db, 'users', user.uid))
-        if (userSnap.exists()) {
-          const userData = userSnap.data()
-          setUserProfile(userData)
-          setCurrentRole(userData.role || userData.Role || userData.accountType || userData.userRole || userData.type || 'STUDENT')
-        } else {
-          setUserProfile(null)
-          setCurrentRole('STUDENT')
-        }
-      } catch (error) {
-        console.error('Lỗi khi lấy role:', error)
-        setCurrentRole('STUDENT')
-        setUserProfile(null)
-      }
-    })
-    return () => unsubscribe()
-  }, [])
-
-  useEffect(() => {
     if (!currentUser?.uid) {
       setUserClassMemberships([])
       setUserClassMembershipsLoading(false)
       return undefined
     }
 
+    let cancelled = false
     setUserClassMembershipsLoading(true)
-    const membershipQuery = query(collection(db, 'classes'), where('memberIds', 'array-contains', currentUser.uid))
-    const unsubscribe = onSnapshot(
-      membershipQuery,
-      (snapshot) => {
-        setUserClassMemberships(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-        setUserClassMembershipsLoading(false)
-      },
-      (error) => {
-        console.warn('Không thể đồng bộ lớp để kiểm tra quyền xem E-learning:', error)
-        setUserClassMemberships([])
-        setUserClassMembershipsLoading(false)
-      },
-    )
 
-    return () => unsubscribe()
-  }, [currentUser?.uid])
+    async function loadMemberships() {
+      const profileClassName = String(getUserClassName(userProfile) || '').trim()
+      const profileGrade = String(userProfile?.grade || userProfile?.Grade || '').trim()
+
+      try {
+        const response = await eLearningApi.classrooms()
+        const classes = Array.isArray(response?.classes) ? response.classes : []
+        const matched = classes.filter((item) => {
+          const name = String(item?.name || item?.className || '').trim()
+          const grade = String(item?.grade || '').trim()
+          return (
+            (profileClassName && name.toLowerCase() === profileClassName.toLowerCase()) ||
+            (profileGrade && grade === profileGrade)
+          )
+        })
+
+        if (!cancelled) {
+          setUserClassMemberships(
+            matched.length
+              ? matched
+              : (profileClassName || profileGrade
+                  ? [{ id: '', name: profileClassName, className: profileClassName, grade: profileGrade }]
+                  : []),
+          )
+        }
+      } catch (error) {
+        console.warn('Không thể đồng bộ lớp để kiểm tra quyền xem E-learning:', error)
+        if (!cancelled) {
+          setUserClassMemberships(
+            profileClassName || profileGrade
+              ? [{ id: '', name: profileClassName, className: profileClassName, grade: profileGrade }]
+              : [],
+          )
+        }
+      } finally {
+        if (!cancelled) setUserClassMembershipsLoading(false)
+      }
+    }
+
+    loadMemberships()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentUser?.uid, userProfile])
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -222,43 +274,43 @@ function CourseDetail() {
       return undefined
     }
 
-    const unsubscribe = onSnapshot(
-      collection(db, 'courseSavedLists'),
-      (snapshot) => {
-        const items = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .filter((item) => String(item.ownerId || '') === String(currentUser.uid))
-          .sort((a, b) => {
-            const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?.seconds * 1000 || a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0
-            const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?.seconds * 1000 || b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0
-            return bTime - aTime
-          })
-        setSavedLists(items)
-      },
-      (error) => console.warn('Không thể đồng bộ danh sách lưu:', error),
-    )
+    let cancelled = false
 
-    return () => unsubscribe()
+    async function loadSavedLists() {
+      try {
+        const response = await eLearningApi.savedLists()
+        if (!cancelled) setSavedLists(normalizeSavedLists(response))
+      } catch (error) {
+        console.warn('Không thể đồng bộ danh sách lưu:', error)
+        if (!cancelled) setSavedLists([])
+      }
+    }
+
+    loadSavedLists()
+    const timer = window.setInterval(loadSavedLists, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [currentUser?.uid])
 
   async function fetchCourseTeacherProfile(courseData) {
     try {
-      const teacherId =
-        courseData?.teacherId ||
-        courseData?.createdByUid ||
-        courseData?.createdBy ||
-        courseData?.ownerId ||
-        courseData?.userId ||
-        courseData?.uid ||
-        ''
+      const teacherId = teacherIdFromCourse(courseData)
 
       if (!teacherId) {
         setCourseTeacherProfile(null)
         return
       }
 
-      const teacherSnap = await getDoc(doc(db, 'users', String(teacherId)))
-      setCourseTeacherProfile(teacherSnap.exists() ? teacherSnap.data() : null)
+      const response = await eLearningApi.forumUsers()
+      const users = Array.isArray(response?.users) ? response.users : []
+      const teacher = users.find((item) =>
+        String(item?.id || item?.uid || item?.user_id || '') === String(teacherId),
+      )
+
+      setCourseTeacherProfile(teacher || null)
     } catch (error) {
       console.warn('Không thể lấy tên giáo viên hiện tại:', error)
       setCourseTeacherProfile(null)
@@ -267,38 +319,44 @@ function CourseDetail() {
 
   async function fetchNextCourseSuggestion(courseData, currentId) {
     try {
-      const [courseSnapshot, progressSnapshot] = await Promise.all([
-        getDocs(collection(db, 'courses')),
-        currentUser?.uid
-          ? getDocs(collection(db, 'learningStats', currentUser.uid, 'courses'))
-          : Promise.resolve({ docs: [] }),
-      ])
+      const courseResponse = await eLearningApi.courses({ limit: 500 })
+      const allCourses = normalizeCourses(courseResponse)
+
+      const progressPairs = await Promise.all(
+        allCourses.map(async (item) => {
+          if (!currentUser?.uid) return [String(item.id), null]
+          try {
+            const response = await eLearningApi.progress(item.id)
+            return [String(item.id), response?.progress || null]
+          } catch {
+            return [String(item.id), null]
+          }
+        }),
+      )
 
       const completedCourseIds = new Set(
-        progressSnapshot.docs
-          .filter((item) => {
-            const data = item.data() || {}
-            return Number(data.progress || data.percent || data.completion || 0) >= 100 || Boolean(data.completedAt)
-          })
-          .map((item) => String(item.id)),
+        progressPairs
+          .filter(([, progress]) =>
+            Number(progress?.progress || progress?.percent || progress?.completion || 0) >= 100 ||
+            Boolean(progress?.completedAt),
+          )
+          .map(([id]) => id),
       )
 
       completedCourseIds.add(String(currentId))
 
       const studentClass = getUserClassName(userProfile)
       const teacherCanViewAll = isTeacherRole(currentRole)
-      const eligibleCourses = courseSnapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => {
-          const status = String(item.status || item.moderationStatus || 'approved').toLowerCase()
-          const visibility = String(item.visibility || 'public').toLowerCase()
-          if (status !== 'approved' || status === 'deleted') return false
-          if (visibility === 'class') return false
-          if (completedCourseIds.has(String(item.id))) return false
-          if (!teacherCanViewAll && isCourseLocked(item)) return false
-          if (!teacherCanViewAll && !canAccessCourseByClass(item, studentClass)) return false
-          return true
-        })
+      const eligibleCourses = allCourses.filter((item) => {
+        const status = String(item.status || item.moderationStatus || 'approved').toLowerCase()
+        const visibility = String(item.visibility || 'public').toLowerCase()
+        if (status !== 'approved' || status === 'deleted') return false
+        if (visibility === 'class') return false
+        if (completedCourseIds.has(String(item.id))) return false
+        if (!teacherCanViewAll && isCourseLocked(item)) return false
+        if (!teacherCanViewAll && !canAccessCourseByClass(item, studentClass)) return false
+        return true
+      })
 
       if (!eligibleCourses.length) {
         setNextCourse(null)
@@ -316,27 +374,33 @@ function CourseDetail() {
   useEffect(() => {
     async function fetchCourseDetail() {
       try {
-        const courseRef = doc(db, 'courses', courseId)
-        const courseSnap = await getDoc(courseRef)
-        if (courseSnap.exists()) {
-          const courseData = { id: courseSnap.id, ...courseSnap.data() }
-          setRealCourseId(courseSnap.id)
+        let courseData = null
+
+        if (/^\d+$/.test(String(courseId || ''))) {
+          try {
+            const response = await eLearningApi.course(courseId)
+            courseData = response?.course || null
+          } catch {
+            courseData = null
+          }
+        }
+
+        if (!courseData) {
+          const response = await eLearningApi.courses({ limit: 500 })
+          const decodedTitle = decodeURIComponent(courseId)
+          courseData = normalizeCourses(response).find(
+            (item) => String(item?.title || '') === decodedTitle,
+          ) || null
+        }
+
+        if (courseData) {
+          setRealCourseId(courseData.id)
           setCourse(courseData)
           await fetchCourseTeacherProfile(courseData)
-          await fetchNextCourseSuggestion(courseData, courseSnap.id)
+          await fetchNextCourseSuggestion(courseData, courseData.id)
           return
         }
-        const titleQuery = query(collection(db, 'courses'), where('title', '==', decodeURIComponent(courseId)))
-        const titleSnapshot = await getDocs(titleQuery)
-        if (!titleSnapshot.empty) {
-          const firstCourse = titleSnapshot.docs[0]
-          const courseData = { id: firstCourse.id, ...firstCourse.data() }
-          setRealCourseId(firstCourse.id)
-          setCourse(courseData)
-          await fetchCourseTeacherProfile(courseData)
-          await fetchNextCourseSuggestion(courseData, firstCourse.id)
-          return
-        }
+
         setCourse(null)
       } catch (error) {
         console.error('Lỗi khi lấy chi tiết bài học:', error)
@@ -345,8 +409,10 @@ function CourseDetail() {
         setLoading(false)
       }
     }
+
     fetchCourseDetail()
   }, [courseId])
+
 
 
   useEffect(() => {
@@ -357,40 +423,59 @@ function CourseDetail() {
   useEffect(() => {
     if (!realCourseId) return undefined
 
-    const courseRef = doc(db, 'courses', realCourseId)
-    const unsubscribe = onSnapshot(
-      courseRef,
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          setCourse(null)
-          setLoading(false)
-          return
-        }
-        setCourse((previous) => ({ ...(previous || {}), id: snapshot.id, ...snapshot.data() }))
-      },
-      (error) => console.warn('Không thể đồng bộ lượt xem và đánh giá:', error),
-    )
+    let cancelled = false
 
-    return () => unsubscribe()
+    async function refreshCourse() {
+      try {
+        const response = await eLearningApi.course(realCourseId)
+        if (!cancelled && response?.course) {
+          setCourse((previous) => ({ ...(previous || {}), ...response.course }))
+        }
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể đồng bộ lượt xem và đánh giá:', error)
+      }
+    }
+
+    const timer = window.setInterval(refreshCourse, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [realCourseId])
+
 
   useEffect(() => {
     if (!realCourseId) return undefined
-    const unsubscribe = onSnapshot(
-      collection(db, 'courses', realCourseId, 'ratings'),
-      (snapshot) => setRatingItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể đồng bộ danh sách đánh giá:', error),
-    )
-    return () => unsubscribe()
+
+    let cancelled = false
+
+    async function loadRatings() {
+      try {
+        const response = await eLearningApi.ratings(realCourseId)
+        if (!cancelled) setRatingItems(Array.isArray(response?.ratings) ? response.ratings : [])
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể đồng bộ danh sách đánh giá:', error)
+      }
+    }
+
+    loadRatings()
+    const timer = window.setInterval(loadRatings, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [realCourseId])
+
 
   useEffect(() => {
     if (!currentUser || !realCourseId || !canTrackLearningProgress(currentRole)) return
+
     async function loadLearningRecord() {
       try {
-        const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
-        const progressSnap = await getDoc(progressRef)
-        const data = progressSnap.exists() ? progressSnap.data() : {}
+        const response = await eLearningApi.progress(realCourseId)
+        const data = response?.progress || {}
         setLearningRecord(data)
         setNoteDraft(data.notes || '')
         setNoteColor(data.noteColor || (isDarkMode ? '#ffffff' : '#000000'))
@@ -400,75 +485,39 @@ function CourseDetail() {
         setLearningRecord({})
       }
     }
+
     loadLearningRecord()
   }, [currentUser, realCourseId, currentRole, isDarkMode])
 
+
   useEffect(() => {
     if (!currentUser || !realCourseId || !course || !canTrackLearningProgress(currentRole)) return
+
     async function saveLearningProgress() {
       try {
         const today = getLocalDateKey()
-        const statsRef = doc(db, 'learningStats', currentUser.uid)
-        const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
-        const progressSnap = await getDoc(progressRef)
-        const alreadyWatched = progressSnap.exists()
         const hasYoutubeLesson =
           Boolean(course.youtubeUrl) ||
           (Array.isArray(course.lessons) &&
-            course.lessons.some((lesson) => (lesson.attachMode || 'youtube') === 'youtube' && lesson.youtubeUrl))
+            course.lessons.some((lesson) =>
+              (lesson.attachMode || 'youtube') === 'youtube' &&
+              lesson.youtubeUrl,
+            ))
 
-        await setDoc(
-          progressRef,
-          {
-            courseId: realCourseId,
-            lastWatchedAt: serverTimestamp(),
-            lastViewedAt: serverTimestamp(),
-            watchedDate: today,
-            ...(hasYoutubeLesson ? {} : { progress: 100, watchedSeconds: 10 }),
-          },
-          { merge: true },
-        )
+        await eLearningApi.updateProgress(realCourseId, {
+          watchedDate: today,
+          markViewed: true,
+          markWatched: true,
+          ...(hasYoutubeLesson ? {} : { progress: 100, watchedSeconds: 10 }),
+        })
 
-        const statsSnap = await getDoc(statsRef)
-        const statsData = statsSnap.exists() ? statsSnap.data() : {}
-        const oldDates = Array.isArray(statsData.watchedDates) ? statsData.watchedDates : []
-        const oldCourseIds = Array.isArray(statsData.watchedCourseIds) ? statsData.watchedCourseIds : []
-        const nextDates = oldDates.includes(today) ? oldDates : [...oldDates, today]
-        const nextCourseIds = oldCourseIds.includes(realCourseId) ? oldCourseIds : [...oldCourseIds, realCourseId]
-
-        await setDoc(
-          statsRef,
-          {
-            watchedLessons: nextCourseIds.length,
-            watchedCourses: nextCourseIds.length,
-            watchedCourseIds: nextCourseIds,
-            watchedDates: nextDates,
-            firstWatchedAt: statsData.firstWatchedAt || serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
-        )
         try {
-          const courseRef = doc(db, 'courses', realCourseId)
-          const uniqueViewRef = doc(db, 'courseViews', realCourseId, 'users', currentUser.uid)
-          let countedNewView = false
+          const viewResponse = await eLearningApi.addView(realCourseId)
 
-          await runTransaction(db, async (transaction) => {
-            const uniqueViewSnap = await transaction.get(uniqueViewRef)
-            if (uniqueViewSnap.exists()) return
-
-            transaction.set(uniqueViewRef, {
-              courseId: realCourseId,
-              userId: currentUser.uid,
-              userEmail: currentUser.email || '',
-              firstViewedAt: serverTimestamp(),
-            })
-            transaction.update(courseRef, { views: increment(1) })
-            countedNewView = true
-          })
-
-          if (countedNewView) {
-            setCourse((previous) => previous ? { ...previous, views: Number(previous.views || 0) + 1 } : previous)
+          if (viewResponse?.created) {
+            setCourse((previous) =>
+              previous ? { ...previous, views: Number(previous.views || 0) + 1 } : previous,
+            )
           }
         } catch (error) {
           console.warn('Không thể ghi nhận lượt xem duy nhất:', error)
@@ -477,47 +526,32 @@ function CourseDetail() {
         console.error('Lỗi khi lưu tiến độ học:', error)
       }
     }
+
     saveLearningProgress()
   }, [currentUser, realCourseId, course, currentRole, userProfile])
 
+
   async function updateLearningRecord(partial) {
     if (!currentUser || !realCourseId || !canTrackLearningProgress(currentRole)) return
-    try {
-      const today = getLocalDateKey()
-      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
-      const statsRef = doc(db, 'learningStats', currentUser.uid)
-      await setDoc(
-        progressRef,
-        {
-          courseId: realCourseId,
-          ...partial,
-          watchedDate: today,
-          lastViewedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
-      setLearningRecord((prev) => ({ ...prev, ...partial }))
 
-      const statsSnap = await getDoc(statsRef)
-      const statsData = statsSnap.exists() ? statsSnap.data() : {}
-      const oldDates = Array.isArray(statsData.watchedDates) ? statsData.watchedDates : []
-      const oldCourseIds = Array.isArray(statsData.watchedCourseIds) ? statsData.watchedCourseIds : []
-      await setDoc(
-        statsRef,
-        {
-          watchedDates: oldDates.includes(today) ? oldDates : [...oldDates, today],
-          watchedCourseIds: oldCourseIds.includes(realCourseId) ? oldCourseIds : [...oldCourseIds, realCourseId],
-          watchedLessons: oldCourseIds.includes(realCourseId) ? oldCourseIds.length : oldCourseIds.length + 1,
-          watchedCourses: oldCourseIds.includes(realCourseId) ? oldCourseIds.length : oldCourseIds.length + 1,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
+    try {
+      const response = await eLearningApi.updateProgress(realCourseId, {
+        ...partial,
+        watchedDate: getLocalDateKey(),
+        markViewed: true,
+        completed: Number(partial?.progress || 0) >= 100 || Boolean(partial?.completedAt),
+      })
+
+      setLearningRecord((prev) => ({
+        ...prev,
+        ...partial,
+        ...(response?.progress || {}),
+      }))
     } catch (error) {
       console.error('Không thể cập nhật tiến độ CBT:', error)
     }
   }
+
 
   function handleToggleChecklist(itemId) {
     const currentChecklist = learningRecord.completedChecklist || {}
@@ -546,24 +580,54 @@ function CourseDetail() {
       return
     }
     if (savingDestination) return
+
     try {
       setSavingDestination('remove')
-      await setDoc(doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId), {
-        courseId: realCourseId,
+
+      await eLearningApi.updateProgress(realCourseId, {
         bookmarked: false,
-        unsavedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
+        markViewed: true,
+      })
 
       const containingLists = savedLists.filter((list) =>
-        Array.isArray(list.courseIds) && list.courseIds.map(String).includes(String(realCourseId)),
+        Array.isArray(list.courseIds) &&
+        list.courseIds.map(String).includes(String(realCourseId)),
       )
-      await Promise.all(containingLists.map((list) => updateDoc(doc(db, 'courseSavedLists', list.id), {
-        courseIds: arrayRemove(realCourseId),
-        updatedAt: serverTimestamp(),
-      })))
 
-      setLearningRecord((current) => ({ ...current, bookmarked: false }))
+      const updatedLists = await Promise.all(
+        containingLists.map(async (list) => {
+          const nextCourseIds = (list.courseIds || [])
+            .map(String)
+            .filter((courseId) => courseId !== String(realCourseId))
+
+          const response = await eLearningApi.updateSavedList(list.id, {
+            courseIds: nextCourseIds,
+          })
+
+          return response?.list || {
+            ...list,
+            courseIds: nextCourseIds,
+          }
+        }),
+      )
+
+      if (updatedLists.length) {
+        const updatedMap = new Map(
+          updatedLists.map((list) => [String(list.id), list]),
+        )
+
+        setSavedLists((current) =>
+          current.map((list) =>
+            updatedMap.get(String(list.id)) || list,
+          ),
+        )
+      }
+
+      setLearningRecord((current) => ({
+        ...current,
+        bookmarked: false,
+      }))
+
       setSaveNotice({ removed: true })
       window.setTimeout(() => setSaveNotice(null), 2600)
     } catch (error) {
@@ -574,29 +638,60 @@ function CourseDetail() {
     }
   }
 
+
   async function saveCourseToDestination(savedList = null) {
     if (!currentUser?.uid || !realCourseId || savingDestination) return
     const destinationId = savedList?.id || 'private'
+
     try {
       setSavingDestination(destinationId)
-      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', realCourseId)
-      await setDoc(progressRef, {
-        courseId: realCourseId,
+
+      await eLearningApi.updateProgress(realCourseId, {
         bookmarked: true,
-        savedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
+        markViewed: true,
+      })
 
       if (savedList?.id) {
-        await updateDoc(doc(db, 'courseSavedLists', savedList.id), {
-          courseIds: arrayUnion(realCourseId),
-          updatedAt: serverTimestamp(),
-        })
+        const nextCourseIds = Array.from(
+          new Set([
+            ...(Array.isArray(savedList.courseIds)
+              ? savedList.courseIds.map(String)
+              : []),
+            String(realCourseId),
+          ]),
+        )
+
+        const response = await eLearningApi.updateSavedList(
+          savedList.id,
+          {
+            courseIds: nextCourseIds,
+          },
+        )
+
+        const updatedList = response?.list || {
+          ...savedList,
+          courseIds: nextCourseIds,
+        }
+
+        setSavedLists((current) =>
+          current.map((item) =>
+            String(item.id) === String(savedList.id)
+              ? updatedList
+              : item,
+          ),
+        )
       }
 
-      setLearningRecord((current) => ({ ...current, bookmarked: true }))
+      setLearningRecord((current) => ({
+        ...current,
+        bookmarked: true,
+      }))
+
       setSavePickerOpen(false)
-      setSaveNotice({ destination: savedList?.title || 'Đã lưu riêng' })
+      setSaveNotice({
+        destination: savedList?.title || 'Đã lưu riêng',
+      })
+
       window.setTimeout(() => setSaveNotice(null), 2600)
     } catch (error) {
       console.error('Không thể lưu bài học:', error)
@@ -605,6 +700,7 @@ function CourseDetail() {
       setSavingDestination('')
     }
   }
+
 
   function handleQuizAnswer(questionIndex, optionIndex, statementIndex = null) {
     if (quizSubmitted) return
@@ -650,23 +746,24 @@ function CourseDetail() {
   async function createCourseOwnerNotification(notificationId, payload = {}) {
     const ownerId = String(teacherId || '')
     if (!ownerId || !notificationId) return
+
     try {
-      const dismissalRef = doc(db, 'users', ownerId, 'elearningNotificationDismissals', notificationId)
-      const dismissalSnap = await getDoc(dismissalRef)
-      if (dismissalSnap.exists()) return
-      await setDoc(doc(db, 'users', ownerId, 'elearningNotifications', notificationId), {
+      await eLearningApi.createNotification({
+        legacyId: notificationId,
+        userId: ownerId,
         title: payload.title || 'Thông báo bài học',
         message: payload.message || '',
         type: payload.type || 'course_activity',
-        courseId: realCourseId,
-        actorId: currentUser?.uid || '',
-        read: false,
-        createdAt: serverTimestamp(),
-      }, { merge: true })
+        data: {
+          courseId: realCourseId,
+          actorId: currentUser?.uid || '',
+        },
+      })
     } catch (error) {
       console.warn('Không thể tạo thông báo cho chủ bài học:', error)
     }
   }
+
 
   async function handleRating(value) {
     if (!currentUser) {
@@ -689,51 +786,40 @@ function CourseDetail() {
       setSelectedRating(value)
       setRatingBurst(true)
 
-      const courseRef = doc(db, 'courses', realCourseId)
-      const ratingRef = doc(db, 'courses', realCourseId, 'ratings', currentUser.uid)
-      let wasExistingRating = false
+      const oldRating = ratingItems.find(
+        (item) => String(item.userId || item.id || '') === String(currentUser.uid),
+      )
+      const wasExistingRating = Boolean(oldRating)
 
-      await runTransaction(db, async (transaction) => {
-        const [courseSnap, ratingSnap] = await Promise.all([
-          transaction.get(courseRef),
-          transaction.get(ratingRef),
-        ])
+      const response = await eLearningApi.rate(realCourseId, Number(value))
 
-        if (!courseSnap.exists()) throw new Error('Bài học không còn tồn tại.')
+      setCourse((previous) =>
+        previous
+          ? {
+              ...previous,
+              rating: Number(response?.average || previous.rating || 0),
+              ratingTotal: Number(response?.ratingTotal || previous.ratingTotal || 0),
+              ratingCount: Number(response?.ratingCount || previous.ratingCount || 0),
+            }
+          : previous,
+      )
 
-        const courseData = courseSnap.data()
-        wasExistingRating = ratingSnap.exists()
-        const oldRating = ratingSnap.exists() ? Number(ratingSnap.data().rating || 0) : 0
-        const currentTotal = Number(courseData.ratingTotal || 0)
-        const currentCount = Number(courseData.ratingCount || 0)
-        const nextTotal = currentTotal - oldRating + Number(value)
-        const nextCount = ratingSnap.exists() ? Math.max(1, currentCount) : currentCount + 1
-        const nextAverage = nextCount > 0 ? nextTotal / nextCount : 0
+      const reviewerName =
+        userProfile?.fullName ||
+        userProfile?.name ||
+        userProfile?.displayName ||
+        currentUser.displayName ||
+        currentUser.email ||
+        'Một người dùng'
 
-        transaction.set(
-          ratingRef,
-          {
-            userId: currentUser.uid,
-            rating: Number(value),
-            ...(ratingSnap.exists() ? {} : { createdAt: serverTimestamp() }),
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
-        )
-        transaction.update(courseRef, {
-          ratingTotal: nextTotal,
-          ratingCount: nextCount,
-          rating: nextAverage,
-          updatedAt: serverTimestamp(),
-        })
-      })
-
-      const reviewerName = userProfile?.fullName || userProfile?.name || userProfile?.displayName || currentUser.displayName || currentUser.email || 'Một người dùng'
       await createCourseOwnerNotification(`course_rating_${realCourseId}_${currentUser.uid}`, {
         type: 'course_rating',
         title: wasExistingRating ? 'Đánh giá bài học đã được cập nhật' : 'Bài học có đánh giá mới',
         message: `${reviewerName} ${wasExistingRating ? 'đã cập nhật đánh giá thành' : 'đã đánh giá'} ${Number(value)} sao cho “${stripHtml(course.title) || 'bài học của bạn'}”.`,
       })
+
+      const ratingsResponse = await eLearningApi.ratings(realCourseId)
+      setRatingItems(Array.isArray(ratingsResponse?.ratings) ? ratingsResponse.ratings : [])
 
       window.setTimeout(() => setRatingBurst(false), 650)
     } catch (error) {
@@ -743,6 +829,113 @@ function CourseDetail() {
       setSubmittingRating(false)
     }
   }
+
+
+  const changeDetailTab = (
+    tabId,
+    { replace = false } = {},
+  ) => {
+    const safeTab =
+      validDetailTabIds.has(String(tabId))
+        ? String(tabId)
+        : 'overview'
+
+    setActiveDetailTab(safeTab)
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const url = new URL(window.location.href)
+
+    if (safeTab === 'overview') {
+      url.searchParams.delete('tab')
+    } else {
+      url.searchParams.set('tab', safeTab)
+    }
+
+    /*
+     * questionId/replyId chỉ có ý nghĩa trong Q&A.
+     * Khi người dùng chủ động rời Q&A thì xóa chúng.
+     *
+     * Các query khác như playlist, playlistIndex,
+     * autoplay... được giữ nguyên.
+     */
+    if (safeTab !== 'qa') {
+      url.searchParams.delete('questionId')
+      url.searchParams.delete('replyId')
+    }
+
+    const nextUrl =
+      `${url.pathname}${url.search}${url.hash}`
+
+    if (replace) {
+      window.history.replaceState(
+        {},
+        '',
+        nextUrl,
+      )
+    } else {
+      window.history.pushState(
+        {},
+        '',
+        nextUrl,
+      )
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    const syncDetailTabFromUrl = () => {
+      const url =
+        new URL(window.location.href)
+
+      const requestedTab =
+        url.searchParams.get('tab')
+
+      const safeTab =
+        requestedTab &&
+        validDetailTabIds.has(requestedTab)
+          ? requestedTab
+          : 'overview'
+
+      setActiveDetailTab(safeTab)
+
+      /*
+       * URL tab không hợp lệ:
+       * fallback overview và canonicalize URL.
+       */
+      if (
+        requestedTab &&
+        requestedTab !== safeTab
+      ) {
+        url.searchParams.delete('tab')
+        url.searchParams.delete('questionId')
+        url.searchParams.delete('replyId')
+
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        )
+      }
+    }
+
+    window.addEventListener(
+      'popstate',
+      syncDetailTabFromUrl,
+    )
+
+    return () => {
+      window.removeEventListener(
+        'popstate',
+        syncDetailTabFromUrl,
+      )
+    }
+  }, [validDetailTabIds])
 
   if (loading) {
     return (
@@ -798,7 +991,7 @@ function CourseDetail() {
   }
 
   if (!canBypassAccessGate && userClassMembershipsLoading && ['class', 'private'].includes(visibility)) {
-    return <CourseGateState icon="⌛" title="Đang kiểm tra quyền truy cập" description="ZUNY đang đồng bộ lớp học của bạn từ Firebase." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} />
+    return <CourseGateState icon="⌛" title="Đang kiểm tra quyền truy cập" description="ZUNY đang đồng bộ lớp học của bạn từ máy chủ." onBack={() => navigate('/e-learning')} isDarkMode={isDarkMode} />
   }
 
   if (deniedByModeration) {
@@ -860,7 +1053,33 @@ function CourseDetail() {
   function handleSelectLesson(index) {
     setSelectedLessonIndex(index)
     setActiveDetailTab('content')
-    window.setTimeout(() => document.getElementById(`lesson-block-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+
+      url.searchParams.delete('tab')
+      url.searchParams.delete('questionId')
+      url.searchParams.delete('replyId')
+
+      window.history.replaceState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      )
+    }
+
+    window.setTimeout(
+      () =>
+        document
+          .getElementById(
+            `lesson-block-${index}`,
+          )
+          ?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          }),
+      80,
+    )
   }
 
   async function handleShareCourse() {
@@ -935,33 +1154,72 @@ function CourseDetail() {
 
   async function submitDetailReport(event) {
     event?.preventDefault?.()
-    if (!currentUser) { alert('Bạn cần đăng nhập để gửi báo cáo.'); return }
+    if (!currentUser) {
+      alert('Bạn cần đăng nhập để gửi báo cáo.')
+      return
+    }
     if (!reportReason) return
+
     try {
       setReportSubmitting(true)
-      const existing = await getDocs(query(collection(db, 'learningReports'), where('courseId', '==', realCourseId)))
-      const duplicated = existing.docs.some((item) => String(item.data()?.reporterId || item.data()?.userId || '') === String(currentUser.uid))
-      if (duplicated) { alert('Bạn đã báo cáo bài học này rồi. Quản trị viên đang xem xét nhé!'); setReportOpen(false); return }
-      const createdReportRef = await addDoc(collection(db, 'learningReports'), {
+
+      const existingResponse = await eLearningApi.reports()
+      const existingReports = Array.isArray(existingResponse?.reports) ? existingResponse.reports : []
+      const duplicated = existingReports.some((item) =>
+        String(item?.courseId || '') === String(realCourseId) &&
+        String(item?.reporterId || item?.userId || '') === String(currentUser.uid),
+      )
+
+      if (duplicated) {
+        alert('Bạn đã báo cáo bài học này rồi. Quản trị viên đang xem xét nhé!')
+        setReportOpen(false)
+        return
+      }
+
+      const createdReport = await eLearningApi.createReport({
         reportType: 'course',
-        courseId: realCourseId, courseTitle: stripHtml(course.title), courseOwnerId: teacherId,
-        reporterId: currentUser.uid, reporterName: userProfile?.fullName || userProfile?.name || currentUser.displayName || currentUser.email || 'Người dùng ZUNY',
-        reporterEmail: currentUser.email || '', userId: currentUser.uid, userEmail: currentUser.email || '',
-        reason: reportReason, detail: reportDetail.trim(), status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        courseId: realCourseId,
+        reportedUserId: teacherId || '',
+        reason: reportReason,
+        detail: reportDetail.trim(),
+        data: {
+          courseTitle: stripHtml(course.title),
+          courseOwnerId: teacherId,
+          reporterName:
+            userProfile?.fullName ||
+            userProfile?.name ||
+            currentUser.displayName ||
+            currentUser.email ||
+            'Người dùng ZUNY',
+          reporterEmail: currentUser.email || '',
+        },
       })
-      await setDoc(doc(db, 'users', currentUser.uid, 'elearningNotifications', `report_submitted_${createdReportRef.id}`), {
+
+      const reportId = createdReport?.reportId || ''
+
+      await eLearningApi.createNotification({
+        userId: currentUser.uid,
         title: 'Đã gửi báo cáo tới quản trị viên',
         message: `Báo cáo về bài học “${stripHtml(course.title) || 'Bài học'}” đã được tiếp nhận và đang chờ xử lý.`,
         type: 'report_submitted',
-        courseId: realCourseId,
-        reportId: createdReportRef.id,
-        actorId: currentUser.uid,
-        read: false,
-        createdAt: serverTimestamp(),
+        data: {
+          courseId: realCourseId,
+          reportId,
+          actorId: currentUser.uid,
+        },
       })
-      setReportOpen(false); setReportDetail(''); alert('Đã gửi báo cáo tới quản trị viên. Bạn sẽ nhận thông báo khi báo cáo được giải quyết.')
-    } catch (error) { console.error('Không thể gửi báo cáo:', error); alert('Chưa gửi được báo cáo. Vui lòng thử lại.') } finally { setReportSubmitting(false) }
+
+      setReportOpen(false)
+      setReportDetail('')
+      alert('Đã gửi báo cáo tới quản trị viên. Bạn sẽ nhận thông báo khi báo cáo được giải quyết.')
+    } catch (error) {
+      console.error('Không thể gửi báo cáo:', error)
+      alert('Chưa gửi được báo cáo. Vui lòng thử lại.')
+    } finally {
+      setReportSubmitting(false)
+    }
   }
+
 
 
   return (
@@ -997,7 +1255,7 @@ function CourseDetail() {
             </header>}<div className={`overflow-visible rounded-2xl border border-slate-200 bg-black shadow-xl shadow-slate-950/15 dark:border-white/10 dark:shadow-black/40 ${simulationFocusMode ? 'h-[calc(100dvh-84px)] rounded-xl border-white/10' : ''}`}><MainLearningViewer course={course} mainVideoLesson={mainVideoLesson} selectedLessonIndex={selectedLessonIndex} realCourseId={realCourseId} currentUser={currentUser} currentRole={currentRole} lessonCount={lessonCount} onSkipWarning={(warning)=>setSkipWarning(warning || {})} autoPlay={autoPlayEnabled} onEnded={handleAutoAdvance} focusMode={simulationFocusMode}/></div><div className={`mt-3 flex items-center gap-2 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-md shadow-slate-900/5 backdrop-blur-sm [scrollbar-width:none] dark:border-white/10 dark:bg-[#0c1a2f]/90 dark:shadow-black/25 [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-end sm:p-2.5 ${simulationFocusMode ? 'fixed right-3 top-3 z-[1210] mt-0 border-white/15 bg-black/75 shadow-2xl backdrop-blur-xl dark:bg-black/75' : ''}`}>{!simulationFocusMode && <button type="button" disabled={Boolean(savingDestination)} onClick={handleToggleBookmark} className={`group relative h-10 cursor-pointer overflow-hidden rounded-full border px-4 text-xs font-black transition-all duration-300 active:scale-95 disabled:cursor-wait disabled:opacity-70 ${learningRecord.bookmarked?'border-emerald-500 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25':'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white'}`}><span className="mr-2">{savingDestination==='remove'?'◌':learningRecord.bookmarked?'★':'☆'}</span>{savingDestination==='remove'?'Đang hủy lưu...':learningRecord.bookmarked?'Đang lưu':'Lưu bài học'}</button>}{isSimulationCourse && <button type="button" onClick={()=>setSimulationFocusMode((value)=>!value)} className={`h-10 rounded-full border px-4 text-xs font-black shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${simulationFocusMode?'border-violet-400 bg-violet-600 text-white':'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-400/25 dark:bg-violet-500/10 dark:text-violet-300 dark:hover:bg-violet-500/20'}`}><span className="mr-2">{simulationFocusMode?'↙':'⛶'}</span>{simulationFocusMode?'Thoát tập trung':'Chế độ tập trung'}</button>}{!simulationFocusMode && <button type="button" onClick={handleShareCourse} className="h-10 rounded-full border border-slate-300 bg-white px-4 text-xs font-black shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-md dark:border-slate-600 dark:bg-slate-800">↗ Chia sẻ</button>}{!simulationFocusMode && <button type="button" onClick={()=>setReportOpen(true)} className="h-10 rounded-full border border-rose-200 bg-white px-4 text-xs font-black text-rose-600 hover:bg-rose-50 dark:border-rose-400/20 dark:bg-white/5 dark:hover:bg-rose-500/10">⚑ Báo cáo</button>}</div>
 
             {!simulationFocusMode && <div className="mt-4 space-y-4">
-              <div className="sticky top-0 z-30 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 px-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#0c1a2f]/95 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div className="flex min-w-max gap-1">{detailTabs.map((tab)=><button key={tab.id} type="button" onClick={()=>setActiveDetailTab(tab.id)} className={`shrink-0 rounded-xl px-4 py-4 text-sm font-bold transition ${activeDetailTab===tab.id?'bg-blue-600 text-white shadow':'text-slate-600 hover:text-blue-700 dark:text-slate-300 dark:hover:text-sky-300'}`}>{tab.label}</button>)}</div></div>
+              <div className="sticky top-0 z-30 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 px-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#0c1a2f]/95 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><div className="flex min-w-max gap-1">{detailTabs.map((tab)=><button key={tab.id} type="button" onClick={()=>changeDetailTab(tab.id)} className={`shrink-0 rounded-xl px-4 py-4 text-sm font-bold transition ${activeDetailTab===tab.id?'bg-blue-600 text-white shadow':'text-slate-600 hover:text-blue-700 dark:text-slate-300 dark:hover:text-sky-300'}`}>{tab.label}</button>)}</div></div>
 
               {activeDetailTab==='overview' && <section id="detail-overview" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><h2 className="text-xl font-black">Tổng quát</h2><div className="mt-5 space-y-5"><section className="min-w-0"><h3 className="text-lg font-black">Mô tả bài học</h3><div className={`mt-3 w-full min-w-0 max-w-[900px] whitespace-normal break-words text-sm leading-7 text-slate-600 [overflow-wrap:anywhere] [&_*]:max-w-full [&_*]:whitespace-normal [&_*]:break-words dark:text-slate-300 ${descriptionExpanded?'':'line-clamp-3'}`} dangerouslySetInnerHTML={{__html:course.description||course.content||'Giáo viên chưa thêm mô tả bài học.'}}/><button type="button" onClick={()=>setDescriptionExpanded((value)=>!value)} className="mt-2 cursor-pointer text-sm font-bold text-blue-600">{descriptionExpanded?'Thu gọn':'Xem thêm'}</button></section><section className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><div className="grid min-w-0 gap-4 md:grid-cols-2"><OverviewList title="Bạn sẽ học được" items={learningObjectives} empty="Giáo viên chưa thêm mục tiêu học tập."/><OverviewList title="Kiến thức cần có" items={prerequisites} empty="Bài học này chưa yêu cầu kiến thức nền cụ thể."/></div><div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-4 text-sm dark:border-white/10"><div><p className="text-xs text-slate-500">Cấp lớp</p><b>{course.className||'Tất cả'}</b></div><div><p className="text-xs text-slate-500">Môn học</p><b>{course.category||'---'}</b></div><div className="min-w-0"><p className="text-xs text-slate-500">Chủ đề</p><b className="block w-full min-w-0 max-w-[220px] whitespace-normal break-words [overflow-wrap:anywhere]">{stripHtml(course.topic)||'---'}</b></div><div><p className="text-xs text-slate-500">{isSimulationCourse?'Ngôn ngữ':'Thời lượng'}</p><b>{isSimulationCourse?simulationLanguageLabel:(course.duration||course.estimatedMinutes||'---')}</b></div><div><p className="text-xs text-slate-500">Lượt xem</p><b>{Number(course.views||0).toLocaleString('vi-VN')}</b></div><div><p className="text-xs text-slate-500">Mã thẻ bài học</p><b className="break-all">{course.courseCode||realCourseId||'---'}</b></div><div><p className="text-xs text-slate-500">Cập nhật</p><b>{course.updatedAt?'Gần đây':'---'}</b></div></div></section><section className="rounded-2xl border border-slate-200 p-5 dark:border-white/10"><h3 className="font-black">Đánh giá từ học viên</h3><div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center"><div><div className="text-4xl font-black">{ratingAverage}</div><div className="text-amber-400">★★★★★</div><p className="mt-1 text-xs text-slate-500">({course.ratingCount||0} đánh giá)</p></div><div className="flex-1 space-y-2">{ratingDistribution.map(({star,count})=><div key={star} className="flex items-center gap-2 text-xs"><span>{star}★</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-amber-400" style={{width:`${ratingItems.length?Math.round(count/ratingItems.length*100):0}%`}}/></div><span className="w-8 text-right">{count}</span></div>)}</div></div></section></div></section>}
               {activeDetailTab==='notes' && <section id="detail-notes" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0c1a2f] sm:p-6"><NotesPanel noteDraft={noteDraft} setNoteDraft={setNoteDraft} noteColor={noteColor} setNoteColor={setNoteColor} savingNote={savingNote} onSave={handleSaveNotes}/></section>}

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 import {
   BrowserRouter,
@@ -16,18 +16,18 @@ import AppLayout from './components/layout/AppLayout.jsx';
 import LoadingSkeleton from './components/ui/LoadingSkeleton.jsx';
 import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx';
 
-import Home from './pages/Home.jsx';
-import Exams from './pages/exam/Exams.jsx';
-import ExamRoom from './pages/exam/ExamRoom.jsx';
-import ResultPage from './pages/exam/ResultPage.jsx';
-import Forum from './pages/forum/Forum.jsx';
-import ELearning from './pages/e-learning/E-learning.jsx';
-import ELearningDetail from './pages/e-learning/E-learningDetail.jsx';
-import LearningPage from './pages/learning/LearningPage.jsx';
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Exams = lazy(() => import('./pages/exam/Exams.jsx'))
+const ExamRoom = lazy(() => import('./pages/exam/ExamRoom.jsx'))
+const ResultPage = lazy(() => import('./pages/exam/ResultPage.jsx'))
+const Forum = lazy(() => import('./pages/forum/Forum.jsx'))
+const ELearning = lazy(() => import('./pages/e-learning/E-learning.jsx'))
+const ELearningDetail = lazy(() => import('./pages/e-learning/E-learningDetail.jsx'))
+const LearningPage = lazy(() => import('./pages/learning/LearningPage.jsx'))
 import Classes from './pages/learning/Classes.jsx';
 import Setup from './pages/setup/Setup.jsx';
 import NotFound from './pages/NotFound.jsx';
-import Setting from './pages/setting/Setting.jsx';
+const Setting = lazy(() => import('./pages/setting/Setting.jsx'))
 
 import Login from './components/Signpage/login.jsx';
 import Register from './components/Signpage/register.jsx';
@@ -178,9 +178,16 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   const { user, userDetails, isLoading } = useAuth();
 
   const normalizedPath = location.pathname.toLowerCase();
+  const isSettingsRoute = normalizedPath === '/settings';
+  const isLearningPageRoute = normalizedPath === '/learningpage';
+  const isHomeRoute = normalizedPath === '/';
   const isForumRoute = normalizedPath === '/forum';
   const isELearningLibraryRoute = normalizedPath === '/e-learning';
   const isELearningDetailRoute = normalizedPath.startsWith('/e-learning/');
+  const isAuthRoute =
+    location.pathname === '/login' ||
+    location.pathname === '/register';
+
 
   useEffect(() => {
     if (!isForumRoute) setIsForumChannelOpen(false);
@@ -214,7 +221,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.28, ease: 'easeOut' }}
           >
-            <Routes location={location}>
+            <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="text-sm font-semibold text-slate-500">Đang tải...</div></div>}><Routes location={location}>
               <Route
                 path="/setup"
                 element={
@@ -223,7 +230,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                   </ProtectedRoute>
                 }
               />
-            </Routes>
+            </Routes></Suspense>
           </motion.div>
         </AnimatePresence>
       </>
@@ -259,12 +266,21 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
         mainClassName={
+          isAuthRoute ||
+          isExamRoomRoute ||
+          isHomeRoute ||
+          isELearningLibraryRoute ||
+          isELearningDetailRoute ||
+          isLearningPageRoute ||
+          isSettingsRoute ||
           isForumRoute
-            ? (isForumChannelOpen ? 'h-screen pt-0' : 'min-h-[calc(100vh-80px)] pt-10')
-            : (isELearningDetailRoute ? 'pt-0' : 'pt-20')
+            ? 'pt-0'
+            : isForumRoute && isForumChannelOpen
+              ? 'h-screen pt-20'
+              : 'pt-20'
         }
-        showFooter={!isForumRoute && !isELearningLibraryRoute && !isELearningDetailRoute}
-        showNavbar={!(isELearningDetailRoute || (isForumRoute && isForumChannelOpen))}
+        showFooter={normalizedPath === '/'}
+        showNavbar={!isAuthRoute && !isExamRoomRoute}
         lockPageScroll={isForumRoute && isForumChannelOpen}
       >
         <AnimatePresence mode="wait">

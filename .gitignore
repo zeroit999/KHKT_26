@@ -24,18 +24,10 @@ build/
 backend/.env
 frontend/.env
 
-# Firebase Admin secret
-backend/config/firebase-admin-key.json
-
 # Local process files
 .local-*.pid
 .local-tools/
-.firebase-data/
-firebase-debug.log
 *-debug.log
-firebase-emulator.out.log
-firebase-emulator.err.log
-firebase-admin-key.json
 
 # Python
 __pycache__/
@@ -65,4 +57,74 @@ backend/users.db
 *.ntvs*
 *.njsproj
 *.sln
-backend/config/firebase-admin-key.json
+# ==============================
+# ZUNY local/generated files
+# ==============================
+
+# Environment / secrets
+.env.*
+!.env.example
+
+frontend/.env.*
+!frontend/.env.example
+
+backend/.env.*
+!backend/.env.example
+
+# Node
+
+# Vite build
+
+# Python environments
+venv311/
+backend/venv/
+backend/venv311/
+backend/.venv/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Local runtime
+*.pid
+*.sock
+
+backend/backend-local.log
+backend/backend-local.err.log
+backend/.local-backend.pid
+
+frontend/frontend-local.log
+frontend/frontend-local.err.log
+frontend/.local-frontend.pid
+
+# Temporary / backup
+*.tmp
+*.temp
+*.bak
+*.bak-*
+*~
+Thumbs.db
+
+# IDE
+.vscode/
+
+# OS/editor swap
+*.swp
+*.swo
+
+# Nested Python virtual environments
+**/lib/python*/site-packages/
+**/lib64/python*/site-packages/
+**/pyvenv.cfg
+
+# Project audit artifacts
+zuny-*-audit.txt
+*-audit.txt
+
+# Manual local E2E helpers
+backend/tests/manual_*_e2e.py

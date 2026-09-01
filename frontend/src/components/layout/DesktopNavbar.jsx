@@ -19,9 +19,6 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
-
-import { auth } from '../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
 import useResponsive from '../../hooks/common/useResponsive';
@@ -39,7 +36,7 @@ const normalizeRole = (role) =>
 export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, userDetails } = useAuth();
+  const { user, userDetails, logout } = useAuth();
 
   const [isHovered, setIsHovered] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
@@ -134,7 +131,7 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await logout();
       setIsAccountOpen(false);
       navigate('/login');
     } catch (error) {

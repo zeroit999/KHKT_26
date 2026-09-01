@@ -2,13 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
 import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-  updateProfile,
-} from 'firebase/auth'
-
-import {
   Bell,
   Check,
   ChevronLeft,
@@ -25,6 +18,7 @@ import {
 } from 'lucide-react'
 
 import { useAuth } from '../../contexts/AuthContext.jsx'
+import { authService } from '../../services/auth.js'
 import { settingsTabs } from '../../data/settingsData.js'
 import {
   getUserSettings,
@@ -35,7 +29,20 @@ import {
 export default function Setting({ darkMode, onToggleDarkMode }) {
   const { user, userDetails } = useAuth()
 
-  const [activeTab, setActiveTab] = useState('account')
+  const validTabIds = useMemo(
+    () => new Set(settingsTabs.map((tab) => String(tab.id))),
+    [],
+  )
+
+  const getTabFromUrl = () => {
+    if (typeof window === 'undefined') return 'account'
+    const requestedTab = new URLSearchParams(window.location.search).get('tab')
+    return requestedTab && validTabIds.has(requestedTab)
+      ? requestedTab
+      : 'account'
+  }
+
+  const [activeTab, setActiveTab] = useState(getTabFromUrl)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
@@ -154,12 +161,6 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
 
       await updateUserProfileField(user.uid, editModal.field, value)
 
-      if (editModal.field === 'fullName') {
-        await updateProfile(user, {
-          displayName: value,
-        })
-      }
-
       setLocalProfile((prev) => ({
         ...prev,
         [editModal.field]: value,
@@ -195,13 +196,42 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
         return
       }
 
-      const credential = EmailAuthProvider.credential(
-        user.email,
-        passwordForm.currentPassword,
+      const accessToken = authService.getAccessToken()
+
+      if (!accessToken) {
+        toast.error('Vui lòng đăng nhập lại trước khi đổi mật khẩu')
+        return
+      }
+
+      const apiBaseUrl =
+        import.meta.env.VITE_API_BASE_URL ||
+        'http://127.0.0.1:5000'
+
+      const response = await fetch(
+        `${apiBaseUrl}/auth/change-password`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            current_password: passwordForm.currentPassword,
+            new_password: passwordForm.newPassword,
+          }),
+        },
       )
 
-      await reauthenticateWithCredential(user, credential)
-      await updatePassword(user, passwordForm.newPassword)
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Đổi mật khẩu thất bại',
+        )
+      }
 
       setPasswordForm({
         currentPassword: '',
@@ -214,22 +244,10 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
     } catch (error) {
       console.error(error)
 
-      if (error.code === 'auth/wrong-password') {
-        toast.error('Mật khẩu hiện tại không đúng')
-        return
-      }
-
-      if (error.code === 'auth/too-many-requests') {
-        toast.error('Bạn thử quá nhiều lần, vui lòng quay lại sau')
-        return
-      }
-
-      if (error.code === 'auth/requires-recent-login') {
-        toast.error('Vui lòng đăng nhập lại trước khi đổi mật khẩu')
-        return
-      }
-
-      toast.error('Đổi mật khẩu thất bại')
+      toast.error(
+        error?.message ||
+          'Đổi mật khẩu thất bại',
+      )
     }
   }
 
@@ -243,9 +261,57 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
   }
 
   const handleChangeTab = (tabId) => {
-    setActiveTab(tabId)
+    const safeTab = validTabIds.has(String(tabId))
+      ? String(tabId)
+      : 'account'
+
+    setActiveTab(safeTab)
     setMobileSidebarOpen(false)
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+
+      if (safeTab === 'account') {
+        url.searchParams.delete('tab')
+      } else {
+        url.searchParams.set('tab', safeTab)
+      }
+
+      window.history.pushState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      )
+    }
   }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncTabFromUrl = () => {
+      const params = new URLSearchParams(window.location.search)
+      const requestedTab = params.get('tab')
+      const safeTab =
+        requestedTab && validTabIds.has(requestedTab)
+          ? requestedTab
+          : 'account'
+
+      setActiveTab(safeTab)
+
+      if (requestedTab && requestedTab !== safeTab) {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('tab')
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        )
+      }
+    }
+
+    window.addEventListener('popstate', syncTabFromUrl)
+    return () => window.removeEventListener('popstate', syncTabFromUrl)
+  }, [validTabIds])
 
   if (isLoading) {
     return (

@@ -1,6 +1,68 @@
 import { useEffect, useRef, useState } from 'react'
-import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
-import { db } from '../../../../components/firebase'
+
+const API_BASE_URL = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+async function apiRequest(path, {
+  method = 'GET',
+  body,
+} = {}) {
+  const token =
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('token') ||
+    ''
+
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    credentials: 'include',
+    body: body == null ? undefined : JSON.stringify(body),
+  })
+
+  let data = null
+
+  try {
+    data = await response.json()
+  } catch {
+    data = null
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.message ||
+      data?.error ||
+      `API request failed (${response.status})`,
+    )
+    error.status = response.status
+    error.code = data?.error || ''
+    error.retryAfter = Number(data?.retryAfter || 0)
+    throw error
+  }
+
+  return data
+}
+
+async function getCourseProgress(courseId) {
+  const response = await apiRequest(`/api/courses/${courseId}/progress`)
+  return response?.progress || null
+}
+
+async function patchCourseProgress(courseId, payload) {
+  const response = await apiRequest(`/api/courses/${courseId}/progress`, {
+    method: 'PATCH',
+    body: payload,
+  })
+
+  return response?.progress || null
+}
 import { getCurrentCourseTeacherName, getInitials, formatFullDateTime, stripHtml, getDifficultyLabel, formatEstimatedMinutes, getYoutubeVideoId, isPdfFile, getRatingAverage, normalizeChecklist, defaultLearningChecklist, getLocalDateKey, canTrackLearningProgress, loadYoutubeIframeApi, formatSeconds } from '../utils/detailUtils'
 
 
@@ -595,16 +657,20 @@ export function YoutubeProgressPlayer({
     warningActiveRef.current = false
     hasRestoredRef.current = false
 
+    const progressCacheRef = {
+      current: null,
+    }
+
     async function loadSavedProgress() {
       if (!currentUser || !courseId || !canTrackLearningProgress(currentRole)) return 0
 
       try {
-        const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', courseId)
-        const progressSnap = await getDoc(progressRef)
+        const data = await getCourseProgress(courseId)
 
-        if (!progressSnap.exists()) return 0
+        if (!data) return 0
 
-        const data = progressSnap.data()
+        progressCacheRef.current = data
+
         const lessonMaxWatchedSeconds = data.lessonMaxWatchedSeconds || {}
         const lessonWatchedSeconds = data.lessonWatchedSeconds || {}
         const savedTime =
@@ -633,47 +699,49 @@ export function YoutubeProgressPlayer({
           : Math.min(100, Math.round(((lessonIndex + lessonProgress / 100) / safeTotalLessons) * 100))
 
       const today = getLocalDateKey()
-      const statsRef = doc(db, 'learningStats', currentUser.uid)
-      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', courseId)
+      const cached = progressCacheRef.current || {}
 
-      await setDoc(
-        progressRef,
-        {
-          courseId,
-          progress: courseProgress,
-          watchedSeconds,
-          durationSeconds,
-          lastViewedAt: serverTimestamp(),
-          lastWatchedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          watchedDate: today,
-          [`lessonProgress.${lessonIndex}`]: lessonProgress,
-          [`lessonWatchedSeconds.${lessonIndex}`]: watchedSeconds,
-          [`lessonDurationSeconds.${lessonIndex}`]: durationSeconds,
-          [`lessonMaxWatchedSeconds.${lessonIndex}`]: watchedSeconds,
-        },
-        { merge: true },
-      )
+      const nextLessonProgress = {
+        ...(cached.lessonProgress || {}),
+        [lessonIndex]: lessonProgress,
+      }
 
-      const statsSnap = await getDoc(statsRef)
-      const statsData = statsSnap.exists() ? statsSnap.data() : {}
-      const oldDates = Array.isArray(statsData.watchedDates) ? statsData.watchedDates : []
-      const oldCourseIds = Array.isArray(statsData.watchedCourseIds) ? statsData.watchedCourseIds : []
-      const nextDates = oldDates.includes(today) ? oldDates : [...oldDates, today]
-      const nextCourseIds = oldCourseIds.includes(courseId) ? oldCourseIds : [...oldCourseIds, courseId]
+      const nextLessonWatchedSeconds = {
+        ...(cached.lessonWatchedSeconds || {}),
+        [lessonIndex]: watchedSeconds,
+      }
 
-      await setDoc(
-        statsRef,
-        {
-          watchedLessons: nextCourseIds.length,
-          watchedCourses: nextCourseIds.length,
-          watchedCourseIds: nextCourseIds,
-          watchedDates: nextDates,
-          firstWatchedAt: statsData.firstWatchedAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
+      const nextLessonDurationSeconds = {
+        ...(cached.lessonDurationSeconds || {}),
+        [lessonIndex]: durationSeconds,
+      }
+
+      const nextLessonMaxWatchedSeconds = {
+        ...(cached.lessonMaxWatchedSeconds || {}),
+        [lessonIndex]: watchedSeconds,
+      }
+
+      const updated = await patchCourseProgress(courseId, {
+        progress: courseProgress,
+        watchedSeconds,
+        watchedDate: today,
+        markViewed: true,
+        markWatched: true,
+        durationSeconds,
+        lessonProgress: nextLessonProgress,
+        lessonWatchedSeconds: nextLessonWatchedSeconds,
+        lessonDurationSeconds: nextLessonDurationSeconds,
+        lessonMaxWatchedSeconds: nextLessonMaxWatchedSeconds,
+      })
+
+      progressCacheRef.current = {
+        ...cached,
+        ...(updated || {}),
+        lessonProgress: nextLessonProgress,
+        lessonWatchedSeconds: nextLessonWatchedSeconds,
+        lessonDurationSeconds: nextLessonDurationSeconds,
+        lessonMaxWatchedSeconds: nextLessonMaxWatchedSeconds,
+      }
     }
 
     function showSkipWarning(payload) {
@@ -827,6 +895,7 @@ export function YoutubeProgressPlayer({
 
 
   const fitClass = 'aspect-video w-[min(100%,calc((100dvh-150px)*16/9))] max-h-[calc(100dvh-150px)] lg:h-[min(500px,calc(100dvh-180px))] lg:w-[min(100%,800px)] lg:aspect-auto lg:max-h-none 2xl:h-[min(680px,calc(100dvh-160px))] 2xl:w-[min(100%,1100px)]'
+  const progressCacheRef = useRef(null)
 
   return (
     <div className="flex w-full flex-col items-center justify-center bg-black">
@@ -864,9 +933,9 @@ function Mp4LearningPlayer({ src, autoPlay, onEnded, courseId, currentUser, curr
     async function restore() {
       if (!currentUser?.uid || !courseId || !canTrackLearningProgress(currentRole)) return
       try {
-        const snap = await getDoc(doc(db, 'learningStats', currentUser.uid, 'courses', courseId))
-        if (!snap.exists() || cancelled) return
-        const data = snap.data()
+        const data = await getCourseProgress(courseId)
+        if (!data || cancelled) return
+        progressCacheRef.current = data
         const saved = Number(data.lessonMaxWatchedSeconds?.[lessonIndex] || data.lessonWatchedSeconds?.[lessonIndex] || data.watchedSeconds || 0)
         maxWatchedRef.current = Math.max(0, saved)
         lastTimeRef.current = maxWatchedRef.current
@@ -882,23 +951,55 @@ function Mp4LearningPlayer({ src, autoPlay, onEnded, courseId, currentUser, curr
 
   async function saveProgress(watchedTime, duration) {
     if (!currentUser?.uid || !courseId || !duration || !canTrackLearningProgress(currentRole)) return
+
     const safe = Math.max(0, Math.min(Number(watchedTime || 0), duration))
+    const watchedSeconds = Math.floor(safe)
+    const durationSeconds = Math.floor(duration)
     const lessonProgress = Math.min(100, Math.round((safe / duration) * 100))
     const safeTotalLessons = Math.max(1, Number(totalLessons || 1))
     const courseProgress = safeTotalLessons <= 1 ? lessonProgress : Math.min(100, Math.round(((lessonIndex + lessonProgress / 100) / safeTotalLessons) * 100))
-    await setDoc(doc(db, 'learningStats', currentUser.uid, 'courses', courseId), {
-      courseId,
+    const cached = progressCacheRef.current || {}
+
+    const nextLessonProgress = {
+      ...(cached.lessonProgress || {}),
+      [lessonIndex]: lessonProgress,
+    }
+
+    const nextLessonWatchedSeconds = {
+      ...(cached.lessonWatchedSeconds || {}),
+      [lessonIndex]: watchedSeconds,
+    }
+
+    const nextLessonDurationSeconds = {
+      ...(cached.lessonDurationSeconds || {}),
+      [lessonIndex]: durationSeconds,
+    }
+
+    const nextLessonMaxWatchedSeconds = {
+      ...(cached.lessonMaxWatchedSeconds || {}),
+      [lessonIndex]: watchedSeconds,
+    }
+
+    const updated = await patchCourseProgress(courseId, {
       progress: courseProgress,
-      watchedSeconds: Math.floor(safe),
-      durationSeconds: Math.floor(duration),
-      lastViewedAt: serverTimestamp(),
-      lastWatchedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      [`lessonProgress.${lessonIndex}`]: lessonProgress,
-      [`lessonWatchedSeconds.${lessonIndex}`]: Math.floor(safe),
-      [`lessonDurationSeconds.${lessonIndex}`]: Math.floor(duration),
-      [`lessonMaxWatchedSeconds.${lessonIndex}`]: Math.floor(safe),
-    }, { merge: true })
+      watchedSeconds,
+      markViewed: true,
+      markWatched: true,
+      durationSeconds,
+      lessonProgress: nextLessonProgress,
+      lessonWatchedSeconds: nextLessonWatchedSeconds,
+      lessonDurationSeconds: nextLessonDurationSeconds,
+      lessonMaxWatchedSeconds: nextLessonMaxWatchedSeconds,
+    })
+
+    progressCacheRef.current = {
+      ...cached,
+      ...(updated || {}),
+      lessonProgress: nextLessonProgress,
+      lessonWatchedSeconds: nextLessonWatchedSeconds,
+      lessonDurationSeconds: nextLessonDurationSeconds,
+      lessonMaxWatchedSeconds: nextLessonMaxWatchedSeconds,
+    }
   }
 
   function updateDisplay(watched, duration) {
@@ -1042,20 +1143,57 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
 
   useEffect(() => {
     if (!courseId) return undefined
-    return onSnapshot(collection(db, 'courses', courseId, 'questions'), (snapshot) => {
-      setQuestions(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt)))
-    }, (error) => console.warn('Không thể đồng bộ hỏi đáp:', error))
+
+    let cancelled = false
+
+    async function loadQuestions() {
+      try {
+        const response = await apiRequest(`/api/courses/${courseId}/questions`)
+        if (cancelled) return
+        const items = Array.isArray(response?.questions) ? response.questions : []
+        setQuestions(items.sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt)))
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể đồng bộ hỏi đáp:', error)
+      }
+    }
+
+    loadQuestions()
+    const timer = window.setInterval(loadQuestions, 3000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [courseId])
 
   useEffect(() => {
-    if (!currentUser?.uid) { setPendingWarnings([]); return undefined }
-    return onSnapshot(collection(db, 'users', currentUser.uid, 'commentWarnings'), (snapshot) => {
-      const warnings = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => !item.acknowledgedAt && String(item.status || 'pending') === 'pending')
-        .sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt))
-      setPendingWarnings(warnings)
-    }, (error) => console.warn('Không thể đồng bộ cảnh báo comment:', error))
+    if (!currentUser?.uid) {
+      setPendingWarnings([])
+      return undefined
+    }
+
+    let cancelled = false
+
+    async function loadWarnings() {
+      try {
+        const response = await apiRequest('/api/learning/comment-warnings')
+        if (cancelled) return
+        const warnings = (Array.isArray(response?.warnings) ? response.warnings : [])
+          .filter((item) => !item.acknowledgedAt && String(item.status || 'pending') !== 'acknowledged')
+          .sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt))
+        setPendingWarnings(warnings)
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể đồng bộ cảnh báo comment:', error)
+      }
+    }
+
+    loadWarnings()
+    const timer = window.setInterval(loadWarnings, 3000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [currentUser?.uid])
 
   useEffect(() => {
@@ -1084,20 +1222,24 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
   async function notifyCourseOwner(notificationId, payload = {}) {
     const ownerId = String(courseOwnerId || '')
     if (!ownerId || !notificationId || ownerId === String(currentUser?.uid || '')) return
+
     try {
-      const dismissalSnap = await getDoc(doc(db, 'users', ownerId, 'elearningNotificationDismissals', notificationId))
-      if (dismissalSnap.exists()) return
-      await setDoc(doc(db, 'users', ownerId, 'elearningNotifications', notificationId), {
-        title: payload.title || 'Hoạt động hỏi đáp mới',
-        message: payload.message || '',
-        type: payload.type || 'course_qa',
-        courseId,
-        questionId: payload.questionId || '',
-        replyId: payload.replyId || '',
-        actorId: currentUser?.uid || '',
-        read: false,
-        createdAt: serverTimestamp(),
-      }, { merge: true })
+      await apiRequest('/api/learning/notifications', {
+        method: 'POST',
+        body: {
+          legacyId: notificationId,
+          userId: ownerId,
+          title: payload.title || 'Hoạt động hỏi đáp mới',
+          message: payload.message || '',
+          type: payload.type || 'course_qa',
+          data: {
+            courseId,
+            questionId: payload.questionId || '',
+            replyId: payload.replyId || '',
+            actorId: currentUser?.uid || '',
+          },
+        },
+      })
     } catch (error) {
       console.warn('Không thể tạo thông báo hỏi đáp:', error)
     }
@@ -1112,8 +1254,11 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
   async function acknowledgeWarning() {
     if (!currentUser?.uid || !activeWarning || warningCountdown > 0) return
     try {
-      await updateDoc(doc(db, 'users', currentUser.uid, 'commentWarnings', activeWarning.id), {
-        status: 'acknowledged', acknowledgedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      await apiRequest(`/api/learning/comment-warnings/${activeWarning.id}`, {
+        method: 'PATCH',
+        body: {
+          status: 'acknowledged',
+        },
       })
     } catch (error) {
       console.error('Không thể xác nhận cảnh báo:', error)
@@ -1128,15 +1273,22 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
     if (!content || !currentUser?.uid || sending || cooldownLeft > 0) return
     try {
       setSending(true)
-      const questionRef = doc(collection(db, 'courses', courseId, 'questions'))
-      await setDoc(questionRef, {
-        content, userId: currentUser.uid, userName: displayName, userAvatar: avatar,
-        userRole: normalizedRole || 'STUDENT', isAdmin: isCurrentAdmin, replies: [],
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      const response = await apiRequest(`/api/courses/${courseId}/questions`, {
+        method: 'POST',
+        body: {
+          content,
+          data: {
+            source: 'course_detail',
+          },
+        },
       })
-      await notifyCourseOwner(`course_question_${courseId}_${questionRef.id}`, {
+
+      const createdQuestion = response?.question || {}
+      const questionId = createdQuestion.id || ''
+
+      await notifyCourseOwner(`course_question_${courseId}_${questionId}`, {
         type: 'course_question',
-        questionId: questionRef.id,
+        questionId,
         title: 'Bài học có câu hỏi mới',
         message: `${displayName} đã đặt câu hỏi trong bài học của bạn: “${content.slice(0, 120)}${content.length > 120 ? '…' : ''}”`,
       })
@@ -1152,14 +1304,19 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
     const content = String(replyDrafts[question.id] || '').trim()
     if (!content || !currentUser?.uid) return
     try {
-      const replyId = `${currentUser.uid}_${Date.now()}`
-      await updateDoc(doc(db, 'courses', courseId, 'questions', question.id), {
-        replies: arrayUnion({
-          id: replyId, content, userId: currentUser.uid, userName: displayName,
-          userAvatar: avatar, userRole: normalizedRole || 'STUDENT', isAdmin: isCurrentAdmin,
-          isTeacherReply: String(currentUser.uid) === String(courseOwnerId || ''), createdAt: new Date().toISOString(),
-        }), updatedAt: serverTimestamp(),
+      const response = await apiRequest(`/api/courses/${courseId}/questions/${question.id}/replies`, {
+        method: 'POST',
+        body: {
+          content,
+          data: {
+            source: 'course_detail',
+          },
+        },
       })
+
+      const createdReply = response?.reply || {}
+      const replyId = createdReply.id || ''
+
       await notifyCourseOwner(`course_reply_${courseId}_${question.id}_${replyId}`, {
         type: 'course_reply',
         questionId: question.id,
@@ -1187,10 +1344,19 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
     if (!deleteTarget) return
     try {
       if (deleteTarget.reply) {
-        const nextReplies = (deleteTarget.question.replies || []).filter((item) => item.id !== deleteTarget.reply.id)
-        await updateDoc(doc(db, 'courses', courseId, 'questions', deleteTarget.question.id), { replies: nextReplies, updatedAt: serverTimestamp() })
+        await apiRequest(
+          `/api/courses/${courseId}/questions/${deleteTarget.question.id}/replies/${deleteTarget.reply.id}`,
+          {
+            method: 'DELETE',
+          },
+        )
       } else {
-        await deleteDoc(doc(db, 'courses', courseId, 'questions', deleteTarget.question.id))
+        await apiRequest(
+          `/api/courses/${courseId}/questions/${deleteTarget.question.id}`,
+          {
+            method: 'DELETE',
+          },
+        )
       }
       setDeleteTarget(null)
       showNotice('success', 'Đã xóa bình luận', 'Nội dung đã được cập nhật.')
@@ -1204,7 +1370,12 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
     const content = editingDraft.trim()
     if (!content || String(question.userId || '') !== String(currentUser?.uid || '')) return
     try {
-      await updateDoc(doc(db, 'courses', courseId, 'questions', question.id), { content, updatedAt: serverTimestamp(), editedAt: serverTimestamp() })
+      await apiRequest(`/api/courses/${courseId}/questions/${question.id}`, {
+        method: 'PATCH',
+        body: {
+          content,
+        },
+      })
       setEditingId(''); setEditingDraft('')
     } catch (error) { showNotice('error', 'Chưa lưu được thay đổi', 'Vui lòng thử lại.') }
   }
@@ -1216,42 +1387,49 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
     const reportId = `${currentUser.uid}_${targetKey}`.replace(/[^a-zA-Z0-9_-]/g, '_')
     try {
       setReportSubmitting(true)
-      await runTransaction(db, async (transaction) => {
-        const reportRef = doc(db, 'learningCommentReports', reportId)
-        const userRef = doc(db, 'users', currentUser.uid)
-        const [reportSnap, userSnap] = await Promise.all([transaction.get(reportRef), transaction.get(userRef)])
-        if (reportSnap.exists()) throw new Error('DUPLICATE_REPORT')
-        const lastReportMs = getTime(userSnap.exists() ? userSnap.data().lastCommentReportAt : null)
-        if (lastReportMs && Date.now() - lastReportMs < 10000) throw new Error(`REPORT_COOLDOWN_${Math.ceil((10000 - (Date.now() - lastReportMs)) / 1000)}`)
-        transaction.set(reportRef, {
-          courseId, courseOwnerId: courseOwnerId || '', questionId: reportTarget.questionId,
-          replyId: reportTarget.replyId || '', commentType: reportTarget.replyId ? 'reply' : 'question',
-          commentContent: reportTarget.content || '', commentUserId: reportTarget.userId || '',
-          commentUserName: reportTarget.userName || '', reporterId: currentUser.uid,
-          reporterName: displayName, reporterEmail: currentUser.email || '', reason: reportReason,
-          detail: reportDetail.trim(), status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        })
-        transaction.set(userRef, { lastCommentReportAt: serverTimestamp() }, { merge: true })
+      const reportResponse = await apiRequest('/api/learning/comment-reports', {
+        method: 'POST',
+        body: {
+          courseId,
+          questionId: reportTarget.questionId,
+          replyId: reportTarget.replyId || '',
+          reportedUserId: reportTarget.userId || '',
+          commentContent: reportTarget.content || '',
+          commentUserName: reportTarget.userName || '',
+          reason: reportReason,
+          detail: reportDetail.trim(),
+        },
       })
-      await setDoc(doc(db, 'users', currentUser.uid, 'elearningNotifications', `comment_report_submitted_${reportId}`), {
-        title: 'Đã gửi báo cáo tới quản trị viên',
-        message: `Báo cáo về ${reportTarget.replyId ? 'phản hồi' : 'bình luận'} của ${reportTarget.userName || 'người dùng'} đã được tiếp nhận và đang chờ xử lý.`,
-        type: 'comment_report_submitted',
-        courseId,
-        reportId,
-        actorId: currentUser.uid,
-        read: false,
-        createdAt: serverTimestamp(),
+
+      const savedReportId = reportResponse?.reportId || reportId
+
+      await apiRequest('/api/learning/notifications', {
+        method: 'POST',
+        body: {
+          userId: currentUser.uid,
+          title: 'Đã gửi báo cáo tới quản trị viên',
+          message: `Báo cáo về ${reportTarget.replyId ? 'phản hồi' : 'bình luận'} của ${reportTarget.userName || 'người dùng'} đã được tiếp nhận và đang chờ xử lý.`,
+          type: 'comment_report_submitted',
+          data: {
+            courseId,
+            reportId: savedReportId,
+            actorId: currentUser.uid,
+          },
+        },
       })
       setReportTarget(null); setReportDetail(''); setReportReason(reportReasons[0]); setReportCooldownLeft(10)
       showNotice('success', 'Đã gửi báo cáo tới quản trị viên', 'Bạn sẽ nhận thông báo khi báo cáo được giải quyết.')
     } catch (error) {
-      const code = String(error?.message || '')
-      if (code === 'DUPLICATE_REPORT') showNotice('warning', 'Bạn đã báo cáo tin nhắn này', 'Mỗi người chỉ được báo cáo một lần cho cùng một tin nhắn.')
-      else if (code.startsWith('REPORT_COOLDOWN_')) {
-        const seconds = Number(code.split('_').pop() || 10); setReportCooldownLeft(seconds)
+      const code = String(error?.code || error?.message || '')
+      if (code === 'DUPLICATE_REPORT') {
+        showNotice('warning', 'Bạn đã báo cáo tin nhắn này', 'Mỗi người chỉ được báo cáo một lần cho cùng một tin nhắn.')
+      } else if (code === 'REPORT_COOLDOWN' || error?.status === 429) {
+        const seconds = Math.max(1, Number(error?.retryAfter || 10))
+        setReportCooldownLeft(seconds)
         showNotice('warning', 'Hãy chờ trước khi báo cáo tiếp', `Bạn có thể báo cáo tin nhắn khác sau ${seconds} giây.`)
-      } else showNotice('error', 'Chưa gửi được báo cáo', 'Vui lòng thử lại.')
+      } else {
+        showNotice('error', 'Chưa gửi được báo cáo', 'Vui lòng thử lại.')
+      }
     } finally { setReportSubmitting(false) }
   }
 

@@ -162,7 +162,7 @@ export default function useExamsPage() {
       return
     }
 
-    navigate(`/exam/${exam.id}`, { state: { role } })
+    enterExam(exam)
   }
 
   const copyExamLink = async (exam) => {
@@ -191,33 +191,114 @@ export default function useExamsPage() {
   }
 
   const previewExam = (exam) => {
+    enterExam(exam)
+  }
+
+  const getStudentAttemptCount = (exam) => {
+    const authoritativeCount =
+      exam?.attemptState?.attemptCount
+
+    if (
+      authoritativeCount !== undefined &&
+      authoritativeCount !== null
+    ) {
+      return Number(authoritativeCount || 0)
+    }
+
+    if (!currentUserId) return 0
+
+    const attempt = exam.attempts?.find(
+      (item) =>
+        item.id === currentUserId ||
+        item.studentId === currentUserId,
+    )
+
+    if (attempt) {
+      return Number(attempt.count || 0)
+    }
+
+    return (
+      exam.studentResults?.filter(
+        (result) =>
+          result.studentId === currentUserId,
+      ).length ?? 0
+    )
+  }
+
+  const getExamMaxAttempts = (exam) => {
+    const authoritativeMax =
+      exam?.attemptState?.maxAttempts
+
+    if (
+      authoritativeMax !== undefined &&
+      authoritativeMax !== null
+    ) {
+      return Math.max(
+        1,
+        Number(authoritativeMax || 1),
+      )
+    }
+
+    return exam.attemptMode === 'multiple'
+      ? Math.max(
+          1,
+          Number(exam.maxAttempts || 1),
+        )
+      : 1
+  }
+
+  const canStudentAttemptExam = (exam) => {
+    if (!isStudent) return true
+
+    const authoritativeDecision =
+      exam?.attemptState?.canAttempt
+
+    if (
+      typeof authoritativeDecision ===
+      'boolean'
+    ) {
+      return authoritativeDecision
+    }
+
+    if (
+      typeof exam?.canAttempt ===
+      'boolean'
+    ) {
+      return exam.canAttempt
+    }
+
+    return (
+      getStudentAttemptCount(exam) <
+      getExamMaxAttempts(exam)
+    )
+  }
+
+  const enterExam = (exam) => {
+    if (!exam?.id) return false
+
+    if (
+      isStudent &&
+      !canStudentAttemptExam(exam)
+    ) {
+      toast.error(
+        'Bạn đã hết số lượt làm bài thi này',
+        {
+          id:
+            `exam-attempt-exhausted-${exam.id}`,
+        },
+      )
+      return false
+    }
+
     navigate(`/exam/${exam.id}`, {
       state: {
         role,
         preview: !isStudent,
       },
     })
+
+    return true
   }
-
-  const getStudentAttemptCount = (exam) => {
-    if (!currentUserId) return 0
-
-    const attempt = exam.attempts?.find(
-      (item) => item.id === currentUserId || item.studentId === currentUserId,
-    )
-
-    if (attempt) return Number(attempt.count || 0)
-
-    return (
-      exam.studentResults?.filter((result) => result.studentId === currentUserId)
-        .length ?? 0
-    )
-  }
-
-  const getExamMaxAttempts = (exam) =>
-    exam.attemptMode === 'multiple'
-      ? Math.max(1, Number(exam.maxAttempts || 1))
-      : 1
 
   const getExamAudienceText = (exam) =>
     exam.status === 'public'
@@ -226,8 +307,16 @@ export default function useExamsPage() {
         ? exam.selectedClasses.join(', ')
         : 'Chưa chọn lớp'
 
-  const handleOutOfAttempts = () => {
-    toast.error('Bạn đã hết số lượt làm bài thi này')
+  const handleOutOfAttempts = (
+    examId = 'unknown',
+  ) => {
+    toast.error(
+      'Bạn đã hết số lượt làm bài thi này',
+      {
+        id:
+          `exam-attempt-exhausted-${examId}`,
+      },
+    )
   }
 
   const openCreateModal = () => {
@@ -278,6 +367,7 @@ export default function useExamsPage() {
     previewExam,
     getStudentAttemptCount,
     getExamMaxAttempts,
+    canStudentAttemptExam,
     getExamAudienceText,
     handleOutOfAttempts,
     openCreateModal,

@@ -40,7 +40,7 @@ http://127.0.0.1:5173 || http://localhost:5173 (nếu chạy bằng npm run dev)
 
 ## Chạy local trên Linux
 
-Script này khởi động Firebase Emulator, backend và frontend.
+Script này khởi động backend và frontend.
 
 ```bash
 ./scripts/linux/start-local.sh
@@ -67,7 +67,7 @@ Các tài khoản này chỉ hoạt động khi `VITE_LOCAL_DEV_MODE=true`.
 
 ## Chạy local trên Windows
 
-Script PowerShell sẽ khởi động Firebase Emulator, backend và frontend.
+Script PowerShell sẽ khởi động backend và frontend.
 
 ```powershell
 ./scripts/windows/start-local.ps1
@@ -89,13 +89,9 @@ Nếu chưa có môi trường phù hợp, script sẽ báo thiếu `backend/ven
 - Frontend production cần đặt `VITE_API_BASE_URL` trỏ tới backend.
 - Backend production cần cho phép domain frontend trong `ALLOWED_ORIGINS`.
 - Nếu muốn dùng OpenAI thật, cấu hình trong `backend/.env`, không đặt API key vào biến `VITE_*`.
-- Firebase Storage cần áp dụng CORS một lần cho bucket để lưu ảnh bằng chứng giám sát từ frontend:
-
 ```bash
-gcloud storage buckets update gs://<FIREBASE_STORAGE_BUCKET> --cors-file=storage.cors.json
 ```
 
-Sau khi đổi domain frontend, cập nhật `storage.cors.json` và chạy lại lệnh trên.
 
 ## Deploy
 

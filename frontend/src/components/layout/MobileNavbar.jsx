@@ -19,9 +19,6 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { signOut } from 'firebase/auth'
-
-import { auth } from '../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 
 import darkLogo from '../../assets/favicon-dark-mode.png'
@@ -39,7 +36,7 @@ export default function MobileNavbar({
 }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, userDetails } = useAuth()
+  const { user, userDetails, logout } = useAuth()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -217,7 +214,7 @@ export default function MobileNavbar({
 
   const handleLogout = async () => {
     try {
-      await signOut(auth)
+      await logout()
       closeAllMenus()
       navigate('/login')
     } catch (error) {

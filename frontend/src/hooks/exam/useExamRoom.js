@@ -23,6 +23,8 @@ export default function useExamRoom() {
   const [exam, setExam] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [attemptBlocked, setAttemptBlocked] = useState(false)
+  const [attemptState, setAttemptState] = useState(null)
 
   const [hasStarted, setHasStarted] = useState(false)
 
@@ -30,6 +32,7 @@ export default function useExamRoom() {
   const [textAnswers, setTextAnswers] = useState({})
   const [timeLeft, setTimeLeft] = useState(0)
   const submittedRef = useRef(false)
+  const loadedExamIdRef = useRef(null)
 
   const {
     config: proctoringConfig,
@@ -74,22 +77,57 @@ export default function useExamRoom() {
           return
         }
 
-        setExam(loadedExam)
-        setTimeLeft(Number(loadedExam.duration || 45) * 60)
+        const loadedAttemptState =
+          loadedExam.attemptState ?? null
+
+        const blocked =
+          !preview &&
+          !isTeacher &&
+          (
+            loadedAttemptState?.canAttempt ===
+              false ||
+            loadedExam.canAttempt === false
+          )
+
+        setAttemptState(
+          loadedAttemptState,
+        )
+        setAttemptBlocked(
+          blocked,
+        )
+        setExam(
+          loadedExam,
+        )
+
+        if (!blocked) {
+          setTimeLeft(
+            Number(
+              loadedExam.duration || 45,
+            ) * 60,
+          )
+        }
       } catch (error) {
         console.error(error)
-        toast.error(
+
+        const message =
           error?.response?.data?.message ||
-            error.message ||
-            'Không thể tải đề thi',
-        )
+          error.message ||
+          'Không thể tải đề thi'
+
+        toast.error(message)
+
       } finally {
         setLoading(false)
       }
     }
 
+    if (loadedExamIdRef.current === examId) {
+      return
+    }
+
+    loadedExamIdRef.current = examId
     loadExam()
-  }, [examId])
+  }, [examId, navigate])
 
   const requestExamFullscreen = useCallback(async () => {
     if (preview || isTeacher) return true
@@ -126,6 +164,17 @@ export default function useExamRoom() {
   }
 
   const startExam = async () => {
+    if (attemptBlocked) {
+      toast.error(
+        'Bạn đã hết số lượt làm bài thi này',
+        {
+          id:
+            `exam-attempt-exhausted-${examId}`,
+        },
+      )
+      return
+    }
+
     if (needsDevicePermission && !proctoringReady) {
       toast.error('Hãy cấp đủ quyền thiết bị giám sát trước khi bắt đầu')
       return
@@ -238,7 +287,11 @@ export default function useExamRoom() {
 
   const handleSubmit = useCallback(
     async (autoSubmit = false, overrideViolations = null) => {
-      if (submittedRef.current || !exam) return
+      if (
+        submittedRef.current ||
+        !exam ||
+        attemptBlocked
+      ) return
 
       submittedRef.current = true
 
@@ -294,6 +347,7 @@ export default function useExamRoom() {
       exam,
       preview,
       isTeacher,
+      attemptBlocked,
       answers,
       normalizedTextAnswers,
       violations,
@@ -329,7 +383,6 @@ export default function useExamRoom() {
       isTeacher ||
       !hasStarted ||
       !proctoringConfig.enabled ||
-      !proctoringConfig.autoSubmit ||
       violations < proctoringConfig.maxViolations ||
       submittedRef.current
     ) return
@@ -352,6 +405,8 @@ export default function useExamRoom() {
     submitting,
     preview,
     isTeacher,
+    attemptBlocked,
+    attemptState,
     hasStarted,
     fullscreenBlocked: monitoringBlocked,
     blockingReason,

@@ -1,63 +1,56 @@
-import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-} from 'firebase/firestore'
-
-import { db } from '../components/firebase.js'
+import { authService } from './auth'
 import { defaultSettings } from '../data/settingsData.js'
 
 export async function getUserSettings(uid) {
   if (!uid) return defaultSettings
 
-  const userRef = doc(db, 'users', uid)
-  const snap = await getDoc(userRef)
+  const user =
+    await authService.getMe()
 
-  if (!snap.exists()) {
-    await setDoc(
-      userRef,
-      {
-        settings: defaultSettings,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    )
-
+  if (!user) {
     return defaultSettings
   }
 
   return {
     ...defaultSettings,
-    ...(snap.data()?.settings || {}),
+    ...(user.settings || {}),
   }
 }
 
 export async function updateUserSetting(uid, key, value) {
   if (!uid) return
 
-  const userRef = doc(db, 'users', uid)
+  const user =
+    await authService.getMe()
 
-  await updateDoc(userRef, {
-    [`settings.${key}`]: value,
-    updatedAt: serverTimestamp(),
+  const currentSettings = {
+    ...defaultSettings,
+    ...(user?.settings || {}),
+  }
+
+  return authService.updateMe({
+    settings: {
+      ...currentSettings,
+      [key]: value,
+    },
   })
 }
 
 export async function updateUserProfileField(uid, key, value) {
   if (!uid) return
 
-  const allowedFields = ['fullName', 'phone']
+  const allowedFields = [
+    'fullName',
+    'phone',
+  ]
 
   if (!allowedFields.includes(key)) {
-    throw new Error('Field này không được phép chỉnh sửa')
+    throw new Error(
+      'Field này không được phép chỉnh sửa',
+    )
   }
 
-  const userRef = doc(db, 'users', uid)
-
-  await updateDoc(userRef, {
+  return authService.updateMe({
     [key]: value,
-    updatedAt: serverTimestamp(),
   })
 }

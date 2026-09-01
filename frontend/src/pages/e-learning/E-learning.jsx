@@ -1,30 +1,94 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { onAuthStateChanged } from 'firebase/auth'
-import {
-  addDoc,
-  arrayRemove,
-  arrayUnion,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  onSnapshot,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  writeBatch,
-} from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { auth, db, storage } from '../../components/firebase'
+import eLearningApi from '../../services/eLearningApi.js'
+import { useAuth } from '../../contexts/AuthContext.jsx'
 import { subjects, defaultLearningChecklist, difficultyOptions, sortOptions, courseTextLimits } from './e-learning/constants/courseConstants'
 import { DesktopSidebar, MobileSidebar, VideoSection, VideoGrid, VideoCourseCard, VideoSkeleton, EmptyLibraryState, FilterModal, CourseFormModal, ConfirmModal, AchievementModal } from './e-learning/components/CourseComponents'
 import { MenuIcon, SearchIcon, CloseIcon, FilterIcon, PlusIcon, PlayIcon } from './e-learning/icons/Icons'
-import { getEmptyForm, resolveClassesFromUserData, resolveClassesFromClassDocs, uniqueValues, getFirebaseTeacherName, normalizeLessons, stripHtml, normalizeTextList, normalizeChecklist, normalizeQuiz, normalizeDateTimeLocal, getCourseCreatedTime, getUserClassName, canAccessCourseByClass, getAnyTime, toDateKey, isCompletedCourse, isCourseLocked, isHotCourse, getRatingAverageNumber, getCourseFormat, getInitials, useDarkMode, hasAnyText, getOpenAtMs, getMp4DurationFromFile, formatVideoDuration, generateLibraryCourseCode, getYoutubeVideoId, getCourseTeacherName, countWords } from './e-learning/utils/courseUtils'
+import { getEmptyForm, resolveClassesFromUserData, resolveClassesFromClassDocs, uniqueValues, normalizeLessons, stripHtml, normalizeTextList, normalizeChecklist, normalizeQuiz, normalizeDateTimeLocal, getCourseCreatedTime, getUserClassName, canAccessCourseByClass, getAnyTime, toDateKey, isCompletedCourse, isCourseLocked, isHotCourse, getRatingAverageNumber, getCourseFormat, getInitials, useDarkMode, hasAnyText, getOpenAtMs, getMp4DurationFromFile, formatVideoDuration, generateLibraryCourseCode, getYoutubeVideoId, getCourseTeacherName, countWords } from './e-learning/utils/courseUtils'
+
+
+const getCurrentUserId = (user) =>
+  String(
+    user?.id ||
+    user?.uid ||
+    user?.user_id ||
+    '',
+  )
+
+
+const getTeacherNameFromProfile = (profile, user) =>
+  profile?.fullName ||
+  profile?.name ||
+  profile?.displayName ||
+  profile?.teacherName ||
+  user?.displayName ||
+  user?.email ||
+  'GiaoVien'
+
+const normalizeApiUser = (payload, fallback = null) => {
+  const source =
+    payload?.user ||
+    payload?.profile ||
+    payload?.data ||
+    payload ||
+    {}
+
+  if (!source || typeof source !== 'object') return fallback
+
+  return {
+    ...source,
+    id: String(source.id || source.uid || source.user_id || fallback?.id || fallback?.uid || ''),
+    uid: String(source.uid || source.id || source.user_id || fallback?.uid || fallback?.id || ''),
+    email: source.email || fallback?.email || '',
+    displayName:
+      source.displayName ||
+      source.fullName ||
+      source.name ||
+      fallback?.displayName ||
+      '',
+    photoURL:
+      source.photoURL ||
+      source.avatar ||
+      source.avatarUrl ||
+      source.profileImage ||
+      source.imageUrl ||
+      fallback?.photoURL ||
+      '',
+  }
+}
+
+const normalizeUsers = (payload) =>
+  Array.isArray(payload?.users)
+    ? payload.users
+    : []
+
+const normalizeCoursesResponse = (payload) =>
+  Array.isArray(payload?.courses)
+    ? payload.courses
+    : []
+
+const normalizePlaylistsResponse = (payload) =>
+  Array.isArray(payload?.playlists)
+    ? payload.playlists
+    : []
+
+const normalizeSavedListsResponse = (payload) =>
+  Array.isArray(payload?.lists)
+    ? payload.lists
+    : []
+
+const normalizeReportsResponse = (payload) =>
+  Array.isArray(payload?.reports)
+    ? payload.reports
+    : []
+
+const normalizeNotificationsResponse = (payload) =>
+  Array.isArray(payload?.notifications)
+    ? payload.notifications
+    : []
+
 
 const libraryTree = [
   {
@@ -170,11 +234,12 @@ const learningQuotes = [
 
 function Courses() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const lessonsRef = useRef(null)
   const sortBoxRef = useRef(null)
   const createMenuRef = useRef(null)
   const classCreateRequestHandledRef = useRef(false)
-  const [currentUser, setCurrentUser] = useState(null)
+  const [currentUser, setCurrentUser] = useState(user || null)
   const [role, setRole] = useState('STUDENT')
   const [teacherProfile, setTeacherProfile] = useState(null)
   const [teacherProfilesById, setTeacherProfilesById] = useState({})
@@ -203,7 +268,16 @@ function Courses() {
   const [reportsLoading, setReportsLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [showSortBox, setShowSortBox] = useState(false)
-  const [activeLibrarySection, setActiveLibrarySection] = useState('home')
+  const getLibrarySectionFromUrl = () => {
+    if (typeof window === 'undefined') return 'home'
+    return String(
+      new URLSearchParams(window.location.search).get('section') || 'home',
+    ).trim() || 'home'
+  }
+
+  const [activeLibrarySection, setActiveLibrarySection] = useState(
+    getLibrarySectionFromUrl,
+  )
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showCreateTypeMenu, setShowCreateTypeMenu] = useState(false)
   const [createContentType, setCreateContentType] = useState('video')
@@ -330,8 +404,11 @@ function Courses() {
   }, [currentUser?.uid])
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user)
+    let cancelled = false
+
+    async function syncAuthenticatedUser() {
+      setCurrentUser(user || null)
+
       if (!user) {
         setRole('STUDENT')
         setTeacherProfile(null)
@@ -343,50 +420,152 @@ function Courses() {
         await fetchCourses()
         return
       }
+
       try {
-        const userRef = doc(db, 'users', user.uid)
-        const userSnap = await getDoc(userRef)
-        if (userSnap.exists()) {
-          const userData = userSnap.data()
-          const subjectFromFirebase = userData.subject || userData.teacherSubject || userData.mainSubject || userData.monHoc || ''
-          setRole(userData.role || userData.Role || userData.accountType || userData.userRole || userData.type || 'STUDENT')
-          setTeacherProfile(userData)
-          setTeacherSubject(subjectFromFirebase)
-          try {
-            const classSnapshot = await getDocs(collection(db, 'classes'))
-            const classRows = classSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-            const userEmail = String(user.email || '').trim().toLowerCase()
-            const joinedClasses = classRows.filter((item) => {
-              const memberIds = Array.isArray(item.memberIds) ? item.memberIds.map(String) : []
-              const teacherIds = [item.teacherId, item.createdByUid, item.ownerId].filter(Boolean).map(String)
-              const teacherEmails = [item.teacherEmail, item.ownerEmail].filter(Boolean).map((email) => String(email).trim().toLowerCase())
-              return memberIds.includes(String(user.uid)) || teacherIds.includes(String(user.uid)) || (userEmail && teacherEmails.includes(userEmail))
-            })
-            setParticipatingClasses(joinedClasses)
-            const classesFromUser = resolveClassesFromUserData(userData)
-            const classesFromCollection = resolveClassesFromClassDocs(classSnapshot.docs, user, userData)
-            setTeacherClasses(uniqueValues([...classesFromUser, ...classesFromCollection, ...joinedClasses.map((item) => item.name || item.className || item.title)]))
-          } catch (classError) {
-            console.warn('Không thể lấy danh sách lớp:', classError)
-            setParticipatingClasses([])
-            setTeacherClasses(resolveClassesFromUserData(userData))
-          }
-          if (subjectFromFirebase) setForm((prev) => ({ ...prev, category: subjectFromFirebase }))
-        } else {
-          setRole('STUDENT')
+        const [meResponse, classResponse] = await Promise.all([
+          eLearningApi.me(),
+          eLearningApi.classrooms().catch(() => ({ classes: [] })),
+        ])
+
+        if (cancelled) return
+
+        const userData = normalizeApiUser(meResponse, user)
+        const authenticatedUser = normalizeApiUser(userData, user)
+        const uid = getCurrentUserId(authenticatedUser)
+
+        setCurrentUser(authenticatedUser)
+
+        const subject =
+          userData?.subject ||
+          userData?.teacherSubject ||
+          userData?.mainSubject ||
+          userData?.monHoc ||
+          ''
+
+        setRole(
+          userData?.role ||
+          userData?.Role ||
+          userData?.accountType ||
+          userData?.userRole ||
+          userData?.type ||
+          'STUDENT',
+        )
+        setTeacherProfile(userData)
+        setTeacherSubject(subject)
+
+        const classRows = Array.isArray(classResponse?.classes)
+          ? classResponse.classes
+          : []
+
+        const userEmail = String(authenticatedUser?.email || '')
+          .trim()
+          .toLowerCase()
+
+        const joinedClasses = classRows.filter((item) => {
+          const memberIds = Array.isArray(item.memberIds)
+            ? item.memberIds.map(String)
+            : []
+
+          const teacherIds = [
+            item.teacherId,
+            item.createdByUid,
+            item.ownerId,
+          ]
+            .filter(Boolean)
+            .map(String)
+
+          const teacherEmails = [
+            item.teacherEmail,
+            item.ownerEmail,
+          ]
+            .filter(Boolean)
+            .map((email) =>
+              String(email).trim().toLowerCase(),
+            )
+
+          const className = String(
+            item.name ||
+            item.className ||
+            item.title ||
+            '',
+          )
+
+          const profileClass = String(
+            getUserClassName(userData) || '',
+          )
+
+          return (
+            memberIds.includes(uid) ||
+            teacherIds.includes(uid) ||
+            (userEmail && teacherEmails.includes(userEmail)) ||
+            (profileClass &&
+              className &&
+              profileClass.toLowerCase() === className.toLowerCase())
+          )
+        })
+
+        setParticipatingClasses(joinedClasses)
+
+        const classesFromUser =
+          resolveClassesFromUserData(userData)
+
+        setTeacherClasses(
+          uniqueValues([
+            ...classesFromUser,
+            ...joinedClasses.map(
+              (item) =>
+                item.name ||
+                item.className ||
+                item.title,
+            ),
+          ]),
+        )
+
+        if (subject && !cancelled) {
+          setForm((prev) => ({
+            ...prev,
+            category: subject,
+          }))
         }
-        await fetchAchievement(user.uid)
-        await fetchLearningProgress(user.uid)
-        await fetchLearningReports(user.uid)
-        await fetchFollowingAccounts(user.uid)
-        await fetchMyPlaylists(user.uid)
+
+        if (cancelled) return
+
+        await fetchCourses()
+        await fetchAchievement(uid)
+        await fetchLearningProgress(uid)
+        await fetchLearningReports(uid)
+        await fetchFollowingAccounts(uid)
+        await fetchMyPlaylists(uid)
       } catch (error) {
         console.error('Lỗi khi lấy dữ liệu user:', error)
-        setRole('STUDENT')
+        if (!cancelled) {
+          setRole('STUDENT')
+          await fetchCourses()
+        }
       }
-      await fetchCourses()
-    })
-    return () => unsubscribe()
+    }
+
+    syncAuthenticatedUser()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncLibrarySectionFromUrl = () => {
+      const params = new URLSearchParams(window.location.search)
+      const requestedSection = String(params.get('section') || 'home').trim()
+
+      setActiveLibrarySection(requestedSection || 'home')
+    }
+
+    window.addEventListener('popstate', syncLibrarySectionFromUrl)
+    return () =>
+      window.removeEventListener('popstate', syncLibrarySectionFromUrl)
   }, [])
 
   useEffect(() => {
@@ -436,12 +615,17 @@ function Courses() {
           return
         }
 
-        const targetSnap = await getDoc(doc(db, 'users', targetUserId))
+        const usersResponse = await eLearningApi.users()
         if (cancelled) return
+
+        const targetProfile = normalizeUsers(usersResponse).find(
+          (item) =>
+            String(item.id || item.uid || item.user_id || '') === targetUserId,
+        ) || {}
 
         setSelectedChannel({
           id: targetUserId,
-          profile: targetSnap.exists() ? targetSnap.data() : {},
+          profile: targetProfile,
         })
         setActiveLibrarySection('channel')
         setShowMobileSidebar(false)
@@ -473,23 +657,39 @@ function Courses() {
 
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'courses'),
-      (snapshot) => {
-        const data = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .sort((a, b) => getCourseCreatedTime(b) - getCourseCreatedTime(a))
-        setCourses(data)
-        setLoading(false)
-        fetchCourseTeacherProfiles(data)
-      },
-      (error) => {
-        console.error('Không thể đồng bộ courses theo thời gian thực:', error)
-        setLoading(false)
-      },
-    )
-    return () => unsubscribe()
+    let cancelled = false
+
+    async function refreshCourses() {
+      try {
+        const response = await eLearningApi.courses({ limit: 500 })
+        const data = normalizeCoursesResponse(response)
+          .sort((a, b) =>
+            getCourseCreatedTime(b) -
+            getCourseCreatedTime(a),
+          )
+
+        if (!cancelled) {
+          setCourses(data)
+          setLoading(false)
+          fetchCourseTeacherProfiles(data)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Không thể đồng bộ courses:', error)
+          setLoading(false)
+        }
+      }
+    }
+
+    refreshCourses()
+    const timer = window.setInterval(refreshCourses, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [])
+
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -498,39 +698,30 @@ function Courses() {
     }
 
     let cancelled = false
-    const unsubscribe = onSnapshot(
-      collection(db, 'users', currentUser.uid, 'following'),
-      async (snapshot) => {
-        try {
-          const items = await Promise.all(snapshot.docs.map(async (followDoc) => {
-            const followData = followDoc.data()
-            const targetId = String(followData.targetUserId || followDoc.id)
-            const profileSnap = await getDoc(doc(db, 'users', targetId))
-            const profile = profileSnap.exists() ? profileSnap.data() : {}
-            const lastOpened = getAnyTime(followData.lastOpenedAt || followData.followedAt)
-            const unreadCount = courses.filter((course) => {
-              const ownerIds = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid].filter(Boolean).map(String)
-              const status = String(course.status || course.moderationStatus || 'approved').toLowerCase()
-              const visibility = String(course.visibility || 'public').toLowerCase()
-              return ownerIds.includes(targetId) && status === 'approved' && visibility !== 'class' && getCourseCreatedTime(course) > lastOpened
-            }).length
-            return { id: targetId, ...profile, followedAt: followData.followedAt, lastOpenedAt: followData.lastOpenedAt, unreadCount }
-          }))
-          if (!cancelled) {
-            items.sort((a, b) => getAnyTime(b.followedAt) - getAnyTime(a.followedAt))
-            setFollowingAccounts(items)
-          }
-        } catch (error) {
-          console.warn('Không thể đồng bộ tài khoản đang theo dõi:', error)
+    async function refreshFollowing() {
+      try {
+        await fetchFollowingAccounts(
+          getCurrentUserId(currentUser),
+        )
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ tài khoản đang theo dõi:',
+            error,
+          )
         }
-      },
-      (error) => console.warn('Listener theo dõi gặp lỗi:', error),
-    )
+      }
+    }
+
+    refreshFollowing()
+    const timer = window.setInterval(refreshFollowing, 5000)
+
     return () => {
       cancelled = true
-      unsubscribe()
+      window.clearInterval(timer)
     }
   }, [currentUser?.uid, courses])
+
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -538,33 +729,55 @@ function Courses() {
       return undefined
     }
 
-    const unsubscribeProfile = onSnapshot(
-      doc(db, 'users', currentUser.uid),
-      (snapshot) => {
-        if (!snapshot.exists()) return
-        const userData = snapshot.data()
-        setTeacherProfile(userData)
-        setRole(userData.role || userData.Role || userData.accountType || userData.userRole || userData.type || 'STUDENT')
-      },
-      (error) => console.warn('Không thể đồng bộ tài khoản chính:', error),
-    )
+    let cancelled = false
 
-    const unsubscribeHistory = onSnapshot(
-      collection(db, 'users', currentUser.uid, 'followerHistory'),
-      (snapshot) => {
-        const items = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .sort((a, b) => getAnyTime(a.createdAt || a.occurredAt) - getAnyTime(b.createdAt || b.occurredAt))
-        setFollowerHistory(items)
-      },
-      (error) => console.warn('Không thể đồng bộ lịch sử người theo dõi:', error),
-    )
+    async function refreshMainProfile() {
+      try {
+        const response = await eLearningApi.me()
+        const userData = normalizeApiUser(response, currentUser)
+
+        if (cancelled) return
+
+        setTeacherProfile(userData)
+        setRole(
+          userData?.role ||
+          userData?.Role ||
+          userData?.accountType ||
+          userData?.userRole ||
+          userData?.type ||
+          'STUDENT',
+        )
+
+        const history = Array.isArray(userData?.followerHistory)
+          ? userData.followerHistory
+          : []
+
+        setFollowerHistory(
+          [...history].sort(
+            (a, b) =>
+              getAnyTime(a.createdAt || a.occurredAt) -
+              getAnyTime(b.createdAt || b.occurredAt),
+          ),
+        )
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ tài khoản chính:',
+            error,
+          )
+        }
+      }
+    }
+
+    refreshMainProfile()
+    const timer = window.setInterval(refreshMainProfile, 6000)
 
     return () => {
-      unsubscribeProfile()
-      unsubscribeHistory()
+      cancelled = true
+      window.clearInterval(timer)
     }
   }, [currentUser?.uid])
+
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -573,51 +786,79 @@ function Courses() {
       return undefined
     }
 
-    let realtimeNotifications = []
-    let dismissedIds = new Set()
+    let cancelled = false
 
-    function syncVisibleNotifications() {
-      setNotificationDismissalIds(new Set(dismissedIds))
-      setNotifications(
-        realtimeNotifications
-          .filter((item) => !dismissedIds.has(String(item.id)))
-          .sort((a, b) => getAnyTime(b.createdAt || b.updatedAt || b.readAt) - getAnyTime(a.createdAt || a.updatedAt || a.readAt)),
-      )
+    async function refreshNotifications() {
+      try {
+        const response = await eLearningApi.notifications()
+
+        if (cancelled) return
+
+        const allItems = normalizeNotificationsResponse(response)
+        const dismissed = new Set(
+          allItems
+            .filter((item) => Boolean(item.dismissed))
+            .map((item) => String(item.id)),
+        )
+
+        setNotificationDismissalIds(dismissed)
+        setNotifications(
+          allItems
+            .filter((item) => !item.dismissed)
+            .sort(
+              (a, b) =>
+                getAnyTime(
+                  b.createdAt ||
+                  b.updatedAt ||
+                  b.readAt,
+                ) -
+                getAnyTime(
+                  a.createdAt ||
+                  a.updatedAt ||
+                  a.readAt,
+                ),
+            ),
+        )
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ thông báo E-learning:',
+            error,
+          )
+        }
+      }
     }
 
-    const unsubscribeNotifications = onSnapshot(
-      collection(db, 'users', currentUser.uid, 'elearningNotifications'),
-      (snapshot) => {
-        realtimeNotifications = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-        syncVisibleNotifications()
-      },
-      (error) => console.warn('Không thể đồng bộ thông báo E-learning theo thời gian thực:', error),
-    )
-
-    const unsubscribeDismissals = onSnapshot(
-      collection(db, 'users', currentUser.uid, 'elearningNotificationDismissals'),
-      (snapshot) => {
-        dismissedIds = new Set(snapshot.docs.map((item) => String(item.id)))
-        syncVisibleNotifications()
-      },
-      (error) => console.warn('Không thể đồng bộ lịch sử xóa thông báo:', error),
-    )
+    refreshNotifications()
+    const timer = window.setInterval(refreshNotifications, 4000)
 
     return () => {
-      unsubscribeNotifications()
-      unsubscribeDismissals()
+      cancelled = true
+      window.clearInterval(timer)
     }
   }, [currentUser?.uid])
 
 
+
   useEffect(() => {
-    if (!currentUser?.uid || !followingAccounts.length || !courses.length) return undefined
+    if (
+      !currentUser?.uid ||
+      !followingAccounts.length ||
+      !courses.length
+    ) {
+      return undefined
+    }
 
     let cancelled = false
 
     async function syncFollowedAccountNotifications() {
       const followedMap = new Map(
-        followingAccounts.map((account) => [String(account.id), account]),
+        followingAccounts.map(
+          (account) => [
+            String(account.id),
+            account,
+          ],
+        ),
       )
 
       const eligibleCourses = courses.filter((course) => {
@@ -630,21 +871,59 @@ function Courses() {
           course.uid ||
           '',
         )
-        const followedAccount = followedMap.get(ownerId)
-        if (!followedAccount || ownerId === String(currentUser.uid)) return false
 
-        const status = String(course.status || course.moderationStatus || 'approved').toLowerCase()
-        const visibility = String(course.visibility || 'public').toLowerCase()
-        if (status !== 'approved' || visibility === 'class') return false
+        const followedAccount =
+          followedMap.get(ownerId)
 
-        const courseTime = getCourseCreatedTime(course)
-        const followedTime = getAnyTime(followedAccount.followedAt)
-        return Boolean(courseTime && (!followedTime || courseTime >= followedTime))
+        if (
+          !followedAccount ||
+          ownerId === getCurrentUserId(currentUser)
+        ) {
+          return false
+        }
+
+        const status = String(
+          course.status ||
+          course.moderationStatus ||
+          'approved',
+        ).toLowerCase()
+
+        const visibility = String(
+          course.visibility || 'public',
+        ).toLowerCase()
+
+        if (
+          status !== 'approved' ||
+          visibility === 'class'
+        ) return false
+
+        const courseTime =
+          getCourseCreatedTime(course)
+
+        const followedTime =
+          getAnyTime(followedAccount.followedAt)
+
+        return Boolean(
+          courseTime &&
+          (!followedTime ||
+            courseTime >= followedTime),
+        )
       })
+
+      const existingLegacyIds = new Set(
+        notifications.map(
+          (item) =>
+            String(
+              item.legacyId ||
+              item.data?.legacyId ||
+              '',
+            ),
+        ),
+      )
 
       try {
         await Promise.all(
-          eligibleCourses.map((course) => {
+          eligibleCourses.map(async (course) => {
             const ownerId = String(
               course.teacherId ||
               course.createdByUid ||
@@ -654,7 +933,10 @@ function Courses() {
               course.uid ||
               '',
             )
-            const followedAccount = followedMap.get(ownerId) || {}
+
+            const followedAccount =
+              followedMap.get(ownerId) || {}
+
             const ownerName =
               followedAccount.fullName ||
               followedAccount.name ||
@@ -663,73 +945,198 @@ function Courses() {
               course.teacherName ||
               'Tài khoản bạn theo dõi'
 
-            const notificationId = `follow_course_${course.id}`
-            const notificationRef = doc(db, 'users', currentUser.uid, 'elearningNotifications', notificationId)
-            const dismissalRef = doc(db, 'users', currentUser.uid, 'elearningNotificationDismissals', notificationId)
-            return Promise.all([getDoc(notificationRef), getDoc(dismissalRef)]).then(([notificationSnap, dismissalSnap]) => {
-              // Thông báo đã bị người dùng xóa phải được ghi nhớ vĩnh viễn,
-              // nếu không effect đồng bộ bài đăng sẽ tạo lại nó ở trạng thái chưa đọc.
-              if (notificationDismissalIds.has(notificationId) || notificationSnap.exists() || dismissalSnap.exists()) return null
-              return setDoc(notificationRef, {
-                title: `${ownerName} vừa đăng bài mới`,
-                message: `“${stripHtml(course.title) || 'Bài học mới'}” đã được đăng trong thư viện.`,
-                type: 'follow_course',
+            const notificationId =
+              `follow_course_${course.id}`
+
+            if (
+              notificationDismissalIds.has(notificationId) ||
+              existingLegacyIds.has(notificationId)
+            ) {
+              return
+            }
+
+            await eLearningApi.createNotification({
+              legacyId: notificationId,
+              userId: getCurrentUserId(currentUser),
+              title: `${ownerName} vừa đăng bài mới`,
+              message:
+                `“${stripHtml(course.title) || 'Bài học mới'}” ` +
+                'đã được đăng trong thư viện.',
+              type: 'follow_course',
+              data: {
                 actorId: ownerId,
                 actorName: ownerName,
                 courseId: course.id,
-                read: false,
-                createdAt: course.createdAt || course.updatedAt || serverTimestamp(),
-                sourceCreatedAt: course.createdAt || course.updatedAt || null,
-              })
+                sourceCreatedAt:
+                  course.createdAt ||
+                  course.updatedAt ||
+                  null,
+              },
             })
           }),
         )
       } catch (error) {
-        if (!cancelled) console.warn('Không thể tạo thông báo từ tài khoản đang theo dõi:', error)
+        if (!cancelled) {
+          console.warn(
+            'Không thể tạo thông báo từ tài khoản đang theo dõi:',
+            error,
+          )
+        }
       }
     }
 
     syncFollowedAccountNotifications()
-    return () => { cancelled = true }
-  }, [currentUser?.uid, followingAccounts, courses, notificationDismissalIds])
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    currentUser?.uid,
+    followingAccounts,
+    courses,
+    notificationDismissalIds,
+    notifications,
+  ])
+
 
   useEffect(() => {
     if (!selectedChannel?.id) return undefined
-    const unsubscribe = onSnapshot(
-      doc(db, 'users', String(selectedChannel.id)),
-      (snapshot) => {
-        if (!snapshot.exists()) return
-        setSelectedChannel((current) => current && String(current.id) === String(snapshot.id)
-          ? { ...current, profile: snapshot.data() }
-          : current)
-      },
-      (error) => console.warn('Không thể đồng bộ hồ sơ kênh:', error),
-    )
-    return () => unsubscribe()
+
+    let cancelled = false
+
+    async function refreshSelectedChannel() {
+      try {
+        const response = await eLearningApi.users()
+        const profile = normalizeUsers(response).find(
+          (item) =>
+            String(
+              item.id ||
+              item.uid ||
+              item.user_id ||
+              '',
+            ) === String(selectedChannel.id),
+        )
+
+        if (!cancelled && profile) {
+          setSelectedChannel((current) =>
+            current &&
+            String(current.id) === String(selectedChannel.id)
+              ? {
+                  ...current,
+                  profile,
+                }
+              : current,
+          )
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ hồ sơ kênh:',
+            error,
+          )
+        }
+      }
+    }
+
+    refreshSelectedChannel()
+    const timer =
+      window.setInterval(
+        refreshSelectedChannel,
+        6000,
+      )
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [selectedChannel?.id])
 
+
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'coursePlaylists'),
-      (snapshot) => {
-        const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+    let cancelled = false
+
+    async function refreshPlaylists() {
+      try {
+        const response = await eLearningApi.playlists()
+        const items = normalizePlaylistsResponse(response)
+
+        if (cancelled) return
+
         if (currentUser?.uid) {
-          setMyPlaylists(items
-            .filter((item) => String(item.ownerId || '') === String(currentUser.uid))
-            .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt)))
+          setMyPlaylists(
+            items
+              .filter(
+                (item) =>
+                  String(item.ownerId || '') ===
+                  getCurrentUserId(currentUser),
+              )
+              .sort(
+                (a, b) =>
+                  getAnyTime(
+                    b.updatedAt ||
+                    b.createdAt,
+                  ) -
+                  getAnyTime(
+                    a.updatedAt ||
+                    a.createdAt,
+                  ),
+              ),
+          )
         } else {
           setMyPlaylists([])
         }
+
         if (selectedChannel?.id) {
-          setChannelPlaylists(items
-            .filter((item) => String(item.ownerId || '') === String(selectedChannel.id) && !['private', 'class'].includes(String(item.visibility || 'public').toLowerCase()))
-            .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt)))
+          setChannelPlaylists(
+            items
+              .filter(
+                (item) =>
+                  String(item.ownerId || '') ===
+                    String(selectedChannel.id) &&
+                  !['private', 'class'].includes(
+                    String(
+                      item.visibility ||
+                      item.data?.visibility ||
+                      'public',
+                    ).toLowerCase(),
+                  ),
+              )
+              .sort(
+                (a, b) =>
+                  getAnyTime(
+                    b.updatedAt ||
+                    b.createdAt,
+                  ) -
+                  getAnyTime(
+                    a.updatedAt ||
+                    a.createdAt,
+                  ),
+              ),
+          )
         }
-      },
-      (error) => console.warn('Không thể đồng bộ playlist theo thời gian thực:', error),
-    )
-    return () => unsubscribe()
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ playlist:',
+            error,
+          )
+        }
+      }
+    }
+
+    refreshPlaylists()
+    const timer =
+      window.setInterval(
+        refreshPlaylists,
+        5000,
+      )
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [currentUser?.uid, selectedChannel?.id])
+
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -737,65 +1144,67 @@ function Courses() {
       return undefined
     }
 
-    let allSavedLists = []
-    let importHistory = []
+    let cancelled = false
 
-    function syncSavedLists() {
-      const importedOwnersBySource = new Map()
+    async function refreshSavedLists() {
+      try {
+        const response =
+          await eLearningApi.savedLists()
 
-      // Lịch sử nhập được lưu độc lập nên vẫn giữ nguyên khi người dùng xóa bản sao.
-      importHistory.forEach((item) => {
-        const sourceId = String(item.sourceListId || '').trim()
-        const ownerId = String(item.importerId || '').trim()
-        if (!sourceId || !ownerId) return
-        if (!importedOwnersBySource.has(sourceId)) importedOwnersBySource.set(sourceId, new Set())
-        importedOwnersBySource.get(sourceId).add(ownerId)
-      })
+        if (cancelled) return
 
-      // Tương thích với các bản sao được tạo trước khi có collection lịch sử.
-      allSavedLists.forEach((item) => {
-        const sourceId = String(item.importedFromListId || '').trim()
-        const ownerId = String(item.ownerId || '').trim()
-        if (!sourceId || !ownerId) return
-        if (!importedOwnersBySource.has(sourceId)) importedOwnersBySource.set(sourceId, new Set())
-        importedOwnersBySource.get(sourceId).add(ownerId)
-      })
+        const items =
+          normalizeSavedListsResponse(response)
+            .filter(
+              (item) =>
+                String(item.ownerId || '') ===
+                getCurrentUserId(currentUser),
+            )
+            .map((item) => ({
+              ...item,
+              sharedSaveCount:
+                Number(
+                  item.sharedSaveCount ||
+                  item.data?.sharedSaveCount ||
+                  0,
+                ),
+            }))
+            .sort(
+              (a, b) =>
+                getAnyTime(
+                  b.updatedAt ||
+                  b.createdAt,
+                ) -
+                getAnyTime(
+                  a.updatedAt ||
+                  a.createdAt,
+                ),
+            )
 
-      const items = allSavedLists
-        .filter((item) => String(item.ownerId || '') === String(currentUser.uid))
-        .map((item) => ({
-          ...item,
-          sharedSaveCount: !item.importedFromListId && String(item.shareCode || '').length === 6
-            ? importedOwnersBySource.get(String(item.id))?.size || 0
-            : 0,
-        }))
-        .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt))
-      setSavedLists(items)
+        setSavedLists(items)
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ danh sách lưu:',
+            error,
+          )
+        }
+      }
     }
 
-    const unsubscribeLists = onSnapshot(
-      collection(db, 'courseSavedLists'),
-      (snapshot) => {
-        allSavedLists = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-        syncSavedLists()
-      },
-      (error) => console.warn('Không thể đồng bộ danh sách lưu:', error),
-    )
-
-    const unsubscribeImports = onSnapshot(
-      collection(db, 'courseSavedListImports'),
-      (snapshot) => {
-        importHistory = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-        syncSavedLists()
-      },
-      (error) => console.warn('Không thể đồng bộ lượt lấy danh sách:', error),
-    )
+    refreshSavedLists()
+    const timer =
+      window.setInterval(
+        refreshSavedLists,
+        5000,
+      )
 
     return () => {
-      unsubscribeLists()
-      unsubscribeImports()
+      cancelled = true
+      window.clearInterval(timer)
     }
   }, [currentUser?.uid])
+
 
 
   useEffect(() => {
@@ -820,20 +1229,54 @@ function Courses() {
   async function fetchCourses() {
     try {
       setLoading(true)
-      const snapshot = await getDocs(collection(db, 'courses'))
-      const data = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-      const sortedData = data.sort((a, b) => getCourseCreatedTime(b) - getCourseCreatedTime(a))
+
+      const response =
+        await eLearningApi.courses({
+          limit: 500,
+        })
+
+      const data =
+        normalizeCoursesResponse(response)
+
+      const sortedData =
+        data.sort(
+          (a, b) =>
+            getCourseCreatedTime(b) -
+            getCourseCreatedTime(a),
+        )
+
       setCourses(sortedData)
-      await fetchCourseTeacherProfiles(sortedData)
+
+      await fetchCourseTeacherProfiles(
+        sortedData,
+      )
     } catch (error) {
-      console.error('Lỗi khi lấy dữ liệu courses:', error)
+      console.error(
+        'Lỗi khi lấy dữ liệu courses:',
+        error,
+      )
     } finally {
       setLoading(false)
     }
   }
 
+
   async function fetchCourseTeacherProfiles(courseList) {
     try {
+      const response = await eLearningApi.users()
+      const users = normalizeUsers(response)
+      const byId = new Map(
+        users.map((item) => [
+          String(
+            item.id ||
+            item.uid ||
+            item.user_id ||
+            '',
+          ),
+          item,
+        ]),
+      )
+
       const teacherIds = uniqueValues(
         courseList.flatMap((course) => [
           course.teacherId,
@@ -844,104 +1287,255 @@ function Courses() {
           course.uid,
         ]),
       )
+
       const nextProfiles = {}
-      await Promise.all(
-        teacherIds.map(async (teacherId) => {
-          try {
-            const userSnap = await getDoc(doc(db, 'users', teacherId))
-            if (userSnap.exists()) nextProfiles[teacherId] = userSnap.data()
-          } catch (error) {
-            console.warn('Không thể lấy tên giáo viên:', teacherId, error)
-          }
-        }),
-      )
+
+      teacherIds.forEach((teacherId) => {
+        const profile =
+          byId.get(String(teacherId))
+
+        if (profile) {
+          nextProfiles[String(teacherId)] =
+            profile
+        }
+      })
+
       setTeacherProfilesById(nextProfiles)
     } catch (error) {
-      console.warn('Không thể tải danh sách tên giáo viên hiện tại:', error)
+      console.warn(
+        'Không thể tải danh sách tên giáo viên hiện tại:',
+        error,
+      )
       setTeacherProfilesById({})
     }
   }
 
+
   async function fetchAchievement(uid) {
     try {
-      const achievementRef = doc(db, 'learningStats', uid)
-      const achievementSnap = await getDoc(achievementRef)
-      const achievementData = achievementSnap.exists() ? achievementSnap.data() : {}
-      const progressSnapshot = await getDocs(collection(db, 'learningStats', uid, 'courses'))
+      const courseResponse =
+        await eLearningApi.courses({
+          limit: 500,
+        })
+
+      const courseRows =
+        normalizeCoursesResponse(
+          courseResponse,
+        )
+
+      const progressEntries =
+        await Promise.all(
+          courseRows.map(
+            async (course) => {
+              try {
+                const response =
+                  await eLearningApi.progress(
+                    course.id,
+                  )
+
+                return [
+                  String(course.id),
+                  response?.progress || null,
+                ]
+              } catch {
+                return [
+                  String(course.id),
+                  null,
+                ]
+              }
+            },
+          ),
+        )
+
       const watchedCourseIds = []
-      const watchedDateSet = new Set(Array.isArray(achievementData.watchedDates) ? achievementData.watchedDates : [])
+      const watchedDateSet = new Set()
 
-      progressSnapshot.docs.forEach((progressDoc) => {
-        const data = progressDoc.data()
-        watchedCourseIds.push(progressDoc.id)
-        const watchedDate = data.watchedDate || toDateKey(data.lastViewedAt || data.lastWatchedAt || data.updatedAt || data.createdAt)
-        if (watchedDate) watchedDateSet.add(watchedDate)
-      })
+      progressEntries.forEach(
+        ([courseId, data]) => {
+          if (!data) return
 
-      const uniqueCourseIds = Array.from(new Set([...(Array.isArray(achievementData.watchedCourseIds) ? achievementData.watchedCourseIds : []), ...watchedCourseIds]))
-      const watchedDates = Array.from(watchedDateSet).sort()
-      const nextAchievement = { watchedLessons: uniqueCourseIds.length, watchedDates }
-      setAchievement(nextAchievement)
+          const hasProgress =
+            Number(data.progress || 0) > 0 ||
+            Number(data.watchedSeconds || 0) > 0 ||
+            Boolean(data.lastViewedAt)
 
-      await setDoc(
-        achievementRef,
-        {
-          watchedLessons: uniqueCourseIds.length,
-          watchedCourses: uniqueCourseIds.length,
-          watchedCourseIds: uniqueCourseIds,
-          watchedDates,
-          updatedAt: serverTimestamp(),
+          if (hasProgress) {
+            watchedCourseIds.push(courseId)
+          }
+
+          const watchedDate =
+            data.watchedDate ||
+            toDateKey(
+              data.lastViewedAt ||
+              data.lastWatchedAt ||
+              data.updatedAt ||
+              data.createdAt,
+            )
+
+          if (watchedDate) {
+            watchedDateSet.add(
+              watchedDate,
+            )
+          }
         },
-        { merge: true },
       )
+
+      const watchedDates =
+        Array.from(
+          watchedDateSet,
+        ).sort()
+
+      setAchievement({
+        watchedLessons:
+          new Set(
+            watchedCourseIds,
+          ).size,
+        watchedDates,
+      })
     } catch (error) {
-      console.error('Lỗi khi lấy thành tích:', error)
-      setAchievement({ watchedLessons: 0, watchedDates: [] })
+      console.error(
+        'Lỗi khi lấy thành tích:',
+        error,
+      )
+
+      setAchievement({
+        watchedLessons: 0,
+        watchedDates: [],
+      })
     }
   }
+
 
   async function fetchLearningProgress(uid) {
     try {
-      const progressSnapshot = await getDocs(collection(db, 'learningStats', uid, 'courses'))
+      const courseResponse =
+        await eLearningApi.courses({
+          limit: 500,
+        })
+
+      const courseRows =
+        normalizeCoursesResponse(
+          courseResponse,
+        )
+
+      const entries =
+        await Promise.all(
+          courseRows.map(
+            async (course) => {
+              try {
+                const response =
+                  await eLearningApi.progress(
+                    course.id,
+                  )
+
+                return [
+                  String(course.id),
+                  response?.progress || {},
+                ]
+              } catch {
+                return [
+                  String(course.id),
+                  {},
+                ]
+              }
+            },
+          ),
+        )
+
       const progressMap = {}
-      progressSnapshot.docs.forEach((progressDoc) => {
-        const data = progressDoc.data()
-        progressMap[progressDoc.id] = {
-          progress: Number(data.progress || data.percent || data.completion || 0),
-          lastViewedAt: data.lastViewedAt || data.lastWatchedAt || data.updatedAt || data.createdAt || null,
-          watchedSeconds: Number(data.watchedSeconds || 0),
-          completedChecklist: data.completedChecklist || {},
-          bookmarked: Boolean(data.bookmarked),
-          quizResult: data.quizResult || null,
-        }
-      })
-      setLearningProgress(progressMap)
+
+      entries.forEach(
+        ([courseId, data]) => {
+          progressMap[courseId] = {
+            progress:
+              Number(
+                data.progress ||
+                data.percent ||
+                data.completion ||
+                0,
+              ),
+            lastViewedAt:
+              data.lastViewedAt ||
+              data.lastWatchedAt ||
+              data.updatedAt ||
+              data.createdAt ||
+              null,
+            watchedSeconds:
+              Number(
+                data.watchedSeconds ||
+                0,
+              ),
+            completedChecklist:
+              data.completedChecklist ||
+              {},
+            bookmarked:
+              Boolean(data.bookmarked),
+            quizResult:
+              data.quizResult ||
+              null,
+          }
+        },
+      )
+
+      setLearningProgress(
+        progressMap,
+      )
+      setLearningError('')
     } catch (error) {
-      console.error('Lỗi khi lấy tiến độ học:', error)
-      setLearningError('Không thể tải tiến độ học tập.')
+      console.error(
+        'Lỗi khi lấy tiến độ học:',
+        error,
+      )
+      setLearningError(
+        'Không thể tải tiến độ học tập.',
+      )
       setLearningProgress({})
     }
   }
+
 
   async function fetchLearningReports(uid) {
     if (!uid) {
       setReports([])
       return
     }
+
     try {
       setReportsLoading(true)
-      const reportSnapshot = await getDocs(collection(db, 'learningReports'))
-      const items = reportSnapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => {
-          const ownerIds = [item.userId, item.reporterId, item.createdByUid, item.uid].filter(Boolean).map(String)
-          const ownerEmails = [item.userEmail, item.reporterEmail, item.createdByEmail].filter(Boolean).map((value) => String(value).toLowerCase())
-          return ownerIds.includes(String(uid)) || ownerEmails.includes(String(currentUser?.email || '').toLowerCase())
-        })
-        .sort((a, b) => getAnyTime(b.createdAt || b.reportedAt || b.updatedAt) - getAnyTime(a.createdAt || a.reportedAt || a.updatedAt))
+
+      const response =
+        await eLearningApi.reports()
+
+      const items =
+        normalizeReportsResponse(response)
+          .filter(
+            (item) =>
+              String(
+                item.reporterId ||
+                item.userId ||
+                '',
+              ) === String(uid),
+          )
+          .sort(
+            (a, b) =>
+              getAnyTime(
+                b.createdAt ||
+                b.reportedAt ||
+                b.updatedAt,
+              ) -
+                getAnyTime(
+                  a.createdAt ||
+                  a.reportedAt ||
+                  a.updatedAt,
+                ),
+          )
+
       setReports(items)
     } catch (error) {
-      console.warn('Không thể tải lịch sử báo cáo E-learning:', error)
+      console.warn(
+        'Không thể tải lịch sử báo cáo E-learning:',
+        error,
+      )
       setReports([])
     } finally {
       setReportsLoading(false)
@@ -949,57 +1543,212 @@ function Courses() {
   }
 
 
+
   async function fetchMyPlaylists(uid) {
-    if (!uid) { setMyPlaylists([]); return }
+    if (!uid) {
+      setMyPlaylists([])
+      return
+    }
+
     try {
-      const snapshot = await getDocs(collection(db, 'coursePlaylists'))
-      const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => String(item.ownerId || '') === String(uid))
-        .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt))
+      const response =
+        await eLearningApi.playlists()
+
+      const items =
+        normalizePlaylistsResponse(response)
+          .filter(
+            (item) =>
+              String(item.ownerId || '') ===
+              String(uid),
+          )
+          .sort(
+            (a, b) =>
+              getAnyTime(
+                b.updatedAt ||
+                b.createdAt,
+              ) -
+              getAnyTime(
+                a.updatedAt ||
+                a.createdAt,
+              ),
+          )
+
       setMyPlaylists(items)
     } catch (error) {
-      console.warn('Không thể tải danh sách phát:', error)
+      console.warn(
+        'Không thể tải danh sách phát:',
+        error,
+      )
       setMyPlaylists([])
     }
   }
 
+
   async function fetchChannelPlaylists(ownerId) {
-    if (!ownerId) { setChannelPlaylists([]); return }
+    if (!ownerId) {
+      setChannelPlaylists([])
+      return
+    }
+
     try {
-      const snapshot = await getDocs(collection(db, 'coursePlaylists'))
-      const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => String(item.ownerId || '') === String(ownerId) && !['private', 'class'].includes(String(item.visibility || 'public').toLowerCase()))
-        .sort((a, b) => getAnyTime(b.updatedAt || b.createdAt) - getAnyTime(a.updatedAt || a.createdAt))
+      const response =
+        await eLearningApi.playlists()
+
+      const items =
+        normalizePlaylistsResponse(response)
+          .filter(
+            (item) =>
+              String(item.ownerId || '') ===
+                String(ownerId) &&
+              ![
+                'private',
+                'class',
+              ].includes(
+                String(
+                  item.visibility ||
+                  item.data?.visibility ||
+                  'public',
+                ).toLowerCase(),
+              ),
+          )
+          .sort(
+            (a, b) =>
+              getAnyTime(
+                b.updatedAt ||
+                b.createdAt,
+              ) -
+              getAnyTime(
+                a.updatedAt ||
+                a.createdAt,
+              ),
+          )
+
       setChannelPlaylists(items)
     } catch (error) {
-      console.warn('Không thể tải playlist của kênh:', error)
+      console.warn(
+        'Không thể tải playlist của kênh:',
+        error,
+      )
       setChannelPlaylists([])
     }
   }
 
+
   async function fetchFollowingAccounts(uid) {
-    if (!uid) { setFollowingAccounts([]); return }
+    if (!uid) {
+      setFollowingAccounts([])
+      return
+    }
+
     try {
-      const followingSnapshot = await getDocs(collection(db, 'users', uid, 'following'))
-      const items = await Promise.all(followingSnapshot.docs.map(async (followDoc) => {
-        const followData = followDoc.data()
-        const targetId = followData.targetUserId || followDoc.id
-        const profileSnap = await getDoc(doc(db, 'users', String(targetId)))
-        const profile = profileSnap.exists() ? profileSnap.data() : {}
-        const lastOpened = getAnyTime(followData.lastOpenedAt || followData.followedAt)
-        const unreadCount = courses.filter((course) => {
-          const ownerIds = [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid].filter(Boolean).map(String)
-          const status = String(course.status || course.moderationStatus || 'approved').toLowerCase()
-          return ownerIds.includes(String(targetId)) && status === 'approved' && getCourseCreatedTime(course) > lastOpened
-        }).length
-        return { id: String(targetId), ...profile, followedAt: followData.followedAt, lastOpenedAt: followData.lastOpenedAt, unreadCount }
-      }))
+      const [
+        followResponse,
+        usersResponse,
+      ] = await Promise.all([
+        eLearningApi.following(),
+        eLearningApi.users(),
+      ])
+
+      const follows =
+        Array.isArray(
+          followResponse?.following,
+        )
+          ? followResponse.following
+          : []
+
+      const users =
+        normalizeUsers(usersResponse)
+
+      const usersById =
+        new Map(
+          users.map((item) => [
+            String(
+              item.id ||
+              item.uid ||
+              item.user_id ||
+              '',
+            ),
+            item,
+          ]),
+        )
+
+      const items =
+        follows.map((follow) => {
+          const targetId =
+            String(
+              follow.targetUserId ||
+              follow.id ||
+              '',
+            )
+
+          const profile =
+            usersById.get(targetId) ||
+            {}
+
+          const lastOpened =
+            getAnyTime(
+              follow.lastOpenedAt ||
+              follow.followedAt,
+            )
+
+          const unreadCount =
+            courses.filter((course) => {
+              const ownerIds = [
+                course.teacherId,
+                course.createdByUid,
+                course.createdBy,
+                course.ownerId,
+                course.userId,
+                course.uid,
+              ]
+                .filter(Boolean)
+                .map(String)
+
+              const status =
+                String(
+                  course.status ||
+                  course.moderationStatus ||
+                  'approved',
+                ).toLowerCase()
+
+              return (
+                ownerIds.includes(
+                  targetId,
+                ) &&
+                status === 'approved' &&
+                getCourseCreatedTime(
+                  course,
+                ) > lastOpened
+              )
+            }).length
+
+          return {
+            id: targetId,
+            ...profile,
+            followedAt:
+              follow.followedAt,
+            lastOpenedAt:
+              follow.lastOpenedAt,
+            unreadCount,
+          }
+        })
+
+      items.sort(
+        (a, b) =>
+          getAnyTime(b.followedAt) -
+          getAnyTime(a.followedAt),
+      )
+
       setFollowingAccounts(items)
     } catch (error) {
-      console.warn('Không thể tải tài khoản đang theo dõi:', error)
+      console.warn(
+        'Không thể tải tài khoản đang theo dõi:',
+        error,
+      )
       setFollowingAccounts([])
     }
   }
+
 
   function openPresenterChannel(ownerId, fallbackProfile = {}) {
     if (!ownerId) return
@@ -1016,207 +1765,568 @@ function Courses() {
   }
 
   async function openFollowingAccount(account) {
-    if (!currentUser?.uid || !account?.id) return
-    try {
-      await setDoc(doc(db, 'users', currentUser.uid, 'following', account.id), { targetUserId: account.id, lastOpenedAt: serverTimestamp() }, { merge: true })
-      setFollowingAccounts((items) => items.map((item) => String(item.id) === String(account.id) ? { ...item, unreadCount: 0, lastOpenedAt: new Date() } : item))
-    } catch (error) {
-      console.warn('Không thể xóa thông báo theo dõi:', error)
+    if (
+      !currentUser?.uid ||
+      !account?.id
+    ) {
+      return
     }
-    openPresenterChannel(account.id, account)
+
+    try {
+      await eLearningApi.touchFollow(
+        account.id,
+      )
+
+      setFollowingAccounts(
+        (items) =>
+          items.map((item) =>
+            String(item.id) ===
+            String(account.id)
+              ? {
+                  ...item,
+                  unreadCount: 0,
+                  lastOpenedAt:
+                    new Date().toISOString(),
+                }
+              : item,
+          ),
+      )
+    } catch (error) {
+      console.warn(
+        'Không thể cập nhật lần mở tài khoản theo dõi:',
+        error,
+      )
+    }
+
+    openPresenterChannel(
+      account.id,
+      account,
+    )
   }
+
 
   async function toggleFollowChannel(targetUserId) {
-    if (!currentUser?.uid || !targetUserId || String(currentUser.uid) === String(targetUserId)) return
-    const followRef = doc(db, 'users', currentUser.uid, 'following', String(targetUserId))
-    const targetRef = doc(db, 'users', String(targetUserId))
-    const historyRef = doc(collection(db, 'users', String(targetUserId), 'followerHistory'))
+    if (
+      !currentUser?.uid ||
+      !targetUserId ||
+      getCurrentUserId(currentUser) ===
+        String(targetUserId)
+    ) {
+      return
+    }
+
     try {
-      await runTransaction(db, async (transaction) => {
-        const followSnap = await transaction.get(followRef)
-        const targetSnap = await transaction.get(targetRef)
-        const currentCount = Number(targetSnap.exists() ? targetSnap.data().followersCount || targetSnap.data().followerCount || 0 : 0)
-        if (followSnap.exists()) {
-          const nextCount = Math.max(0, currentCount - 1)
-          transaction.delete(followRef)
-          if (targetSnap.exists()) transaction.update(targetRef, { followersCount: nextCount, updatedAt: serverTimestamp() })
-          transaction.set(historyRef, {
-            actorId: currentUser.uid,
-            targetUserId: String(targetUserId),
-            type: 'unfollow',
-            delta: -1,
-            countAfter: nextCount,
-            createdAt: serverTimestamp(),
-          })
-        } else {
-          const nextCount = currentCount + 1
-          transaction.set(followRef, { targetUserId: String(targetUserId), followedAt: serverTimestamp(), lastOpenedAt: serverTimestamp() })
-          if (targetSnap.exists()) transaction.update(targetRef, { followersCount: nextCount, updatedAt: serverTimestamp() })
-          transaction.set(historyRef, {
-            actorId: currentUser.uid,
-            targetUserId: String(targetUserId),
-            type: 'follow',
-            delta: 1,
-            countAfter: nextCount,
-            createdAt: serverTimestamp(),
-          })
-        }
-      })
-      const targetSnap = await getDoc(targetRef)
-      if (targetSnap.exists()) setSelectedChannel((current) => current && String(current.id) === String(targetUserId) ? { ...current, profile: targetSnap.data() } : current)
+      await eLearningApi.toggleFollow(
+        targetUserId,
+      )
+
+      await fetchFollowingAccounts(
+        getCurrentUserId(currentUser),
+      )
+
+      const usersResponse =
+        await eLearningApi.users()
+
+      const targetProfile =
+        normalizeUsers(usersResponse).find(
+          (item) =>
+            String(
+              item.id ||
+              item.uid ||
+              item.user_id ||
+              '',
+            ) === String(targetUserId),
+        )
+
+      if (targetProfile) {
+        setSelectedChannel(
+          (current) =>
+            current &&
+            String(current.id) ===
+              String(targetUserId)
+              ? {
+                  ...current,
+                  profile:
+                    targetProfile,
+                }
+              : current,
+        )
+      }
     } catch (error) {
-      console.error('Không thể cập nhật theo dõi:', error)
-      alert('Không thể cập nhật trạng thái theo dõi. Vui lòng thử lại.')
+      console.error(
+        'Không thể cập nhật theo dõi:',
+        error,
+      )
+
+      alert(
+        'Không thể cập nhật trạng thái theo dõi. Vui lòng thử lại.',
+      )
     }
   }
 
-  async function createPlaylist({ title, description, courseIds, thumbnail = '', thumbnailFileName = '' }) {
-    if (!currentUser?.uid || !title.trim()) return
+
+  async function createPlaylist({
+    title,
+    description,
+    courseIds,
+    thumbnail = '',
+    thumbnailFileName = '',
+  }) {
+    if (
+      !currentUser?.uid ||
+      !title.trim()
+    ) {
+      return
+    }
+
     try {
-      await addDoc(collection(db, 'coursePlaylists'), {
-        ownerId: currentUser.uid,
-        ownerName: currentTeacherName,
+      await eLearningApi.createPlaylist({
         title: title.trim(),
-        description: description.trim(),
-        thumbnail: String(thumbnail || '').trim(),
-        thumbnailFileName: thumbnailFileName || '',
-        courseIds: Array.from(new Set(courseIds || [])),
-        visibility: 'public',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        description:
+          description.trim(),
+        thumbnail:
+          String(
+            thumbnail || '',
+          ).trim(),
+        thumbnailFileName:
+          thumbnailFileName || '',
+        courseIds:
+          Array.from(
+            new Set(
+              courseIds || [],
+            ),
+          ),
+        data: {
+          ownerName:
+            currentTeacherName,
+          visibility:
+            'public',
+        },
       })
+
       setPlaylistModalOpen(false)
+
+      await fetchMyPlaylists(
+        getCurrentUserId(currentUser),
+      )
     } catch (error) {
-      console.error('Không thể tạo danh sách phát:', error)
-      alert('Không thể tạo danh sách phát. Vui lòng thử lại.')
+      console.error(
+        'Không thể tạo danh sách phát:',
+        error,
+      )
+      alert(
+        'Không thể tạo danh sách phát. Vui lòng thử lại.',
+      )
     }
   }
 
-  async function createSavedList({ title, description, courseIds, thumbnail = '', thumbnailFileName = '' }) {
-    if (!currentUser?.uid || !title.trim()) return
+
+  async function createSavedList({
+    title,
+    description,
+    courseIds,
+    thumbnail = '',
+    thumbnailFileName = '',
+  }) {
+    if (
+      !currentUser?.uid ||
+      !title.trim()
+    ) {
+      return
+    }
+
     try {
-      await addDoc(collection(db, 'courseSavedLists'), {
-        ownerId: currentUser.uid,
+      await eLearningApi.createSavedList({
         title: title.trim(),
-        description: description.trim(),
-        thumbnail: String(thumbnail || '').trim(),
-        thumbnailFileName: thumbnailFileName || '',
-        courseIds: Array.from(new Set(courseIds || [])),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        description:
+          description.trim(),
+        thumbnail:
+          String(
+            thumbnail || '',
+          ).trim(),
+        thumbnailFileName:
+          thumbnailFileName || '',
+        courseIds:
+          Array.from(
+            new Set(
+              courseIds || [],
+            ),
+          ),
       })
+
       setSavedListModalOpen(false)
+
+      const response =
+        await eLearningApi.savedLists()
+
+      setSavedLists(
+        normalizeSavedListsResponse(
+          response,
+        ),
+      )
     } catch (error) {
-      console.error('Không thể tạo danh sách lưu:', error)
-      alert('Không thể tạo danh sách lưu. Vui lòng thử lại.')
+      console.error(
+        'Không thể tạo danh sách lưu:',
+        error,
+      )
+      alert(
+        'Không thể tạo danh sách lưu. Vui lòng thử lại.',
+      )
     }
   }
 
-  async function updatePlaylist(playlistId, { title, description, courseIds, thumbnail = '', thumbnailFileName = '' }) {
-    if (!currentUser?.uid || !playlistId || !title.trim()) return
+
+  async function updatePlaylist(
+    playlistId,
+    {
+      title,
+      description,
+      courseIds,
+      thumbnail = '',
+      thumbnailFileName = '',
+    },
+  ) {
+    if (
+      !currentUser?.uid ||
+      !playlistId ||
+      !title.trim()
+    ) {
+      return
+    }
+
     try {
-      await updateDoc(doc(db, 'coursePlaylists', playlistId), {
-        title: title.trim(),
-        description: description.trim(),
-        thumbnail: String(thumbnail || '').trim(),
-        thumbnailFileName: thumbnailFileName || '',
-        courseIds: Array.from(new Set(courseIds || [])),
-        updatedAt: serverTimestamp(),
-      })
+      await eLearningApi.updatePlaylist(
+        playlistId,
+        {
+          title:
+            title.trim(),
+          description:
+            description.trim(),
+          thumbnail:
+            String(
+              thumbnail || '',
+            ).trim(),
+          thumbnailFileName:
+            thumbnailFileName || '',
+          courseIds:
+            Array.from(
+              new Set(
+                courseIds || [],
+              ),
+            ),
+        },
+      )
+
       setEditingPlaylist(null)
       setPlaylistPreview(null)
+
+      await fetchMyPlaylists(
+        getCurrentUserId(currentUser),
+      )
     } catch (error) {
-      console.error('Không thể cập nhật danh sách phát:', error)
-      alert('Không thể cập nhật danh sách phát. Vui lòng thử lại.')
+      console.error(
+        'Không thể cập nhật danh sách phát:',
+        error,
+      )
+      alert(
+        'Không thể cập nhật danh sách phát. Vui lòng thử lại.',
+      )
     }
   }
 
-  async function updateSavedList(savedListId, { title, description, courseIds, thumbnail = '', thumbnailFileName = '' }) {
-    if (!currentUser?.uid || !savedListId || !title.trim()) return
+
+  async function updateSavedList(
+    savedListId,
+    {
+      title,
+      description,
+      courseIds,
+      thumbnail = '',
+      thumbnailFileName = '',
+    },
+  ) {
+    if (
+      !currentUser?.uid ||
+      !savedListId ||
+      !title.trim()
+    ) {
+      return
+    }
+
     try {
-      await updateDoc(doc(db, 'courseSavedLists', savedListId), {
-        title: title.trim(),
-        description: description.trim(),
-        thumbnail: String(thumbnail || '').trim(),
-        thumbnailFileName: thumbnailFileName || '',
-        courseIds: Array.from(new Set(courseIds || [])),
-        updatedAt: serverTimestamp(),
-      })
+      const response =
+        await eLearningApi.updateSavedList(
+          savedListId,
+          {
+            title:
+              title.trim(),
+            description:
+              description.trim(),
+            thumbnail:
+              String(
+                thumbnail || '',
+              ).trim(),
+            thumbnailFileName:
+              thumbnailFileName || '',
+            courseIds:
+              Array.from(
+                new Set(
+                  courseIds || [],
+                ),
+              ),
+          },
+        )
+
+      const updated =
+        response?.list
+
+      if (updated) {
+        setSavedLists(
+          (current) =>
+            current.map(
+              (item) =>
+                String(item.id) ===
+                String(savedListId)
+                  ? updated
+                  : item,
+            ),
+        )
+      }
+
       setEditingSavedList(null)
       setSavedListPreview(null)
     } catch (error) {
-      console.error('Không thể cập nhật danh sách lưu:', error)
-      alert('Không thể cập nhật danh sách lưu. Vui lòng thử lại.')
+      console.error(
+        'Không thể cập nhật danh sách lưu:',
+        error,
+      )
+      alert(
+        'Không thể cập nhật danh sách lưu. Vui lòng thử lại.',
+      )
     }
   }
 
+
   async function unsaveCourse(course) {
-    if (!currentUser?.uid || !course?.id || unsavingCourseId) return
+    if (
+      !currentUser?.uid ||
+      !course?.id ||
+      unsavingCourseId
+    ) {
+      return
+    }
+
     try {
-      setUnsavingCourseId(course.id)
-      await setDoc(doc(db, 'learningStats', currentUser.uid, 'courses', course.id), {
-        courseId: course.id,
-        bookmarked: false,
-        unsavedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
-
-      const containingLists = savedLists.filter((list) =>
-        Array.isArray(list.courseIds) && list.courseIds.map(String).includes(String(course.id)),
+      setUnsavingCourseId(
+        course.id,
       )
-      await Promise.all(containingLists.map((list) => updateDoc(doc(db, 'courseSavedLists', list.id), {
-        courseIds: arrayRemove(course.id),
-        updatedAt: serverTimestamp(),
-      })))
 
-      setLearningProgress((current) => ({
-        ...current,
-        [course.id]: { ...(current[course.id] || {}), bookmarked: false },
-      }))
+      await eLearningApi.updateProgress(
+        course.id,
+        {
+          bookmarked: false,
+          markViewed: true,
+        },
+      )
+
+      const containingLists =
+        savedLists.filter(
+          (list) =>
+            Array.isArray(
+              list.courseIds,
+            ) &&
+            list.courseIds
+              .map(String)
+              .includes(
+                String(course.id),
+              ),
+        )
+
+      const updates =
+        await Promise.all(
+          containingLists.map(
+            async (list) => {
+              const nextCourseIds =
+                list.courseIds
+                  .map(String)
+                  .filter(
+                    (id) =>
+                      id !==
+                      String(course.id),
+                  )
+
+              const response =
+                await eLearningApi.updateSavedList(
+                  list.id,
+                  {
+                    courseIds:
+                      nextCourseIds,
+                  },
+                )
+
+              return (
+                response?.list ||
+                {
+                  ...list,
+                  courseIds:
+                    nextCourseIds,
+                }
+              )
+            },
+          ),
+        )
+
+      if (updates.length) {
+        const byId = new Map(
+          updates.map((item) => [
+            String(item.id),
+            item,
+          ]),
+        )
+
+        setSavedLists(
+          (current) =>
+            current.map(
+              (item) =>
+                byId.get(
+                  String(item.id),
+                ) || item,
+            ),
+        )
+      }
+
+      setLearningProgress(
+        (current) => ({
+          ...current,
+          [course.id]: {
+            ...(current[
+              course.id
+            ] || {}),
+            bookmarked: false,
+          },
+        }),
+      )
+
       setSaveSuccessNotice({
-        courseTitle: stripHtml(course.title) || 'Bài học',
-        destination: 'removed',
+        courseTitle:
+          stripHtml(
+            course.title,
+          ) || 'Bài học',
+        destination:
+          'removed',
       })
     } catch (error) {
-      console.error('Không thể hủy lưu bài học:', error)
-      alert('Không thể hủy lưu bài học. Vui lòng thử lại.')
+      console.error(
+        'Không thể hủy lưu bài học:',
+        error,
+      )
+      alert(
+        'Không thể hủy lưu bài học. Vui lòng thử lại.',
+      )
     } finally {
       setUnsavingCourseId('')
     }
   }
 
-  async function saveCourseToDestination(course, savedList = null) {
-    if (!currentUser?.uid || !course?.id) return
+
+  async function saveCourseToDestination(
+    course,
+    savedList = null,
+  ) {
+    if (
+      !currentUser?.uid ||
+      !course?.id
+    ) {
+      return
+    }
+
     try {
-      const progressRef = doc(db, 'learningStats', currentUser.uid, 'courses', course.id)
-      await setDoc(progressRef, {
-        courseId: course.id,
-        bookmarked: true,
-        savedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
+      await eLearningApi.updateProgress(
+        course.id,
+        {
+          bookmarked: true,
+          markViewed: true,
+        },
+      )
 
       if (savedList?.id) {
-        await updateDoc(doc(db, 'courseSavedLists', savedList.id), {
-          courseIds: arrayUnion(course.id),
-          updatedAt: serverTimestamp(),
-        })
+        const nextCourseIds =
+          Array.from(
+            new Set([
+              ...(Array.isArray(
+                savedList.courseIds,
+              )
+                ? savedList.courseIds.map(
+                    String,
+                  )
+                : []),
+              String(course.id),
+            ]),
+          )
+
+        const response =
+          await eLearningApi.updateSavedList(
+            savedList.id,
+            {
+              courseIds:
+                nextCourseIds,
+            },
+          )
+
+        const updated =
+          response?.list ||
+          {
+            ...savedList,
+            courseIds:
+              nextCourseIds,
+          }
+
+        setSavedLists(
+          (current) =>
+            current.map(
+              (item) =>
+                String(item.id) ===
+                String(savedList.id)
+                  ? updated
+                  : item,
+            ),
+        )
       }
 
-      setLearningProgress((current) => ({
-        ...current,
-        [course.id]: { ...(current[course.id] || {}), bookmarked: true },
-      }))
+      setLearningProgress(
+        (current) => ({
+          ...current,
+          [course.id]: {
+            ...(current[
+              course.id
+            ] || {}),
+            bookmarked: true,
+          },
+        }),
+      )
+
       setSaveCourseTarget(null)
+
       setSaveSuccessNotice({
-        courseTitle: stripHtml(course.title) || 'Bài học',
-        destination: savedList?.title || 'Đã lưu riêng',
+        courseTitle:
+          stripHtml(
+            course.title,
+          ) || 'Bài học',
+        destination:
+          savedList?.title ||
+          'Đã lưu riêng',
       })
     } catch (error) {
-      console.error('Không thể lưu bài học:', error)
-      alert('Không thể lưu bài học. Vui lòng thử lại.')
+      console.error(
+        'Không thể lưu bài học:',
+        error,
+      )
+      alert(
+        'Không thể lưu bài học. Vui lòng thử lại.',
+      )
     }
   }
+
 
   function getAvailablePlaylistCourseIds(playlist) {
     return (Array.isArray(playlist?.courseIds) ? playlist.courseIds : [])
@@ -1243,23 +2353,86 @@ function Courses() {
     navigate(`/e-learning/${encodeURIComponent(courseIds[0])}?${params.toString()}`)
   }
 
-  async function removeCourseFromPlaylist(playlist, courseId) {
-    if (!playlist?.id || !courseId || String(playlist.ownerId || '') !== String(currentUser?.uid || '')) return
+  async function removeCourseFromPlaylist(
+    playlist,
+    courseId,
+  ) {
+    if (
+      !playlist?.id ||
+      !courseId ||
+      String(
+        playlist.ownerId ||
+        '',
+      ) !==
+        getCurrentUserId(currentUser)
+    ) {
+      return
+    }
+
     try {
-      await updateDoc(doc(db, 'coursePlaylists', playlist.id), {
-        courseIds: arrayRemove(courseId),
-        updatedAt: serverTimestamp(),
-      })
-      const nextPlaylist = {
-        ...playlist,
-        courseIds: (playlist.courseIds || []).filter((id) => String(id) !== String(courseId)),
-      }
-      setPlaylistPreview(nextPlaylist)
+      const nextCourseIds =
+        (playlist.courseIds || [])
+          .map(String)
+          .filter(
+            (id) =>
+              id !==
+              String(courseId),
+          )
+
+      const response =
+        await eLearningApi.updatePlaylist(
+          playlist.id,
+          {
+            title:
+              playlist.title ||
+              'Danh sách phát',
+            description:
+              playlist.description ||
+              '',
+            thumbnail:
+              playlist.thumbnail ||
+              '',
+            thumbnailFileName:
+              playlist.thumbnailFileName ||
+              '',
+            courseIds:
+              nextCourseIds,
+          },
+        )
+
+      const nextPlaylist =
+        response?.playlist ||
+        {
+          ...playlist,
+          courseIds:
+            nextCourseIds,
+        }
+
+      setPlaylistPreview(
+        nextPlaylist,
+      )
+
+      setMyPlaylists(
+        (current) =>
+          current.map(
+            (item) =>
+              String(item.id) ===
+              String(playlist.id)
+                ? nextPlaylist
+                : item,
+          ),
+      )
     } catch (error) {
-      console.error('Không thể xóa bài khỏi danh sách phát:', error)
-      alert('Không thể xóa bài khỏi danh sách phát. Vui lòng thử lại.')
+      console.error(
+        'Không thể xóa bài khỏi danh sách phát:',
+        error,
+      )
+      alert(
+        'Không thể xóa bài khỏi danh sách phát. Vui lòng thử lại.',
+      )
     }
   }
+
 
   function generateSavedListShareCode() {
     const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
@@ -1280,65 +2453,108 @@ function Courses() {
   }
 
   async function ensureSavedListShareCode(list) {
-    if (!list?.id || String(list.ownerId || '') !== String(currentUser?.uid || '')) return ''
-    if (String(list.shareCode || '').length === 6) return String(list.shareCode)
+    if (
+      !list?.id ||
+      String(
+        list.ownerId ||
+        '',
+      ) !==
+        getCurrentUserId(currentUser)
+    ) {
+      return ''
+    }
+
+    if (
+      String(
+        list.shareCode ||
+        '',
+      ).length === 6
+    ) {
+      return String(
+        list.shareCode,
+      )
+    }
+
     try {
-      const snapshot = await getDocs(collection(db, 'courseSavedLists'))
-      const usedCodes = new Set(snapshot.docs.map((item) => String(item.data()?.shareCode || '')).filter(Boolean))
-      let code = generateSavedListShareCode()
-      while (usedCodes.has(code)) code = generateSavedListShareCode()
-      await updateDoc(doc(db, 'courseSavedLists', list.id), {
-        shareCode: code,
-        shareEnabled: true,
-        updatedAt: serverTimestamp(),
-      })
-      setShareSavedListTarget({ ...list, shareCode: code, shareEnabled: true })
-      return code
+      const response =
+        await eLearningApi.enableSavedListShare(
+          list.id,
+        )
+
+      const updated =
+        response?.list ||
+        {
+          ...list,
+          shareCode:
+            response?.shareCode ||
+            '',
+          shareEnabled: true,
+        }
+
+      setShareSavedListTarget(
+        updated,
+      )
+
+      setSavedLists(
+        (current) =>
+          current.map(
+            (item) =>
+              String(item.id) ===
+              String(list.id)
+                ? updated
+                : item,
+          ),
+      )
+
+      return String(
+        updated.shareCode ||
+        response?.shareCode ||
+        '',
+      )
     } catch (error) {
-      console.error('Không thể tạo mã chia sẻ:', error)
-      alert('Không thể tạo mã chia sẻ. Vui lòng thử lại.')
+      console.error(
+        'Không thể tạo mã chia sẻ:',
+        error,
+      )
+      alert(
+        'Không thể tạo mã chia sẻ. Vui lòng thử lại.',
+      )
       return ''
     }
   }
 
-  async function importSavedListByCode(rawCode) {
-    const code = String(rawCode || '').trim()
-    if (!currentUser?.uid || code.length !== 6) throw new Error('Mã chia sẻ phải gồm đúng 6 ký tự.')
-    const snapshot = await getDocs(collection(db, 'courseSavedLists'))
-    const sourceDoc = snapshot.docs.find((item) => String(item.data()?.shareCode || '') === code && item.data()?.shareEnabled !== false)
-    if (!sourceDoc) throw new Error('Không tìm thấy danh sách lưu với mã này.')
-    const source = sourceDoc.data() || {}
-    if (String(source.ownerId || '') === String(currentUser.uid)) throw new Error('Danh sách này đã thuộc tài khoản của bạn.')
-    const duplicated = savedLists.some((item) => String(item.importedFromListId || '') === String(sourceDoc.id))
-    if (duplicated) throw new Error('Bạn đã lấy danh sách lưu này trước đó.')
-    const importedListRef = doc(collection(db, 'courseSavedLists'))
-    const importHistoryRef = doc(db, 'courseSavedListImports', `${sourceDoc.id}_${currentUser.uid}`)
-    const batch = writeBatch(db)
 
-    batch.set(importedListRef, {
-      ownerId: currentUser.uid,
-      title: source.title || 'Danh sách được chia sẻ',
-      description: source.description || '',
-      thumbnail: source.thumbnail || '',
-      thumbnailFileName: source.thumbnailFileName || '',
-      courseIds: Array.from(new Set(Array.isArray(source.courseIds) ? source.courseIds : [])),
-      importedFromListId: sourceDoc.id,
-      importedFromOwnerId: source.ownerId || '',
-      importedByCode: code,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    batch.set(importHistoryRef, {
-      sourceListId: sourceDoc.id,
-      sourceOwnerId: source.ownerId || '',
-      importerId: currentUser.uid,
-      importedByCode: code,
-      firstImportedAt: serverTimestamp(),
-      lastImportedAt: serverTimestamp(),
-    }, { merge: true })
-    await batch.commit()
+  async function importSavedListByCode(rawCode) {
+    const code =
+      String(
+        rawCode || '',
+      ).trim()
+
+    if (
+      !currentUser?.uid ||
+      code.length !== 6
+    ) {
+      throw new Error(
+        'Mã chia sẻ phải gồm đúng 6 ký tự.',
+      )
+    }
+
+    await eLearningApi.importSavedList(
+      code,
+    )
+
+    const response =
+      await eLearningApi.savedLists()
+
+    setSavedLists(
+      normalizeSavedListsResponse(
+        response,
+      ),
+    )
+
     setImportSavedListOpen(false)
   }
+
 
   function deleteSavedList(list) {
     if (!list?.id || String(list.ownerId || '') !== String(currentUser?.uid || '')) return
@@ -1346,20 +2562,79 @@ function Courses() {
   }
 
   async function confirmDeleteSavedList() {
-    const list = deleteSavedListTarget
-    if (!list?.id || String(list.ownerId || '') !== String(currentUser?.uid || '')) return
+    const list =
+      deleteSavedListTarget
+
+    if (
+      !list?.id ||
+      String(
+        list.ownerId ||
+        '',
+      ) !==
+        getCurrentUserId(currentUser)
+    ) {
+      return
+    }
+
     try {
-      await deleteDoc(doc(db, 'courseSavedLists', list.id))
-      if (String(savedListPreview?.id || '') === String(list.id)) setSavedListPreview(null)
-      if (String(editingSavedList?.id || '') === String(list.id)) setEditingSavedList(null)
-      if (String(shareSavedListTarget?.id || '') === String(list.id)) setShareSavedListTarget(null)
+      await eLearningApi.deleteSavedList(
+        list.id,
+      )
+
+      setSavedLists(
+        (current) =>
+          current.filter(
+            (item) =>
+              String(item.id) !==
+              String(list.id),
+          ),
+      )
+
+      if (
+        String(
+          savedListPreview?.id ||
+          '',
+        ) === String(list.id)
+      ) {
+        setSavedListPreview(null)
+      }
+
+      if (
+        String(
+          editingSavedList?.id ||
+          '',
+        ) === String(list.id)
+      ) {
+        setEditingSavedList(null)
+      }
+
+      if (
+        String(
+          shareSavedListTarget?.id ||
+          '',
+        ) === String(list.id)
+      ) {
+        setShareSavedListTarget(null)
+      }
+
       setDeleteSavedListTarget(null)
-      setDeletedSavedListNotice({ title: list.title || 'Danh sách lưu' })
+
+      setDeletedSavedListNotice({
+        title:
+          list.title ||
+          'Danh sách lưu',
+      })
     } catch (error) {
-      console.error('Không thể xóa danh sách lưu:', error)
-      alert('Không thể xóa danh sách lưu. Vui lòng thử lại.')
+      console.error(
+        'Không thể xóa danh sách lưu:',
+        error,
+      )
+      alert(
+        'Không thể xóa danh sách lưu. Vui lòng thử lại.',
+      )
     }
   }
+
 
   async function handleWordUpload(event) {
     const file = event.target.files?.[0]
@@ -1381,11 +2656,21 @@ function Courses() {
         alert('Chỉ hỗ trợ file Word (.doc, .docx) hoặc PDF.')
         return
       }
-      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const fileRef = ref(storage, `course-files/${currentUser.uid}/${safeName}`)
-      const extractedHtml = lowerName.endsWith('.docx') ? await extractDocxHtml(file).catch(() => '') : ''
-      const snapshot = await uploadBytes(fileRef, file, { contentType: file.type || undefined })
-      const fileUrl = await getDownloadURL(snapshot.ref)
+      const extractedHtml = lowerName.endsWith('.docx')
+        ? await extractDocxHtml(file).catch(() => '')
+        : ''
+
+      const uploadResult = await eLearningApi.uploadAsset(
+        file,
+        'course-file',
+        'course-files',
+      )
+
+      const fileUrl =
+        uploadResult?.url ||
+        uploadResult?.publicUrl ||
+        uploadResult?.fileUrl ||
+        ''
       const documentFileType = lowerName.endsWith('.pdf') ? 'pdf' : lowerName.endsWith('.docx') ? 'docx' : 'doc'
       setForm((prev) => ({
         ...prev,
@@ -1425,11 +2710,19 @@ function Courses() {
     }
     try {
       setUploadingImage(true)
-      const safeName = `${Date.now()}-${String(file.name || 'image').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const imageRef = ref(storage, `course-images/${currentUser.uid}/${safeName}`)
-      const contentType = file.type || ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[extension]) || 'application/octet-stream'
-      const snapshot = await uploadBytes(imageRef, file, { contentType, customMetadata: { originalName: file.name, ownerUid: currentUser.uid } })
-      const imageUrl = await getDownloadURL(snapshot.ref)
+      const uploadResult = await eLearningApi.uploadAsset(
+        file,
+        'course-image',
+        target === 'document'
+          ? 'document-images'
+          : 'course-images',
+      )
+
+      const imageUrl =
+        uploadResult?.url ||
+        uploadResult?.publicUrl ||
+        uploadResult?.fileUrl ||
+        ''
       setForm((prev) => target === 'document'
         ? { ...prev, documentMode: 'image', documentImageUrl: imageUrl, documentImageName: file.name, documentImageSize: Number(file.size || 0), wordFileName: '', wordFileUrl: '', documentFileSize: 0, richDocument: '' }
         : { ...prev, thumbnail: imageUrl, thumbnailFileName: file.name })
@@ -1479,21 +2772,17 @@ function Courses() {
         new Promise((resolve) => window.setTimeout(() => resolve(0), 8000)),
       ])
 
-      const safeBaseName = fileName
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-zA-Z0-9._-]/g, '_')
-      const safeName = `${Date.now()}-${safeBaseName || 'video.mp4'}`
-      const videoRef = ref(storage, `course-videos/${currentUser.uid}/${safeName}`)
+      const uploadResult = await eLearningApi.uploadAsset(
+        file,
+        'course-video',
+        'course-videos',
+      )
 
-      const snapshot = await uploadBytes(videoRef, file, {
-        contentType: 'video/mp4',
-        customMetadata: {
-          originalName: fileName,
-          ownerUid: currentUser.uid,
-        },
-      })
-      const videoUrl = await getDownloadURL(snapshot.ref)
+      const videoUrl =
+        uploadResult?.url ||
+        uploadResult?.publicUrl ||
+        uploadResult?.fileUrl ||
+        ''
       const duration = formatVideoDuration(durationSeconds)
 
       if (lessonIndex === null) {
@@ -1569,13 +2858,12 @@ function Courses() {
       return
     }
     try {
-      const teacherName = getFirebaseTeacherName(teacherProfile, currentUser)
+      const teacherName = getTeacherNameFromProfile(teacherProfile, currentUser)
       const lessons = Array.isArray(form.lessons) ? form.lessons : []
       const firstLesson = lessons[0] || {}
       const totalDurationSeconds = Number(firstLesson.durationSeconds || form.durationSeconds || 0)
       const youtubeDuration = firstLesson.duration || form.duration || formatVideoDuration(totalDurationSeconds)
-      const publishWithoutReview = normalizedRole === 'ADMINDEV' || form.visibility === 'class'
-      await addDoc(collection(db, 'courses'), {
+      await eLearningApi.createCourse({
         title: form.title,
         topic: form.topic,
         description: form.description,
@@ -1641,11 +2929,8 @@ function Courses() {
         ratingCount: 0,
         views: 0,
         isFeatured: false,
-        status: publishWithoutReview ? 'approved' : 'pending',
-        moderationStatus: publishWithoutReview ? 'approved' : 'pending',
-        submittedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        status: (isAdminDev || form.visibility === 'class') ? 'approved' : 'pending',
+        moderationStatus: (isAdminDev || form.visibility === 'class') ? 'approved' : 'pending',
       })
       if (draftStorageKey) window.localStorage.removeItem(draftStorageKey)
       setForm(getEmptyForm(teacherSubject))
@@ -1688,13 +2973,12 @@ function Courses() {
       return
     }
     try {
-      const teacherName = getFirebaseTeacherName(teacherProfile, currentUser) || editingCourse.teacherName || 'GiaoVien'
+      const teacherName = getTeacherNameFromProfile(teacherProfile, currentUser) || editingCourse.teacherName || 'GiaoVien'
       const lessons = Array.isArray(form.lessons) ? form.lessons : []
       const firstLesson = lessons[0] || {}
       const totalDurationSeconds = Number(firstLesson.durationSeconds || form.durationSeconds || 0)
       const youtubeDuration = firstLesson.duration || form.duration || formatVideoDuration(totalDurationSeconds)
-      const publishWithoutReview = normalizedRole === 'ADMINDEV' || form.visibility === 'class'
-      await updateDoc(doc(db, 'courses', editingCourse.id), {
+      await eLearningApi.updateCourse(editingCourse.id, {
         title: form.title,
         topic: form.topic,
         description: form.description,
@@ -1751,10 +3035,8 @@ function Courses() {
         teacherName,
         teacherEmail: currentUser.email || editingCourse.teacherEmail || '',
         teacherSubject: form.category,
-        status: publishWithoutReview ? 'approved' : 'pending',
-        moderationStatus: publishWithoutReview ? 'approved' : 'pending',
-        submittedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        status: (isAdminDev || form.visibility === 'class') ? 'approved' : 'pending',
+        moderationStatus: (isAdminDev || form.visibility === 'class') ? 'approved' : 'pending',
       })
       setForm(getEmptyForm(teacherSubject))
       setEditingCourse(null)
@@ -1776,37 +3058,61 @@ function Courses() {
   }
 
   async function permanentlyDeleteCourse(courseId) {
-    const normalizedCourseId = String(courseId || '').trim()
+    const normalizedCourseId =
+      String(
+        courseId || '',
+      ).trim()
+
     if (!normalizedCourseId) return
 
-    const cleanupSnapshots = await Promise.allSettled([
-      getDocs(collection(db, 'courses', normalizedCourseId, 'ratings')),
-      getDocs(collection(db, 'courses', normalizedCourseId, 'questions')),
-      getDocs(collection(db, 'courseViews', normalizedCourseId, 'users')),
-      getDocs(collection(db, 'learningReports')),
-      getDocs(collection(db, 'learningCommentReports')),
-      getDocs(collection(db, 'coursePlaylists')),
-      getDocs(collection(db, 'courseSavedLists')),
-    ])
+    await eLearningApi.deleteCourse(
+      normalizedCourseId,
+    )
 
-    // Xóa document chính trước. Sau thao tác này, bài không thể mở lại bằng URL.
-    await deleteDoc(doc(db, 'courses', normalizedCourseId))
-    setCourses((current) => current.filter((item) => String(item.id) !== normalizedCourseId))
+    setCourses(
+      (current) =>
+        current.filter(
+          (item) =>
+            String(item.id) !==
+            normalizedCourseId,
+        ),
+    )
 
-    const [ratingsResult, questionsResult, viewsResult, reportsResult, commentReportsResult, playlistsResult, savedListsResult] = cleanupSnapshots
-    const cleanupTasks = []
+    setMyPlaylists(
+      (current) =>
+        current.map((item) => ({
+          ...item,
+          courseIds:
+            Array.isArray(
+              item.courseIds,
+            )
+              ? item.courseIds.filter(
+                  (id) =>
+                    String(id) !==
+                    normalizedCourseId,
+                )
+              : [],
+        })),
+    )
 
-    if (ratingsResult.status === 'fulfilled') ratingsResult.value.docs.forEach((item) => cleanupTasks.push(deleteDoc(item.ref)))
-    if (questionsResult.status === 'fulfilled') questionsResult.value.docs.forEach((item) => cleanupTasks.push(deleteDoc(item.ref)))
-    if (viewsResult.status === 'fulfilled') viewsResult.value.docs.forEach((item) => cleanupTasks.push(deleteDoc(item.ref)))
-    if (reportsResult.status === 'fulfilled') reportsResult.value.docs.filter((item) => String(item.data()?.courseId || '') === normalizedCourseId).forEach((item) => cleanupTasks.push(deleteDoc(item.ref)))
-    if (commentReportsResult.status === 'fulfilled') commentReportsResult.value.docs.filter((item) => String(item.data()?.courseId || '') === normalizedCourseId).forEach((item) => cleanupTasks.push(deleteDoc(item.ref)))
-    if (playlistsResult.status === 'fulfilled') playlistsResult.value.docs.filter((item) => Array.isArray(item.data()?.courseIds) && item.data().courseIds.map(String).includes(normalizedCourseId)).forEach((item) => cleanupTasks.push(updateDoc(item.ref, { courseIds: arrayRemove(normalizedCourseId), updatedAt: serverTimestamp() })))
-    if (savedListsResult.status === 'fulfilled') savedListsResult.value.docs.filter((item) => Array.isArray(item.data()?.courseIds) && item.data().courseIds.map(String).includes(normalizedCourseId)).forEach((item) => cleanupTasks.push(updateDoc(item.ref, { courseIds: arrayRemove(normalizedCourseId), updatedAt: serverTimestamp() })))
-
-    const cleanupResults = await Promise.allSettled(cleanupTasks)
-    cleanupResults.filter((item) => item.status === 'rejected').forEach((item) => console.warn('Không thể dọn một dữ liệu liên quan của bài đã xóa:', item.reason))
+    setSavedLists(
+      (current) =>
+        current.map((item) => ({
+          ...item,
+          courseIds:
+            Array.isArray(
+              item.courseIds,
+            )
+              ? item.courseIds.filter(
+                  (id) =>
+                    String(id) !==
+                    normalizedCourseId,
+                )
+              : [],
+        })),
+    )
   }
+
 
   async function confirmDeleteCourse() {
     if (!deleteTarget) return
@@ -1842,7 +3148,18 @@ function Courses() {
     if (!block?.active) return null
     const endMs = getAnyTime(block.endAt)
     if (endMs && Date.now() > endMs) {
-      if (currentUser?.uid) updateDoc(doc(db, 'users', currentUser.uid), { 'elearningPostingBlock.active': false, 'elearningPostingBlock.unblockedAt': serverTimestamp() }).catch(() => {})
+      if (currentUser?.uid) {
+        eLearningApi.updateUser(
+          getCurrentUserId(currentUser),
+          {
+            elearningPostingBlock: {
+              ...(block || {}),
+              active: false,
+              unblockedAt: new Date().toISOString(),
+            },
+          },
+        ).catch(() => {})
+      }
       return null
     }
     return block
@@ -2219,232 +3536,700 @@ function Courses() {
     }
   }
 
-  async function submitCourseReport({ reason, detail }) {
-    if (!currentUser || !reportTarget) {
-      setReportNotice({ type: 'error', title: 'Bạn chưa đăng nhập', message: 'Hãy đăng nhập trước khi gửi báo cáo nhé.' })
+  async function submitCourseReport({
+    reason,
+    detail,
+  }) {
+    if (
+      !currentUser ||
+      !reportTarget
+    ) {
+      setReportNotice({
+        type: 'error',
+        title:
+          'Bạn chưa đăng nhập',
+        message:
+          'Hãy đăng nhập trước khi gửi báo cáo nhé.',
+      })
       return
     }
 
     try {
-      const reportSnapshot = await getDocs(collection(db, 'learningReports'))
-      const alreadyReported = reportSnapshot.docs.some((reportDoc) => {
-        const data = reportDoc.data()
-        const sameCourse = String(data.courseId || '') === String(reportTarget.id || '')
-        const sameUser = [data.reporterId, data.userId, data.createdByUid, data.uid]
-          .filter(Boolean)
-          .map(String)
-          .includes(String(currentUser.uid))
-        return sameCourse && sameUser
-      })
+      const reportResponse =
+        await eLearningApi.reports()
+
+      const alreadyReported =
+        normalizeReportsResponse(
+          reportResponse,
+        ).some((report) => {
+          const sameCourse =
+            String(
+              report.courseId ||
+              '',
+            ) ===
+            String(
+              reportTarget.id ||
+              '',
+            )
+
+          const sameUser =
+            String(
+              report.reporterId ||
+              '',
+            ) ===
+            getCurrentUserId(
+              currentUser,
+            )
+
+          return (
+            sameCourse &&
+            sameUser
+          )
+        })
 
       if (alreadyReported) {
         setReportTarget(null)
         setReportNotice({
           type: 'duplicate',
-          title: 'Bạn đã báo cáo bài này rồi',
-          message: 'Một lần là đủ để quản trị viên tiếp nhận. Bạn cứ yên tâm, báo cáo đang được xem xét.',
+          title:
+            'Bạn đã báo cáo bài này rồi',
+          message:
+            'Một lần là đủ để quản trị viên tiếp nhận. Bạn cứ yên tâm, báo cáo đang được xem xét.',
         })
         return
       }
 
-      const createdReportRef = await addDoc(collection(db, 'learningReports'), {
-        reportType: 'course',
-        courseId: reportTarget.id,
-        courseTitle: stripHtml(reportTarget.title),
-        courseOwnerId: reportTarget.teacherId || reportTarget.createdByUid || reportTarget.createdBy || '',
-        reporterId: currentUser.uid,
-        reporterName: currentTeacherName,
-        reporterEmail: currentUser.email || '',
-        userId: currentUser.uid,
-        userEmail: currentUser.email || '',
-        reason,
-        detail: detail || '',
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-      await pushNotification(currentUser.uid, {
-        notificationId: `report_submitted_${createdReportRef.id}`,
-        title: 'Đã gửi báo cáo tới quản trị viên',
-        message: `Báo cáo về bài học “${stripHtml(reportTarget.title) || 'Bài học'}” đã được tiếp nhận và đang chờ xử lý.`,
-        type: 'report_submitted',
-        courseId: reportTarget.id,
-        reportId: createdReportRef.id,
-      })
+      const created =
+        await eLearningApi.createReport({
+          reportType:
+            'course',
+          courseId:
+            reportTarget.id,
+          reportedUserId:
+            reportTarget.teacherId ||
+            reportTarget.createdByUid ||
+            reportTarget.createdBy ||
+            '',
+          reason,
+          detail:
+            detail || '',
+          status:
+            'pending',
+          data: {
+            courseTitle:
+              stripHtml(
+                reportTarget.title,
+              ),
+            courseOwnerId:
+              reportTarget.teacherId ||
+              reportTarget.createdByUid ||
+              reportTarget.createdBy ||
+              '',
+            reporterName:
+              currentTeacherName,
+            reporterEmail:
+              currentUser.email ||
+              '',
+          },
+        })
+
+      const reportId =
+        created?.reportId ||
+        ''
+
+      await pushNotification(
+        getCurrentUserId(
+          currentUser,
+        ),
+        {
+          notificationId:
+            `report_submitted_${reportId}`,
+          title:
+            'Đã gửi báo cáo tới quản trị viên',
+          message:
+            `Báo cáo về bài học “${stripHtml(reportTarget.title) || 'Bài học'}” ` +
+            'đã được tiếp nhận và đang chờ xử lý.',
+          type:
+            'report_submitted',
+          courseId:
+            reportTarget.id,
+          reportId,
+        },
+      )
 
       setReportTarget(null)
-      await fetchLearningReports(currentUser.uid)
+
+      await fetchLearningReports(
+        getCurrentUserId(
+          currentUser,
+        ),
+      )
+
       setReportNotice({
         type: 'success',
-        title: 'Đã gửi báo cáo',
-        message: 'Cảm ơn bạn đã giúp ZUNY an toàn hơn. Quản trị viên sẽ kiểm tra nội dung này sớm nhất có thể.',
+        title:
+          'Đã gửi báo cáo',
+        message:
+          'Cảm ơn bạn đã giúp ZUNY an toàn hơn. Quản trị viên sẽ kiểm tra nội dung này sớm nhất có thể.',
       })
     } catch (error) {
-      console.error('Không thể gửi báo cáo:', error)
-      setReportNotice({ type: 'error', title: 'Chưa gửi được báo cáo', message: 'Có một chút trục trặc. Bạn vui lòng thử lại sau nhé.' })
+      console.error(
+        'Không thể gửi báo cáo:',
+        error,
+      )
+      setReportNotice({
+        type: 'error',
+        title:
+          'Chưa gửi được báo cáo',
+        message:
+          'Có một chút trục trặc. Bạn vui lòng thử lại sau nhé.',
+      })
     }
   }
 
-  async function submitChannelReport({ reason, detail }) {
-    if (!currentUser?.uid || !channelReportTarget?.id) return
-    const duplicate = adminReports.some((item) => String(item.reporterId || item.userId) === String(currentUser.uid) && String(item.reportedUserId || '') === String(channelReportTarget.id) && !['resolved','deleted'].includes(String(item.status || 'pending').toLowerCase()))
-    if (duplicate) {
-      setChannelReportTarget(null)
-      setReportNotice({ type: 'duplicate', title: 'Kênh đã được báo cáo', message: 'Báo cáo trước đó vẫn đang được quản trị viên xem xét.' })
+
+  async function submitChannelReport({
+    reason,
+    detail,
+  }) {
+    if (
+      !currentUser?.uid ||
+      !channelReportTarget?.id
+    ) {
       return
     }
-    try {
-      const createdReportRef = await addDoc(collection(db, 'learningReports'), {
-        reportType: 'account', reportedUserId: channelReportTarget.id,
-        reportedUserName: channelReportTarget.name || '', reporterId: currentUser.uid,
-        reporterName: currentTeacherName, reporterEmail: currentUser.email || '',
-        userId: currentUser.uid, userEmail: currentUser.email || '',
-        reason, detail: detail || '', status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      })
-      await pushNotification(currentUser.uid, {
-        notificationId: `report_submitted_${createdReportRef.id}`,
-        title: 'Đã gửi báo cáo tới quản trị viên',
-        message: `Báo cáo về tài khoản ${channelReportTarget.name || 'người dùng'} đã được tiếp nhận và đang chờ xử lý.`,
-        type: 'account_report_submitted',
-        reportId: createdReportRef.id,
-      })
+
+    const duplicate =
+      adminReports.some(
+        (item) =>
+          String(
+            item.reporterId ||
+            item.userId,
+          ) ===
+            getCurrentUserId(
+              currentUser,
+            ) &&
+          String(
+            item.reportedUserId ||
+            '',
+          ) ===
+            String(
+              channelReportTarget.id,
+            ) &&
+          ![
+            'resolved',
+            'deleted',
+          ].includes(
+            String(
+              item.status ||
+              'pending',
+            ).toLowerCase(),
+          ),
+      )
+
+    if (duplicate) {
       setChannelReportTarget(null)
-      setReportNotice({ type: 'success', title: 'Đã báo cáo kênh', message: 'Quản trị viên sẽ kiểm tra tài khoản và nội dung liên quan.' })
+      setReportNotice({
+        type: 'duplicate',
+        title:
+          'Kênh đã được báo cáo',
+        message:
+          'Báo cáo trước đó vẫn đang được quản trị viên xem xét.',
+      })
+      return
+    }
+
+    try {
+      const created =
+        await eLearningApi.createReport({
+          reportType:
+            'account',
+          reportedUserId:
+            channelReportTarget.id,
+          reason,
+          detail:
+            detail || '',
+          status:
+            'pending',
+          data: {
+            reportedUserName:
+              channelReportTarget.name ||
+              '',
+            reporterName:
+              currentTeacherName,
+            reporterEmail:
+              currentUser.email ||
+              '',
+          },
+        })
+
+      const reportId =
+        created?.reportId ||
+        ''
+
+      await pushNotification(
+        getCurrentUserId(
+          currentUser,
+        ),
+        {
+          notificationId:
+            `report_submitted_${reportId}`,
+          title:
+            'Đã gửi báo cáo tới quản trị viên',
+          message:
+            `Báo cáo về tài khoản ${channelReportTarget.name || 'người dùng'} ` +
+            'đã được tiếp nhận và đang chờ xử lý.',
+          type:
+            'account_report_submitted',
+          reportId,
+        },
+      )
+
+      setChannelReportTarget(null)
+
+      setReportNotice({
+        type: 'success',
+        title:
+          'Đã báo cáo kênh',
+        message:
+          'Quản trị viên sẽ kiểm tra tài khoản và nội dung liên quan.',
+      })
     } catch (error) {
-      console.error('Không thể báo cáo kênh:', error)
-      setReportNotice({ type: 'error', title: 'Chưa gửi được báo cáo', message: 'Vui lòng thử lại sau.' })
+      console.error(
+        'Không thể báo cáo kênh:',
+        error,
+      )
+
+      setReportNotice({
+        type: 'error',
+        title:
+          'Chưa gửi được báo cáo',
+        message:
+          'Vui lòng thử lại sau.',
+      })
     }
   }
 
-  async function pushNotification(targetUid, payload = {}) {
+
+  async function pushNotification(
+    targetUid,
+    payload = {},
+  ) {
     if (!targetUid) return
+
     try {
-      const data = {
-        title: payload.title || 'Thông báo E-learning',
-        message: payload.message || '',
-        type: payload.type || 'system',
-        courseId: payload.courseId || '',
-        reportId: payload.reportId || '',
-        actorId: payload.actorId || currentUser?.uid || '',
-        read: false,
-        createdAt: serverTimestamp(),
-      }
-      if (payload.notificationId) {
-        const notificationId = String(payload.notificationId)
-        const dismissalSnap = await getDoc(doc(db, 'users', String(targetUid), 'elearningNotificationDismissals', notificationId))
-        if (dismissalSnap.exists()) return
-        await setDoc(doc(db, 'users', String(targetUid), 'elearningNotifications', notificationId), data, { merge: true })
-      } else {
-        await addDoc(collection(db, 'users', String(targetUid), 'elearningNotifications'), data)
-      }
-    } catch (error) { console.warn('Không thể tạo thông báo:', error) }
+      await eLearningApi.createNotification({
+        legacyId:
+          payload.notificationId ||
+          '',
+        userId:
+          String(targetUid),
+        title:
+          payload.title ||
+          'Thông báo E-learning',
+        message:
+          payload.message ||
+          '',
+        type:
+          payload.type ||
+          'system',
+        data: {
+          courseId:
+            payload.courseId ||
+            '',
+          reportId:
+            payload.reportId ||
+            '',
+          actorId:
+            payload.actorId ||
+            getCurrentUserId(
+              currentUser,
+            ),
+        },
+      })
+    } catch (error) {
+      console.warn(
+        'Không thể tạo thông báo:',
+        error,
+      )
+    }
   }
+
 
   async function markNotificationRead(notification) {
-    if (!currentUser?.uid || !notification?.id || notification.read) return
-    await updateDoc(doc(db, 'users', currentUser.uid, 'elearningNotifications', notification.id), { read: true, readAt: serverTimestamp() })
+    if (
+      !currentUser?.uid ||
+      !notification?.id ||
+      notification.read
+    ) {
+      return
+    }
+
+    await eLearningApi.updateNotification(
+      notification.id,
+      {
+        read: true,
+      },
+    )
+
+    setNotifications(
+      (current) =>
+        current.map(
+          (item) =>
+            String(item.id) ===
+            String(notification.id)
+              ? {
+                  ...item,
+                  read: true,
+                  readAt:
+                    new Date().toISOString(),
+                }
+              : item,
+        ),
+    )
   }
+
 
   async function clearAllNotifications() {
-    if (!currentUser?.uid || !notifications.length) return
-    const itemsToDelete = [...notifications]
-    const deletedIds = new Set(itemsToDelete.map((item) => String(item.id)))
-    setNotificationDismissalIds((current) => new Set([...current, ...deletedIds]))
+    if (
+      !currentUser?.uid ||
+      !notifications.length
+    ) {
+      return
+    }
+
+    const itemsToDelete =
+      [...notifications]
+
+    const deletedIds =
+      new Set(
+        itemsToDelete.map(
+          (item) =>
+            String(item.id),
+        ),
+      )
+
+    setNotificationDismissalIds(
+      (current) =>
+        new Set([
+          ...current,
+          ...deletedIds,
+        ]),
+    )
     setNotifications([])
+
     try {
-      const batch = writeBatch(db)
-      itemsToDelete.forEach((item) => {
-        const notificationRef = doc(db, 'users', currentUser.uid, 'elearningNotifications', item.id)
-        const dismissalRef = doc(db, 'users', currentUser.uid, 'elearningNotificationDismissals', item.id)
-        batch.set(dismissalRef, {
-          notificationId: item.id,
-          type: item.type || 'system',
-          courseId: item.courseId || '',
-          wasRead: Boolean(item.read),
-          dismissedAt: serverTimestamp(),
-        }, { merge: true })
-        batch.delete(notificationRef)
-      })
-      await batch.commit()
+      await Promise.all(
+        itemsToDelete.map(
+          (item) =>
+            eLearningApi.updateNotification(
+              item.id,
+              {
+                dismissed:
+                  true,
+              },
+            ),
+        ),
+      )
     } catch (error) {
-      console.error('Không thể xóa toàn bộ thông báo:', error)
-      setNotificationDismissalIds((current) => { const next = new Set(current); deletedIds.forEach((id) => next.delete(id)); return next })
-      setNotifications(itemsToDelete)
-      alert('Không thể xóa toàn bộ thông báo. Vui lòng thử lại.')
+      console.error(
+        'Không thể xóa toàn bộ thông báo:',
+        error,
+      )
+
+      setNotificationDismissalIds(
+        (current) => {
+          const next =
+            new Set(current)
+
+          deletedIds.forEach(
+            (id) =>
+              next.delete(id),
+          )
+
+          return next
+        },
+      )
+
+      setNotifications(
+        itemsToDelete,
+      )
+
+      alert(
+        'Không thể xóa toàn bộ thông báo. Vui lòng thử lại.',
+      )
     }
   }
+
 
   async function deleteNotification(notification) {
-    if (!currentUser?.uid || !notification?.id) return
-    const notificationId = String(notification.id)
-    setNotificationDismissalIds((current) => new Set([...current, notificationId]))
-    setNotifications((items) => items.filter((item) => String(item.id) !== notificationId))
+    if (
+      !currentUser?.uid ||
+      !notification?.id
+    ) {
+      return
+    }
+
+    const notificationId =
+      String(notification.id)
+
+    setNotificationDismissalIds(
+      (current) =>
+        new Set([
+          ...current,
+          notificationId,
+        ]),
+    )
+
+    setNotifications(
+      (items) =>
+        items.filter(
+          (item) =>
+            String(item.id) !==
+            notificationId,
+        ),
+    )
+
     try {
-      const batch = writeBatch(db)
-      const notificationRef = doc(db, 'users', currentUser.uid, 'elearningNotifications', notification.id)
-      const dismissalRef = doc(db, 'users', currentUser.uid, 'elearningNotificationDismissals', notification.id)
-      batch.set(dismissalRef, {
-        notificationId: notification.id,
-        type: notification.type || 'system',
-        courseId: notification.courseId || '',
-        wasRead: Boolean(notification.read),
-        dismissedAt: serverTimestamp(),
-      }, { merge: true })
-      batch.delete(notificationRef)
-      await batch.commit()
+      await eLearningApi.updateNotification(
+        notification.id,
+        {
+          dismissed: true,
+        },
+      )
     } catch (error) {
-      console.error('Không thể xóa thông báo:', error)
-      setNotificationDismissalIds((current) => { const next = new Set(current); next.delete(notificationId); return next })
-      setNotifications((items) => items.some((item) => String(item.id) === notificationId) ? items : [notification, ...items])
-      alert('Không thể xóa thông báo. Vui lòng thử lại.')
+      console.error(
+        'Không thể xóa thông báo:',
+        error,
+      )
+
+      setNotificationDismissalIds(
+        (current) => {
+          const next =
+            new Set(current)
+
+          next.delete(
+            notificationId,
+          )
+
+          return next
+        },
+      )
+
+      setNotifications(
+        (items) =>
+          items.some(
+            (item) =>
+              String(item.id) ===
+              notificationId,
+          )
+            ? items
+            : [
+                notification,
+                ...items,
+              ],
+      )
+
+      alert(
+        'Không thể xóa thông báo. Vui lòng thử lại.',
+      )
     }
   }
 
+
   useEffect(() => {
-    if (!isAdminDev) return undefined
-    const sortNewest = (items) => items.sort((a, b) => getAnyTime(b.createdAt || b.updatedAt) - getAnyTime(a.createdAt || a.updatedAt))
-    const unsubscribeReports = onSnapshot(collection(db, 'learningReports'), (snapshot) => {
-      setAdminReports(sortNewest(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))))
-    }, (error) => console.warn('Không thể đồng bộ báo cáo bài học:', error))
-    const unsubscribeCommentReports = onSnapshot(collection(db, 'learningCommentReports'), (snapshot) => {
-      setAdminCommentReports(sortNewest(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))))
-    }, (error) => console.warn('Không thể đồng bộ báo cáo comment:', error))
-    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setAdminUsers(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-    }, (error) => console.warn('Không thể đồng bộ người dùng:', error))
-    return () => { unsubscribeReports(); unsubscribeCommentReports(); unsubscribeUsers() }
+    if (!isAdminDev) {
+      return undefined
+    }
+
+    let cancelled = false
+
+    async function refreshAdmin() {
+      try {
+        await fetchAdminData()
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Không thể đồng bộ dữ liệu quản trị:',
+            error,
+          )
+        }
+      }
+    }
+
+    refreshAdmin()
+
+    const timer =
+      window.setInterval(
+        refreshAdmin,
+        5000,
+      )
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [isAdminDev])
+
 
   async function fetchAdminData() {
     if (!isAdminDev) return
+
     try {
       setAdminLoading(true)
-      const [reportSnapshot, commentReportSnapshot, usersSnapshot] = await Promise.all([getDocs(collection(db, 'learningReports')), getDocs(collection(db, 'learningCommentReports')), getDocs(collection(db, 'users'))])
-      setAdminUsers(usersSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-      setAdminReports(reportSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((a, b) => getAnyTime(b.createdAt) - getAnyTime(a.createdAt)))
-      setAdminCommentReports(commentReportSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((a, b) => getAnyTime(b.createdAt) - getAnyTime(a.createdAt)))
-      await fetchCourses()
+
+      const [
+        reportResponse,
+        usersResponse,
+        courseResponse,
+      ] = await Promise.all([
+        eLearningApi.reports(),
+        eLearningApi.users(),
+        eLearningApi.courses({
+          limit: 500,
+        }),
+      ])
+
+      const allReports =
+        normalizeReportsResponse(
+          reportResponse,
+        )
+
+      setAdminUsers(
+        normalizeUsers(
+          usersResponse,
+        ),
+      )
+
+      setAdminReports(
+        allReports
+          .filter(
+            (item) =>
+              String(
+                item.reportType ||
+                '',
+              ).toLowerCase() !==
+              'comment',
+          )
+          .sort(
+            (a, b) =>
+              getAnyTime(
+                b.createdAt,
+              ) -
+              getAnyTime(
+                a.createdAt,
+              ),
+          ),
+      )
+
+      setAdminCommentReports(
+        allReports
+          .filter(
+            (item) =>
+              String(
+                item.reportType ||
+                '',
+              ).toLowerCase() ===
+              'comment',
+          )
+          .sort(
+            (a, b) =>
+              getAnyTime(
+                b.createdAt,
+              ) -
+              getAnyTime(
+                a.createdAt,
+              ),
+          ),
+      )
+
+      const nextCourses =
+        normalizeCoursesResponse(
+          courseResponse,
+        ).sort(
+          (a, b) =>
+            getCourseCreatedTime(b) -
+            getCourseCreatedTime(a),
+        )
+
+      setCourses(nextCourses)
+
+      await fetchCourseTeacherProfiles(
+        nextCourses,
+      )
     } catch (error) {
-      console.error('Không thể tải dữ liệu quản trị:', error)
+      console.error(
+        'Không thể tải dữ liệu quản trị:',
+        error,
+      )
     } finally {
       setAdminLoading(false)
     }
   }
 
-  async function updateCourseModeration(course, status, reason = '') {
-    if (!isAdminDev || !course?.id) return
-    await updateDoc(doc(db, 'courses', course.id), {
-      status,
-      moderationStatus: status,
-      moderationReason: reason,
-      moderatedBy: currentUser?.uid || '',
-      moderatedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    const ownerId = course.teacherId || course.createdByUid || course.createdBy || course.ownerId || course.userId || course.uid
-    await pushNotification(ownerId, { title: status === 'approved' ? 'Bài đăng đã được duyệt' : 'Bài đăng bị từ chối', message: status === 'approved' ? `“${stripHtml(course.title)}” đã xuất hiện trong thư viện.` : `“${stripHtml(course.title)}” bị từ chối${reason ? `: ${reason}` : '.'}`, type: status === 'approved' ? 'approved' : 'rejected', courseId: course.id })
+
+  async function updateCourseModeration(
+    course,
+    status,
+    reason = '',
+  ) {
+    if (
+      !isAdminDev ||
+      !course?.id
+    ) {
+      return
+    }
+
+    await eLearningApi.updateCourse(
+      course.id,
+      {
+        status,
+        moderationStatus:
+          status,
+        moderationReason:
+          reason,
+        metadata: {
+          moderatedBy:
+            getCurrentUserId(
+              currentUser,
+            ),
+          moderatedAt:
+            new Date().toISOString(),
+        },
+      },
+    )
+
+    const ownerId =
+      course.teacherId ||
+      course.createdByUid ||
+      course.createdBy ||
+      course.ownerId ||
+      course.userId ||
+      course.uid
+
+    await pushNotification(
+      ownerId,
+      {
+        title:
+          status === 'approved'
+            ? 'Bài đăng đã được duyệt'
+            : 'Bài đăng bị từ chối',
+        message:
+          status === 'approved'
+            ? `“${stripHtml(course.title)}” đã xuất hiện trong thư viện.`
+            : `“${stripHtml(course.title)}” bị từ chối${reason ? `: ${reason}` : '.'}`,
+        type:
+          status === 'approved'
+            ? 'approved'
+            : 'rejected',
+        courseId:
+          course.id,
+      },
+    )
+
     await fetchAdminData()
   }
+
 
   function handleRejectCourse(course) {
     setRejectCourseTarget(course)
@@ -2457,118 +4242,349 @@ function Courses() {
   }
 
   async function handleReportStatus(report, status) {
-    if (!isAdminDev || !report?.id) return
-    await updateDoc(doc(db, 'learningReports', report.id), {
-      status,
-      handledBy: currentUser?.uid || '',
-      handledAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    if (status === 'resolved' && report.reporterId) {
-      const isAccountReport = ['account', 'channel', 'user'].includes(String(report.reportType || '').toLowerCase()) || Boolean(report.reportedUserId)
-      await pushNotification(report.reporterId, {
-        notificationId: `report_resolved_${report.id}`,
-        title: isAccountReport ? 'Báo cáo tài khoản đã được giải quyết' : 'Báo cáo nội dung đã được giải quyết',
-        message: isAccountReport
-          ? `Báo cáo về tài khoản ${report.reportedUserName || 'người dùng'} đã được quản trị viên xem xét và giải quyết.`
-          : `Báo cáo về “${report.courseTitle || report.title || 'nội dung'}” đã được quản trị viên xem xét và giải quyết.`,
-        type: isAccountReport ? 'account_report_resolved' : 'report_resolved',
-        courseId: report.courseId || '',
-        reportId: report.id,
-      })
+    if (
+      !isAdminDev ||
+      !report?.id
+    ) {
+      return
     }
+
+    await eLearningApi.updateReport(
+      report.id,
+      {
+        status,
+        data: {
+          handledBy:
+            getCurrentUserId(
+              currentUser,
+            ),
+          handledAt:
+            new Date().toISOString(),
+        },
+      },
+    )
+
+    if (
+      status === 'resolved' &&
+      report.reporterId
+    ) {
+      const isAccountReport =
+        [
+          'account',
+          'channel',
+          'user',
+        ].includes(
+          String(
+            report.reportType ||
+            '',
+          ).toLowerCase(),
+        ) ||
+        Boolean(
+          report.reportedUserId,
+        )
+
+      await pushNotification(
+        report.reporterId,
+        {
+          notificationId:
+            `report_resolved_${report.id}`,
+          title:
+            isAccountReport
+              ? 'Báo cáo tài khoản đã được giải quyết'
+              : 'Báo cáo nội dung đã được giải quyết',
+          message:
+            isAccountReport
+              ? `Báo cáo về tài khoản ${report.reportedUserName || 'người dùng'} đã được quản trị viên xem xét và giải quyết.`
+              : `Báo cáo về “${report.courseTitle || report.title || 'nội dung'}” đã được quản trị viên xem xét và giải quyết.`,
+          type:
+            isAccountReport
+              ? 'account_report_resolved'
+              : 'report_resolved',
+          courseId:
+            report.courseId ||
+            '',
+          reportId:
+            report.id,
+        },
+      )
+    }
+
     await fetchAdminData()
   }
 
-  async function handleCommentReportStatus(report, status = 'resolved') {
-    if (!isAdminDev || !report?.id) return
-    await updateDoc(doc(db, 'learningCommentReports', report.id), {
-      status,
-      handledBy: currentUser?.uid || '',
-      handledAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    await pushNotification(report.reporterId, {
-      title: 'Báo cáo bình luận đã được xử lý',
-      message: `Báo cáo về bình luận của ${report.commentUserName || 'người dùng'} đã được quản trị viên xem xét.`,
-      type: 'comment_report_resolved',
-      courseId: report.courseId || '',
-      reportId: report.id,
-    })
+
+  async function handleCommentReportStatus(
+    report,
+    status = 'resolved',
+  ) {
+    if (
+      !isAdminDev ||
+      !report?.id
+    ) {
+      return
+    }
+
+    await eLearningApi.updateReport(
+      report.id,
+      {
+        status,
+        data: {
+          handledBy:
+            getCurrentUserId(
+              currentUser,
+            ),
+          handledAt:
+            new Date().toISOString(),
+        },
+      },
+    )
+
+    await pushNotification(
+      report.reporterId,
+      {
+        title:
+          'Báo cáo bình luận đã được xử lý',
+        message:
+          `Báo cáo về bình luận của ${report.commentUserName || 'người dùng'} ` +
+          'đã được quản trị viên xem xét.',
+        type:
+          'comment_report_resolved',
+        courseId:
+          report.courseId ||
+          '',
+        reportId:
+          report.id,
+      },
+    )
+
     await fetchAdminData()
   }
+
 
   async function handleDeleteReportedComment(report) {
-    if (!isAdminDev || !report?.id || !report?.courseId || !report?.questionId) return
+    if (
+      !isAdminDev ||
+      !report?.id ||
+      !report?.courseId ||
+      !report?.questionId
+    ) {
+      return
+    }
+
     try {
-      const questionRef = doc(db, 'courses', String(report.courseId), 'questions', String(report.questionId))
       if (report.replyId) {
-        const questionSnap = await getDoc(questionRef)
-        if (questionSnap.exists()) {
-          const replies = Array.isArray(questionSnap.data().replies) ? questionSnap.data().replies : []
-          await updateDoc(questionRef, {
-            replies: replies.filter((item) => String(item.id) !== String(report.replyId)),
-            updatedAt: serverTimestamp(),
-          })
-        }
+        await eLearningApi.deleteReply(
+          report.courseId,
+          report.questionId,
+          report.replyId,
+        )
       } else {
-        await deleteDoc(questionRef)
+        await eLearningApi.deleteQuestion(
+          report.courseId,
+          report.questionId,
+        )
       }
-      const relatedReportSnapshot = await getDocs(collection(db, 'learningCommentReports'))
-      const relatedReports = relatedReportSnapshot.docs.filter((reportDoc) => {
-        const data = reportDoc.data()
-        return String(data.courseId || '') === String(report.courseId || '')
-          && String(data.questionId || '') === String(report.questionId || '')
-          && String(data.replyId || '') === String(report.replyId || '')
-      })
-      await Promise.all(relatedReports.map((reportDoc) => updateDoc(reportDoc.ref, {
-        status: 'deleted', deletedBy: currentUser?.uid || '', deletedAt: serverTimestamp(),
-        handledBy: currentUser?.uid || '', handledAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      })))
-      await pushNotification(report.commentUserId, {
-        title: 'Bình luận đã bị xóa',
-        message: `Bình luận “${String(report.commentContent || '').slice(0, 90)}” đã bị quản trị viên xóa sau khi xem xét báo cáo.`,
-        type: 'comment_deleted', courseId: report.courseId || '', reportId: report.id,
-      })
+
+      const reportsResponse =
+        await eLearningApi.reports()
+
+      const relatedReports =
+        normalizeReportsResponse(
+          reportsResponse,
+        ).filter(
+          (item) =>
+            String(
+              item.courseId ||
+              '',
+            ) ===
+              String(
+                report.courseId ||
+                '',
+              ) &&
+            String(
+              item.questionId ||
+              '',
+            ) ===
+              String(
+                report.questionId ||
+                '',
+              ) &&
+            String(
+              item.replyId ||
+              '',
+            ) ===
+              String(
+                report.replyId ||
+                '',
+              ),
+        )
+
+      await Promise.all(
+        relatedReports.map(
+          (item) =>
+            eLearningApi.updateReport(
+              item.id,
+              {
+                status:
+                  'deleted',
+                data: {
+                  deletedBy:
+                    getCurrentUserId(
+                      currentUser,
+                    ),
+                  deletedAt:
+                    new Date().toISOString(),
+                  handledBy:
+                    getCurrentUserId(
+                      currentUser,
+                    ),
+                  handledAt:
+                    new Date().toISOString(),
+                },
+              },
+            ),
+        ),
+      )
+
+      await pushNotification(
+        report.commentUserId ||
+        report.reportedUserId,
+        {
+          title:
+            'Bình luận đã bị xóa',
+          message:
+            `Bình luận “${String(report.commentContent || '').slice(0, 90)}” ` +
+            'đã bị quản trị viên xóa sau khi xem xét báo cáo.',
+          type:
+            'comment_deleted',
+          courseId:
+            report.courseId ||
+            '',
+          reportId:
+            report.id,
+        },
+      )
+
+      await fetchAdminData()
     } catch (error) {
-      console.error('Không thể xóa comment bị báo cáo:', error)
+      console.error(
+        'Không thể xóa comment bị báo cáo:',
+        error,
+      )
     }
   }
 
-  async function handleWarnReportedComment(report, payload = {}) {
-    if (!isAdminDev || !report?.commentUserId || !report?.id || !payload.reason) return
-    const warningRef = doc(collection(db, 'users', String(report.commentUserId), 'commentWarnings'))
-    const userRef = doc(db, 'users', String(report.commentUserId))
-    let nextWarningCount = 1
+
+  async function handleWarnReportedComment(
+    report,
+    payload = {},
+  ) {
+    if (
+      !isAdminDev ||
+      !(
+        report?.commentUserId ||
+        report?.reportedUserId
+      ) ||
+      !report?.id ||
+      !payload.reason
+    ) {
+      return
+    }
+
     try {
-      await runTransaction(db, async (transaction) => {
-        const userSnap = await transaction.get(userRef)
-        nextWarningCount = Number(userSnap.exists() ? userSnap.data().commentWarningCount || 0 : 0) + 1
-        transaction.set(warningRef, {
-          reportId: report.id, courseId: report.courseId || '', questionId: report.questionId || '', replyId: report.replyId || '',
-          commentType: report.commentType || (report.replyId ? 'reply' : 'question'),
-          commentContent: report.commentContent || '', reason: payload.reason,
-          detail: payload.detail || '', warningCount: nextWarningCount, status: 'pending',
-          issuedBy: currentUser?.uid || '', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      const response =
+        await eLearningApi.createCommentWarning({
+          reportId:
+            report.id,
+          userId:
+            report.commentUserId ||
+            report.reportedUserId,
+          courseId:
+            report.courseId ||
+            '',
+          questionId:
+            report.questionId ||
+            '',
+          replyId:
+            report.replyId ||
+            '',
+          commentType:
+            report.commentType ||
+            (
+              report.replyId
+                ? 'reply'
+                : 'question'
+            ),
+          commentContent:
+            report.commentContent ||
+            '',
+          reason:
+            payload.reason,
+          detail:
+            payload.detail ||
+            '',
         })
-        transaction.set(userRef, {
-          commentWarningCount: nextWarningCount, lastCommentWarningAt: serverTimestamp(),
-        }, { merge: true })
-        transaction.update(doc(db, 'learningCommentReports', report.id), {
-          status: 'warned', warningId: warningRef.id, warningReason: payload.reason,
-          warningDetail: payload.detail || '', warningCount: nextWarningCount,
-          handledBy: currentUser?.uid || '', handledAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        })
-      })
-      await pushNotification(report.commentUserId, {
-        title: `Cảnh báo bình luận lần ${nextWarningCount}`,
-        message: `Bạn nhận cảnh báo vì bình luận: “${String(report.commentContent || '').slice(0, 90)}”.`,
-        type: 'comment_warning', courseId: report.courseId || '', reportId: report.id,
-      })
+
+      const nextWarningCount =
+        Number(
+          response?.warningCount ||
+          report.warningCount ||
+          0,
+        )
+
+      await eLearningApi.updateReport(
+        report.id,
+        {
+          status:
+            'warned',
+          data: {
+            warningId:
+              response?.warningId ||
+              '',
+            warningReason:
+              payload.reason,
+            warningDetail:
+              payload.detail ||
+              '',
+            warningCount:
+              nextWarningCount,
+            handledBy:
+              getCurrentUserId(
+                currentUser,
+              ),
+            handledAt:
+              new Date().toISOString(),
+          },
+        },
+      )
+
+      await pushNotification(
+        report.commentUserId ||
+        report.reportedUserId,
+        {
+          title:
+            `Cảnh báo bình luận lần ${Math.max(1, nextWarningCount)}`,
+          message:
+            `Bạn nhận cảnh báo vì bình luận: “${String(report.commentContent || '').slice(0, 90)}”.`,
+          type:
+            'comment_warning',
+          courseId:
+            report.courseId ||
+            '',
+          reportId:
+            report.id,
+        },
+      )
+
+      await fetchAdminData()
     } catch (error) {
-      console.error('Không thể tạo cảnh báo comment:', error)
+      console.error(
+        'Không thể tạo cảnh báo comment:',
+        error,
+      )
     }
   }
+
 
   async function confirmResolveReport() {
     if (!resolveReportTarget) return
@@ -2577,22 +4593,103 @@ function Courses() {
     setResolveReportTarget(null)
   }
 
-  async function confirmDeleteReportedCourse({ reason, detail }) {
-    const report = deleteReportedCourseTarget
-    if (!report?.id || !report?.courseId || !reason) return
+  async function confirmDeleteReportedCourse({
+    reason,
+    detail,
+  }) {
+    const report =
+      deleteReportedCourseTarget
 
-    const relatedReportsSnapshot = await getDocs(collection(db, 'learningReports'))
-    const relatedReports = relatedReportsSnapshot.docs.filter(
-      (reportDoc) => String(reportDoc.data()?.courseId || '') === String(report.courseId),
+    if (
+      !report?.id ||
+      !report?.courseId ||
+      !reason
+    ) {
+      return
+    }
+
+    const reportsResponse =
+      await eLearningApi.reports()
+
+    const relatedReports =
+      normalizeReportsResponse(
+        reportsResponse,
+      ).filter(
+        (item) =>
+          String(
+            item.courseId ||
+            '',
+          ) ===
+          String(
+            report.courseId,
+          ),
+      )
+
+    await Promise.all(
+      relatedReports.map(
+        (item) =>
+          pushNotification(
+            item.reporterId ||
+            item.userId,
+            {
+              title:
+                'Bài học đã bị xóa vĩnh viễn',
+              message:
+                `Bài “${item.courseTitle || 'đã báo cáo'}” ` +
+                'đã bị xóa vĩnh viễn sau khi xem xét báo cáo.',
+              type:
+                'report_deleted',
+              courseId: '',
+              reportId:
+                item.id,
+            },
+          ),
+      ),
     )
 
-    await Promise.all(relatedReports.map((reportDoc) => { const data = reportDoc.data(); return pushNotification(data.reporterId || data.userId, { title: 'Bài học đã bị xóa vĩnh viễn', message: `Bài “${data.courseTitle || 'đã báo cáo'}” đã bị xóa vĩnh viễn sau khi xem xét báo cáo.`, type: 'report_deleted', courseId: '', reportId: reportDoc.id }) }))
+    await permanentlyDeleteCourse(
+      report.courseId,
+    )
 
-    await permanentlyDeleteCourse(report.courseId)
-    setDeleteReportedCourseTarget(null)
+    await Promise.all(
+      relatedReports.map(
+        (item) =>
+          eLearningApi.updateReport(
+            item.id,
+            {
+              status:
+                'deleted',
+              data: {
+                deleteReason:
+                  reason,
+                deleteDetail:
+                  detail ||
+                  '',
+                handledBy:
+                  getCurrentUserId(
+                    currentUser,
+                  ),
+              },
+            },
+          ),
+      ),
+    )
+
+    setDeleteReportedCourseTarget(
+      null,
+    )
+
     await fetchAdminData()
-    if (currentUser?.uid) await fetchLearningReports(currentUser.uid)
+
+    if (currentUser?.uid) {
+      await fetchLearningReports(
+        getCurrentUserId(
+          currentUser,
+        ),
+      )
+    }
   }
+
 
   function applyRightFilter() {
     setActiveCategory(rightSubjectFilter)
@@ -2628,6 +4725,26 @@ function Courses() {
   }
 
   function handleSidebarSelection(sectionId) {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+
+      if (sectionId === 'home') {
+        url.searchParams.delete('section')
+        url.searchParams.delete('user')
+      } else {
+        url.searchParams.set('section', sectionId)
+
+        if (sectionId !== 'channel') {
+          url.searchParams.delete('user')
+        }
+      }
+
+      window.history.pushState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      )
+    }
     setActiveLibrarySection(sectionId)
     setShowMobileSidebar(false)
     setMainSort('all')
@@ -2703,7 +4820,7 @@ function Courses() {
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-2.5 pb-28 sm:px-5 sm:pb-20 lg:px-6 [&_button]:cursor-pointer">
-          <header className="sticky top-0 z-30 -mx-2.5 border-b border-slate-200/80 bg-[#f8fafc]/95 px-2.5 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-[#0b1120]/95 sm:-mx-5 sm:px-5 sm:py-3 lg:-mx-6 lg:px-6">
+          <header className="sticky top-[var(--zuny-navbar-height,80px)] z-30 -mx-2.5 border-b border-slate-200/80 bg-[#f8fafc]/95 px-2.5 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-[#0b1120]/95 sm:-mx-5 sm:px-5 sm:py-3 lg:-mx-6 lg:px-6">
             <div className="grid grid-cols-[40px_minmax(0,1fr)_38px] items-center gap-2 sm:flex sm:gap-3">
               <button type="button" onClick={() => setShowMobileSidebar(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-slate-100 dark:hover:bg-white/10 xl:hidden" aria-label="Mở menu">
                 <MenuIcon />
@@ -3011,7 +5128,10 @@ function Courses() {
           ) : activeLibrarySection === 'notifications' ? (
             <NotificationCenter notifications={visibleNotifications} onRead={markNotificationRead} onDelete={deleteNotification} onClearAll={clearAllNotifications} onOpenCourse={(id)=>id&&navigate(`/e-learning/${id}`)} />
           ) : activeLibrarySection === 'manage' && isAdminDev ? (
-            <AdminManagementPanel activeTab={adminTab} setActiveTab={setAdminTab} courses={courses.filter((course) => String(course.visibility || 'public').toLowerCase() !== 'class')} reports={adminReports} commentReports={adminCommentReports} users={adminUsers} loading={adminLoading} onApprove={(course) => updateCourseModeration(course, 'approved')} onReject={handleRejectCourse} onOpen={openCourse} onDeleteCourse={handleDeleteCourse} onResolveReport={setResolveReportTarget} onDeleteReportedCourse={setDeleteReportedCourseTarget} onResolveCommentReport={handleCommentReportStatus} onOpenComment={openReportedComment} onDeleteComment={handleDeleteReportedComment} onWarnComment={handleWarnReportedComment} onBlock={setBlockTarget} onWarn={setWarningTarget} onVerify={async (user) => { const nextVerified=!Boolean(user.elearningVerified); await updateDoc(doc(db, 'users', user.id), { elearningVerified: nextVerified, elearningVerifiedAt: nextVerified ? serverTimestamp() : null, elearningVerifiedBy: nextVerified ? (currentUser?.uid || '') : '' }); await pushNotification(user.id, { title: nextVerified ? 'Bạn đã được cấp xác nhận' : 'Xác nhận đã được thu hồi', message: nextVerified ? 'Tài khoản của bạn đã có dấu tick xanh trong thư viện E-learning.' : 'Dấu xác nhận E-learning của tài khoản đã được thu hồi.', type: 'verified' }); await fetchAdminData() }} onOpenUser={(user) => openPresenterChannel(user.id, user)} onResolveViolation={(report) => handleReportStatus(report, 'resolved')} onUnblock={async (user) => { await updateDoc(doc(db, 'users', user.id), { elearningPostingBlock: { ...(user.elearningPostingBlock || {}), active: false, unblockedBy: currentUser?.uid || '', unblockedAt: new Date().toISOString() } }); await fetchAdminData() }} />
+            <AdminManagementPanel activeTab={adminTab} setActiveTab={setAdminTab} courses={courses.filter(
+              (course) =>
+                String(course.visibility || 'public').toLowerCase() !== 'class'
+            )} reports={adminReports} commentReports={adminCommentReports} users={adminUsers} loading={adminLoading} onApprove={(course) => updateCourseModeration(course, 'approved')} onReject={handleRejectCourse} onOpen={openCourse} onDeleteCourse={handleDeleteCourse} onResolveReport={setResolveReportTarget} onDeleteReportedCourse={setDeleteReportedCourseTarget} onResolveCommentReport={handleCommentReportStatus} onOpenComment={openReportedComment} onDeleteComment={handleDeleteReportedComment} onWarnComment={handleWarnReportedComment} onBlock={setBlockTarget} onWarn={setWarningTarget} onVerify={async (user) => { const nextVerified=!Boolean(user.elearningVerified); await eLearningApi.updateUser(user.id, { elearningVerified: nextVerified, elearningVerifiedAt: nextVerified ? new Date().toISOString() : null, elearningVerifiedBy: nextVerified ? getCurrentUserId(currentUser) : '' }); await pushNotification(user.id, { title: nextVerified ? 'Bạn đã được cấp xác nhận' : 'Xác nhận đã được thu hồi', message: nextVerified ? 'Tài khoản của bạn đã có dấu tick xanh trong thư viện E-learning.' : 'Dấu xác nhận E-learning của tài khoản đã được thu hồi.', type: 'verified' }); await fetchAdminData() }} onOpenUser={(user) => openPresenterChannel(user.id, user)} onResolveViolation={(report) => handleReportStatus(report, 'resolved')} onUnblock={async (user) => { await eLearningApi.updateUser(user.id, { elearningPostingBlock: { ...(user.elearningPostingBlock || {}), active: false, unblockedBy: getCurrentUserId(currentUser), unblockedAt: new Date().toISOString() } }); await fetchAdminData() }} />
           ) : (
             <>
           {activeLibrarySection === 'home' && (
@@ -3239,9 +5359,9 @@ function Courses() {
       {deleteSuccessNotice && <SuccessNoticeModal icon="🗑️" title="Đã xóa bài học" description={`“${deleteSuccessNotice.title}” đã được xóa khỏi thư viện.`} onClose={()=>setDeleteSuccessNotice(null)} />}
       {saveSuccessNotice && <SuccessNoticeModal icon={saveSuccessNotice.destination==='removed'?'☆':'★'} title={saveSuccessNotice.destination==='removed'?'Đã hủy lưu bài học':'Đã lưu bài học'} description={saveSuccessNotice.destination==='removed'?`“${saveSuccessNotice.courseTitle}” đã được gỡ khỏi bài đã lưu và các danh sách lưu.`:`“${saveSuccessNotice.courseTitle}” đã được lưu vào ${saveSuccessNotice.destination}.`} onClose={()=>setSaveSuccessNotice(null)} />}
       {channelReportTarget && <ChannelReportModal channel={channelReportTarget} onClose={() => setChannelReportTarget(null)} onSubmit={submitChannelReport} />}
-      {postingWarningNotice && <PostingWarningModal warning={postingWarningNotice} onClose={() => setPostingWarningNotice(null)} onConfirm={async () => { if (currentUser?.uid) await updateDoc(doc(db, 'users', currentUser.uid), { 'elearningPostingWarning.acknowledgedAt': serverTimestamp() }); const type=postingWarningNotice.requestedType||''; const preset=postingWarningNotice.requestedPreset||null; setTeacherProfile((prev)=>({...prev,elearningPostingWarning:{...(prev?.elearningPostingWarning||{}),acknowledgedAt:new Date().toISOString()}})); setPostingWarningNotice(null); if (type) openCreateModal(type,preset) }} />}
-      {blockTarget && <UserActionModal user={blockTarget} mode="block" onClose={() => setBlockTarget(null)} onSave={async ({reason,startAt,endAt}) => { await updateDoc(doc(db,'users',blockTarget.id), { elearningPostingBlock:{active:true,reason,startAt:new Date(`${startAt}T00:00:00`).toISOString(),endAt:new Date(`${endAt}T23:59:59`).toISOString(),blockedBy:currentUser?.uid||'',createdAt:new Date().toISOString()} }); setBlockTarget(null); await fetchAdminData() }} />}
-      {warningTarget && <UserActionModal user={warningTarget} mode="warning" onClose={() => setWarningTarget(null)} onSave={async ({reason}) => { const count=Math.max(1,adminReports.filter((report)=>String(report.reportedUserId||report.courseOwnerId||'')===String(warningTarget.id)).length); await updateDoc(doc(db,'users',warningTarget.id), { elearningPostingWarning:{active:true,reason,count,acknowledgedAt:null,warnedBy:currentUser?.uid||'',createdAt:new Date().toISOString()} }); setWarningTarget(null); await fetchAdminData() }} />}
+      {postingWarningNotice && <PostingWarningModal warning={postingWarningNotice} onClose={() => setPostingWarningNotice(null)} onConfirm={async () => { if (currentUser?.uid) await eLearningApi.updateUser(getCurrentUserId(currentUser), { elearningPostingWarning: { ...(teacherProfile?.elearningPostingWarning || {}), acknowledgedAt: new Date().toISOString() } }); const type=postingWarningNotice.requestedType||''; const preset=postingWarningNotice.requestedPreset||null; setTeacherProfile((prev)=>({...prev,elearningPostingWarning:{...(prev?.elearningPostingWarning||{}),acknowledgedAt:new Date().toISOString()}})); setPostingWarningNotice(null); if (type) openCreateModal(type,preset) }} />}
+      {blockTarget && <UserActionModal user={blockTarget} mode="block" onClose={() => setBlockTarget(null)} onSave={async ({reason,startAt,endAt}) => { await eLearningApi.updateUser(blockTarget.id, { elearningPostingBlock:{active:true,reason,startAt:new Date(`${startAt}T00:00:00`).toISOString(),endAt:new Date(`${endAt}T23:59:59`).toISOString(),blockedBy:getCurrentUserId(currentUser),createdAt:new Date().toISOString()} }); setBlockTarget(null); await fetchAdminData() }} />}
+      {warningTarget && <UserActionModal user={warningTarget} mode="warning" onClose={() => setWarningTarget(null)} onSave={async ({reason}) => { const count=Math.max(1,adminReports.filter((report)=>String(report.reportedUserId||report.courseOwnerId||'')===String(warningTarget.id)).length); await eLearningApi.updateUser(warningTarget.id, { elearningPostingWarning:{active:true,reason,count,acknowledgedAt:null,warnedBy:getCurrentUserId(currentUser),createdAt:new Date().toISOString()} }); setWarningTarget(null); await fetchAdminData() }} />}
     </div>
   )
 }
@@ -3586,8 +5706,8 @@ function AccountPanel({ profile, followerHistory = [], user, role, classes, cour
   const total=Math.max(1,Number(stats.completed||0)+Number(stats.inProgress||0));const completedPercent=Math.round(Number(stats.completed||0)/total*100)
   return <section className="min-w-0 py-3 sm:py-6"><div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111827] sm:rounded-3xl">
     <div className="relative isolate h-36 overflow-hidden bg-gradient-to-r from-blue-200 via-indigo-200 to-violet-200 dark:from-blue-950 dark:via-indigo-950 dark:to-violet-950 sm:h-56">{coverImage&&<img src={coverImage} alt="Ảnh bìa" className="absolute inset-0 -z-10 h-full w-full object-cover"/>}<div className="absolute inset-0 -z-0 bg-gradient-to-t from-white/90 via-white/15 to-transparent dark:from-[#111827]/95 dark:via-black/20 dark:to-black/5"/></div>
-    <div className="relative z-10 min-w-0 px-3 pb-5 sm:px-8 sm:pb-7"><div className="-mt-12 flex min-w-0 flex-col gap-4 sm:-mt-20 sm:flex-row sm:items-end sm:gap-5"><div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-visible rounded-full border-4 border-white bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-black text-white shadow-xl dark:border-[#111827] sm:h-32 sm:w-32 sm:text-3xl"><span className="h-full w-full overflow-hidden rounded-full">{avatar?<img src={avatar} alt={displayName} className="h-full w-full object-cover"/>:<span className="grid h-full w-full place-items-center">{getInitials(displayName)}</span>}</span>{(isAdminProfile||isVerifiedProfile)&&<span className={`absolute bottom-1 right-1 grid h-7 w-7 place-items-center rounded-full border-4 border-white text-xs font-black text-white shadow dark:border-[#111827] ${isAdminProfile?'bg-amber-500':'bg-blue-600'}`}>✓</span>}</div><div className="min-w-0 flex-1 pb-2"><div className="flex flex-wrap items-center gap-2"><h1 className="min-w-0 break-words text-2xl font-black leading-tight text-slate-950 [overflow-wrap:anywhere] dark:text-white sm:text-4xl">{displayName}</h1>{isAdminProfile?<span className="rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-black text-white shadow">ADMIN ✓</span>:isVerifiedProfile?<span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">Đã xác nhận ✓</span>:null}</div><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">{bio}</p><div className="mt-3 grid min-w-0 gap-1.5 text-xs text-slate-500 dark:text-slate-400 sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:text-sm"><b className="text-slate-900 dark:text-white">{followers.toLocaleString('vi-VN')} người theo dõi</b><span>•</span><span>{approvedCourses.length + pendingCourses.length} bài đăng</span><span>•</span><span>{user?.email||profile?.email||'Tài khoản ZUNY'}</span></div></div></div>
-      <div className="-mx-3 mt-5 flex min-w-0 gap-1 overflow-x-auto border-b border-slate-200 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 sm:mx-0 sm:mt-6 sm:px-0">{tabs.map(([id,label])=><button key={id} type="button" onClick={()=>setActiveTab(id)} className={`relative shrink-0 px-3 py-3 text-xs font-black sm:px-5 sm:text-sm ${activeTab===id?'text-blue-600 dark:text-blue-400':'text-slate-500'}`}>{label}{activeTab===id&&<span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-600"/>}</button>)}</div>
+    <div className="relative z-10 min-w-0 px-3 pb-5 sm:px-8 sm:pb-7"><div className="-mt-12 flex min-w-0 flex-col gap-4 sm:-mt-20 sm:flex-row sm:items-end sm:gap-5"><div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-visible rounded-full border-4 border-white bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-black text-white shadow-xl dark:border-[#111827] sm:h-32 sm:w-32 sm:text-3xl"><span className="h-full w-full overflow-hidden rounded-full">{avatar?<img src={avatar} alt={displayName} className="h-full w-full object-cover"/>:<span className="grid h-full w-full place-items-center">{getInitials(displayName)}</span>}</span>{(isAdminProfile||isVerifiedProfile)&&<span className={`absolute bottom-1 right-1 grid h-7 w-7 place-items-center rounded-full border-4 border-white text-xs font-black text-white shadow dark:border-[#111827] ${isAdminProfile?'bg-amber-500':'bg-blue-600'}`}>✓</span>}</div><div className="min-w-0 flex-1 pb-2"><div className="flex flex-wrap items-center gap-2"><h1 className="min-w-0 break-words text-2xl font-black leading-tight text-slate-950 [overflow-wrap:anywhere] dark:text-white sm:text-4xl">{displayName}</h1>{isAdminProfile?<span className="rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-black text-white shadow">ADMIN ✓</span>:isVerifiedProfile?<span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">Đã xác nhận ✓</span>:null}</div><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">{bio}</p><div className="mt-3 grid min-w-0 gap-1.5 text-xs text-slate-500 dark:text-slate-400 sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:text-sm"><b className="text-slate-900 dark:text-white">{followers.toLocaleString('vi-VN')} người theo dõi</b><span>•</span><span>{ownedCourses.length} bài đăng</span><span>•</span><span>{user?.email||profile?.email||'Tài khoản ZUNY'}</span></div></div></div>
+      <div className="-mx-3 mt-5 flex min-w-0 gap-1 overflow-x-auto border-b border-slate-200 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 sm:mx-0 sm:mt-6 sm:px-0">{tabs.map(([id,label])=><button key={id} type="button" onClick={()=>changeAccountTab(id)} className={`relative shrink-0 px-3 py-3 text-xs font-black sm:px-5 sm:text-sm ${activeTab===id?'text-blue-600 dark:text-blue-400':'text-slate-500'}`}>{label}{activeTab===id&&<span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-600"/>}</button>)}</div>
       {activeTab==='reports'?<ReportHistoryPanel reports={reports} loading={reportsLoading} />:activeTab==='overview'?<div className="min-w-0 py-5 sm:py-7">
         <div className="flex min-w-0 items-center justify-between gap-3"><div className="min-w-0"><h2 className="text-lg font-black sm:text-xl">Thống kê tài khoản</h2><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Tổng quan hoạt động học tập và tài khoản của bạn.</p></div><span className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">Tổng quan</span></div>
         <div className={`mt-4 grid min-w-0 grid-cols-1 gap-3 min-[390px]:grid-cols-2 sm:gap-4 ${isStudentProfile ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
@@ -3786,7 +5906,7 @@ function PlaylistCreateModal({ courses, ownerId, teacherProfilesById = {}, mode 
     const file=event.target.files?.[0]
     if(!file||!ownerId)return
     if(!String(file.type||'').startsWith('image/')||file.size>5*1024*1024){alert('Chỉ hỗ trợ ảnh tối đa 5 MB.');return}
-    try{setUploading(true);const safeName=`${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const fileRef=ref(storage,`playlist-images/${ownerId}/${safeName}`);const snapshot=await uploadBytes(fileRef,file,{contentType:file.type});const url=await getDownloadURL(snapshot.ref);setThumbnail(url);setThumbnailFileName(file.name)}catch(error){console.error('Không thể tải ảnh bộ sưu tập:',error);alert('Không thể tải ảnh lên.')}finally{setUploading(false);event.target.value=''}
+    try{setUploading(true);const uploadResult=await eLearningApi.uploadAsset(file,'playlist-image','playlist-images');const url=uploadResult?.url||uploadResult?.publicUrl||uploadResult?.fileUrl||'';setThumbnail(url);setThumbnailFileName(file.name)}catch(error){console.error('Không thể tải ảnh bộ sưu tập:',error);alert('Không thể tải ảnh lên.')}finally{setUploading(false);event.target.value=''}
   }
   return <div className="fixed inset-0 z-[1300] grid place-items-center bg-black/70 p-4 backdrop-blur-sm"><div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#111827]"><div className="flex items-start justify-between border-b border-slate-200 p-6 dark:border-white/10"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">{mode==='saved'?'Danh sách lưu cá nhân':'Danh sách phát'}</p><h2 className="mt-1 text-2xl font-black">{editing?(mode==='saved'?'Chỉnh sửa danh sách lưu':'Chỉnh sửa danh sách phát'):mode==='saved'?'Tạo danh sách lưu':'Tạo danh sách phát'}</h2><p className="mt-1 text-sm text-slate-500">{mode==='saved'?'Danh sách này chỉ thuộc mục Đã lưu và không xuất hiện trong Bài đã đăng.':'Tạo danh sách phát từ các bài học đã đăng.'}</p></div><button onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full hover:bg-slate-100 dark:hover:bg-white/10">×</button></div><div className="min-h-0 flex-1 overflow-y-auto p-6"><div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]"><div className="space-y-4"><div className="aspect-video overflow-hidden rounded-2xl border border-dashed border-slate-300 bg-gradient-to-br from-blue-600 to-violet-700 dark:border-white/20">{thumbnail?<img src={thumbnail} alt="Thumbnail bộ sưu tập" className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-center text-white"><div><div className="text-4xl">▣</div><p className="mt-2 text-xs font-black">ẢNH BỘ SƯU TẬP</p></div></div>}</div><input value={thumbnail} onChange={(event)=>setThumbnail(event.target.value)} placeholder="Dán URL thumbnail" className="w-full rounded-xl border border-slate-300 bg-transparent px-4 py-3 text-sm outline-none dark:border-white/15"/><label className="block cursor-pointer rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm font-black text-blue-700 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-300">{uploading?'Đang tải ảnh...':'Tải ảnh từ máy'}<input type="file" accept="image/*" onChange={uploadThumbnail} className="hidden"/></label><input value={title} onChange={e=>setTitle(e.target.value)} placeholder={mode==='saved'?'Tên danh sách lưu *':'Tên danh sách phát *'} className="w-full rounded-xl border border-slate-300 bg-transparent px-4 py-3 text-sm outline-none dark:border-white/15"/><textarea value={description} onChange={e=>setDescription(e.target.value)} rows="5" placeholder="Mô tả danh sách" className="w-full rounded-xl border border-slate-300 bg-transparent px-4 py-3 text-sm outline-none dark:border-white/15"/></div><div><div className="sticky top-0 z-10 bg-white pb-3 dark:bg-[#111827]"><input value={searchText} onChange={(event)=>setSearchText(event.target.value)} placeholder="Tìm bài học theo tên, người đăng hoặc môn..." className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-500 dark:border-white/15 dark:bg-white/[0.05]"/><p className="mt-2 text-xs font-semibold text-slate-500">Đã chọn {courseIds.length} bài học</p></div><div className="grid gap-3">{filtered.map((course)=>{const selected=courseIds.includes(course.id);const teacherName=getCourseTeacherName(course,teacherProfilesById);return <button key={course.id} type="button" onClick={()=>toggle(course.id)} className={`flex gap-3 rounded-2xl border p-3 text-left transition ${selected?'border-blue-500 bg-blue-50 ring-2 ring-blue-500/10 dark:bg-blue-500/10':'border-slate-200 hover:border-blue-300 dark:border-white/10'}`}><div className="aspect-video w-32 shrink-0 overflow-hidden rounded-xl"><ChannelCourseThumbnail course={course}/></div><div className="min-w-0 flex-1"><p className="line-clamp-2 font-black">{stripHtml(course.title)}</p><p className="mt-1 truncate text-xs font-semibold text-slate-500">{teacherName}</p><p className="mt-2 text-xs text-slate-400">{course.category||'Môn học'} • {Number(course.views||0).toLocaleString('vi-VN')} lượt xem</p></div><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-black ${selected?'bg-blue-600 text-white':'bg-slate-100 text-slate-400 dark:bg-white/10'}`}>{selected?'✓':'+'}</span></button>})}{!filtered.length&&<div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-white/15">Không tìm thấy bài học phù hợp.</div>}</div></div></div></div><div className="flex justify-end gap-2 border-t border-slate-200 p-5 dark:border-white/10"><button onClick={onClose} className="rounded-full px-5 py-2.5 text-sm font-black">Hủy</button><button disabled={!title.trim()} onClick={()=>onCreate({title,description,courseIds,thumbnail,thumbnailFileName})} className="rounded-full bg-blue-600 px-6 py-2.5 text-sm font-black text-white disabled:opacity-40">{editing?'Lưu thay đổi':mode==='saved'?'Tạo danh sách lưu':'Tạo danh sách phát'}</button></div></div></div>
 }
@@ -3832,10 +5952,73 @@ function ChannelReportModal({ channel, onClose, onSubmit }) {
 }
 
 function PresenterChannel({ profile, channelId, currentUserId, isFollowing, playlists = [], courses, onBack, onOpen, onToggleFollow, onReport, onOpenPlaylist, onAvatarClick }) {
-  const [followBusy,setFollowBusy]=useState(false);const [followPulse,setFollowPulse]=useState(false);const [tab,setTab]=useState('courses')
+  const getChannelTabFromUrl = () => {
+    if (typeof window === 'undefined') return 'courses'
+
+    return new URLSearchParams(window.location.search)
+      .get('channelTab') === 'playlists'
+      ? 'playlists'
+      : 'courses'
+  }
+
+  const [followBusy,setFollowBusy]=useState(false)
+  const [followPulse,setFollowPulse]=useState(false)
+  const [tab,setTab]=useState(getChannelTabFromUrl)
+
+  const changeChannelTab = (tabId) => {
+    const safeTab =
+      tabId === 'playlists'
+        ? 'playlists'
+        : 'courses'
+
+    setTab(safeTab)
+
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+
+    if (safeTab === 'courses') {
+      url.searchParams.delete('channelTab')
+    } else {
+      url.searchParams.set('channelTab', safeTab)
+    }
+
+    window.history.pushState(
+      {},
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    )
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncChannelTabFromUrl = () => {
+      const requestedTab =
+        new URLSearchParams(window.location.search)
+          .get('channelTab')
+
+      setTab(
+        requestedTab === 'playlists'
+          ? 'playlists'
+          : 'courses',
+      )
+    }
+
+    window.addEventListener(
+      'popstate',
+      syncChannelTabFromUrl,
+    )
+
+    return () =>
+      window.removeEventListener(
+        'popstate',
+        syncChannelTabFromUrl,
+      )
+  }, [])
   const name=profile?.fullName||profile?.name||profile?.displayName||profile?.email||'Kênh ZUNY';const avatar=profile?.photoURL||profile?.avatar||profile?.avatarUrl||profile?.profileImage||'';const cover=profile?.coverURL||profile?.coverImage||profile?.banner||'';const bio=profile?.bio||profile?.description||'Chia sẻ kiến thức và tài nguyên học tập trên ZUNY.';const followers=Number(profile?.followersCount||profile?.followerCount||0);const views=courses.reduce((sum,item)=>sum+Number(item.views||0),0);const subjects=Array.from(new Set(courses.map((item)=>item.category).filter(Boolean)));const ownChannel=String(channelId||'')===String(currentUserId||'');const normalizedChannelRole=String(profile?.role||profile?.Role||profile?.accountType||profile?.userRole||'').replace(/[\s_-]/g,'').toUpperCase();const isAdminChannel=['ADMIN','ADMINDEV'].includes(normalizedChannelRole);const isVerifiedChannel=Boolean(profile?.elearningVerified)
   async function handleFollowClick(){if(followBusy)return;setFollowBusy(true);setFollowPulse(true);try{await onToggleFollow(channelId)}finally{window.setTimeout(()=>setFollowPulse(false),520);setFollowBusy(false)}}
-  return <section className="animate-[fadeIn_.35s_ease-out] bg-white py-6 text-slate-950 dark:bg-[#0b1120] dark:text-white"><button onClick={onBack} className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black shadow-sm transition hover:-translate-x-1 dark:border-white/10 dark:bg-white/[0.06]">← Quay lại thư viện</button><div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-white/10 dark:bg-[#111827]"><div className="relative h-52 overflow-hidden bg-gradient-to-r from-blue-200 via-indigo-200 to-violet-200 dark:from-blue-950 dark:via-indigo-950 dark:to-violet-950 sm:h-64">{cover&&<img src={cover} className="h-full w-full object-cover" alt="Ảnh bìa kênh"/>}<div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent"/></div><div className="relative bg-gradient-to-b from-blue-100 via-white to-white px-5 pb-8 dark:bg-none sm:px-8"><div className="-mt-16 flex flex-col gap-5 sm:-mt-20 sm:flex-row sm:items-end"><button type="button" onClick={onAvatarClick} title={ownChannel ? "Mở tài khoản chính" : `Mở kênh của ${name}`} className="relative grid h-32 w-32 shrink-0 place-items-center overflow-visible rounded-[2rem] border-4 border-white bg-gradient-to-br from-blue-500 to-indigo-700 text-3xl font-black text-white shadow-2xl transition hover:scale-[1.03] dark:border-[#111827]"><span className="h-full w-full overflow-hidden rounded-[1.65rem]">{avatar?<img src={avatar} className="h-full w-full object-cover" alt={name}/>:<span className="grid h-full w-full place-items-center">{getInitials(name)}</span>}</span>{(isAdminChannel||isVerifiedChannel)&&<span className={`absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full border-4 border-white text-sm font-black text-white shadow-lg dark:border-[#111827] ${isAdminChannel?'bg-amber-500':'bg-blue-600'}`}>✓</span>}</button><div className="min-w-0 flex-1 pb-1"><p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">Người sáng tạo nội dung</p><div className="mt-1 flex min-w-0 flex-wrap items-center gap-3"><h1 className="truncate text-3xl font-black text-slate-950 dark:text-white sm:text-4xl">{name}</h1>{isAdminChannel?<span className="rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-black text-white">ADMIN ✓</span>:isVerifiedChannel?<span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">Đã xác nhận ✓</span>:null}</div><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">{bio}</p></div>{!ownChannel&&currentUserId&&<div className="mb-1 flex shrink-0 flex-wrap gap-2"><button type="button" disabled={followBusy} onClick={handleFollowClick} className={`rounded-full px-6 py-3 text-sm font-black transition ${isFollowing?'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300':'bg-red-600 text-white'} ${followPulse?'scale-105 ring-4 ring-blue-400/20':''}`}>{followBusy?'Đang cập nhật...':isFollowing?'✓ Đang theo dõi':'+ Theo dõi'}</button><button type="button" onClick={()=>onReport?.({id:channelId,name})} className="rounded-full border border-rose-300 bg-white px-5 py-3 text-sm font-black text-rose-600 hover:bg-rose-50 dark:border-rose-400/30 dark:bg-white/[0.04] dark:hover:bg-rose-500/10">⚑ Báo cáo</button></div>}</div><div className="mt-6 grid gap-3 sm:grid-cols-3"><ChannelStat label="Bài học công khai" value={courses.length} icon="🎬"/><ChannelStat label="Tổng lượt xem" value={views.toLocaleString('vi-VN')} icon="👁️"/><ChannelStat label="Người theo dõi" value={followers.toLocaleString('vi-VN')} icon="👥"/></div>{subjects.length>0&&<div className="mt-5 flex flex-wrap gap-2">{subjects.slice(0,8).map(subject=><span key={subject} className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{subject}</span>)}</div>}<div className="mt-9 flex gap-2 border-b border-slate-200 dark:border-white/10"><button onClick={()=>setTab('courses')} className={`relative px-5 py-3 text-sm font-black ${tab==='courses'?'text-blue-600':'text-slate-500'}`}>Bài học công khai ({courses.length}){tab==='courses'&&<span className="absolute inset-x-2 bottom-0 h-0.5 bg-blue-600"/>}</button><button onClick={()=>setTab('playlists')} className={`relative px-5 py-3 text-sm font-black ${tab==='playlists'?'text-blue-600':'text-slate-500'}`}>Danh sách phát ({playlists.length}){tab==='playlists'&&<span className="absolute inset-x-2 bottom-0 h-0.5 bg-blue-600"/>}</button></div>{tab==='courses'?(courses.length?<div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{courses.map(c=><button key={c.id} onClick={()=>onOpen(c)} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white text-left shadow-sm transition duration-300 hover:-translate-y-1.5 hover:shadow-xl dark:border-white/10 dark:bg-white/[0.03]"><div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-black"><ChannelCourseThumbnail course={c}/></div><div className="p-5"><p className="line-clamp-2 text-base font-black leading-6 group-hover:text-blue-600 dark:group-hover:text-blue-400">{stripHtml(c.title)}</p><div className="mt-4 flex items-center justify-between text-xs font-semibold text-slate-500"><span>{Number(c.views||0).toLocaleString('vi-VN')} lượt xem</span><span className="text-blue-600">Xem bài →</span></div></div></button>)}</div>:<div className="mt-5 rounded-3xl border border-dashed border-slate-300 px-6 py-16 text-center text-slate-500 dark:border-white/15">Kênh chưa có bài học.</div>):(playlists.length?<div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{playlists.map((playlist)=><PlaylistCoverCard key={playlist.id} playlist={playlist} courses={courses} onOpen={()=>onOpenPlaylist?.(playlist)}/>)}</div>:<div className="mt-5 rounded-3xl border border-dashed border-slate-300 px-6 py-16 text-center text-slate-500 dark:border-white/15">Kênh chưa có danh sách phát.</div>)}</div></div></section>
+  return <section className="animate-[fadeIn_.35s_ease-out] bg-white py-6 text-slate-950 dark:bg-[#0b1120] dark:text-white"><button onClick={onBack} className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black shadow-sm transition hover:-translate-x-1 dark:border-white/10 dark:bg-white/[0.06]">← Quay lại thư viện</button><div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-white/10 dark:bg-[#111827]"><div className="relative h-52 overflow-hidden bg-gradient-to-r from-blue-200 via-indigo-200 to-violet-200 dark:from-blue-950 dark:via-indigo-950 dark:to-violet-950 sm:h-64">{cover&&<img src={cover} className="h-full w-full object-cover" alt="Ảnh bìa kênh"/>}<div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent"/></div><div className="relative bg-gradient-to-b from-blue-100 via-white to-white px-5 pb-8 dark:bg-none sm:px-8"><div className="-mt-16 flex flex-col gap-5 sm:-mt-20 sm:flex-row sm:items-end"><button type="button" onClick={onAvatarClick} title={ownChannel ? "Mở tài khoản chính" : `Mở kênh của ${name}`} className="relative grid h-32 w-32 shrink-0 place-items-center overflow-visible rounded-[2rem] border-4 border-white bg-gradient-to-br from-blue-500 to-indigo-700 text-3xl font-black text-white shadow-2xl transition hover:scale-[1.03] dark:border-[#111827]"><span className="h-full w-full overflow-hidden rounded-[1.65rem]">{avatar?<img src={avatar} className="h-full w-full object-cover" alt={name}/>:<span className="grid h-full w-full place-items-center">{getInitials(name)}</span>}</span>{(isAdminChannel||isVerifiedChannel)&&<span className={`absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full border-4 border-white text-sm font-black text-white shadow-lg dark:border-[#111827] ${isAdminChannel?'bg-amber-500':'bg-blue-600'}`}>✓</span>}</button><div className="min-w-0 flex-1 pb-1"><p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">Người sáng tạo nội dung</p><div className="mt-1 flex min-w-0 flex-wrap items-center gap-3"><h1 className="truncate text-3xl font-black text-slate-950 dark:text-white sm:text-4xl">{name}</h1>{isAdminChannel?<span className="rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-black text-white">ADMIN ✓</span>:isVerifiedChannel?<span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">Đã xác nhận ✓</span>:null}</div><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">{bio}</p></div>{!ownChannel&&currentUserId&&<div className="mb-1 flex shrink-0 flex-wrap gap-2"><button type="button" disabled={followBusy} onClick={handleFollowClick} className={`rounded-full px-6 py-3 text-sm font-black transition ${isFollowing?'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300':'bg-red-600 text-white'} ${followPulse?'scale-105 ring-4 ring-blue-400/20':''}`}>{followBusy?'Đang cập nhật...':isFollowing?'✓ Đang theo dõi':'+ Theo dõi'}</button><button type="button" onClick={()=>onReport?.({id:channelId,name})} className="rounded-full border border-rose-300 bg-white px-5 py-3 text-sm font-black text-rose-600 hover:bg-rose-50 dark:border-rose-400/30 dark:bg-white/[0.04] dark:hover:bg-rose-500/10">⚑ Báo cáo</button></div>}</div><div className="mt-6 grid gap-3 sm:grid-cols-3"><ChannelStat label="Bài học công khai" value={courses.length} icon="🎬"/><ChannelStat label="Tổng lượt xem" value={views.toLocaleString('vi-VN')} icon="👁️"/><ChannelStat label="Người theo dõi" value={followers.toLocaleString('vi-VN')} icon="👥"/></div>{subjects.length>0&&<div className="mt-5 flex flex-wrap gap-2">{subjects.slice(0,8).map(subject=><span key={subject} className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{subject}</span>)}</div>}<div className="mt-9 flex gap-2 border-b border-slate-200 dark:border-white/10"><button onClick={()=>changeChannelTab('courses')} className={`relative px-5 py-3 text-sm font-black ${tab==='courses'?'text-blue-600':'text-slate-500'}`}>Bài học công khai ({courses.length}){tab==='courses'&&<span className="absolute inset-x-2 bottom-0 h-0.5 bg-blue-600"/>}</button><button onClick={()=>changeChannelTab('playlists')} className={`relative px-5 py-3 text-sm font-black ${tab==='playlists'?'text-blue-600':'text-slate-500'}`}>Danh sách phát ({playlists.length}){tab==='playlists'&&<span className="absolute inset-x-2 bottom-0 h-0.5 bg-blue-600"/>}</button></div>{tab==='courses'?(courses.length?<div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{courses.map(c=><button key={c.id} onClick={()=>onOpen(c)} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white text-left shadow-sm transition duration-300 hover:-translate-y-1.5 hover:shadow-xl dark:border-white/10 dark:bg-white/[0.03]"><div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-black"><ChannelCourseThumbnail course={c}/></div><div className="p-5"><p className="line-clamp-2 text-base font-black leading-6 group-hover:text-blue-600 dark:group-hover:text-blue-400">{stripHtml(c.title)}</p><div className="mt-4 flex items-center justify-between text-xs font-semibold text-slate-500"><span>{Number(c.views||0).toLocaleString('vi-VN')} lượt xem</span><span className="text-blue-600">Xem bài →</span></div></div></button>)}</div>:<div className="mt-5 rounded-3xl border border-dashed border-slate-300 px-6 py-16 text-center text-slate-500 dark:border-white/15">Kênh chưa có bài học.</div>):(playlists.length?<div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{playlists.map((playlist)=><PlaylistCoverCard key={playlist.id} playlist={playlist} courses={courses} onOpen={()=>onOpenPlaylist?.(playlist)}/>)}</div>:<div className="mt-5 rounded-3xl border border-dashed border-slate-300 px-6 py-16 text-center text-slate-500 dark:border-white/15">Kênh chưa có danh sách phát.</div>)}</div></div></section>
 }
 
 function ChannelCourseThumbnail({ course }) {

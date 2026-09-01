@@ -52,7 +52,7 @@ function ExamSidebar({
             },
             {
               id: 'statistics',
-              label: 'Thống kê',
+              label: 'Tiến độ của tôi',
               icon: BarChart3,
             },
           ]
@@ -69,20 +69,10 @@ function ExamSidebar({
               badge: page?.exams?.length || 0,
             },
             {
-              id: 'exam-room',
-              label: 'Phòng thi',
-              icon: DoorOpen,
-            },
-            {
               id: 'submissions',
               label: 'Danh sách bài nộp',
               icon: ClipboardList,
               badge: page?.studentResults?.length || 0,
-            },
-            {
-              id: 'statistics',
-              label: 'Thống kê',
-              icon: BarChart3,
             },
           ],
     [isStudent, page?.exams?.length, page?.studentResults],

@@ -6,20 +6,9 @@ import {
 } from 'react'
 
 import {
-  onAuthStateChanged,
-  signOut,
-} from 'firebase/auth'
+  authService,
+} from '../services/auth'
 
-import {
-  doc,
-  getDoc,
-  setDoc,
-} from 'firebase/firestore'
-
-import {
-  auth,
-  db,
-} from '../components/firebase'
 const AuthContext =
   createContext()
 
@@ -37,211 +26,139 @@ export function AuthProvider({
   const [isLoading, setIsLoading] =
     useState(true)
 
+  const applyUser = (
+    currentUser
+  ) => {
+    setUser(currentUser)
+    setUserDetails(currentUser)
+
+    authService.currentUser =
+      currentUser
+  }
+
   // =========================
   // REFRESH USER DATA
   // =========================
   const refreshUserData =
-    async (currentUser = user) => {
+    async () => {
       try {
-        if (!currentUser) return
+        const currentUser =
+          await authService.getMe()
 
-        const userRef = doc(
-          db,
-          'users',
-          currentUser.uid
-        )
-
-        const userSnap =
-          await getDoc(userRef)
-
-        if (
-          userSnap.exists()
-        ) {
-          const data =
-            userSnap.data()
-
-          console.log(
-            'USER DATA:',
-            data
-          )
-
-          setUserDetails(
-            data
-          )
-
-          return data
+        if (!currentUser) {
+          applyUser(null)
+          return null
         }
 
-        return null
+        applyUser(currentUser)
+
+        return currentUser
       } catch (error) {
         console.error(
           'Refresh user error:',
           error
         )
 
+        applyUser(null)
+
         return null
       }
     }
 
   // =========================
-  // AUTH LISTENER
+  // RESTORE LOGIN SESSION
   // =========================
   useEffect(() => {
-    console.log(
-      'AuthContext: Setting up auth listener'
-    )
+    let active = true
 
-    const unsubscribe =
-      onAuthStateChanged(
-        auth,
-        async (
-          currentUser
-        ) => {
-          try {
-            console.log(
-              'Auth state changed:',
-              currentUser?.email
-            )
+    const restoreSession =
+      async () => {
+        try {
+          setIsLoading(true)
 
-            setIsLoading(true)
+          const currentUser =
+            await authService.getMe()
 
-            if (
-              !currentUser
-            ) {
-              setUser(null)
+          if (!active) return
 
-              setUserDetails(
-                null
-              )
+          applyUser(
+            currentUser || null
+          )
+        } catch (error) {
+          console.error(
+            'Restore session error:',
+            error
+          )
 
-              setIsLoading(
-                false
-              )
-
-              return
-            }
-
-            setUser(
-              currentUser
-            )
-
-            // =========================
-            // GET USER DATA
-            // =========================
-            console.log(
-              'Fetching user data for:',
-              currentUser.email
-            )
-
-            const userRef =
-              doc(
-                db,
-                'users',
-                currentUser.uid
-              )
-
-            const userSnap =
-              await getDoc(
-                userRef
-              )
-
-            // =========================
-            // USER EXISTS
-            // =========================
-            if (
-              userSnap.exists()
-            ) {
-              const data =
-                userSnap.data()
-
-              console.log(
-                'User data loaded:',
-                data
-              )
-
-              setUserDetails(
-                data
-              )
-            }
-
-            // =========================
-            // CREATE NEW USER
-            // =========================
-            else {
-              console.log(
-                'Creating new user document'
-              )
-
-              const newUser =
-                {
-                  uid: currentUser.uid,
-
-                  email:
-                    currentUser.email,
-
-                  fullName:
-                    currentUser.displayName ||
-                    '',
-
-                  photoURL:
-                    currentUser.photoURL ||
-                    '',
-
-                  role:
-                    'user',
-
-                  points: 0,
-
-                  learningStreak: 0,
-
-                  school: '',
-
-                  className:
-                    '',
-
-                  subject: '',
-
-                  phone: '',
-
-                  city: '',
-
-                  address: '',
-
-                  facebook:
-                    '',
-
-                  isSetupComplete:
-                    false,
-
-                  createdAt:
-                    new Date().toISOString(),
-                }
-
-              await setDoc(
-                userRef,
-                newUser
-              )
-
-              setUserDetails(
-                newUser
-              )
-            }
-          } catch (error) {
-            console.error(
-              'Error fetching user data:',
-              error
-            )
-          } finally {
-            setIsLoading(
-              false
-            )
+          if (active) {
+            applyUser(null)
+          }
+        } finally {
+          if (active) {
+            setIsLoading(false)
           }
         }
-      )
+      }
 
-    return () =>
-      unsubscribe()
+    restoreSession()
+
+    return () => {
+      active = false
+    }
   }, [])
+
+  // =========================
+  // LOGIN HELPERS
+  // =========================
+  const loginWithEmailPassword =
+    async (
+      email,
+      password
+    ) => {
+      const currentUser =
+        await authService
+          .loginWithEmailPassword(
+            email,
+            password
+          )
+
+      applyUser(currentUser)
+
+      return currentUser
+    }
+
+  const register =
+    async (
+      email,
+      password,
+      additionalData = {}
+    ) => {
+      const currentUser =
+        await authService.register(
+          email,
+          password,
+          additionalData
+        )
+
+      applyUser(currentUser)
+
+      return currentUser
+    }
+
+  const loginWithGoogleCredential =
+    async (
+      credential
+    ) => {
+      const currentUser =
+        await authService
+          .loginWithGoogleCredential(
+            credential
+          )
+
+      applyUser(currentUser)
+
+      return currentUser
+    }
 
   // =========================
   // LOGOUT
@@ -249,25 +166,18 @@ export function AuthProvider({
   const logout =
     async () => {
       try {
-        await signOut(
-          auth
-        )
-
-        setUser(null)
-
-        setUserDetails(
-          null
-        )
-      } catch (error) {
-        console.error(
-          'Logout error:',
-          error
-        )
+        await authService.logout()
+      } finally {
+        applyUser(null)
       }
     }
 
   const normalizedRole =
-    String(userDetails?.role || '').trim().toLowerCase()
+    String(
+      userDetails?.role || ''
+    )
+      .trim()
+      .toLowerCase()
 
   const isUser =
     normalizedRole === 'user' ||
@@ -278,7 +188,8 @@ export function AuthProvider({
     normalizedRole === 'teacher'
 
   const isAdminDev =
-    normalizedRole === 'admin_dev'
+    normalizedRole ===
+    'admin_dev'
 
   const canManageAll =
     isAdminDev
@@ -293,9 +204,16 @@ export function AuthProvider({
         user,
         userDetails,
         setUserDetails,
+
         refreshUserData,
+
+        loginWithEmailPassword,
+        register,
+        loginWithGoogleCredential,
         logout,
+
         isLoading,
+
         normalizedRole,
         isUser,
         isAdmin,
@@ -309,7 +227,6 @@ export function AuthProvider({
   )
 }
 
-// Hook và provider cùng file để giữ API hiện tại của dự án.
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(

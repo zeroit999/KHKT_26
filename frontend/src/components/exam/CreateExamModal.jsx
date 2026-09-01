@@ -178,6 +178,11 @@ function CreateExamModal({
     duration: 45,
     openDate: '',
     closeDate: '',
+    settings: {
+      reviewEnabled: false,
+      reviewStartAt: '',
+      reviewEndAt: '',
+    },
     shuffleQuestions: false,
     shuffleAnswers: false,
     totalScore: 0,
@@ -232,6 +237,33 @@ function CreateExamModal({
     closeTimeValue <= openTimeValue
   );
 
+  const reviewStartTimeValue = form.settings?.reviewStartAt
+    ? new Date(form.settings.reviewStartAt).getTime()
+    : 0;
+
+  const reviewEndTimeValue = form.settings?.reviewEndAt
+    ? new Date(form.settings.reviewEndAt).getTime()
+    : 0;
+
+  const invalidReviewWindow = Boolean(
+    form.settings?.reviewEnabled &&
+    form.settings?.reviewStartAt &&
+    form.settings?.reviewEndAt &&
+    !Number.isNaN(reviewStartTimeValue) &&
+    !Number.isNaN(reviewEndTimeValue) &&
+    reviewEndTimeValue <= reviewStartTimeValue
+  );
+
+  const updateReviewSetting = (key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      settings: {
+        ...(prev.settings ?? {}),
+        [key]: value,
+      },
+    }));
+  };
+
   const getValidCloseDate = (openDate, duration = 45, closeDate = '') => {
     if (!openDate) return closeDate || '';
 
@@ -278,6 +310,12 @@ function CreateExamModal({
           Number(editingExam.duration || 45),
           editingExam.closeDate ?? ''
         ),
+        settings: {
+          ...(editingExam.settings ?? {}),
+          reviewEnabled: Boolean(editingExam.settings?.reviewEnabled),
+          reviewStartAt: editingExam.settings?.reviewStartAt ?? '',
+          reviewEndAt: editingExam.settings?.reviewEndAt ?? '',
+        },
         shuffleQuestions: Boolean(editingExam.shuffleQuestions),
         shuffleAnswers: Boolean(editingExam.shuffleAnswers),
         totalScore: Number(editingExam.totalScore || 0),
@@ -321,6 +359,11 @@ function CreateExamModal({
         duration: 45,
         openDate: '',
         closeDate: '',
+        settings: {
+          reviewEnabled: false,
+          reviewStartAt: '',
+          reviewEndAt: '',
+        },
         shuffleQuestions: false,
         shuffleAnswers: false,
         totalScore: 0,
@@ -648,6 +691,23 @@ function CreateExamModal({
       return;
     }
 
+    if (form.settings?.reviewEnabled) {
+      if (!form.settings?.reviewStartAt) {
+        alert('Vui lòng chọn thời gian bắt đầu cho phép xem đáp án');
+        return;
+      }
+
+      if (!form.settings?.reviewEndAt) {
+        alert('Vui lòng chọn thời gian kết thúc cho phép xem đáp án');
+        return;
+      }
+
+      if (invalidReviewWindow) {
+        alert('Thời gian kết thúc xem đáp án phải sau thời gian bắt đầu');
+        return;
+      }
+    }
+
     if (computedTotalScore <= 0) {
       alert('Vui lòng nhập điểm cho từng phần');
       return;
@@ -673,6 +733,16 @@ function CreateExamModal({
       maxAttempts: Number(form.maxAttempts || 1),
       duration: Number(form.duration || 45),
       totalScore: computedTotalScore,
+      settings: {
+        ...(form.settings ?? {}),
+        reviewEnabled: Boolean(form.settings?.reviewEnabled),
+        reviewStartAt: form.settings?.reviewEnabled
+          ? form.settings?.reviewStartAt || ''
+          : '',
+        reviewEndAt: form.settings?.reviewEnabled
+          ? form.settings?.reviewEndAt || ''
+          : '',
+      },
       scoring: {
         part1: {
           perQuestion: Number(form.scoring.part1.perQuestion || 0),
@@ -1444,6 +1514,90 @@ function CreateExamModal({
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               />
             </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-violet-200 bg-white p-4 dark:border-violet-500/20 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h4 className="text-base font-black text-slate-900 dark:text-white">
+                  Cho phép xem đáp án sau khi nộp
+                </h4>
+
+                <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+                  Học sinh chỉ được xem đáp án đúng và kết quả chi tiết trong
+                  khoảng thời gian giáo viên cho phép.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-pressed={Boolean(form.settings?.reviewEnabled)}
+                onClick={() => {
+                  const nextEnabled = !form.settings?.reviewEnabled;
+
+                  setForm((prev) => ({
+                    ...prev,
+                    settings: {
+                      ...(prev.settings ?? {}),
+                      reviewEnabled: nextEnabled,
+                      reviewStartAt: nextEnabled
+                        ? prev.settings?.reviewStartAt || prev.closeDate || ''
+                        : '',
+                      reviewEndAt: nextEnabled
+                        ? prev.settings?.reviewEndAt || ''
+                        : '',
+                    },
+                  }));
+                }}
+                className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+                  form.settings?.reviewEnabled
+                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20'
+                    : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+                }`}
+              >
+                {form.settings?.reviewEnabled
+                  ? 'Đang cho phép'
+                  : 'Không cho phép'}
+              </button>
+            </div>
+
+            {form.settings?.reviewEnabled && (
+              <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Bắt đầu cho xem đáp án
+                  </label>
+
+                  <DateTimePicker
+                    value={form.settings?.reviewStartAt ?? ''}
+                    onChange={(value) =>
+                      updateReviewSetting('reviewStartAt', value)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Kết thúc cho xem đáp án
+                  </label>
+
+                  <DateTimePicker
+                    value={form.settings?.reviewEndAt ?? ''}
+                    min={form.settings?.reviewStartAt || undefined}
+                    onChange={(value) =>
+                      updateReviewSetting('reviewEndAt', value)
+                    }
+                    hasError={invalidReviewWindow}
+                  />
+
+                  {invalidReviewWindow && (
+                    <p className="mt-2 text-xs font-black text-red-600 dark:text-red-300">
+                      Thời gian kết thúc phải sau thời gian bắt đầu.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

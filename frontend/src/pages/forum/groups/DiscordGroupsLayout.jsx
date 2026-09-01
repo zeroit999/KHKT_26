@@ -6,6 +6,8 @@ import {
   arrayUnion,
   collection,
   collectionGroup,
+  db,
+  deleteDoc,
   doc,
   documentId,
   getDocs,
@@ -17,8 +19,7 @@ import {
   setDoc,
   updateDoc,
   where,
-  deleteDoc,
-} from 'firebase/firestore'
+} from './forumSqlAdapter'
 import {
   AlertTriangle,
   Bell,
@@ -49,7 +50,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-import { db } from '../../../components/firebase'
 import {
   formatRelativeTime,
   getInitials,
@@ -172,7 +172,7 @@ const getGroupAvatarStyle = (theme = '') => {
   return { background: theme }
 }
 
-const FirebaseUserAvatar = ({
+const ForumUserAvatar = ({
   avatarUrl = '',
   name = 'Thành viên',
   initials = '',
@@ -304,7 +304,7 @@ function PinnedMessagesPopup({ pinnedMessages, resolveUser = () => ({}), onClose
             return (
             <div key={msg.id} className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-400/20 dark:bg-white/5">
               <div className="mb-2 flex items-center gap-2">
-                <FirebaseUserAvatar
+                <ForumUserAvatar
                   avatarUrl={syncedAuthor.avatarUrl}
                   name={syncedAuthor.name}
                   initials={syncedAuthor.initials}
@@ -829,7 +829,7 @@ useEffect(() => {
   const [activeGroupPresence, setActiveGroupPresence] = useState({})
   // Full member profiles for the active group's roster (uid -> { id, name, initials, role })
   const [memberProfiles, setMemberProfiles] = useState({})
-  // Firebase user profiles for group owners, shown only to admin_dev on group cards
+  // SQL user profiles for group owners, shown only to admin_dev on group cards
   const [ownerProfiles, setOwnerProfiles] = useState({})
   // Right sidebar collapsed state
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
@@ -1183,18 +1183,18 @@ useEffect(() => {
 
 
   const resolveSyncedUser = (userId = '', fallback = {}) => {
-    const firebaseProfile = userId === currentUser?.uid
+    const sqlProfile = userId === currentUser?.uid
       ? { id: currentUser.uid, name: displayName, initials, role: roleKey, avatarUrl }
       : memberProfiles[userId] || ownerProfiles[userId] || {}
 
-    const name = firebaseProfile.name || fallback.name || fallback.authorName || 'Thành viên'
+    const name = sqlProfile.name || fallback.name || fallback.authorName || 'Thành viên'
     return {
-      id: userId || firebaseProfile.id || fallback.id || '',
+      id: userId || sqlProfile.id || fallback.id || '',
       name,
-      initials: firebaseProfile.initials || fallback.initials || fallback.authorInitials || getInitials(name),
-      role: firebaseProfile.role || fallback.role || fallback.authorRole || 'student',
+      initials: sqlProfile.initials || fallback.initials || fallback.authorInitials || getInitials(name),
+      role: sqlProfile.role || fallback.role || fallback.authorRole || 'student',
       avatarUrl:
-        firebaseProfile.avatarUrl ||
+        sqlProfile.avatarUrl ||
         fallback.avatarUrl ||
         fallback.authorPhotoURL ||
         fallback.photoURL ||
@@ -1301,7 +1301,7 @@ useEffect(() => {
   useEffect(() => { setGroupsPage(1) }, [search])
   useEffect(() => { if (groupsPage > totalGroupPages) setGroupsPage(totalGroupPages) }, [totalGroupPages, groupsPage])
 
-  // Load group channels from Firestore
+  // Load group channels from SQL API
   useEffect(() => {
     if (!activeGroupId) return undefined
     const groupRef = doc(db, 'forumGroups', activeGroupId)
@@ -1442,7 +1442,7 @@ useEffect(() => {
     return () => unsubscribe()
   }, [activeGroupId])
 
-  // Đồng bộ realtime hồ sơ Firebase của toàn bộ thành viên trong nhóm.
+  // Đồng bộ realtime hồ sơ SQL của toàn bộ thành viên trong nhóm.
   // Avatar luôn lấy từ collection users, vì vậy khi người dùng đổi ảnh đại diện,
   // danh sách thành viên và tin nhắn đang mở sẽ cập nhật ngay mà không cần tải lại trang.
   useEffect(() => {
@@ -2467,8 +2467,8 @@ const handleLeaveGroup = async () => {
                     <p className="mt-6 font-mono text-xs font-bold text-slate-400 dark:text-slate-500">Mã nhóm: {group.groupCode || 'Chưa có mã'}</p>
                     {roleKey === 'admin_dev' && (() => {
                       const ownerProfile = ownerProfiles[group.ownerId] || {}
-                      const ownerNameFromFirebase = ownerProfile.name || group.ownerName || group.createdByName || 'Chưa rõ tên'
-                      const ownerEmailFromFirebase = ownerProfile.email || group.ownerEmail || group.createdByEmail || 'Chưa rõ email'
+                      const ownerNameFromSQL = ownerProfile.name || group.ownerName || group.createdByName || 'Chưa rõ tên'
+                      const ownerEmailFromSQL = ownerProfile.email || group.ownerEmail || group.createdByEmail || 'Chưa rõ email'
 
                       return (
                         <div className="mt-2 rounded-2xl border border-sky-400/20 bg-sky-500/10 px-3 py-2">
@@ -2476,10 +2476,10 @@ const handleLeaveGroup = async () => {
                             Người tạo nhóm
                           </p>
                           <p className="mt-1 truncate text-xs font-black text-slate-200">
-                            {ownerNameFromFirebase}
+                            {ownerNameFromSQL}
                           </p>
                           <p className="mt-0.5 truncate text-xs font-bold text-slate-400">
-                            {ownerEmailFromFirebase}
+                            {ownerEmailFromSQL}
                           </p>
                         </div>
                       )
@@ -2790,9 +2790,9 @@ const handleLeaveGroup = async () => {
 
         <div className="border-t border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900">
           <div className="flex items-center gap-3">
-            <FirebaseUserAvatar avatarUrl={avatarUrl} name={displayName} initials={initials} sizeClass="h-12 w-12">
+            <ForumUserAvatar avatarUrl={avatarUrl} name={displayName} initials={initials} sizeClass="h-12 w-12">
               <span className="absolute -bottom-0.5 -right-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-slate-900" />
-            </FirebaseUserAvatar>
+            </ForumUserAvatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black text-slate-950 dark:text-white">{displayName}</p>
               <p className="text-xs font-bold text-emerald-500 dark:text-emerald-400">{roleText[roleKey] || 'Thành viên'}</p>
@@ -2877,19 +2877,19 @@ const handleLeaveGroup = async () => {
                   return (
                     <div key={group.author.id} className="group/message flex gap-4 rounded-2xl px-3 py-2 transition hover:bg-slate-50 dark:hover:bg-white/[0.025]">
                       {(() => {
-                        const firebaseAuthor = group.author.authorId === currentUser?.uid
+                        const syncedAuthorProfile = group.author.authorId === currentUser?.uid
                           ? { avatarUrl, name: displayName, initials }
                           : memberProfiles[group.author.authorId]
                         const syncedAvatarUrl =
-                          firebaseAuthor?.avatarUrl ||
+                          syncedAuthorProfile?.avatarUrl ||
                           group.author.authorPhotoURL ||
                           group.author.avatarUrl ||
                           ''
-                        const syncedAuthorName = firebaseAuthor?.name || group.author.authorName || 'Thành viên'
-                        const syncedInitials = firebaseAuthor?.initials || group.author.authorInitials || getInitials(syncedAuthorName)
+                        const syncedAuthorName = syncedAuthorProfile?.name || group.author.authorName || 'Thành viên'
+                        const syncedInitials = syncedAuthorProfile?.initials || group.author.authorInitials || getInitials(syncedAuthorName)
 
                         return (
-                          <FirebaseUserAvatar
+                          <ForumUserAvatar
                             avatarUrl={syncedAvatarUrl}
                             name={syncedAuthorName}
                             initials={syncedInitials}
@@ -3226,9 +3226,9 @@ const handleLeaveGroup = async () => {
                       }}
                       className="flex w-full items-center gap-3 rounded-2xl p-2 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04]"
                     >
-                      <FirebaseUserAvatar avatarUrl={member.avatarUrl} name={member.name} initials={member.initials} sizeClass="h-10 w-10">
+                      <ForumUserAvatar avatarUrl={member.avatarUrl} name={member.name} initials={member.initials} sizeClass="h-10 w-10">
                         <span className="absolute -bottom-0.5 -right-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-slate-900" />
-                      </FirebaseUserAvatar>
+                      </ForumUserAvatar>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-black text-slate-950 dark:text-white">{member.name}</p>
                         <p className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${badge.bg}`}>{badge.label}</p>
@@ -3504,7 +3504,7 @@ const handleLeaveGroup = async () => {
                           return (
                             <div key={uid} className="flex items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
                               <div className="flex min-w-0 items-center gap-3">
-                                <FirebaseUserAvatar
+                                <ForumUserAvatar
                                   avatarUrl={member.avatarUrl}
                                   name={member.name}
                                   initials={member.initials}
@@ -3736,7 +3736,7 @@ const handleLeaveGroup = async () => {
 
                   <div className="mt-4 rounded-3xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-400/20 dark:bg-blue-500/10">
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-600 dark:text-blue-300">Trạng thái</p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-blue-700 dark:text-blue-100">{canManageActiveGroup ? 'Các thay đổi chỉ được ghi vào Firebase sau khi bạn nhấn “Lưu thay đổi”.' : 'Bạn đang xem cài đặt nhóm ở chế độ chỉ đọc.'}</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-blue-700 dark:text-blue-100">{canManageActiveGroup ? 'Các thay đổi chỉ được ghi vào PostgreSQL sau khi bạn nhấn “Lưu thay đổi”.' : 'Bạn đang xem cài đặt nhóm ở chế độ chỉ đọc.'}</p>
                   </div>
                 </div>
               </aside>

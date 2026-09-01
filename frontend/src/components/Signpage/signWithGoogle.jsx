@@ -1,99 +1,442 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth, db } from "../firebase.js";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useAuth } from "../../contexts/AuthContext";
 
-function SignWithGoogle() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  const googleLogin = async () => {
-    setLoading(true);
-    setError("");
+const GOOGLE_SCRIPT_SRC =
+  "https://accounts.google.com/gsi/client";
 
-    try {
-      console.log("🔄 Logging in with Google via Firebase...");
+/*
+ * Google Identity Services dùng configuration global.
+ *
+ * React StrictMode có thể mount -> unmount -> mount component
+ * trong development. Nếu initialize() nằm trực tiếp trong useEffect,
+ * Google SDK sẽ bị initialize nhiều lần.
+ *
+ * Vì vậy trạng thái initialize được giữ ở module scope.
+ */
+let googleInitialized = false;
+let googleScriptPromise = null;
+let activeCredentialHandler = null;
 
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+const loadGoogleScript = () => {
+  if (window.google?.accounts?.id) {
+    return Promise.resolve();
+  }
 
-      console.log("✅ Google login successful:", result.user.email);
+  if (googleScriptPromise) {
+    return googleScriptPromise;
+  }
 
-      const userRef = doc(db, "users", result.user.uid);
-      const userSnap = await getDoc(userRef);
+  googleScriptPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(
+      `script[src="${GOOGLE_SCRIPT_SRC}"]`
+    );
 
-      // USER CHƯA CÓ TRONG FIRESTORE
-      if (!userSnap.exists()) {
-        console.log("🆕 Creating new user document...");
-
-        await setDoc(userRef, {
-          uid: result.user.uid,
-          email: result.user.email || "",
-          name: result.user.displayName || "",
-          fullName: result.user.displayName || "",
-          avatar: result.user.photoURL || "",
-          photoURL: result.user.photoURL || "",
-          role: "",
-          points: 0,
-          streak: 0,
-          isSetupComplete: false,
-        });
-
-        console.log("✅ User document created");
-        navigate("/setup");
+    if (existingScript) {
+      if (window.google?.accounts?.id) {
+        resolve();
         return;
       }
 
-      // USER ĐÃ CÓ
-      const userData = userSnap.data();
-      console.log("📄 Existing user data:", userData);
+      const handleLoad = () => {
+        cleanup();
 
-      if (!userData.isSetupComplete) {
-        navigate("/setup");
-      } else {
-        navigate("/");
-      }
-    } catch (error) {
-      console.error("❌ Google login error:", error);
+        if (window.google?.accounts?.id) {
+          resolve();
+        } else {
+          googleScriptPromise = null;
+          reject(
+            new Error(
+              "Google Identity Services không khởi tạo được."
+            )
+          );
+        }
+      };
 
-      if (error.code === "auth/popup-closed-by-user") {
-        setError("Đăng nhập bị hủy");
-      } else if (error.code === "auth/popup-blocked") {
-        setError("Popup bị chặn. Vui lòng cho phép popup và thử lại.");
-      } else if (error.code === "auth/cancelled-popup-request") {
-        setError("Yêu cầu đăng nhập bị hủy");
-      } else {
-        setError("Đăng nhập Google thất bại. Vui lòng thử lại.");
-      }
+      const handleError = () => {
+        cleanup();
+        googleScriptPromise = null;
 
-      setTimeout(() => setError(""), 5000);
-    } finally {
-      setLoading(false);
+        reject(
+          new Error(
+            "Không thể tải dịch vụ đăng nhập Google."
+          )
+        );
+      };
+
+      const cleanup = () => {
+        existingScript.removeEventListener(
+          "load",
+          handleLoad
+        );
+
+        existingScript.removeEventListener(
+          "error",
+          handleError
+        );
+      };
+
+      existingScript.addEventListener(
+        "load",
+        handleLoad
+      );
+
+      existingScript.addEventListener(
+        "error",
+        handleError
+      );
+
+      return;
     }
+
+    const script = document.createElement("script");
+
+    script.src = GOOGLE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      if (window.google?.accounts?.id) {
+        resolve();
+      } else {
+        googleScriptPromise = null;
+
+        reject(
+          new Error(
+            "Google Identity Services không khởi tạo được."
+          )
+        );
+      }
+    };
+
+    script.onerror = () => {
+      googleScriptPromise = null;
+
+      reject(
+        new Error(
+          "Không thể tải dịch vụ đăng nhập Google."
+        )
+      );
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return googleScriptPromise;
+};
+
+const ensureGoogleInitialized = () => {
+  if (googleInitialized) {
+    return;
+  }
+
+  if (!GOOGLE_CLIENT_ID) {
+    throw new Error(
+      "Chưa cấu hình Google Client ID."
+    );
+  }
+
+  if (!window.google?.accounts?.id) {
+    throw new Error(
+      "Google Sign-In chưa sẵn sàng."
+    );
+  }
+
+  window.google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+
+    callback: (response) => {
+      if (
+        typeof activeCredentialHandler ===
+        "function"
+      ) {
+        activeCredentialHandler(response);
+      }
+    },
+  });
+
+  googleInitialized = true;
+};
+
+function SignWithGoogle() {
+  const navigate = useNavigate();
+
+  const {
+    loginWithGoogleCredential,
+  } = useAuth();
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const googleButtonRef =
+    useRef(null);
+
+  const googleReadyRef =
+    useRef(false);
+
+  const credentialHandlerRef =
+    useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const credentialHandler =
+      async (response) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!response?.credential) {
+          setLoading(false);
+
+          setError(
+            "Không nhận được thông tin đăng nhập từ Google."
+          );
+
+          window.setTimeout(
+            () => setError(""),
+            5000
+          );
+
+          return;
+        }
+
+        try {
+          console.log(
+            "🔄 Logging in with Google..."
+          );
+
+          const user =
+            await loginWithGoogleCredential(
+              response.credential,
+              "STUDENT"
+            );
+
+          if (cancelled) {
+            return;
+          }
+
+          console.log(
+            "✅ Google login successful:",
+            user?.email
+          );
+
+          navigate("/setup");
+        } catch (loginError) {
+          if (cancelled) {
+            return;
+          }
+
+          console.error(
+            "❌ Google login error:",
+            loginError
+          );
+
+          setError(
+            loginError?.message ||
+              "Đăng nhập Google thất bại. Vui lòng thử lại."
+          );
+
+          window.setTimeout(
+            () => setError(""),
+            5000
+          );
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      };
+
+    credentialHandlerRef.current =
+      credentialHandler;
+
+    activeCredentialHandler =
+      credentialHandler;
+
+    const setupGoogle = async () => {
+      try {
+        if (!GOOGLE_CLIENT_ID) {
+          throw new Error(
+            "Chưa cấu hình Google Client ID."
+          );
+        }
+
+        await loadGoogleScript();
+
+        if (
+          cancelled ||
+          !googleButtonRef.current
+        ) {
+          return;
+        }
+
+        ensureGoogleInitialized();
+
+        googleButtonRef.current.innerHTML =
+          "";
+
+        window.google.accounts.id.renderButton(
+          googleButtonRef.current,
+          {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+          }
+        );
+
+        googleReadyRef.current = true;
+      } catch (setupError) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          "❌ Google Sign-In setup error:",
+          setupError
+        );
+
+        googleReadyRef.current = false;
+
+        setError(
+          setupError?.message ||
+            "Không thể khởi tạo đăng nhập Google."
+        );
+
+        window.setTimeout(
+          () => setError(""),
+          5000
+        );
+      }
+    };
+
+    setupGoogle();
+
+    return () => {
+      cancelled = true;
+
+      googleReadyRef.current = false;
+
+      if (
+        activeCredentialHandler ===
+        credentialHandlerRef.current
+      ) {
+        activeCredentialHandler = null;
+      }
+    };
+  }, [
+    loginWithGoogleCredential,
+    navigate,
+  ]);
+
+  const googleLogin = async () => {
+    setError("");
+
+    if (!GOOGLE_CLIENT_ID) {
+      setError(
+        "Chưa cấu hình Google Client ID."
+      );
+
+      window.setTimeout(
+        () => setError(""),
+        5000
+      );
+
+      return;
+    }
+
+    if (
+      !googleReadyRef.current ||
+      !googleButtonRef.current
+    ) {
+      setError(
+        "Google Sign-In chưa sẵn sàng. Vui lòng thử lại."
+      );
+
+      window.setTimeout(
+        () => setError(""),
+        5000
+      );
+
+      return;
+    }
+
+    const googleButton =
+      googleButtonRef.current.querySelector(
+        'div[role="button"]'
+      ) ||
+      googleButtonRef.current.querySelector(
+        "iframe"
+      );
+
+    if (!googleButton) {
+      setError(
+        "Không thể mở cửa sổ đăng nhập Google."
+      );
+
+      window.setTimeout(
+        () => setError(""),
+        5000
+      );
+
+      return;
+    }
+
+    setLoading(true);
+
+    googleButton.click();
+
+    /*
+     * Nếu người dùng đóng popup hoặc chưa hoàn tất,
+     * không giữ nút ở trạng thái loading vô thời hạn.
+     */
+    window.setTimeout(() => {
+      setLoading(false);
+    }, 1500);
   };
 
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded">
+        <div className="mb-4 rounded border border-red-400 bg-red-100 p-3 text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400">
           {error}
         </div>
       )}
+
+      <div
+        ref={googleButtonRef}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
 
       <button
         type="button"
         onClick={googleLogin}
         disabled={loading}
-        className="w-full flex items-center justify-center px-6 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex w-full items-center justify-center rounded-xl border-2 border-gray-300 bg-white px-6 py-3 font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
       >
         <img
           src="https://developers.google.com/identity/images/g-logo.png"
           alt="Google"
-          className="w-5 h-5 mr-3"
+          className="mr-3 h-5 w-5"
         />
-        {loading ? "Đang đăng nhập..." : "Đăng nhập bằng Google"}
+
+        {loading
+          ? "Đang đăng nhập..."
+          : "Đăng nhập bằng Google"}
       </button>
     </div>
   );

@@ -9,19 +9,8 @@ import {
 } from 'react-router-dom'
 
 import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth'
-
-import {
-  auth,
-  db,
-} from '../firebase.js'
-
-import {
-  doc,
-  setDoc,
-} from 'firebase/firestore'
+  useAuth,
+} from '../../contexts/AuthContext'
 
 import SignWithGoogle from './signWithGoogle'
 
@@ -59,6 +48,10 @@ function Register() {
     useState(false)
 
   const navigate = useNavigate()
+
+  const {
+    register,
+  } = useAuth()
 
   // =========================
   // DARK MODE
@@ -108,61 +101,12 @@ function Register() {
           '🔄 Creating account...'
         )
 
-        const userCredential =
-          await createUserWithEmailAndPassword(
-            auth,
-            email,
-            password
-          )
-
-        await updateProfile(
-          userCredential.user,
+        await register(
+          email,
+          password,
           {
-            displayName:
+            full_name:
               fullName,
-          }
-        )
-
-        await setDoc(
-          doc(
-            db,
-            'users',
-            userCredential.user.uid
-          ),
-          {
-            uid: userCredential.user.uid,
-
-            fullName,
-
-            email,
-
-            photoURL: '',
-
-            role: '',
-
-            points: 0,
-
-            learningStreak: 0,
-
-            school: '',
-
-            className: '',
-
-            subject: '',
-
-            phone: '',
-
-            city: '',
-
-            address: '',
-
-            facebook: '',
-
-            isSetupComplete:
-              false,
-
-            createdAt:
-              new Date().toISOString(),
           }
         )
 

@@ -1,216 +1,100 @@
-import {
-  useState,
-  useEffect,
-} from 'react'
+import { useState, useEffect } from 'react';
 
-import {
-  Link,
-  useNavigate,
-} from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom';
 
-import {
-  signInWithEmailAndPassword,
-} from 'firebase/auth'
+import { useAuth } from '../../contexts/AuthContext';
 
-import { auth } from '../firebase.js'
+import SignWithGoogle from './signWithGoogle';
 
-import {
-  useAuth,
-} from '../../contexts/AuthContext'
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
-import SignWithGoogle from './signWithGoogle'
 
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-} from 'lucide-react'
+import lightLogo from '../../assets/favicon-light-mode.png';
+import darkLogo from '../../assets/favicon-dark-mode.png';
+import { LOCAL_DEMO_ACCOUNTS } from '../../utils/localAuth.js';
 
-import {
-  doc,
-  getDoc,
-} from 'firebase/firestore'
-
-import { db } from '../firebase.js'
-
-import lightLogo from '../../assets/favicon-light-mode.png'
-import darkLogo from '../../assets/favicon-dark-mode.png'
-import { LOCAL_DEMO_ACCOUNTS } from '../../utils/localAuth.js'
-
-const LOCAL_DEV_MODE = import.meta.env.VITE_LOCAL_DEV_MODE === 'true'
-const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
+const LOCAL_DEV_MODE = import.meta.env.VITE_LOCAL_DEV_MODE === 'true';
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || '';
 
 function Login() {
-  const [email, setEmail] =
-    useState('')
+  const [email, setEmail] = useState('');
 
-  const [password, setPassword] =
-    useState('')
+  const [password, setPassword] = useState('');
 
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [error, setError] =
-    useState('')
+  const [error, setError] = useState('');
 
-  const [loading, setLoading] =
-    useState(false)
+  const [loading, setLoading] = useState(false);
 
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  const { user, isLoading } =
-    useAuth()
+  const { user, isLoading, loginWithEmailPassword } = useAuth();
 
   // =========================
   // DARK MODE
   // =========================
-  const [darkMode, setDarkMode] =
-    useState(
-      document.documentElement.classList.contains(
-        'dark'
-      )
-    )
+  const [darkMode, setDarkMode] = useState(
+    document.documentElement.classList.contains('dark')
+  );
 
   useEffect(() => {
-    const observer =
-      new MutationObserver(() => {
-        setDarkMode(
-          document.documentElement.classList.contains(
-            'dark'
-          )
-        )
-      })
+    const observer = new MutationObserver(() => {
+      setDarkMode(document.documentElement.classList.contains('dark'));
+    });
 
-    observer.observe(
-      document.documentElement,
-      {
-        attributes: true,
-        attributeFilter: ['class'],
-      }
-    )
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
 
-    return () =>
-      observer.disconnect()
-  }, [])
+    return () => observer.disconnect();
+  }, []);
 
   // =========================
   // LOGIN
   // =========================
-  const handleSubmit =
-    async (e) => {
-      e.preventDefault()
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-      setError('')
+    setError('');
+    setLoading(true);
 
-      setLoading(true)
+    try {
+      const loggedInUser = await loginWithEmailPassword(email, password);
 
-      try {
-        console.log(
-          '🔄 Logging in with Firebase...'
-        )
+      console.log('✅ Login successful:', loggedInUser?.email);
 
-        const userCredential =
-          await signInWithEmailAndPassword(
-            auth,
-            email,
-            password
-          )
+      navigate('/');
+    } catch (error) {
+      console.error('❌ Login error:', error);
 
-        console.log(
-          '✅ Firebase login successful:',
-          userCredential.user.email
-        )
+      setError(
+        error?.message ||
+          'Đăng nhập thất bại. Vui lòng thử lại.'
+      );
 
-        const userDoc =
-          await getDoc(
-            doc(
-              db,
-              'users',
-              userCredential.user.uid
-            )
-          )
-
-        if (
-          !userDoc.exists() ||
-          !userDoc.data()
-            ?.isSetupComplete
-        ) {
-          navigate('/setup')
-        } else {
-          navigate('/')
-        }
-      } catch (error) {
-        console.error(
-          '❌ Login error:',
-          error
-        )
-
-        if (
-          error.code ===
-          'auth/user-not-found'
-        ) {
-          setError(
-            'Không tìm thấy tài khoản với email này'
-          )
-        } else if (
-          error.code ===
-          'auth/wrong-password'
-        ) {
-          setError(
-            'Mật khẩu không chính xác'
-          )
-        } else if (
-          error.code ===
-          'auth/invalid-email'
-        ) {
-          setError(
-            'Email không hợp lệ'
-          )
-        } else if (
-          error.code ===
-          'auth/invalid-credential'
-        ) {
-          setError(
-            'Thông tin đăng nhập không chính xác'
-          )
-        } else {
-          setError(
-            'Đăng nhập thất bại. Vui lòng thử lại.'
-          )
-        }
-
-        setTimeout(
-          () => setError(''),
-          5000
-        )
-      } finally {
-        setLoading(false)
-      }
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setLoading(false);
     }
+  };
 
   // =========================
   // REDIRECT
   // =========================
   useEffect(() => {
     if (!isLoading && user) {
-      console.log(
-        '✅ User already logged in, redirecting...'
-      )
+      console.log('✅ User already logged in, redirecting...');
 
-      navigate('/')
+      navigate('/');
     }
-  }, [user, isLoading, navigate])
+  }, [user, isLoading, navigate]);
 
   return (
     <div
-      className={`relative flex min-h-screen items-center justify-center overflow-hidden px-4 transition-colors duration-300 ${
-        darkMode
-          ? 'bg-[#030712]'
-          : 'bg-slate-100'
-      }`}
+      className={`relative flex min-h-screen items-center justify-center overflow-hidden px-4 transition-colors duration-300 ${darkMode ? 'bg-[#030712]' : 'bg-slate-100'
+        }`}
     >
       {/* ========================= */}
       {/* BACKGROUND */}
@@ -230,11 +114,10 @@ function Login() {
       {/* ========================= */}
       <div className="relative z-10 w-full max-w-md">
         <div
-          className={`rounded-[2rem] p-8 backdrop-blur-2xl transition-colors duration-300 ${
-            darkMode
+          className={`rounded-[2rem] p-8 backdrop-blur-2xl transition-colors duration-300 ${darkMode
               ? 'bg-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.45)]'
               : 'border border-slate-200 bg-white/80 shadow-[0_25px_80px_rgba(15,23,42,0.15)]'
-          }`}
+            }`}
         >
           {/* ========================= */}
           {/* HEADER */}
@@ -257,14 +140,13 @@ function Login() {
                     backdrop-blur-xl
                     transition-all
                     duration-300
-                    ${
-                      darkMode
-                        ? `
+                    ${darkMode
+                      ? `
                           bg-black
                           border border-white/5
                           shadow-[0_0_45px_rgba(59,130,246,0.35)]
                         `
-                        : `
+                      : `
                           bg-white
                           border border-slate-200
                           shadow-[0_20px_50px_rgba(15,23,42,0.15)]
@@ -273,11 +155,7 @@ function Login() {
                   `}
                 >
                   <img
-                    src={
-                      darkMode
-                        ? darkLogo
-                        : lightLogo
-                    }
+                    src={darkMode ? darkLogo : lightLogo}
                     alt="EduSprint"
                     className="h-14 w-14 rounded-xl object-cover"
                   />
@@ -286,21 +164,15 @@ function Login() {
             </div>
 
             <h1
-              className={`text-4xl font-black ${
-                darkMode
-                  ? 'text-white'
-                  : 'text-slate-900'
-              }`}
+              className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-900'
+                }`}
             >
               Chào mừng trở lại
             </h1>
 
             <p
-              className={`mt-3 ${
-                darkMode
-                  ? 'text-slate-300'
-                  : 'text-slate-600'
-              }`}
+              className={`mt-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'
+                }`}
             >
               Đăng nhập để tiếp tục học tập.
             </p>
@@ -309,13 +181,12 @@ function Login() {
           {/* ========================= */}
           {/* FORM */}
           {/* ========================= */}
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5"
-          >
+          <form onSubmit={handleSubmit} className="space-y-5">
             {LOCAL_DEV_MODE && (
               <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-4 text-sm">
-                <p className={`font-bold ${darkMode ? 'text-cyan-200' : 'text-cyan-800'}`}>
+                <p
+                  className={`font-bold ${darkMode ? 'text-cyan-200' : 'text-cyan-800'}`}
+                >
                   Tài khoản demo local
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -324,20 +195,21 @@ function Login() {
                       key={account.uid}
                       type="button"
                       onClick={() => {
-                        setEmail(account.email)
-                        setPassword(DEMO_PASSWORD)
+                        setEmail(account.email);
+                        setPassword(DEMO_PASSWORD);
                       }}
-                      className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
-                        darkMode
+                      className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${darkMode
                           ? 'border-cyan-300/20 text-cyan-100 hover:bg-cyan-400/10'
                           : 'border-cyan-200 text-cyan-800 hover:bg-cyan-100'
-                      }`}
+                        }`}
                     >
                       {account.role === 'TEACHER' ? 'Giáo viên' : 'Học sinh'}
                     </button>
                   ))}
                 </div>
-                <p className={`mt-3 text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p
+                  className={`mt-3 text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                >
                   Mật khẩu chung: <code>{DEMO_PASSWORD}</code>
                 </p>
               </div>
@@ -355,17 +227,12 @@ function Login() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) =>
-                    setEmail(
-                      e.target.value
-                    )
-                  }
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="Nhập email của bạn"
-                  className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none backdrop-blur-xl transition ${
-                    darkMode
+                  className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none backdrop-blur-xl transition ${darkMode
                       ? 'bg-white/10 text-white placeholder:text-slate-400'
                       : 'border border-slate-300 bg-slate-50 text-slate-900'
-                  }`}
+                    }`}
                   required
                 />
               </div>
@@ -390,33 +257,20 @@ function Login() {
                 <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-cyan-400" />
 
                 <input
-                  type={
-                    showPassword
-                      ? 'text'
-                      : 'password'
-                  }
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) =>
-                    setPassword(
-                      e.target.value
-                    )
-                  }
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu"
-                  className={`w-full rounded-2xl py-4 pl-12 pr-14 outline-none backdrop-blur-xl transition ${
-                    darkMode
+                  className={`w-full rounded-2xl py-4 pl-12 pr-14 outline-none backdrop-blur-xl transition ${darkMode
                       ? 'bg-white/10 text-white placeholder:text-slate-400'
                       : 'border border-slate-300 bg-slate-50 text-slate-900'
-                  }`}
+                    }`}
                   required
                 />
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowPassword(
-                      !showPassword
-                    )
-                  }
+                  onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-cyan-400"
                 >
                   {showPassword ? (
@@ -441,30 +295,26 @@ function Login() {
               disabled={loading}
               className="w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-600 py-4 text-lg font-bold text-white shadow-[0_10px_40px_rgba(14,165,233,0.35)] transition hover:scale-[1.02]"
             >
-              {loading
-                ? 'Đang đăng nhập...'
-                : 'Đăng nhập'}
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
 
             {/* DIVIDER */}
             <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
                 <div
-                  className={`w-full ${
-                    darkMode
+                  className={`w-full ${darkMode
                       ? 'border-t border-white/10'
                       : 'border-t border-slate-300'
-                  }`}
+                    }`}
                 />
               </div>
 
               <div className="relative flex justify-center text-sm">
                 <span
-                  className={`px-3 ${
-                    darkMode
+                  className={`px-3 ${darkMode
                       ? 'bg-[#030712] text-slate-400'
                       : 'bg-slate-100 text-slate-500'
-                  }`}
+                    }`}
                 >
                   hoặc tiếp tục với
                 </span>
@@ -474,11 +324,8 @@ function Login() {
             {!LOCAL_DEV_MODE && <SignWithGoogle />}
 
             <p
-              className={`text-center ${
-                darkMode
-                  ? 'text-slate-300'
-                  : 'text-slate-600'
-              }`}
+              className={`text-center ${darkMode ? 'text-slate-300' : 'text-slate-600'
+                }`}
             >
               Chưa có tài khoản?{' '}
               <Link
@@ -492,7 +339,7 @@ function Login() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default Login
+export default Login;

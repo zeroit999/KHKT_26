@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from 'firebase/storage'
 import {
   ChevronDown,
   Clipboard,
@@ -12,6 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { authService } from '../../../services/auth'
 import {
   generateGroupCode,
   generateInviteCode,
@@ -37,19 +37,85 @@ const buildSafeFileName = (fileName = 'cover-image') => {
   return `${safeName}${extension.toLowerCase()}`
 }
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://127.0.0.1:5000'
+
 const uploadGroupCoverImage = async (file) => {
   if (!file) return ''
+
   if (!GROUP_COVER_IMAGE_TYPES.includes(file.type)) {
     throw new Error('INVALID_IMAGE_TYPE')
   }
 
-  const storage = getStorage()
+  const formData = new FormData()
   const fileName = buildSafeFileName(file.name)
-  const uploadPath = `forumGroupCovers/${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${fileName}`
-  const fileRef = storageRef(storage, uploadPath)
 
-  await uploadBytes(fileRef, file, { contentType: file.type })
-  return getDownloadURL(fileRef)
+  formData.append(
+    'file',
+    file,
+    fileName,
+  )
+
+  let accessToken =
+    authService.getAccessToken()
+
+  if (!accessToken) {
+    throw new Error('AUTH_REQUIRED')
+  }
+
+  let response = await fetch(
+    `${API_BASE_URL}/api/storage/forum/group-cover`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+    },
+  )
+
+  if (
+    response.status === 401 &&
+    authService.getRefreshToken()
+  ) {
+    accessToken =
+      await authService.refreshAccessToken()
+
+    response = await fetch(
+      `${API_BASE_URL}/api/storage/forum/group-cover`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: formData,
+      },
+    )
+  }
+
+  const data =
+    await response
+      .json()
+      .catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      data.message ||
+      'UPLOAD_FAILED',
+    )
+  }
+
+  const coverImage =
+    data.coverImage ||
+    ''
+
+  if (!coverImage) {
+    throw new Error('UPLOAD_FAILED')
+  }
+
+  return coverImage
 }
 
 const CUSTOM_COLOR_TYPES = [

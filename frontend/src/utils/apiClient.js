@@ -1,62 +1,110 @@
 import axios from 'axios'
-import { onAuthStateChanged } from 'firebase/auth'
-import { auth } from '../components/firebase'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+import {
+  authService,
+} from '../services/auth'
 
-const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://127.0.0.1:5000'
 
-const waitForFirebaseUser = () => {
-  return new Promise((resolve) => {
-    if (auth.currentUser) {
-      resolve(auth.currentUser)
-      return
-    }
+const apiClient =
+  axios.create({
+    baseURL:
+      `${API_BASE_URL}/api`,
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe()
-      resolve(user)
-    })
+    headers: {
+      'Content-Type':
+        'application/json',
+    },
   })
-}
 
 apiClient.interceptors.request.use(
-  async (config) => {
-    const user = await waitForFirebaseUser()
+  (config) => {
+    const token =
+      authService
+        .getAccessToken()
 
-    if (!user) {
-      throw new Error('Bạn chưa đăng nhập')
+    if (token) {
+      config.headers =
+        config.headers || {}
+
+      config.headers.Authorization =
+        `Bearer ${token}`
     }
-
-    const token = await user.getIdToken()
-
-    config.headers = config.headers || {}
-    config.headers.Authorization = `Bearer ${token}`
 
     return config
   },
-  (error) => Promise.reject(error),
+
+  (error) =>
+    Promise.reject(error)
 )
+
+let refreshPromise = null
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+
+  async (error) => {
+    const originalRequest =
+      error.config
+
+    if (
+      error.response?.status ===
+        401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      authService
+        .getRefreshToken()
+    ) {
+      originalRequest._retry =
+        true
+
+      try {
+        if (!refreshPromise) {
+          refreshPromise =
+            authService
+              .refreshAccessToken()
+              .finally(() => {
+                refreshPromise =
+                  null
+              })
+        }
+
+        const newToken =
+          await refreshPromise
+
+        originalRequest.headers =
+          originalRequest.headers ||
+          {}
+
+        originalRequest
+          .headers
+          .Authorization =
+          `Bearer ${newToken}`
+
+        return apiClient(
+          originalRequest
+        )
+      } catch {
+        authService.clearSession()
+      }
+    }
+
     const message =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
+      error.response?.data
+        ?.message ||
+      error.response?.data
+        ?.error ||
       error.message ||
       'Có lỗi xảy ra'
 
-    return Promise.reject({
-      ...error,
-      message,
-    })
-  },
+    error.message = message
+
+    return Promise.reject(
+      error
+    )
+  }
 )
 
 export default apiClient

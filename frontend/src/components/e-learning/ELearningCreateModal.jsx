@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { db, storage } from '../../components/firebase'
+
+const API_BASE_URL = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 const initialForm = {
   title: '',
@@ -469,15 +468,18 @@ function ELearningCreateModal({
         ratingTotal: 0,
         ratingCount: 0,
         views: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       }
 
-      const docRef = await addDoc(collection(db, 'eLearnings'), payload)
+      const created = await apiRequest('/api/courses', {
+        method: 'POST',
+        body: payload,
+      })
+
+      const createdCourse = created?.course || created?.data || created
 
       setForm(initialForm)
       setActiveStep(1)
-      onCreated?.({ id: docRef.id, ...payload })
+      onCreated?.(createdCourse)
       onClose()
     } catch (error) {
       console.error('Lỗi khi đăng bài E-learning:', error)
@@ -1358,26 +1360,55 @@ function resolveFileStateKey(nameKey) {
 
 async function uploadSelectedFile(file, folder) {
   if (!file) {
-    return {
-      name: '',
-      url: '',
-      type: '',
-      path: '',
-    }
+    return { name: '', url: '', type: '', path: '' }
   }
 
-  const safeName = `${Date.now()}-${String(file.name || 'file').replace(/[\\/#?%*:|"<>]/g, '-')}`
-  const filePath = `${folder}/${safeName}`
-  const fileRef = ref(storage, filePath)
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('folder', folder)
 
-  await uploadBytes(fileRef, file)
+  const uploaded = await apiRequest('/api/storage/e-learning/asset', {
+    method: 'POST',
+    body: formData,
+    isFormData: true,
+  })
+
+  const asset = uploaded?.asset || uploaded?.file || uploaded?.data || uploaded
 
   return {
-    name: file.name || safeName,
-    url: await getDownloadURL(fileRef),
-    type: file.type || '',
-    path: filePath,
+    name: asset?.name || asset?.fileName || file.name || '',
+    url: asset?.url || asset?.fileUrl || asset?.publicUrl || asset?.downloadUrl || '',
+    type: asset?.type || asset?.contentType || file.type || '',
+    path: asset?.path || asset?.key || asset?.objectKey || '',
   }
+}
+
+async function apiRequest(path, { method = 'GET', body, isFormData = false } = {}) {
+  const token =
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('token') ||
+    ''
+
+  const headers = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (!isFormData) headers['Content-Type'] = 'application/json'
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    credentials: 'include',
+    body: body == null ? undefined : isFormData ? body : JSON.stringify(body),
+  })
+
+  let data = null
+  try { data = await response.json() } catch { data = null }
+
+  if (!response.ok) {
+    throw new Error(data?.error || data?.message || `API request failed (${response.status})`)
+  }
+
+  return data
 }
 
 function getOpenAtMs(value) {

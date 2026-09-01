@@ -203,7 +203,7 @@ export function normalizeDateTimeLocal(value) {
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${year}-${month}-${day}T${hours}:${minutes}`
 }
-export function getFirebaseTeacherName(profile, user) {
+export function getTeacherName(profile, user) {
   return profile?.fullName || profile?.name || profile?.displayName || user?.displayName || user?.email || 'GiaoVien'
 }
 export function generateCourseCode(teacherName, subject, teacherCode = '0000') {

@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
+
 import toast from "react-hot-toast";
+
 import { useNavigate } from "react-router-dom";
-import { auth } from "../../components/firebase";
+
 import { useAuth } from "../../contexts/AuthContext";
+
 import { normalizeGrade } from "../../utils/gradeUtils";
+
 import { getProvinces, getWardsByProvince } from "../../services/locationService";
+
 import { saveUserProfile } from "../../services/userService";
+
 import { getSchoolsByLocation } from "../../services/schoolService";
 
 export const teacherSubjects = [
@@ -41,7 +47,7 @@ const normalizeText = (value = "") =>
 
 export function useSetupForm() {
   const navigate = useNavigate();
-  const { refreshUserData } = useAuth();
+  const { user, refreshUserData } = useAuth();
 
   const [step, setStep] = useState(1);
   const [role, setRole] = useState("");
@@ -63,12 +69,10 @@ export function useSetupForm() {
   const [ward, setWard] = useState("");
 
   useEffect(() => {
-    const user = auth.currentUser;
-
     if (user?.email) {
       setEmail(user.email);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const loadProvinces = async () => {
@@ -206,8 +210,6 @@ export function useSetupForm() {
 
   const handleFinish = async () => {
     try {
-      const user = auth.currentUser;
-
       if (!user) {
         toast.error("Bạn chưa đăng nhập");
         return;
@@ -249,8 +251,12 @@ export function useSetupForm() {
         return;
       }
 
-      const normalizedGrade = role === "STUDENT" ? normalizeGrade(grade) : "";
-      const studentClassName = normalizedGrade ? `Khối ${normalizedGrade}` : "";
+      const normalizedGrade =
+        role === "STUDENT" ? normalizeGrade(grade) : "";
+
+      const studentClassName = normalizedGrade
+        ? `Khối ${normalizedGrade}`
+        : "";
 
       const userData = {
         uid: user.uid,
@@ -276,7 +282,9 @@ export function useSetupForm() {
         className: role === "STUDENT" ? studentClassName : "",
         studentClass: role === "STUDENT" ? studentClassName : "",
         classes:
-          role === "STUDENT" && studentClassName ? [studentClassName] : [],
+          role === "STUDENT" && studentClassName
+            ? [studentClassName]
+            : [],
 
         subject: role === "TEACHER" ? subject : "",
         teacherSubject: role === "TEACHER" ? subject : "",

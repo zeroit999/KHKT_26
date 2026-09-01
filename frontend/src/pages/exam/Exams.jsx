@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Award,
   BarChart3,
@@ -400,7 +401,9 @@ function SectionTopbar({ page, isStudent, activeSection }) {
     'exam-room': 'Phòng thi',
     submissions: 'Danh sách nộp bài',
     grading: 'Chấm tự luận',
-    statistics: 'Thống kê',
+    statistics: isStudent
+      ? 'Tiến độ của tôi'
+      : 'Thống kê',
   }
 }
 
@@ -662,36 +665,362 @@ function RepositorySection({ page, isStudent }) {
 }
 
 function SubmissionsSection({ page }) {
+  const [submissionSearch, setSubmissionSearch] = useState('')
+  const [examFilter, setExamFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+
   const results = page.studentResults || []
+
+  const getSubmissionStatus = (result) => {
+    if (
+      result.status === 'pending' ||
+      result.needsGrading
+    ) {
+      return 'pending'
+    }
+
+    return 'graded'
+  }
+
+  const getViolationCount = (result) => {
+    const events = Array.isArray(result.proctoringReport?.events)
+      ? result.proctoringReport.events
+      : []
+
+    return events.filter(
+      (event) => event.severity === 'violation',
+    ).length
+  }
+
+  const gradedResults = results.filter(
+    (result) => getSubmissionStatus(result) === 'graded',
+  )
+
+  const pendingResults = results.filter(
+    (result) => getSubmissionStatus(result) === 'pending',
+  )
+
+  const averageScore = gradedResults.length
+    ? (
+        gradedResults.reduce(
+          (sum, result) => sum + Number(result.score || 0),
+          0,
+        ) / gradedResults.length
+      ).toFixed(1)
+    : '0.0'
+
+  const examOptions = Array.from(
+    new Map(
+      results.map((result) => [
+        String(result.examId || ''),
+        result.examTitle || result.title || 'Bài thi',
+      ]),
+    ).entries(),
+  ).filter(([id]) => id)
+
+  const keyword = submissionSearch
+    .trim()
+    .toLowerCase()
+
+  const filteredResults = results.filter((result) => {
+    const studentName = String(
+      result.studentName ||
+      result.name ||
+      '',
+    ).toLowerCase()
+
+    const studentEmail = String(
+      result.studentEmail ||
+      result.email ||
+      '',
+    ).toLowerCase()
+
+    const examTitle = String(
+      result.examTitle ||
+      result.title ||
+      '',
+    ).toLowerCase()
+
+    const matchesSearch =
+      !keyword ||
+      studentName.includes(keyword) ||
+      studentEmail.includes(keyword) ||
+      examTitle.includes(keyword)
+
+    const matchesExam =
+      examFilter === 'all' ||
+      String(result.examId) === examFilter
+
+    const matchesStatus =
+      statusFilter === 'all' ||
+      getSubmissionStatus(result) === statusFilter
+
+    return (
+      matchesSearch &&
+      matchesExam &&
+      matchesStatus
+    )
+  })
+
+  const openSubmission = (result) => {
+    const exam = (page.exams || []).find(
+      (item) =>
+        String(item.id) ===
+        String(result.examId),
+    )
+
+    if (!exam) {
+      return
+    }
+
+    page.setResultsExam?.({
+      ...exam,
+      focusResultId: result.id,
+      focusStudentId:
+        result.studentId ||
+        result.userId ||
+        result.uid,
+    })
+  }
+
   return (
-    <section className="space-y-5">
+    <section className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Danh sách nộp bài</h1>
-        <p className="mt-1 text-sm font-medium text-slate-500">Theo dõi các bài thi học sinh đã gửi.</p>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          Danh sách bài nộp
+        </h1>
+
+        <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+          Theo dõi kết quả, trạng thái chấm và dữ liệu giám sát của học sinh.
+        </p>
       </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Tổng bài nộp"
+          value={results.length}
+          helper="tất cả đề thi"
+          icon="📨"
+          iconClass="bg-indigo-50 text-indigo-500 dark:bg-indigo-500/15"
+        />
+
+        <StatCard
+          label="Đã chấm"
+          value={gradedResults.length}
+          helper="đã có kết quả"
+          icon="✅"
+          iconClass="bg-emerald-50 text-emerald-500 dark:bg-emerald-500/15"
+        />
+
+        <StatCard
+          label="Chờ chấm"
+          value={pendingResults.length}
+          helper="cần giáo viên xử lý"
+          icon="✏️"
+          iconClass="bg-amber-50 text-amber-500 dark:bg-amber-500/15"
+        />
+
+        <StatCard
+          label="Điểm trung bình"
+          value={averageScore}
+          helper="các bài đã chấm"
+          icon="🎯"
+          iconClass="bg-violet-50 text-violet-500 dark:bg-violet-500/15"
+        />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_4px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/5">
+        <div className="grid gap-3 xl:grid-cols-[minmax(280px,1fr)_220px_190px]">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-slate-900">
+            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+
+            <input
+              value={submissionSearch}
+              onChange={(event) =>
+                setSubmissionSearch(event.target.value)
+              }
+              placeholder="Tìm học sinh, email hoặc đề thi..."
+              className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 dark:text-white"
+            />
+          </div>
+
+          <DarkModeSelect
+            value={examFilter}
+            onChange={setExamFilter}
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả đề thi',
+              },
+              ...examOptions.map(([id, title]) => ({
+                value: id,
+                label: title,
+              })),
+            ]}
+            buttonClassName="rounded-xl bg-white px-4 py-3 text-sm dark:bg-slate-900"
+          />
+
+          <DarkModeSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              {
+                value: 'all',
+                label: 'Tất cả trạng thái',
+              },
+              {
+                value: 'graded',
+                label: 'Đã chấm',
+              },
+              {
+                value: 'pending',
+                label: 'Chờ chấm',
+              },
+            ]}
+            buttonClassName="rounded-xl bg-white px-4 py-3 text-sm dark:bg-slate-900"
+          />
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5">
-        {results.length ? (
+        {page.submissionsLoading ? (
+          <div className="flex min-h-64 items-center justify-center text-sm font-bold text-slate-400">
+            Đang tải danh sách bài nộp...
+          </div>
+        ) : filteredResults.length ? (
           <div className="overflow-x-auto">
-            <div className="min-w-[760px]">
-              <div className="grid grid-cols-[1.3fr_1.8fr_1fr_1fr] gap-4 bg-slate-50 px-6 py-4 text-[11px] font-black uppercase tracking-[0.05em] text-slate-500 dark:bg-white/5">
-                <span>Học sinh</span><span>Đề thi</span><span>Thời gian nộp</span><span>Trạng thái</span>
+            <div className="min-w-[1120px]">
+              <div className="grid grid-cols-[1.4fr_1.7fr_0.9fr_1fr_0.8fr_0.8fr_100px] items-center gap-4 bg-slate-50 px-6 py-4 text-[11px] font-black uppercase tracking-[0.05em] text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                <span>Học sinh</span>
+                <span>Đề thi</span>
+                <span>Điểm</span>
+                <span>Thời gian nộp</span>
+                <span>Vi phạm</span>
+                <span>Trạng thái</span>
+                <span className="text-right">
+                  Thao tác
+                </span>
               </div>
+
               <div className="divide-y divide-slate-100 dark:divide-white/10">
-                {results.map((result, index) => (
-                  <div key={result.id || `${result.examId}-${index}`} className="grid grid-cols-[1.3fr_1.8fr_1fr_1fr] gap-4 px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-bold text-slate-800 dark:text-white">{result.studentName || result.name || 'Học sinh'}</span>
-                    <span>{result.examTitle || result.title || 'Bài thi'}</span>
-                    <span>{result.submittedAt ? formatDate(result.submittedAt) : 'Chưa xác định'}</span>
-                    <span className="font-bold text-emerald-600">Đã nộp</span>
-                  </div>
-                ))}
+                {filteredResults.map((result, index) => {
+                  const status =
+                    getSubmissionStatus(result)
+
+                  const violationCount =
+                    getViolationCount(result)
+
+                  return (
+                    <div
+                      key={
+                        result.id ||
+                        `${result.examId}-${result.studentId}-${index}`
+                      }
+                      className="grid grid-cols-[1.4fr_1.7fr_0.9fr_1fr_0.8fr_0.8fr_100px] items-center gap-4 px-6 py-4 transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800 dark:text-white">
+                          {result.studentName ||
+                            result.name ||
+                            'Học sinh'}
+                        </p>
+
+                        <p className="mt-0.5 truncate text-xs font-medium text-slate-400">
+                          {result.studentEmail ||
+                            result.email ||
+                            'Không có email'}
+                        </p>
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+                          {result.examTitle ||
+                            result.title ||
+                            'Bài thi'}
+                        </p>
+
+                        {result.examSubject && (
+                          <p className="mt-0.5 truncate text-xs text-slate-400">
+                            {result.examSubject}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="text-base font-black text-slate-900 dark:text-white">
+                          {result.score ?? '—'}
+                        </span>
+
+                        <span className="text-xs font-semibold text-slate-400">
+                          /{result.totalScore || 10}
+                        </span>
+                      </div>
+
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        {result.submittedAt
+                          ? formatDate(result.submittedAt)
+                          : 'Chưa xác định'}
+                      </span>
+
+                      <div>
+                        <span
+                          className={`inline-flex min-w-8 justify-center rounded-full px-2.5 py-1 text-xs font-black ${
+                            violationCount > 0
+                              ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300'
+                              : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
+                          }`}
+                        >
+                          {violationCount}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                            status === 'pending'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
+                              : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                          }`}
+                        >
+                          {status === 'pending'
+                            ? 'Chờ chấm'
+                            : 'Đã chấm'}
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openSubmission(result)
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black text-[#5339f7] transition hover:bg-violet-50 dark:hover:bg-violet-500/10"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Xem bài
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
         ) : (
-          <div className="flex min-h-64 flex-col items-center justify-center text-slate-400">
+          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center text-slate-400">
             <ClipboardList className="h-12 w-12" />
-            <p className="mt-3 text-sm font-semibold">Chưa có bài nộp</p>
+
+            <p className="mt-4 text-sm font-bold">
+              {results.length
+                ? 'Không tìm thấy bài nộp phù hợp'
+                : 'Chưa có bài nộp'}
+            </p>
+
+            <p className="mt-1 text-xs font-medium">
+              {results.length
+                ? 'Thử thay đổi từ khóa hoặc bộ lọc.'
+                : 'Bài làm của học sinh sẽ xuất hiện tại đây sau khi nộp.'}
+            </p>
           </div>
         )}
       </div>
@@ -731,19 +1060,217 @@ function GradingSection({ page }) {
   )
 }
 
-function StatisticsSection({ page, isStudent }) {
+function StatisticsSection({ page }) {
+  const stats =
+    page.studentStatistics ?? {}
+
+  const totalExams =
+    Number(stats.totalExams ?? 0)
+
+  const completed =
+    Number(stats.completed ?? 0)
+
+  const pending =
+    Number(stats.pending ?? 0)
+
+  const averageScore =
+    Number(stats.averageScore ?? 0)
+
+  const completionRate =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(stats.completionRate ?? 0),
+      ),
+    )
+
+  const history =
+    Array.isArray(stats.history)
+      ? stats.history
+      : []
+
+  if (page.progressLoading) {
+    return (
+      <section className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            Tiến độ của tôi
+          </h1>
+
+          <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+            Đang tải kết quả học tập của bạn...
+          </p>
+        </div>
+
+        <div className="grid animate-pulse gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map(
+            (item) => (
+              <div
+                key={item}
+                className="h-28 rounded-xl bg-slate-100 dark:bg-white/5"
+              />
+            ),
+          )}
+        </div>
+
+        <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-white/5" />
+      </section>
+    )
+  }
+
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Thống kê</h1>
-          <p className="mt-1 text-sm font-medium text-slate-500">Tổng hợp kết quả và hoạt động thi.</p>
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          Tiến độ của tôi
+        </h1>
+
+        <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+          Theo dõi tiến độ hoàn thành và kết quả các bài thi của bạn.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Tổng số đề"
+          value={totalExams}
+          helper="đề thi bạn được tham gia"
+          icon="📚"
+          iconClass="bg-indigo-50 text-indigo-500 dark:bg-indigo-500/15"
+        />
+
+        <StatCard
+          label="Đã hoàn thành"
+          value={completed}
+          helper="đề đã có bài nộp"
+          icon="✅"
+          iconClass="bg-emerald-50 text-emerald-500 dark:bg-emerald-500/15"
+        />
+
+        <StatCard
+          label="Chưa làm"
+          value={pending}
+          helper="đề còn lại"
+          icon="⏳"
+          iconClass="bg-amber-50 text-amber-500 dark:bg-amber-500/15"
+        />
+
+        <StatCard
+          label="Điểm trung bình"
+          value={averageScore.toFixed(2)}
+          helper="kết quả mới nhất mỗi đề"
+          icon="🎯"
+          iconClass="bg-violet-50 text-violet-500 dark:bg-violet-500/15"
+        />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-black text-slate-900 dark:text-white">
+              Tỷ lệ hoàn thành
+            </p>
+
+            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+              {completed}/{totalExams} đề đã hoàn thành
+            </p>
+          </div>
+
+          <p className="text-2xl font-black text-[#5339f7]">
+            {completionRate.toFixed(1)}%
+          </p>
         </div>
-        {!isStudent && (
-          <button type="button" onClick={() => page.setStatsOpen(true)} className="rounded-xl bg-[#5339f7] px-5 py-3 text-sm font-bold text-white">Xem thống kê chi tiết</button>
+
+        <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+          <div
+            className="h-full rounded-full bg-[#5339f7] transition-[width] duration-500"
+            style={{
+              width: `${completionRate}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5">
+        <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
+          <h2 className="font-black text-slate-900 dark:text-white">
+            Kết quả gần đây
+          </h2>
+
+          <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+            Kết quả mới nhất của từng đề thi.
+          </p>
+        </div>
+
+        {history.length ? (
+          <div className="divide-y divide-slate-200 dark:divide-white/10">
+            {history.map(
+              (result) => (
+                <div
+                  key={
+                    result.resultId ||
+                    result.examId
+                  }
+                  className="grid gap-4 px-5 py-4 sm:grid-cols-[1fr_auto_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-900 dark:text-white">
+                      {result.title ||
+                        'Bài thi'}
+                    </p>
+
+                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {result.subject ||
+                        'Chưa xác định môn'}
+                    </p>
+                  </div>
+
+                  <div className="sm:text-right">
+                    <p className="text-lg font-black text-[#5339f7]">
+                      {Number(
+                        result.score ?? 0,
+                      ).toFixed(2)}
+                      <span className="text-xs text-slate-400">
+                        /{result.totalScore || 10}
+                      </span>
+                    </p>
+
+                    <p className="text-xs font-medium text-slate-400">
+                      {Number(
+                        result.answeredCount ?? 0,
+                      )}{' '}
+                      câu đã trả lời
+                    </p>
+                  </div>
+
+                  <div className="sm:min-w-28 sm:text-right">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      {result.submittedAt
+                        ? formatDate(
+                            result.submittedAt,
+                          )
+                        : 'Chưa xác định'}
+                    </p>
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
+        ) : (
+          <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center text-slate-400">
+            <Trophy className="h-12 w-12" />
+
+            <p className="mt-4 text-sm font-black">
+              Chưa có kết quả
+            </p>
+
+            <p className="mt-1 text-xs font-medium">
+              Kết quả sẽ xuất hiện sau khi bạn hoàn thành bài thi đầu tiên.
+            </p>
+          </div>
         )}
       </div>
-      <DashboardStats page={page} isStudent={isStudent} />
     </section>
   )
 }
@@ -842,14 +1369,7 @@ function ActiveSection({ page, isStudent, activeSection }) {
       return <ExamRoomSection page={page} isStudent={isStudent} />
 
     case 'submissions':
-      return (
-        <MaintenanceState
-          badge="Danh sách nộp bài"
-          title="Đang bảo trì"
-          subtitle="Tính năng đang được hoàn thiện"
-          description="Danh sách bài nộp của học sinh sẽ sớm được cập nhật. Vui lòng quay lại sau."
-        />
-      )
+      return <SubmissionsSection page={page} />
 
     case 'grading':
       return (
@@ -862,14 +1382,9 @@ function ActiveSection({ page, isStudent, activeSection }) {
       )
 
     case 'statistics':
-      return (
-        <MaintenanceState
-          badge="Thống kê đề thi"
-          title="Đang bảo trì"
-          subtitle="Dữ liệu thống kê đang được cập nhật"
-          description="Báo cáo và biểu đồ kết quả thi sẽ sớm được mở lại. Vui lòng quay lại sau."
-        />
-      )
+      return isStudent
+        ? <StatisticsSection page={page} />
+        : <RepositorySection page={page} isStudent={false} />
 
     case 'repository':
     default:
@@ -932,14 +1447,76 @@ function TeacherView({ page, activeSection, onNavigate }) {
 
 function Exams() {
   const page = useExamsPage()
-  const [activeSection, setActiveSection] = useState('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  if (page.roleLoading) return <LoadingState dark={page.dark} />
-  if (page.isStudent) {
-    return <StudentView page={page} activeSection={activeSection} onNavigate={setActiveSection} />
+  const allowedSections = page.isStudent
+    ? [
+        'overview',
+        'repository',
+        'exam-room',
+        'statistics',
+      ]
+    : [
+        'overview',
+        'repository',
+        'submissions',
+        'grading',
+      ]
+
+  const requestedSection =
+    searchParams.get('section') || 'overview'
+
+  const activeSection =
+    allowedSections.includes(requestedSection)
+      ? requestedSection
+      : 'overview'
+
+  const handleSectionNavigate = (section) => {
+    const safeSection =
+      allowedSections.includes(section)
+        ? section
+        : 'overview'
+
+    const nextParams =
+      new URLSearchParams(searchParams)
+
+    if (safeSection === 'overview') {
+      nextParams.delete('section')
+    } else {
+      nextParams.set(
+        'section',
+        safeSection,
+      )
+    }
+
+    setSearchParams(nextParams)
   }
-  if (!page.canManage) return <NoAccessView dark={page.dark} />
-  return <TeacherView page={page} activeSection={activeSection} onNavigate={setActiveSection} />
+
+  if (page.roleLoading) {
+    return <LoadingState dark={page.dark} />
+  }
+
+  if (page.isStudent) {
+    return (
+      <StudentView
+        page={page}
+        activeSection={activeSection}
+        onNavigate={handleSectionNavigate}
+      />
+    )
+  }
+
+  if (!page.canManage) {
+    return <NoAccessView dark={page.dark} />
+  }
+
+  return (
+    <TeacherView
+      page={page}
+      activeSection={activeSection}
+      onNavigate={handleSectionNavigate}
+    />
+  )
 }
 
 export default Exams

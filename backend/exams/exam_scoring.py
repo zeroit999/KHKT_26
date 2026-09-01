@@ -205,21 +205,88 @@ def get_answered_count(questions, answers, text_answers):
 def calculate_exam_score(questions, answers, text_answers, scoring):
     wrong_questions = []
     score = 0
+    correct_count = 0
+    answered_count = 0
 
     for question in questions:
+        question_id = question.get("id")
         question_type = question.get("type", "multiple")
         section = question.get("section", "part1")
 
-        if section == "part1" or question_type == "multiple":
-            point, wrong = grade_multiple(question, answers, scoring)
+        # ---------------------------------------------------------
+        # Xác định câu hỏi đã được học sinh trả lời hay chưa.
+        #
+        # Câu bỏ trống KHÔNG được tính là câu sai.
+        # ---------------------------------------------------------
+        is_answered = False
 
-        elif section == "part2" or question_type == "truefalse":
-            point, wrong = grade_truefalse(question, answers, scoring)
+        if question_type in [
+            "essay",
+            "code",
+            "short-answer",
+            "short_answer",
+        ]:
+            value = ""
 
-        elif section == "part3" or question_type in ["short-answer", "short_answer"]:
-            point, wrong = grade_short_answer(question, text_answers, scoring)
+            if isinstance(text_answers, dict):
+                value = text_answers.get(question_id, "")
+
+            is_answered = bool(str(value).strip())
+
+        elif question_type == "truefalse":
+            value = (
+                answers.get(question_id)
+                if isinstance(answers, dict)
+                else None
+            )
+
+            is_answered = (
+                isinstance(value, dict)
+                and len(value) > 0
+            )
 
         else:
+            is_answered = (
+                isinstance(answers, dict)
+                and question_id in answers
+                and answers.get(question_id) is not None
+            )
+
+        # Bỏ trống => không chấm sai.
+        if not is_answered:
+            continue
+
+        answered_count += 1
+
+        # ---------------------------------------------------------
+        # Chấm câu đã trả lời.
+        # ---------------------------------------------------------
+        if section == "part1" or question_type == "multiple":
+            point, wrong = grade_multiple(
+                question,
+                answers,
+                scoring,
+            )
+
+        elif section == "part2" or question_type == "truefalse":
+            point, wrong = grade_truefalse(
+                question,
+                answers,
+                scoring,
+            )
+
+        elif section == "part3" or question_type in [
+            "short-answer",
+            "short_answer",
+        ]:
+            point, wrong = grade_short_answer(
+                question,
+                text_answers,
+                scoring,
+            )
+
+        else:
+            # Essay / code hiện chờ giáo viên chấm.
             point, wrong = 0, None
 
         score += point
@@ -227,12 +294,22 @@ def calculate_exam_score(questions, answers, text_answers, scoring):
         if wrong:
             wrong_questions.append(wrong)
 
-    answered_count = get_answered_count(questions, answers, text_answers)
+        elif question_type not in ["essay", "code"]:
+            correct_count += 1
+
+    total_questions = len(questions)
+    wrong_count = len(wrong_questions)
+    unanswered_count = max(
+        0,
+        total_questions - answered_count,
+    )
 
     return {
         "score": round(score, 2),
         "wrongQuestions": wrong_questions,
         "answeredCount": answered_count,
-        "totalQuestions": len(questions),
-        "wrongCount": len(wrong_questions),
+        "correctCount": correct_count,
+        "wrongCount": wrong_count,
+        "unansweredCount": unanswered_count,
+        "totalQuestions": total_questions,
     }

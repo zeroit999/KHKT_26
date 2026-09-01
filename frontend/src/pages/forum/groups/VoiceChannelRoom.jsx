@@ -11,11 +11,9 @@
 //   serverTimestamp,
 //   setDoc,
 //   where,
-// } from 'firebase/firestore'
 // import { ArrowLeft, Eraser, Headphones, Maximize2, Mic, MicOff, Minus, Palette, PenTool, PhoneOff, Pin, PinOff, Plus, ScreenShare, ScreenShareOff, SmilePlus, Trash2, Type, Users, Video, VideoOff, Volume2, VolumeX } from 'lucide-react'
 // import toast from 'react-hot-toast'
 
-// import { db } from '../../../components/firebase'
 // import { getInitials } from '../utils/forumUtils'
 
 // const RTC_CONFIGURATION = {

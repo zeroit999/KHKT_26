@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   ClipboardCheck,
+  Clock3,
   RotateCcw,
   ShieldAlert,
   XCircle,
@@ -36,12 +37,28 @@ const getAnswerText = (question, result) => {
   return `${String.fromCharCode(65 + Number(selectedIndex))}. ${content || ''}`.trim()
 }
 
+const formatReviewTime = (value) => {
+  if (!value) return ''
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value)
+  }
+
+  return new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date)
+}
+
 function ResultPage() {
   const { id } = useParams()
   const location = useLocation()
   const [exam, setExam] = useState(location.state?.exam ?? null)
   const [result, setResult] = useState(location.state?.result ?? null)
-  const [loading, setLoading] = useState(!exam || !result)
+  const [review, setReview] = useState(location.state?.review ?? null)
+  const [loading, setLoading] = useState(!exam || !result || !review)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -51,12 +68,23 @@ function ResultPage() {
       try {
         const [examResponse, resultResponse] = await Promise.all([
           exam ? Promise.resolve(null) : getExamDetailApi(id),
-          result ? Promise.resolve(null) : getMyExamResultApi(id),
+          (!result || !review) ? getMyExamResultApi(id) : Promise.resolve(null),
         ])
 
         if (cancelled) return
-        if (examResponse) setExam(examResponse.data?.exam ?? null)
-        if (resultResponse) setResult(resultResponse.data?.result ?? null)
+
+        if (examResponse) {
+          setExam(examResponse.data?.exam ?? null)
+
+          if (!review && examResponse.data?.review) {
+            setReview(examResponse.data.review)
+          }
+        }
+
+        if (resultResponse) {
+          setResult(resultResponse.data?.result ?? null)
+          setReview(resultResponse.data?.review ?? null)
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError?.response?.data?.message || loadError.message || 'Không thể tải kết quả')
@@ -70,7 +98,7 @@ function ResultPage() {
     return () => {
       cancelled = true
     }
-  }, [exam, id, result])
+  }, [exam, id, result, review])
 
   const summary = useMemo(() => {
     const total = Number(result?.totalQuestions ?? exam?.questions?.length ?? 0)
@@ -80,20 +108,18 @@ function ResultPage() {
         (question.type === 'essay' || question.type === 'code') &&
         String(result?.textAnswers?.[question.id] || '').trim(),
     ).length
-    const autoGradedAnswered = Math.max(0, answered - pending)
-    const wrong = Math.min(
-      autoGradedAnswered,
-      Number(result?.wrongCount ?? result?.wrongQuestions?.length ?? 0),
-    )
+
+    const canReviewAnswers = review?.allowed === true
+
     return {
       total,
       answered,
-      wrong,
-      correct: Math.max(0, autoGradedAnswered - wrong),
+      wrong: canReviewAnswers ? Number(result?.wrongCount ?? 0) : null,
+      correct: canReviewAnswers ? Number(result?.correctCount ?? 0) : null,
       blank: Math.max(0, total - answered),
       pending,
     }
-  }, [exam, result])
+  }, [exam, result, review])
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-black text-slate-500 dark:bg-slate-950 dark:text-slate-300">Đang tải kết quả...</div>
@@ -121,8 +147,8 @@ function ResultPage() {
             {[
               [`${Number(result.score || 0).toFixed(2)}/10`, 'Điểm'],
               [summary.answered, 'Đã trả lời'],
-              [summary.correct, 'Câu đúng'],
-              [summary.wrong, 'Câu sai'],
+              [summary.correct ?? '—', 'Câu đúng'],
+              [summary.wrong ?? '—', 'Câu sai'],
               [summary.blank, 'Bỏ trống'],
               [summary.pending, 'Chờ chấm'],
             ].map(([value, label]) => (
@@ -141,6 +167,44 @@ function ResultPage() {
           </div>
         )}
 
+        {review?.allowed === true ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="text-sm font-black">Đang trong thời gian xem đáp án</p>
+              <p className="mt-1 text-sm font-semibold opacity-80">
+                Bạn có thể xem kết quả đúng/sai, đáp án đúng và lời giải của giáo viên.
+                {review.endAt ? ` Thời gian xem kết thúc lúc ${formatReviewTime(review.endAt)}.` : ''}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+            <Clock3 className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="text-sm font-black">
+                {review?.status === 'not_started'
+                  ? 'Chưa đến thời gian xem đáp án'
+                  : review?.status === 'expired'
+                    ? 'Đã hết thời gian xem đáp án'
+                    : review?.status === 'invalid'
+                      ? 'Chưa thể xem đáp án'
+                      : 'Giáo viên chưa cho phép xem đáp án'}
+              </p>
+
+              <p className="mt-1 text-sm font-semibold opacity-80">
+                {review?.status === 'not_started' && review?.startAt
+                  ? `Bạn có thể xem đáp án từ ${formatReviewTime(review.startAt)}. Hiện tại bạn vẫn có thể xem lại bài làm của mình.`
+                  : review?.status === 'expired'
+                    ? 'Bạn vẫn có thể xem lại câu trả lời của mình, nhưng đáp án đúng và lời giải đã được ẩn.'
+                    : review?.status === 'invalid'
+                      ? 'Cấu hình thời gian xem đáp án chưa hợp lệ. Bạn vẫn có thể xem lại bài làm của mình.'
+                      : 'Bạn vẫn có thể xem lại bài làm của mình. Đáp án đúng và lời giải hiện đang được ẩn.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900">
           <div className="flex items-center gap-3">
             <ClipboardCheck className="h-6 w-6 text-blue-600" />
@@ -149,9 +213,16 @@ function ResultPage() {
 
           <div className="mt-5 space-y-4">
             {(exam.questions || []).map((question, index) => {
-              const wrongItem = (result.wrongQuestions || []).find(
-                (item) => item.question === question.question,
-              )
+              const canReviewAnswers = review?.allowed === true
+
+              const wrongItem = canReviewAnswers
+                ? (result.wrongQuestions || []).find(
+                    (item) =>
+                      item.questionId === question.id ||
+                      item.question === question.question,
+                  )
+                : null
+
               const awaitsManualGrading =
                 (question.type === 'essay' || question.type === 'code') &&
                 String(result?.textAnswers?.[question.id] || '').trim()
@@ -159,7 +230,9 @@ function ResultPage() {
               return (
                 <article key={question.id ?? index} className="rounded-2xl border border-slate-200 p-5 dark:border-white/10">
                   <div className="flex items-start gap-3">
-                    {wrongItem ? (
+                    {!canReviewAnswers ? (
+                      <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" />
+                    ) : wrongItem ? (
                       <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
                     ) : awaitsManualGrading ? (
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
@@ -169,9 +242,23 @@ function ResultPage() {
                     <div className="min-w-0">
                       <p className="font-black">Câu {index + 1}: {String(question.question || '').replace(/<[^>]+>/g, '')}</p>
                       <p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-300">Bài làm: {getAnswerText(question, result)}</p>
-                      {awaitsManualGrading && <p className="mt-2 text-sm font-bold text-amber-600">Đang chờ giáo viên chấm</p>}
-                      {wrongItem && <p className="mt-2 text-sm font-bold text-emerald-600">Đáp án đúng: {wrongItem.correctAnswer || 'Xem hướng dẫn chấm'}</p>}
-                      {wrongItem?.teacherNote && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{wrongItem.teacherNote}</p>}
+                      {canReviewAnswers && awaitsManualGrading && (
+                        <p className="mt-2 text-sm font-bold text-amber-600">
+                          Đang chờ giáo viên chấm
+                        </p>
+                      )}
+
+                      {canReviewAnswers && wrongItem && (
+                        <p className="mt-2 text-sm font-bold text-emerald-600">
+                          Đáp án đúng: {wrongItem.correctAnswer || 'Xem hướng dẫn chấm'}
+                        </p>
+                      )}
+
+                      {canReviewAnswers && wrongItem?.teacherNote && (
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                          {wrongItem.teacherNote}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </article>

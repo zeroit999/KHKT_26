@@ -3,6 +3,12 @@ import apiClient from '../utils/apiClient'
 export const getExamsApi = () =>
   apiClient.get('/exams')
 
+export const getMyExamStatisticsApi = () =>
+  apiClient.get('/exams/my-statistics')
+
+export const getPublicExamsApi = () =>
+  apiClient.get('/exams/public')
+
 export const getExamDetailApi = (examId) =>
   apiClient.get(`/exams/${examId}`)
 

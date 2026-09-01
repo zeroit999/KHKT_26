@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.jsx'
+import { authService } from '../../services/auth.js'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
 import {
   collectSafePageContext,
@@ -39,7 +40,8 @@ function buildPageWelcome(profile) {
 
 async function buildAuthHeaders(user) {
   if (!user) return {}
-  const token = await user.getIdToken()
+  const token = authService.getAccessToken()
+  if (!token) return {}
   return { Authorization: `Bearer ${token}` }
 }
 

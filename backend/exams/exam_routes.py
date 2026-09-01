@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify
 
-from auth import firebase_required
+from auth import auth_required
 
 from exams.exam_service import (
     get_exams,
+    get_public_exams,
     get_exam_detail,
     create_exam,
     update_exam,
@@ -12,6 +13,7 @@ from exams.exam_service import (
     submit_exam,
     get_my_result,
     get_exam_results,
+    get_my_statistics,
 )
 
 from exams.word_parser import parse_docx_exam
@@ -20,7 +22,7 @@ exam_bp = Blueprint("exam_bp", __name__, url_prefix="/api/exams")
 
 
 @exam_bp.post("/parse-word")
-@firebase_required
+@auth_required
 def parse_word_exam_route():
     try:
         file = request.files.get("file")
@@ -56,8 +58,20 @@ def parse_word_exam_route():
         }), 400
 
 
+@exam_bp.get("/public")
+def get_public_exams_route():
+    try:
+        data = get_public_exams()
+        return jsonify(data), 200
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "message": str(error),
+        }), 400
+
+
 @exam_bp.get("")
-@firebase_required
+@auth_required
 def get_exams_route():
     try:
         data = get_exams(request.current_user)
@@ -69,8 +83,26 @@ def get_exams_route():
         }), 400
 
 
-@exam_bp.get("/<exam_id>")
-@firebase_required
+@exam_bp.get("/my-statistics")
+@auth_required
+def get_my_statistics_route():
+    try:
+        data = get_my_statistics(
+            request.current_user
+        )
+
+        return jsonify(data), 200
+
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "message": str(error),
+        }), 400
+
+
+
+@exam_bp.get("/<int:exam_id>")
+@auth_required
 def get_exam_detail_route(exam_id):
     try:
         data = get_exam_detail(request.current_user, exam_id)
@@ -83,7 +115,7 @@ def get_exam_detail_route(exam_id):
 
 
 @exam_bp.post("")
-@firebase_required
+@auth_required
 def create_exam_route():
     try:
         payload = request.get_json() or {}
@@ -96,8 +128,8 @@ def create_exam_route():
         }), 400
 
 
-@exam_bp.put("/<exam_id>")
-@firebase_required
+@exam_bp.put("/<int:exam_id>")
+@auth_required
 def update_exam_route(exam_id):
     try:
         payload = request.get_json() or {}
@@ -110,8 +142,8 @@ def update_exam_route(exam_id):
         }), 400
 
 
-@exam_bp.delete("/<exam_id>")
-@firebase_required
+@exam_bp.delete("/<int:exam_id>")
+@auth_required
 def delete_exam_route(exam_id):
     try:
         data = delete_exam(request.current_user, exam_id)
@@ -123,8 +155,8 @@ def delete_exam_route(exam_id):
         }), 400
 
 
-@exam_bp.post("/<exam_id>/submit")
-@firebase_required
+@exam_bp.post("/<int:exam_id>/submit")
+@auth_required
 def submit_exam_route(exam_id):
     try:
         payload = request.get_json() or {}
@@ -137,8 +169,8 @@ def submit_exam_route(exam_id):
         }), 400
 
 
-@exam_bp.post("/<exam_id>/proctoring/events")
-@firebase_required
+@exam_bp.post("/<int:exam_id>/proctoring/events")
+@auth_required
 def log_proctoring_event_route(exam_id):
     try:
         payload = request.get_json() or {}
@@ -151,8 +183,8 @@ def log_proctoring_event_route(exam_id):
         }), 400
 
 
-@exam_bp.get("/<exam_id>/my-result")
-@firebase_required
+@exam_bp.get("/<int:exam_id>/my-result")
+@auth_required
 def get_my_result_route(exam_id):
     try:
         data = get_my_result(request.current_user, exam_id)
@@ -164,8 +196,8 @@ def get_my_result_route(exam_id):
         }), 400
 
 
-@exam_bp.get("/<exam_id>/results")
-@firebase_required
+@exam_bp.get("/<int:exam_id>/results")
+@auth_required
 def get_exam_results_route(exam_id):
     try:
         data = get_exam_results(request.current_user, exam_id)

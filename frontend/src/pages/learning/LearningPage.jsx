@@ -1,26 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  addDoc,
-  arrayRemove,
-  arrayUnion,
-  collection,
-  doc,
-  getDocs,
-  increment,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-  writeBatch,
-} from 'firebase/firestore'
-import { onAuthStateChanged } from 'firebase/auth'
-import { deleteObject, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
-
-import { auth, db } from '../../components/firebase.js'
+import classroomApi from '../../services/classroomApi.js'
+import eLearningApi from '../../services/eLearningApi.js'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useExamsPage from '../../hooks/exam/useExamsPage.js'
 import {
@@ -74,6 +54,36 @@ const STUDENT_SCHEDULE_DEFAULT_SLOTS = [
 
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase()
+}
+
+function getApiRows(payload) {
+  if (Array.isArray(payload)) return payload
+  const candidates = [
+    payload?.items, payload?.rows, payload?.data, payload?.results,
+    payload?.classrooms, payload?.members, payload?.assignments,
+    payload?.notifications, payload?.messages, payload?.attendance,
+    payload?.schedule, payload?.subjects, payload?.tests, payload?.scores,
+    payload?.courses, payload?.users, payload?.submissions,
+  ]
+  return candidates.find(Array.isArray) || []
+}
+
+function getApiItem(payload) {
+  if (!payload || typeof payload !== 'object') return payload || null
+  return payload.item || payload.data || payload.user || payload.member ||
+    payload.classroom || payload.assignment || payload.notification ||
+    payload.message || payload.submission || payload
+}
+
+function normalizeApiAsset(payload, file) {
+  const source = payload?.asset || payload?.file || payload?.data || payload || {}
+  return {
+    ...source,
+    name: source.name || source.fileName || source.filename || file?.name || 'file',
+    type: source.type || source.contentType || source.mimeType || file?.type || 'file',
+    url: source.url || source.publicUrl || source.downloadUrl || source.href || '',
+    storagePath: source.storagePath || source.path || source.key || source.objectKey || '',
+  }
 }
 
 function resizeChatTextarea(element, maxHeight = 140) {
@@ -481,10 +491,77 @@ function StudentClassExamWorkspace({ selectedClass }) {
 }
 
 function LearningPage() {
-  const { userDetails } = useAuth()
-  const [currentUser, setCurrentUser] = useState(() => auth.currentUser || null)
-  const [activePage, setActivePage] = useState('home')
+  const { user, userDetails } = useAuth()
+
+  const validPageIds = useMemo(
+    () =>
+      new Set([
+        'home',
+        ...NAV_ITEMS.map((item) => item.id),
+        ...SECONDARY_NAV_ITEMS.map((item) => item.id),
+      ]),
+    [],
+  )
+
+  const getPageFromUrl = () => {
+    if (typeof window === 'undefined') return 'home'
+    const requestedPage =
+      new URLSearchParams(window.location.search).get('page')
+
+    return requestedPage && validPageIds.has(requestedPage)
+      ? requestedPage
+      : 'home'
+  }
+
+  const [currentUser, setCurrentUser] = useState(() => user || null)
+  const [activePage, setActivePage] = useState(getPageFromUrl)
   const [classView, setClassView] = useState('list')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    const currentPage = url.searchParams.get('page')
+
+    if (activePage === 'home') {
+      if (currentPage !== null) {
+        url.searchParams.delete('page')
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        )
+      }
+      return
+    }
+
+    if (validPageIds.has(activePage) && currentPage !== activePage) {
+      url.searchParams.set('page', activePage)
+      window.history.replaceState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      )
+    }
+  }, [activePage, validPageIds])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncPageFromUrl = () => {
+      const params = new URLSearchParams(window.location.search)
+      const requestedPage = params.get('page')
+      const safePage =
+        requestedPage && validPageIds.has(requestedPage)
+          ? requestedPage
+          : 'home'
+
+      setActivePage(safePage)
+    }
+
+    window.addEventListener('popstate', syncPageFromUrl)
+    return () => window.removeEventListener('popstate', syncPageFromUrl)
+  }, [validPageIds])
   const [classes, setClasses] = useState([])
   const [classAssignments, setClassAssignments] = useState({})
   const [selectedClassId, setSelectedClassId] = useState('')
@@ -559,7 +636,9 @@ function LearningPage() {
   const messageTextareaRef = useRef(null)
   const membershipRepairUidRef = useRef('')
 
-  useEffect(() => onAuthStateChanged(auth, (user) => setCurrentUser(user || null)), [])
+  useEffect(() => {
+    setCurrentUser(user || null)
+  }, [user])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNotificationClock(new Date()), 60 * 1000)
@@ -579,66 +658,28 @@ function LearningPage() {
       return undefined
     }
 
-    setLoadingClasses(true)
-    setError('')
-    const classesQuery = query(collection(db, 'classes'), where('memberIds', 'array-contains', currentUser.uid))
-    const unsubscribe = onSnapshot(classesQuery, (snapshot) => {
-      const rows = snapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .filter((item) => item.teacherId !== currentUser.uid)
-        .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
-      setClasses(rows)
-      setSelectedClassId((current) => rows.some((item) => item.id === current) ? current : (rows[0]?.id || ''))
-      setLoadingClasses(false)
-
-      const normalizedEmail = normalizeText(currentUser.email)
-      if (normalizedEmail && membershipRepairUidRef.current !== currentUser.uid) {
-        membershipRepairUidRef.current = currentUser.uid
-        ;(async () => {
-          try {
-            const classSnapshot = await getDocs(collection(db, 'classes'))
-            const candidates = classSnapshot.docs.filter((classDoc) => {
-              const data = classDoc.data() || {}
-              const memberIds = Array.isArray(data.memberIds) ? data.memberIds.map(String) : []
-              return data.teacherId !== currentUser.uid && !memberIds.includes(String(currentUser.uid))
-            })
-
-            const matchedStudents = []
-            for (const classDoc of candidates) {
-              const studentSnapshot = await getDocs(query(
-                collection(db, 'classes', classDoc.id, 'students'),
-                where('email', '==', normalizedEmail),
-                limit(1),
-              ))
-              if (!studentSnapshot.empty) matchedStudents.push({ classDoc, studentDoc: studentSnapshot.docs[0] })
-            }
-
-            if (!matchedStudents.length) return
-
-            const batch = writeBatch(db)
-            matchedStudents.forEach(({ classDoc, studentDoc }) => {
-              batch.update(classDoc.ref, {
-                memberIds: arrayUnion(currentUser.uid),
-                updatedAt: serverTimestamp(),
-              })
-              batch.update(studentDoc.ref, {
-                uid: currentUser.uid,
-                status: 'active',
-                updatedAt: serverTimestamp(),
-              })
-            })
-            await batch.commit()
-          } catch (repairError) {
-            console.warn('Không thể đồng bộ lớp đã được giáo viên thêm bằng email:', repairError)
-          }
-        })()
+    let cancelled = false
+    const loadClasses = async () => {
+      try {
+        setLoadingClasses(true)
+        setError('')
+        const response = await classroomApi.listClassrooms()
+        if (cancelled) return
+        const rows = getApiRows(response)
+          .filter((item) => String(item.teacherId || item.teacher_id || item.ownerId || item.owner_id || '') !== String(currentUser.uid))
+          .sort((a, b) => getTimeValue(b.createdAt || b.created_at) - getTimeValue(a.createdAt || a.created_at))
+        setClasses(rows)
+        setSelectedClassId((current) => rows.some((item) => String(item.id) === String(current)) ? current : (rows[0]?.id || ''))
+      } catch (apiError) {
+        if (cancelled) return
+        console.error('Không thể tải lớp học của học sinh:', apiError)
+        setError(apiError?.response?.data?.message || apiError?.message || 'Không thể tải lớp học.')
+      } finally {
+        if (!cancelled) setLoadingClasses(false)
       }
-    }, (firebaseError) => {
-      console.error('Không thể tải lớp học của học sinh:', firebaseError)
-      setError(firebaseError?.message || 'Không thể tải lớp học.')
-      setLoadingClasses(false)
-    })
-    return () => unsubscribe()
+    }
+    loadClasses()
+    return () => { cancelled = true }
   }, [currentUser?.uid])
 
   useEffect(() => {
@@ -646,17 +687,26 @@ function LearningPage() {
       setClassAssignments({})
       return undefined
     }
-    const unsubs = classes.map((classItem) => onSnapshot(
-      collection(db, 'classes', classItem.id, 'assignments'),
-      (snapshot) => {
-        setClassAssignments((current) => ({
-          ...current,
-          [classItem.id]: snapshot.docs.map((item) => ({ id: item.id, classId: classItem.id, className: classItem.name, ...item.data() })),
-        }))
-      },
-      (firebaseError) => console.error(`Không thể tải bài tập lớp ${classItem.id}:`, firebaseError)
-    ))
-    return () => unsubs.forEach((unsubscribe) => unsubscribe())
+
+    let cancelled = false
+    const loadAssignments = async () => {
+      const entries = await Promise.all(classes.map(async (classItem) => {
+        try {
+          const response = await classroomApi.listAssignments(classItem.id)
+          return [classItem.id, getApiRows(response).map((item) => ({
+            ...item,
+            classId: item.classId || item.class_id || classItem.id,
+            className: item.className || item.class_name || classItem.name,
+          }))]
+        } catch (apiError) {
+          console.error(`Không thể tải bài tập lớp ${classItem.id}:`, apiError)
+          return [classItem.id, []]
+        }
+      }))
+      if (!cancelled) setClassAssignments(Object.fromEntries(entries))
+    }
+    loadAssignments()
+    return () => { cancelled = true }
   }, [classes])
 
   useEffect(() => {
@@ -672,35 +722,36 @@ function LearningPage() {
       return undefined
     }
 
-    setDetailLoading(true)
-    const unsubs = []
-    unsubs.push(onSnapshot(collection(db, 'classes', selectedClassId, 'students'), (snapshot) => {
-      setStudents(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-      setDetailLoading(false)
-    }, (firebaseError) => {
-      console.error('Không thể tải thành viên lớp:', firebaseError)
-      setDetailLoading(false)
-    }))
-    unsubs.push(onSnapshot(query(collection(db, 'classes', selectedClassId, 'notifications'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setNotifications(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-    }, (firebaseError) => console.error('Không thể tải thông báo:', firebaseError)))
-    unsubs.push(onSnapshot(query(collection(db, 'classes', selectedClassId, 'messages'), orderBy('createdAt', 'asc')), (snapshot) => {
-      setMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-    }, (firebaseError) => {
-      console.error('Không thể tải trao đổi:', firebaseError)
-      setMessageError(firebaseError?.message || 'Không thể tải trao đổi.')
-    }))
-    unsubs.push(onSnapshot(collection(db, 'classes', selectedClassId, 'attendance'), (snapshot) => {
-      setAttendanceRecords(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-    }, (firebaseError) => console.error('Không thể tải điểm danh:', firebaseError)))
-    unsubs.push(onSnapshot(collection(db, 'classes', selectedClassId, 'schedule'), (snapshot) => {
-      setScheduleItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-    }, (firebaseError) => console.error('Không thể tải lịch học:', firebaseError)))
-    unsubs.push(onSnapshot(query(collection(db, 'classes', selectedClassId, 'subjects'), orderBy('order', 'asc')), (snapshot) => {
-      setSubjects(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-    }, (firebaseError) => console.error('Không thể tải môn học:', firebaseError)))
-
-    return () => unsubs.forEach((unsubscribe) => unsubscribe())
+    let cancelled = false
+    const loadClassDetail = async () => {
+      try {
+        setDetailLoading(true)
+        setMessageError('')
+        const [membersResponse, notificationsResponse, messagesResponse, attendanceResponse, scheduleResponse, subjectsResponse] = await Promise.all([
+          classroomApi.listMembers(selectedClassId),
+          classroomApi.listNotifications(selectedClassId),
+          classroomApi.listMessages(selectedClassId),
+          classroomApi.listAttendance(selectedClassId),
+          classroomApi.listSchedule(selectedClassId),
+          classroomApi.listSubjects(selectedClassId),
+        ])
+        if (cancelled) return
+        setStudents(getApiRows(membersResponse))
+        setNotifications(getApiRows(notificationsResponse).sort((a, b) => getTimeValue(b.createdAt || b.created_at) - getTimeValue(a.createdAt || a.created_at)))
+        setMessages(getApiRows(messagesResponse).sort((a, b) => getTimeValue(a.createdAt || a.created_at) - getTimeValue(b.createdAt || b.created_at)))
+        setAttendanceRecords(getApiRows(attendanceResponse))
+        setScheduleItems(getApiRows(scheduleResponse))
+        setSubjects(getApiRows(subjectsResponse).sort((a, b) => Number(a.order ?? a.sortOrder ?? a.sort_order ?? 0) - Number(b.order ?? b.sortOrder ?? b.sort_order ?? 0)))
+      } catch (apiError) {
+        if (cancelled) return
+        console.error('Không thể tải chi tiết lớp:', apiError)
+        setMessageError(apiError?.response?.data?.message || apiError?.message || 'Không thể tải dữ liệu lớp.')
+      } finally {
+        if (!cancelled) setDetailLoading(false)
+      }
+    }
+    loadClassDetail()
+    return () => { cancelled = true }
   }, [selectedClassId])
 
   useEffect(() => {
@@ -709,22 +760,24 @@ function LearningPage() {
       return undefined
     }
 
-    setELearningResourcesLoading(true)
-    setELearningResourcesError('')
-    const unsubscribe = onSnapshot(
-      collection(db, 'courses'),
-      (snapshot) => {
-        setELearningCourses(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-        setELearningResourcesLoading(false)
-      },
-      (firebaseError) => {
-        console.error('Không thể tải học liệu E-learning cho học sinh:', firebaseError)
+    let cancelled = false
+    const loadCourses = async () => {
+      try {
+        setELearningResourcesLoading(true)
+        setELearningResourcesError('')
+        const response = await eLearningApi.courses()
+        if (!cancelled) setELearningCourses(getApiRows(response))
+      } catch (apiError) {
+        if (cancelled) return
+        console.error('Không thể tải học liệu E-learning cho học sinh:', apiError)
         setELearningCourses([])
-        setELearningResourcesError(firebaseError?.message || 'Không thể tải học liệu E-learning.')
-        setELearningResourcesLoading(false)
+        setELearningResourcesError(apiError?.response?.data?.message || apiError?.message || 'Không thể tải học liệu E-learning.')
+      } finally {
+        if (!cancelled) setELearningResourcesLoading(false)
       }
-    )
-    return () => unsubscribe()
+    }
+    loadCourses()
+    return () => { cancelled = true }
   }, [activePage, classView, currentUser?.uid, selectedClassId])
 
   useEffect(() => {
@@ -732,52 +785,59 @@ function LearningPage() {
       setELearningTeacherProfiles({})
       return undefined
     }
-    const ownerIds = Array.from(new Set(eLearningCourses.flatMap((course) => [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]).filter(Boolean).map(String)))
-    const ownerEmails = Array.from(new Set(eLearningCourses.map((course) => String(course.teacherEmail || course.createdByEmail || course.ownerEmail || '').trim()).filter(Boolean)))
-    const profileMap = {}
-    const syncProfile = (id, profile = {}) => {
-      if (id) profileMap[`id:${id}`] = profile
-      const email = normalizeText(profile.email)
-      if (email) profileMap[`email:${email}`] = profile
-      setELearningTeacherProfiles({ ...profileMap })
+    let cancelled = false
+    const loadProfiles = async () => {
+      try {
+        const response = await eLearningApi.users()
+        if (cancelled) return
+        const profileMap = {}
+        getApiRows(response).forEach((profile) => {
+          ;[profile.id, profile.uid, profile.userId, profile.user_id].filter(Boolean).map(String).forEach((id) => {
+            profileMap[`id:${id}`] = profile
+          })
+          const email = normalizeText(profile.email)
+          if (email) profileMap[`email:${email}`] = profile
+        })
+        setELearningTeacherProfiles(profileMap)
+      } catch (apiError) {
+        console.warn('Không thể đồng bộ avatar người đăng E-learning:', apiError)
+        if (!cancelled) setELearningTeacherProfiles({})
+      }
     }
-    const unsubs = []
-    ownerIds.forEach((ownerId) => {
-      unsubs.push(onSnapshot(doc(db, 'users', ownerId), (snapshot) => {
-        if (snapshot.exists()) syncProfile(snapshot.id, { id: snapshot.id, ...snapshot.data() })
-      }, (firebaseError) => console.warn('Không thể đồng bộ avatar người đăng E-learning:', ownerId, firebaseError)))
-    })
-    for (let index = 0; index < ownerEmails.length; index += 30) {
-      const emailChunk = ownerEmails.slice(index, index + 30)
-      if (!emailChunk.length) continue
-      unsubs.push(onSnapshot(query(collection(db, 'users'), where('email', 'in', emailChunk)), (snapshot) => {
-        snapshot.docs.forEach((item) => syncProfile(item.id, { id: item.id, ...item.data() }))
-      }, (firebaseError) => console.warn('Không thể đồng bộ avatar E-learning theo email:', firebaseError)))
-    }
-    return () => unsubs.forEach((unsubscribe) => unsubscribe())
+    loadProfiles()
+    return () => { cancelled = true }
   }, [activePage, classView, currentUser?.uid, eLearningCourses])
 
   useEffect(() => {
     const selectedTeacherEmail = classes.find((item) => item.id === selectedClassId)?.teacherEmail || ''
-    const emails = Array.from(new Set([...students.map((item) => normalizeText(item.email)), normalizeText(selectedTeacherEmail), normalizeText(currentUser?.email)].filter(Boolean)))
+    const emails = Array.from(new Set([
+      ...students.map((item) => normalizeText(item.email)),
+      normalizeText(selectedTeacherEmail),
+      normalizeText(currentUser?.email),
+    ].filter(Boolean)))
     if (!emails.length) {
       setUserProfilesByEmail({})
       return undefined
     }
-    const chunks = []
-    for (let index = 0; index < emails.length; index += 30) chunks.push(emails.slice(index, index + 30))
-    const byChunk = new Map()
-    const syncProfiles = () => {
-      const merged = {}
-      byChunk.forEach((rows) => rows.forEach((profile) => { const email = normalizeText(profile.email); if (email) merged[email] = profile }))
-      setUserProfilesByEmail(merged)
+    let cancelled = false
+    const loadProfiles = async () => {
+      try {
+        const response = await eLearningApi.users()
+        if (cancelled) return
+        const wanted = new Set(emails)
+        const map = {}
+        getApiRows(response).forEach((profile) => {
+          const email = normalizeText(profile.email)
+          if (email && wanted.has(email)) map[email] = profile
+        })
+        setUserProfilesByEmail(map)
+      } catch (apiError) {
+        console.error('Không thể đồng bộ hồ sơ thành viên:', apiError)
+        if (!cancelled) setUserProfilesByEmail({})
+      }
     }
-    const unsubs = chunks.map((emailChunk, chunkIndex) => onSnapshot(
-      query(collection(db, 'users'), where('email', 'in', emailChunk)),
-      (snapshot) => { byChunk.set(chunkIndex, snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))); syncProfiles() },
-      (firebaseError) => console.error('Không thể đồng bộ hồ sơ thành viên:', firebaseError)
-    ))
-    return () => unsubs.forEach((unsubscribe) => unsubscribe())
+    loadProfiles()
+    return () => { cancelled = true }
   }, [classes, currentUser?.email, selectedClassId, students])
 
   useEffect(() => {
@@ -808,21 +868,24 @@ function LearningPage() {
       setSubjectScores({})
       return undefined
     }
-    const state = {}
-    const sync = (subjectId, key, rows) => {
-      state[subjectId] = { ...(state[subjectId] || {}), [key]: rows }
-      setSubjectScores({ ...state })
+    let cancelled = false
+    const loadScores = async () => {
+      const entries = await Promise.all(subjects.map(async (subject) => {
+        try {
+          const [testsResponse, scoresResponse] = await Promise.all([
+            classroomApi.listSubjectTests(selectedClassId, subject.id),
+            classroomApi.listScores(selectedClassId, subject.id),
+          ])
+          return [subject.id, { tests: getApiRows(testsResponse), scores: getApiRows(scoresResponse) }]
+        } catch (apiError) {
+          console.error(`Không thể tải điểm môn ${subject.id}:`, apiError)
+          return [subject.id, { tests: [], scores: [] }]
+        }
+      }))
+      if (!cancelled) setSubjectScores(Object.fromEntries(entries))
     }
-    const unsubs = []
-    subjects.forEach((subject) => {
-      unsubs.push(onSnapshot(collection(db, 'classes', selectedClassId, 'subjects', subject.id, 'tests'), (snapshot) => {
-        sync(subject.id, 'tests', snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-      }))
-      unsubs.push(onSnapshot(collection(db, 'classes', selectedClassId, 'subjects', subject.id, 'scores'), (snapshot) => {
-        sync(subject.id, 'scores', snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-      }))
-    })
-    return () => unsubs.forEach((unsubscribe) => unsubscribe())
+    loadScores()
+    return () => { cancelled = true }
   }, [selectedClassId, subjects])
 
   useEffect(() => {
@@ -848,7 +911,7 @@ function LearningPage() {
     const syncMobileWorkspaceChrome = () => {
       const shouldHide = window.matchMedia('(max-width: 780px)').matches
       const candidates = Array.from(document.querySelectorAll(
-        'body > header, body > nav, header[class*="navbar"], nav[class*="navbar"], [class*="Navbar"], [class*="topbar"], [class*="Topbar"], [class*="chatbot"], [class*="Chatbot"], [class*="ai-button"], [class*="AIButton"], [class*="floating-ai"], [class*="FloatingAI"], [id*="chatbot" i], [id*="zuny-ai" i], [aria-label*="AI" i], [title*="AI" i]'
+        '[class*="chatbot"], [class*="Chatbot"], [class*="ai-button"], [class*="AIButton"], [class*="floating-ai"], [class*="FloatingAI"], [id*="chatbot" i], [id*="zuny-ai" i], [aria-label*="AI" i], [title*="AI" i]'
       )).filter((element) => !workspace.contains(element) && !element.contains(workspace))
 
       if (shouldHide) {
@@ -1012,7 +1075,7 @@ function LearningPage() {
     )
   }
 
-  const firebaseStudentNotifications = useMemo(
+  const studentNotifications = useMemo(
     () => notifications.filter((item) => {
       if (!notificationMatchesCurrentStudent(item)) return false
       return !Array.isArray(item.dismissedBy) || !item.dismissedBy.includes(currentUser?.uid)
@@ -1021,8 +1084,8 @@ function LearningPage() {
   )
 
   const teacherCreatedNotifications = useMemo(
-    () => firebaseStudentNotifications.filter((item) => !item.systemGenerated),
-    [firebaseStudentNotifications]
+    () => studentNotifications.filter((item) => !item.systemGenerated),
+    [studentNotifications]
   )
 
   const visibleHubClasses = useMemo(() => {
@@ -1139,9 +1202,9 @@ function LearningPage() {
 
 
   const studentNotificationRows = useMemo(() => {
-    const rows = attendanceReminderNotification ? [attendanceReminderNotification, ...firebaseStudentNotifications] : firebaseStudentNotifications
+    const rows = attendanceReminderNotification ? [attendanceReminderNotification, ...studentNotifications] : studentNotifications
     return [...rows].sort((a, b) => getTimeValue(b.createdAt || b.updatedAt) - getTimeValue(a.createdAt || a.updatedAt))
-  }, [attendanceReminderNotification, firebaseStudentNotifications])
+  }, [attendanceReminderNotification, studentNotifications])
 
   const unreadStudentNotifications = useMemo(
     () => studentNotificationRows.filter((item) => !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid)),
@@ -1226,9 +1289,18 @@ function LearningPage() {
       for (const item of missing) {
         if (cancelled) return
         try {
-          await setDoc(doc(db, 'classes', selectedClassId, 'notifications', item.id), { ...item, readBy: [], authorId: 'system', authorName: 'Hệ thống lớp học', createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true })
-        } catch (firebaseError) {
-          console.error('Không thể tạo thông báo tự động cho học sinh:', firebaseError)
+          const response = await classroomApi.createNotification(selectedClassId, {
+            ...item,
+            readBy: [],
+            authorId: 'system',
+            authorName: 'Hệ thống lớp học',
+          })
+          const created = getApiItem(response)
+          if (!cancelled && created?.id) {
+            setNotifications((current) => current.some((row) => String(row.id) === String(created.id)) ? current : [created, ...current])
+          }
+        } catch (apiError) {
+          console.error('Không thể tạo thông báo tự động cho học sinh:', apiError)
         }
       }
     }
@@ -1272,7 +1344,7 @@ function LearningPage() {
         type: attachment.type || 'file',
       }))
     })
-    firebaseStudentNotifications.forEach((notification) => {
+    studentNotifications.forEach((notification) => {
       const attachments = Array.isArray(notification.attachments) ? notification.attachments : []
       attachments.forEach((attachment, index) => rows.push({
         id: `notification-${notification.id}-${index}`,
@@ -1283,7 +1355,7 @@ function LearningPage() {
       }))
     })
     return rows
-  }, [firebaseStudentNotifications, selectedClassAssignments])
+  }, [studentNotifications, selectedClassAssignments])
 
   const studentELearningResourceCounts = useMemo(() => {
     const className = normalizeText(selectedClass?.name || selectedClass?.className || '')
@@ -1397,63 +1469,27 @@ function LearningPage() {
     try {
       setJoining(true)
       setJoinError('')
-      const result = await getDocs(query(collection(db, 'classes'), where('classCode', '==', normalizedCode), limit(1)))
-      if (result.empty) {
-        setJoinError('Không tìm thấy lớp học với mã này.')
-        return
-      }
-      const classDoc = result.docs[0]
-      const classData = classDoc.data()
-      if (classData.teacherId === currentUser.uid) {
-        setJoinError('Tài khoản hiện tại là giáo viên của lớp này.')
-        return
-      }
-      if (Array.isArray(classData.memberIds) && classData.memberIds.includes(currentUser.uid)) {
-        setJoinError('Bạn đã tham gia lớp học này.')
-        return
-      }
-      const existingStudent = currentUser.email
-        ? await getDocs(query(collection(db, 'classes', classDoc.id, 'students'), where('email', '==', currentUser.email.toLowerCase()), limit(1)))
-        : null
-      const batch = writeBatch(db)
-      batch.update(classDoc.ref, {
-        memberIds: arrayUnion(currentUser.uid),
-        updatedAt: serverTimestamp(),
-        ...(existingStudent && existingStudent.empty ? { studentCount: increment(1) } : {}),
+      await classroomApi.joinClassroom(normalizedCode, {
+        uid: currentUser.uid,
+        email: currentUser.email || '',
+        name: currentUser.displayName || userDetails?.displayName || '',
+        role: userDetails?.role || 'STUDENT',
+        photoURL: currentUser.photoURL || userDetails?.photoURL || userDetails?.avatarUrl || '',
+        gender: userDetails?.gender || userDetails?.sex || '',
       })
-      if (existingStudent && existingStudent.empty) {
-        const studentRef = doc(collection(db, 'classes', classDoc.id, 'students'))
-        batch.set(studentRef, {
-          uid: currentUser.uid,
-          email: currentUser.email.toLowerCase(),
-          name: currentUser.displayName || userDetails?.displayName || '',
-          role: userDetails?.role || 'STUDENT',
-          photoURL: currentUser.photoURL || userDetails?.photoURL || userDetails?.avatarUrl || '',
-          gender: userDetails?.gender || userDetails?.sex || '',
-          status: 'active',
-          classId: classDoc.id,
-          className: classData.name || '',
-          studentCode: '',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        })
-      } else if (existingStudent && !existingStudent.empty) {
-        batch.update(existingStudent.docs[0].ref, {
-          uid: currentUser.uid,
-          name: existingStudent.docs[0].data().name || currentUser.displayName || userDetails?.displayName || '',
-          role: userDetails?.role || 'STUDENT',
-          photoURL: existingStudent.docs[0].data().photoURL || currentUser.photoURL || userDetails?.photoURL || userDetails?.avatarUrl || '',
-          status: 'active',
-          updatedAt: serverTimestamp(),
-        })
-      }
-      await batch.commit()
+      const response = await classroomApi.listClassrooms()
+      const rows = getApiRows(response)
+        .filter((item) => String(item.teacherId || item.teacher_id || '') !== String(currentUser.uid))
+        .sort((a, b) => getTimeValue(b.createdAt || b.created_at) - getTimeValue(a.createdAt || a.created_at))
+      setClasses(rows)
+      const joinedClass = rows.find((item) => normalizeText(item.classCode || item.class_code || item.code) === normalizeText(normalizedCode))
+      if (joinedClass?.id) setSelectedClassId(joinedClass.id)
       setJoinOpen(false)
       setJoinCode('')
       showToast('Tham gia lớp thành công')
-    } catch (firebaseError) {
-      console.error('Không thể tham gia lớp:', firebaseError)
-      setJoinError(firebaseError?.message || 'Không thể tham gia lớp học.')
+    } catch (apiError) {
+      console.error('Không thể tham gia lớp:', apiError)
+      setJoinError(apiError?.response?.data?.message || apiError?.message || 'Không thể tham gia lớp học.')
     } finally {
       setJoining(false)
     }
@@ -1461,32 +1497,12 @@ function LearningPage() {
 
   const leaveCurrentClass = async () => {
     if (!selectedClassId || !currentUser?.uid || leavingClass) return
-
     try {
       setLeavingClass(true)
       setLeaveClassError('')
-
-      const batch = writeBatch(db)
-      const classRef = doc(db, 'classes', selectedClassId)
-      const currentStudentCount = Number(selectedClass?.studentCount)
-      const classUpdates = {
-        memberIds: arrayRemove(currentUser.uid),
-        updatedAt: serverTimestamp(),
-      }
-
-      if (studentRecord?.id && Number.isFinite(currentStudentCount) && currentStudentCount > 0) {
-        classUpdates.studentCount = increment(-1)
-      }
-
-      batch.update(classRef, classUpdates)
-      if (studentRecord?.id) {
-        batch.delete(doc(db, 'classes', selectedClassId, 'students', studentRecord.id))
-      }
-
-      await batch.commit()
-
+      await classroomApi.leaveClassroom(selectedClassId)
       const leftClassId = selectedClassId
-      setClasses((current) => current.filter((item) => item.id !== leftClassId))
+      setClasses((current) => current.filter((item) => String(item.id) !== String(leftClassId)))
       setLeaveClassOpen(false)
       setProfileMenuOpen(false)
       setMobileMenuOpen(false)
@@ -1495,9 +1511,9 @@ function LearningPage() {
       setActivePage('home')
       setClassView('list')
       showToast('Đã rời khỏi lớp')
-    } catch (firebaseError) {
-      console.error('Không thể rời khỏi lớp:', firebaseError)
-      setLeaveClassError(firebaseError?.message || 'Không thể rời khỏi lớp. Vui lòng thử lại.')
+    } catch (apiError) {
+      console.error('Không thể rời khỏi lớp:', apiError)
+      setLeaveClassError(apiError?.response?.data?.message || apiError?.message || 'Không thể rời khỏi lớp. Vui lòng thử lại.')
     } finally {
       setLeavingClass(false)
     }
@@ -1510,46 +1526,46 @@ function LearningPage() {
       setSubmissionError('Vui lòng nhập nội dung hoặc chọn tệp bài làm.')
       return
     }
+    let uploadedAttachment = null
     try {
       setSubmitting(true)
       setSubmissionError('')
-      let attachment = null
       if (submissionFile) {
-        const safeName = submissionFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-        const storagePath = `classes/${selectedAssignment.classId}/assignments/${selectedAssignment.id}/submissions/${studentRecord.id}/${Date.now()}-${safeName}`
-        const storageRef = ref(getStorage(), storagePath)
-        await uploadBytes(storageRef, submissionFile)
-        attachment = {
-          name: submissionFile.name,
-          type: submissionFile.type || 'file',
-          url: await getDownloadURL(storageRef),
-          storagePath,
-        }
+        const uploadResponse = await classroomApi.uploadSubmissionAsset(selectedAssignment.classId, submissionFile)
+        uploadedAttachment = normalizeApiAsset(uploadResponse, submissionFile)
       }
       const due = getAssignmentDue(selectedAssignment)
       const submittedAtMillis = Date.now()
-      await updateDoc(doc(db, 'classes', selectedAssignment.classId, 'assignments', selectedAssignment.id), {
-        [`submissions.${studentRecord.id}`]: {
-          studentId: studentRecord.id,
-          uid: currentUser.uid,
-          email: currentUser.email || studentRecord.email || '',
-          studentName,
-          content,
-          attachment,
-          attachments: attachment ? [attachment] : [],
-          status: due && submittedAtMillis > due ? 'late' : 'submitted',
-          isLate: Boolean(due && submittedAtMillis > due),
-          submittedAt: new Date(submittedAtMillis).toISOString(),
-          updatedAt: new Date(submittedAtMillis).toISOString(),
-        },
-        updatedAt: serverTimestamp(),
+      await classroomApi.submitAssignment(selectedAssignment.classId, selectedAssignment.id, {
+        studentId: studentRecord.id,
+        uid: currentUser.uid,
+        email: currentUser.email || studentRecord.email || '',
+        studentName,
+        content,
+        attachment: uploadedAttachment,
+        attachments: uploadedAttachment ? [uploadedAttachment] : [],
+        status: due && submittedAtMillis > due ? 'late' : 'submitted',
+        isLate: Boolean(due && submittedAtMillis > due),
+        submittedAt: new Date(submittedAtMillis).toISOString(),
+        updatedAt: new Date(submittedAtMillis).toISOString(),
       })
+      const refreshedResponse = await classroomApi.listAssignments(selectedAssignment.classId)
+      const refreshed = getApiRows(refreshedResponse).map((item) => ({
+        ...item,
+        classId: item.classId || item.class_id || selectedAssignment.classId,
+        className: item.className || item.class_name || selectedClass?.name || '',
+      }))
+      setClassAssignments((current) => ({ ...current, [selectedAssignment.classId]: refreshed }))
       setSubmissionText('')
       setSubmissionFile(null)
       showToast('Nộp bài thành công')
-    } catch (firebaseError) {
-      console.error('Không thể nộp bài:', firebaseError)
-      setSubmissionError(firebaseError?.message || 'Không thể nộp bài. Có thể Security Rules hiện tại chưa cho phép học sinh cập nhật bài tập.')
+    } catch (apiError) {
+      console.error('Không thể nộp bài:', apiError)
+      if (uploadedAttachment?.storagePath) {
+        try { await classroomApi.deleteAsset(uploadedAttachment.storagePath) }
+        catch (cleanupError) { console.warn('Không thể dọn file R2 sau khi nộp bài thất bại:', cleanupError) }
+      }
+      setSubmissionError(apiError?.response?.data?.message || apiError?.message || 'Không thể nộp bài.')
     } finally {
       setSubmitting(false)
     }
@@ -1562,23 +1578,15 @@ function LearningPage() {
     if (content.length > 2000) { setMessageError('Tin nhắn tối đa 2000 ký tự.'); return }
     if (!content && !messageFile) return
     const classItem = conversation.classItem
+    let uploadedAttachment = null
     try {
       setSendingMessage(true)
       setMessageError('')
-      let attachment = null
       if (messageFile) {
-        const safeName = messageFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-        const storagePath = `classes/${classItem.id}/messages/${Date.now()}-${safeName}`
-        const storageRef = ref(getStorage(), storagePath)
-        await uploadBytes(storageRef, messageFile)
-        attachment = {
-          name: messageFile.name,
-          url: await getDownloadURL(storageRef),
-          type: messageFile.type || 'file',
-          storagePath,
-        }
+        const uploadResponse = await classroomApi.uploadMessageAsset(classItem.id, messageFile)
+        uploadedAttachment = normalizeApiAsset(uploadResponse, messageFile)
       }
-      await addDoc(collection(db, 'classes', classItem.id, 'messages'), {
+      const response = await classroomApi.createMessage(classItem.id, {
         classId: classItem.id,
         conversationId: `student:${normalizeText(currentUser.email)}`,
         senderId: currentUser.uid,
@@ -1591,18 +1599,27 @@ function LearningPage() {
         receiverType: 'teacher',
         receiverAvatar: classItem.teacherPhotoURL || classItem.teacherAvatar || '',
         content,
-        attachment,
+        attachment: uploadedAttachment,
         recalled: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       })
+      const created = getApiItem(response)
+      if (created?.id) {
+        setMessages((current) => [...current, created])
+      } else {
+        const refreshed = await classroomApi.listMessages(classItem.id)
+        setMessages(getApiRows(refreshed).sort((a, b) => getTimeValue(a.createdAt || a.created_at) - getTimeValue(b.createdAt || b.created_at)))
+      }
       setMessageDraft('')
       setMessageFile(null)
       if (messageFileRef.current) messageFileRef.current.value = ''
       showToast('Đã gửi tin nhắn')
-    } catch (firebaseError) {
-      console.error('Không thể gửi tin nhắn:', firebaseError)
-      setMessageError(firebaseError?.message || 'Không thể gửi tin nhắn.')
+    } catch (apiError) {
+      console.error('Không thể gửi tin nhắn:', apiError)
+      if (uploadedAttachment?.storagePath) {
+        try { await classroomApi.deleteAsset(uploadedAttachment.storagePath) }
+        catch (cleanupError) { console.warn('Không thể dọn file R2:', cleanupError) }
+      }
+      setMessageError(apiError?.response?.data?.message || apiError?.message || 'Không thể gửi tin nhắn.')
     } finally {
       setSendingMessage(false)
     }
@@ -1614,21 +1631,22 @@ function LearningPage() {
     if (!item?.id || !currentUser?.uid || !ownMessage || item.recalled || recalling) return
     try {
       setRecalling(true)
-      if (item.attachment?.storagePath || item.attachment?.url) {
-        try {
-          await deleteObject(ref(getStorage(), item.attachment.storagePath || item.attachment.url))
-        } catch (storageError) {
-          if (storageError?.code !== 'storage/object-not-found') throw storageError
-        }
-      }
-      await updateDoc(doc(db, 'classes', item.classId || selectedConversation?.classItem.id, 'messages', item.id), {
-        content: '', attachment: null, recalled: true, recalledAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      })
+      setMessageError('')
+      const classroomId = item.classId || item.class_id || selectedConversation?.classItem?.id
+      await classroomApi.recallMessage(classroomId, item.id)
+      setMessages((current) => current.map((message) => String(message.id) === String(item.id) ? {
+        ...message,
+        content: '',
+        attachment: null,
+        recalled: true,
+        recalledAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } : message))
       setRecallTarget(null)
       showToast('Đã thu hồi tin nhắn')
-    } catch (firebaseError) {
-      console.error('Không thể thu hồi tin nhắn:', firebaseError)
-      setMessageError(firebaseError?.message || 'Không thể thu hồi tin nhắn.')
+    } catch (apiError) {
+      console.error('Không thể thu hồi tin nhắn:', apiError)
+      setMessageError(apiError?.response?.data?.message || apiError?.message || 'Không thể thu hồi tin nhắn.')
     } finally {
       setRecalling(false)
     }
@@ -1680,12 +1698,14 @@ function LearningPage() {
     try {
       setNotificationActionBusy(`read:${item.id}`)
       setNotificationActionError('')
-      await updateDoc(doc(db, 'classes', selectedClassId, 'notifications', item.id), {
-        readBy: arrayUnion(currentUser.uid),
-      })
-    } catch (firebaseError) {
-      console.error('Không thể đánh dấu thông báo đã đọc:', firebaseError)
-      setNotificationActionError(firebaseError?.message || 'Không thể đánh dấu thông báo đã đọc.')
+      await classroomApi.readNotification(selectedClassId, item.id)
+      setNotifications((current) => current.map((notification) => String(notification.id) === String(item.id) ? {
+        ...notification,
+        readBy: Array.from(new Set([...(Array.isArray(notification.readBy) ? notification.readBy : []), currentUser.uid])),
+      } : notification))
+    } catch (apiError) {
+      console.error('Không thể đánh dấu thông báo đã đọc:', apiError)
+      setNotificationActionError(apiError?.response?.data?.message || apiError?.message || 'Không thể đánh dấu thông báo đã đọc.')
     } finally {
       setNotificationActionBusy('')
     }
@@ -1696,42 +1716,31 @@ function LearningPage() {
     try {
       setNotificationActionBusy(`delete:${item.id}`)
       setNotificationActionError('')
-      await updateDoc(doc(db, 'classes', selectedClassId, 'notifications', item.id), {
-        dismissedBy: arrayUnion(currentUser.uid),
-      })
+      await classroomApi.dismissNotification(selectedClassId, item.id)
+      setNotifications((current) => current.filter((notification) => String(notification.id) !== String(item.id)))
       showToast('Đã xóa thông báo khỏi danh sách của bạn')
-    } catch (firebaseError) {
-      console.error('Không thể xóa thông báo khỏi danh sách học sinh:', firebaseError)
-      setNotificationActionError(firebaseError?.message || 'Không thể xóa thông báo.')
+    } catch (apiError) {
+      console.error('Không thể xóa thông báo khỏi danh sách học sinh:', apiError)
+      setNotificationActionError(apiError?.response?.data?.message || apiError?.message || 'Không thể xóa thông báo.')
     } finally {
       setNotificationActionBusy('')
     }
   }
 
   const dismissAllStudentNotifications = async () => {
-    if (!selectedClassId || !currentUser?.uid || !firebaseStudentNotifications.length || notificationActionBusy) return
+    if (!selectedClassId || !currentUser?.uid || !studentNotifications.length || notificationActionBusy) return
     try {
       setNotificationActionBusy('delete-all')
       setNotificationActionError('')
-      const chunks = []
-      for (let index = 0; index < firebaseStudentNotifications.length; index += 430) {
-        chunks.push(firebaseStudentNotifications.slice(index, index + 430))
-      }
-      for (const chunk of chunks) {
-        const batch = writeBatch(db)
-        chunk.forEach((item) => {
-          batch.update(doc(db, 'classes', selectedClassId, 'notifications', item.id), {
-            dismissedBy: arrayUnion(currentUser.uid),
-          })
-        })
-        await batch.commit()
-      }
+      await Promise.all(studentNotifications.map((item) => classroomApi.dismissNotification(selectedClassId, item.id)))
+      const ids = new Set(studentNotifications.map((item) => String(item.id)))
+      setNotifications((current) => current.filter((item) => !ids.has(String(item.id))))
       setNotificationDeleteAllOpen(false)
       setNotificationFilter('all')
       showToast('Đã xóa tất cả thông báo khỏi danh sách của bạn')
-    } catch (firebaseError) {
-      console.error('Không thể xóa tất cả thông báo khỏi danh sách học sinh:', firebaseError)
-      setNotificationActionError(firebaseError?.message || 'Không thể xóa tất cả thông báo.')
+    } catch (apiError) {
+      console.error('Không thể xóa tất cả thông báo khỏi danh sách học sinh:', apiError)
+      setNotificationActionError(apiError?.response?.data?.message || apiError?.message || 'Không thể xóa tất cả thông báo.')
     } finally {
       setNotificationActionBusy('')
     }
@@ -2142,7 +2151,7 @@ function LearningPage() {
               <button type="button" className={notificationFilter === 'all' ? 'active' : ''} onClick={() => setNotificationFilter('all')}>Tất cả</button>
               <button type="button" className={notificationFilter === 'unread' ? 'active' : ''} onClick={() => setNotificationFilter('unread')}>Chưa đọc ({unreadStudentNotifications.length})</button>
             </div>
-            <button type="button" className="student-notification-delete-all" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!firebaseStudentNotifications.length || notificationActionBusy === 'delete-all'}>⌫ Xóa hết</button>
+            <button type="button" className="student-notification-delete-all" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!studentNotifications.length || notificationActionBusy === 'delete-all'}>⌫ Xóa hết</button>
           </div>
         </section>
 
@@ -2202,7 +2211,7 @@ function LearningPage() {
           }) : <div className="student-notification-center-empty">{notificationFilter === 'unread' ? 'Không còn thông báo chưa đọc.' : 'Chưa có thông báo dành cho bạn.'}</div>}
         </section>
 
-        {notificationDeleteAllOpen ? <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && notificationActionBusy !== 'delete-all') setNotificationDeleteAllOpen(false) }}><section className="student-modal student-notification-delete-modal"><header><div><span>THÔNG BÁO</span><h2>Xóa hết thông báo?</h2></div><button type="button" onClick={() => setNotificationDeleteAllOpen(false)} disabled={notificationActionBusy === 'delete-all'}>×</button></header><p>Thông báo sẽ chỉ được ẩn khỏi tài khoản của bạn. Giáo viên và các thành viên khác trong lớp không bị ảnh hưởng.</p><footer><button type="button" className="student-secondary-btn" onClick={() => setNotificationDeleteAllOpen(false)} disabled={notificationActionBusy === 'delete-all'}>Hủy</button><button type="button" className="student-danger-btn" onClick={dismissAllStudentNotifications} disabled={notificationActionBusy === 'delete-all' || !firebaseStudentNotifications.length}>{notificationActionBusy === 'delete-all' ? 'Đang xóa...' : 'Xóa hết'}</button></footer></section></div> : null}
+        {notificationDeleteAllOpen ? <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && notificationActionBusy !== 'delete-all') setNotificationDeleteAllOpen(false) }}><section className="student-modal student-notification-delete-modal"><header><div><span>THÔNG BÁO</span><h2>Xóa hết thông báo?</h2></div><button type="button" onClick={() => setNotificationDeleteAllOpen(false)} disabled={notificationActionBusy === 'delete-all'}>×</button></header><p>Thông báo sẽ chỉ được ẩn khỏi tài khoản của bạn. Giáo viên và các thành viên khác trong lớp không bị ảnh hưởng.</p><footer><button type="button" className="student-secondary-btn" onClick={() => setNotificationDeleteAllOpen(false)} disabled={notificationActionBusy === 'delete-all'}>Hủy</button><button type="button" className="student-danger-btn" onClick={dismissAllStudentNotifications} disabled={notificationActionBusy === 'delete-all' || !studentNotifications.length}>{notificationActionBusy === 'delete-all' ? 'Đang xóa...' : 'Xóa hết'}</button></footer></section></div> : null}
       </div>
     )
   }
@@ -2323,26 +2332,27 @@ function LearningPage() {
       setSelfProfileError('Email phụ huynh chưa đúng định dạng.')
       return
     }
+    const payload = {
+      name,
+      phone: selfProfileEditForm.phone.trim(),
+      gender: selfProfileEditForm.gender.trim(),
+      birthDate: selfProfileEditForm.birthDate.trim(),
+      parentName: selfProfileEditForm.parentName.trim(),
+      parentPhone: selfProfileEditForm.parentPhone.trim(),
+      parentEmail,
+      parentRelation: selfProfileEditForm.parentRelation.trim(),
+      medicalNote: selfProfileEditForm.medicalNote.trim(),
+    }
     try {
       setSelfProfileSaving(true)
       setSelfProfileError('')
-      await updateDoc(doc(db, 'classes', selectedClassId, 'students', studentRecord.id), {
-        name,
-        phone: selfProfileEditForm.phone.trim(),
-        gender: selfProfileEditForm.gender.trim(),
-        birthDate: selfProfileEditForm.birthDate.trim(),
-        parentName: selfProfileEditForm.parentName.trim(),
-        parentPhone: selfProfileEditForm.parentPhone.trim(),
-        parentEmail,
-        parentRelation: selfProfileEditForm.parentRelation.trim(),
-        medicalNote: selfProfileEditForm.medicalNote.trim(),
-        updatedAt: serverTimestamp(),
-      })
+      await classroomApi.updateMember(selectedClassId, studentRecord.id, payload)
+      setStudents((current) => current.map((item) => String(item.id) === String(studentRecord.id) ? { ...item, ...payload } : item))
       setSelfProfileEditing(false)
       showToast('Đã cập nhật hồ sơ')
-    } catch (firebaseError) {
-      console.error('Không thể cập nhật hồ sơ học sinh:', firebaseError)
-      setSelfProfileError(firebaseError?.message || 'Không thể cập nhật hồ sơ học sinh.')
+    } catch (apiError) {
+      console.error('Không thể cập nhật hồ sơ học sinh:', apiError)
+      setSelfProfileError(apiError?.response?.data?.message || apiError?.message || 'Không thể cập nhật hồ sơ học sinh.')
     } finally {
       setSelfProfileSaving(false)
     }
@@ -2508,7 +2518,7 @@ function LearningPage() {
         </section>
       </div>
 
-      {joinOpen ? <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !joining) setJoinOpen(false) }}><form className="student-modal" onSubmit={handleJoinClass}><header><div><span>THAM GIA LỚP</span><h2>Nhập mã lớp học</h2></div><button type="button" onClick={() => setJoinOpen(false)} disabled={joining}>×</button></header><p>Nhập mã lớp do giáo viên cung cấp. Hệ thống sẽ dùng đúng collection lớp học hiện tại.</p><label>Mã lớp<input autoFocus value={joinCode} maxLength={12} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} placeholder="VD: ABCD1234" /></label>{joinError ? <p className="student-error">{joinError}</p> : null}<footer><button type="button" className="student-secondary-btn" onClick={() => setJoinOpen(false)} disabled={joining}>Hủy</button><button type="submit" className="student-primary-btn" disabled={joining || !joinCode.trim()}>{joining ? 'Đang kiểm tra...' : 'Tham gia lớp'}</button></footer></form></div> : null}
+      {joinOpen ? <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !joining) setJoinOpen(false) }}><form className="student-modal" onSubmit={handleJoinClass}><header><div><span>THAM GIA LỚP</span><h2>Nhập mã lớp học</h2></div><button type="button" onClick={() => setJoinOpen(false)} disabled={joining}>×</button></header><p>Nhập mã lớp do giáo viên cung cấp. Hệ thống sẽ dùng dữ liệu lớp học hiện tại.</p><label>Mã lớp<input autoFocus value={joinCode} maxLength={12} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} placeholder="VD: ABCD1234" /></label>{joinError ? <p className="student-error">{joinError}</p> : null}<footer><button type="button" className="student-secondary-btn" onClick={() => setJoinOpen(false)} disabled={joining}>Hủy</button><button type="submit" className="student-primary-btn" disabled={joining || !joinCode.trim()}>{joining ? 'Đang kiểm tra...' : 'Tham gia lớp'}</button></footer></form></div> : null}
 
       {leaveClassOpen ? <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !leavingClass) setLeaveClassOpen(false) }}><section className="student-modal student-leave-class-modal"><header><div><span>LỚP HỌC</span><h2>Rời khỏi lớp?</h2></div><button type="button" onClick={() => setLeaveClassOpen(false)} disabled={leavingClass}>×</button></header><p>Bạn sẽ rời khỏi lớp <strong>{selectedClass?.name || 'hiện tại'}</strong> và lớp này sẽ không còn xuất hiện trong danh sách lớp của bạn.</p><div className="student-leave-class-warning">Hành động này sẽ xóa tư cách thành viên hiện tại của bạn khỏi lớp. Nếu muốn tham gia lại, bạn cần dùng lại mã lớp.</div>{leaveClassError ? <p className="student-error">{leaveClassError}</p> : null}<footer><button className="student-secondary-btn" type="button" disabled={leavingClass} onClick={() => setLeaveClassOpen(false)}>Hủy</button><button className="student-danger-btn" type="button" disabled={leavingClass} onClick={leaveCurrentClass}>{leavingClass ? 'Đang rời lớp...' : 'Rời khỏi lớp'}</button></footer></section></div> : null}
 
@@ -2598,7 +2608,7 @@ const styles = `
 
 /* ============================================================
    2026-08-20: final student workspace light/dark consistency fix
-   Scope only the in-class student workspace. Keep Firebase/UI logic intact.
+   Scope only the in-class student workspace. Keep data/UI logic intact.
    ============================================================ */
 .student-learning-page:not(.student-class-hub){color-scheme:light}
 .dark .student-learning-page:not(.student-class-hub){color-scheme:dark;background:#0b1020;color:#f8fafc}
@@ -2979,8 +2989,5 @@ const styles = `
   .student-chat-messages .student-message,.student-message-action.copy.copied{animation:none}
   .student-message-actions,.student-message-action,.student-message-action>b,.student-message-bubble{transition:none!important}
 }
-
-
 `
-
 export default LearningPage

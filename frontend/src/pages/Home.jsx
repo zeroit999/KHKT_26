@@ -21,7 +21,7 @@ import {
   Zap,
 } from 'lucide-react'
 
-import { getExamsApi } from '../api/examApi'
+import { getPublicExamsApi } from '../api/examApi'
 import { useAuth } from '../contexts/AuthContext'
 
 const fadeUp = {
@@ -225,7 +225,7 @@ function Home() {
         setLoadingStats(true)
         setStatsError('')
 
-        const response = await getExamsApi()
+        const response = await getPublicExamsApi()
         const examList = Array.isArray(response?.data?.exams)
           ? response.data.exams
           : Array.isArray(response?.data)

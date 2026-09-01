@@ -1,199 +1,450 @@
-/* eslint-disable no-useless-catch */
-import { auth } from '../components/firebase.js'
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  GoogleAuthProvider,
-  signInWithPopup,
-} from 'firebase/auth'
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://127.0.0.1:5000'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+const ACCESS_TOKEN_KEY = 'zuny_access_token'
+const REFRESH_TOKEN_KEY = 'zuny_refresh_token'
 
 class AuthService {
   constructor() {
     this.currentUser = null
-    this.accessToken = null
-    this.refreshToken = null
+
+    this.accessToken =
+      localStorage.getItem(
+        ACCESS_TOKEN_KEY
+      )
+
+    this.refreshToken =
+      localStorage.getItem(
+        REFRESH_TOKEN_KEY
+      )
   }
 
-  async loginWithEmailPassword(email, password) {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const firebaseToken = await userCredential.user.getIdToken()
+  async request(
+    path,
+    options = {}
+  ) {
+    const response = await fetch(
+      `${API_BASE_URL}${path}`,
+      {
+        ...options,
 
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+          Accept:
+            'application/json',
+
+          ...(options.body
+            ? {
+                'Content-Type':
+                  'application/json',
+              }
+            : {}),
+
+          ...options.headers,
         },
-        credentials: 'include',
-        body: JSON.stringify({
-          firebase_token: firebaseToken,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to authenticate with backend')
       }
+    )
 
-      const data = await response.json()
+    const data =
+      await response
+        .json()
+        .catch(() => ({}))
 
-      this.setTokens(data.access_token, data.refresh_token)
-      this.currentUser = data.user
-
-      return data.user
-    } catch (error) {
-      throw error
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          data.message ||
+          'Có lỗi xảy ra.'
+      )
     }
+
+    return data
   }
 
-  async loginWithGoogle() {
-    try {
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const firebaseToken = await result.user.getIdToken()
+  async loginWithEmailPassword(
+    email,
+    password
+  ) {
+    const data =
+      await this.request(
+        '/auth/login',
+        {
+          method: 'POST',
 
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          firebase_token: firebaseToken,
-        }),
-      })
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        }
+      )
 
-      if (!response.ok) {
-        throw new Error('Failed to authenticate with backend')
-      }
+    this.setTokens(
+      data.access_token,
+      data.refresh_token
+    )
 
-      const data = await response.json()
+    this.currentUser =
+      data.user
 
-      this.setTokens(data.access_token, data.refresh_token)
-      this.currentUser = data.user
-
-      return data.user
-    } catch (error) {
-      throw error
-    }
+    return data.user
   }
 
-  async register(email, password, additionalData = {}) {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-      const firebaseToken = await userCredential.user.getIdToken()
+  async register(
+    email,
+    password,
+    additionalData = {}
+  ) {
+    const data =
+      await this.request(
+        '/auth/register',
+        {
+          method: 'POST',
 
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          firebase_token: firebaseToken,
-          ...additionalData,
-        }),
-      })
+          body: JSON.stringify({
+            email,
+            password,
+            ...additionalData,
+          }),
+        }
+      )
 
-      if (!response.ok) {
-        throw new Error('Failed to register with backend')
-      }
+    this.setTokens(
+      data.access_token,
+      data.refresh_token
+    )
 
-      const data = await response.json()
+    this.currentUser =
+      data.user
 
-      this.setTokens(data.access_token, data.refresh_token)
-      this.currentUser = data.user
+    return data.user
+  }
 
-      return data.user
-    } catch (error) {
-      throw error
+  async loginWithGoogleCredential(
+    credential
+  ) {
+    const data =
+      await this.request(
+        '/auth/google',
+        {
+          method: 'POST',
+
+          body: JSON.stringify({
+            credential,
+          }),
+        }
+      )
+
+    this.setTokens(
+      data.access_token,
+      data.refresh_token
+    )
+
+    this.currentUser =
+      data.user
+
+    return data.user
+  }
+
+  async getMe() {
+    if (!this.accessToken) {
+      return null
     }
+
+    let response = await fetch(
+      `${API_BASE_URL}/auth/me`,
+      {
+        headers: {
+          Accept:
+            'application/json',
+
+          Authorization:
+            `Bearer ${this.accessToken}`,
+        },
+      }
+    )
+
+    if (
+      response.status === 401 &&
+      this.refreshToken
+    ) {
+      try {
+        await this.refreshAccessToken()
+
+        response = await fetch(
+          `${API_BASE_URL}/auth/me`,
+          {
+            headers: {
+              Accept:
+                'application/json',
+
+              Authorization:
+                `Bearer ${this.accessToken}`,
+            },
+          }
+        )
+      } catch {
+        this.clearSession()
+        return null
+      }
+    }
+
+    if (!response.ok) {
+      this.clearSession()
+      return null
+    }
+
+    const data =
+      await response.json()
+
+    this.currentUser =
+      data.user
+
+    return data.user
+  }
+
+  async updateMe(data = {}) {
+    if (!this.accessToken) {
+      throw new Error(
+        'Bạn chưa đăng nhập.'
+      )
+    }
+
+    let response = await fetch(
+      `${API_BASE_URL}/auth/me`,
+      {
+        method: 'PATCH',
+
+        headers: {
+          Accept:
+            'application/json',
+
+          'Content-Type':
+            'application/json',
+
+          Authorization:
+            `Bearer ${this.accessToken}`,
+        },
+
+        body: JSON.stringify(
+          data
+        ),
+      }
+    )
+
+    if (
+      response.status === 401 &&
+      this.refreshToken
+    ) {
+      try {
+        await this.refreshAccessToken()
+
+        response = await fetch(
+          `${API_BASE_URL}/auth/me`,
+          {
+            method: 'PATCH',
+
+            headers: {
+              Accept:
+                'application/json',
+
+              'Content-Type':
+                'application/json',
+
+              Authorization:
+                `Bearer ${this.accessToken}`,
+            },
+
+            body: JSON.stringify(
+              data
+            ),
+          }
+        )
+      } catch {
+        this.clearSession()
+
+        throw new Error(
+          'Phiên đăng nhập đã hết hạn.'
+        )
+      }
+    }
+
+    const responseData =
+      await response
+        .json()
+        .catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(
+        responseData.error ||
+          responseData.message ||
+          'Không thể cập nhật hồ sơ.'
+      )
+    }
+
+    if (responseData.access_token) {
+      this.accessToken =
+        responseData.access_token
+
+      localStorage.setItem(
+        ACCESS_TOKEN_KEY,
+        responseData.access_token
+      )
+    }
+
+    if (responseData.user) {
+      this.currentUser =
+        responseData.user
+    }
+
+    return responseData
   }
 
   async logout() {
     try {
-      await firebaseSignOut(auth)
-
       if (this.accessToken) {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-          credentials: 'include',
-        })
-      }
+        await fetch(
+          `${API_BASE_URL}/auth/logout`,
+          {
+            method: 'POST',
 
-      this.clearTokens()
-      this.currentUser = null
+            headers: {
+              'Content-Type':
+                'application/json',
+
+              Authorization:
+                `Bearer ${this.accessToken}`,
+            },
+
+            body: JSON.stringify({
+              refresh_token:
+                this.refreshToken,
+            }),
+          }
+        )
+      }
     } catch (error) {
-      console.error('Logout error:', error)
-      this.clearTokens()
-      this.currentUser = null
+      console.error(
+        'Logout error:',
+        error
+      )
+    } finally {
+      this.clearSession()
     }
   }
 
-  setTokens(accessToken, refreshToken) {
-    this.accessToken = accessToken
-    this.refreshToken = refreshToken
+  setTokens(
+    accessToken,
+    refreshToken
+  ) {
+    this.accessToken =
+      accessToken || null
+
+    this.refreshToken =
+      refreshToken || null
+
+    if (this.accessToken) {
+      localStorage.setItem(
+        ACCESS_TOKEN_KEY,
+        this.accessToken
+      )
+    } else {
+      localStorage.removeItem(
+        ACCESS_TOKEN_KEY
+      )
+    }
+
+    if (this.refreshToken) {
+      localStorage.setItem(
+        REFRESH_TOKEN_KEY,
+        this.refreshToken
+      )
+    } else {
+      localStorage.removeItem(
+        REFRESH_TOKEN_KEY
+      )
+    }
   }
 
   clearTokens() {
     this.accessToken = null
     this.refreshToken = null
+
+    localStorage.removeItem(
+      ACCESS_TOKEN_KEY
+    )
+
+    localStorage.removeItem(
+      REFRESH_TOKEN_KEY
+    )
+  }
+
+  clearSession() {
+    this.clearTokens()
+    this.currentUser = null
   }
 
   getAccessToken() {
     return this.accessToken
   }
 
-  isAuthenticated() {
-    return !!this.accessToken && !!this.currentUser
+  getRefreshToken() {
+    return this.refreshToken
   }
 
   getCurrentUser() {
     return this.currentUser
   }
 
+  isAuthenticated() {
+    return Boolean(
+      this.accessToken
+    )
+  }
+
   async refreshAccessToken() {
     if (!this.refreshToken) {
-      throw new Error('No refresh token available')
+      throw new Error(
+        'No refresh token available'
+      )
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          refresh_token: this.refreshToken,
-        }),
-      })
+      const data =
+        await this.request(
+          '/auth/refresh',
+          {
+            method: 'POST',
 
-      if (!response.ok) {
-        throw new Error('Failed to refresh token')
+            body: JSON.stringify({
+              refresh_token:
+                this.refreshToken,
+            }),
+          }
+        )
+
+      if (
+        !data.access_token ||
+        !data.refresh_token
+      ) {
+        throw new Error(
+          'Phản hồi làm mới phiên không hợp lệ.'
+        )
       }
 
-      const data = await response.json()
-
-      this.accessToken = data.access_token
+      this.setTokens(
+        data.access_token,
+        data.refresh_token
+      )
 
       return data.access_token
     } catch (error) {
-      this.clearTokens()
-      this.currentUser = null
+      this.clearSession()
       throw error
     }
   }
 }
 
-export const authService = new AuthService()
+export const authService =
+  new AuthService()
+
 export default AuthService

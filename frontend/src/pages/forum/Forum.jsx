@@ -2,28 +2,6 @@ import GroupModal from './components/GroupModal'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  addDoc,
-  arrayRemove,
-  arrayUnion,
-  collection,
-  collectionGroup,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-} from 'firebase/firestore'
-import { onAuthStateChanged } from 'firebase/auth'
-import {
   Bell,
   BarChart3,
   CheckCircle2,
@@ -78,7 +56,8 @@ import {
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
-import { auth, db } from '../../components/firebase'
+import { forumApi } from '../../services/forumApi'
+import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode'
 import DiscordGroupsLayout from './groups/DiscordGroupsLayout'
 
@@ -260,6 +239,40 @@ const timestampToMs = (value) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? 0 : date.getTime()
 }
+
+const toId = (value) => String(value ?? '')
+
+const normalizeForumUser = (value = {}) => {
+  const safe = value && typeof value === 'object' ? value : {}
+  const id = toId(safe.uid || safe.id || safe.user_id || safe.userId)
+  return {
+    ...safe,
+    id,
+    uid: id,
+    fullName: safe.fullName || safe.full_name || safe.name || safe.displayName || '',
+    displayName: safe.displayName || safe.fullName || safe.full_name || safe.name || '',
+    className: safe.className || safe.class_name || safe.class || safe.lop || '',
+    photoURL: safe.photoURL || safe.photoUrl || safe.avatarUrl || safe.avatarURL || safe.avatar || safe.profileImage || '',
+  }
+}
+
+const normalizeForumItemIds = (item = {}) => ({
+  ...item,
+  id: toId(item.id),
+  authorId: item.authorId === undefined || item.authorId === null ? '' : toId(item.authorId),
+  postId: item.postId === undefined || item.postId === null ? '' : toId(item.postId),
+  commentId: item.commentId === undefined || item.commentId === null ? '' : toId(item.commentId),
+  groupId: item.groupId === undefined || item.groupId === null ? '' : toId(item.groupId),
+  toUserId: item.toUserId === undefined || item.toUserId === null ? '' : toId(item.toUserId),
+  fromUserId: item.fromUserId === undefined || item.fromUserId === null ? '' : toId(item.fromUserId),
+  reporterId: item.reporterId === undefined || item.reporterId === null ? '' : toId(item.reporterId),
+  savedBy: Array.isArray(item.savedBy) ? item.savedBy.map(toId) : [],
+  likedBy: Array.isArray(item.likedBy) ? item.likedBy.map(toId) : [],
+  viewedBy: Array.isArray(item.viewedBy) ? item.viewedBy.map(toId) : [],
+  reportedBy: Array.isArray(item.reportedBy) ? item.reportedBy.map(toId) : [],
+  eventInterestedBy: Array.isArray(item.eventInterestedBy) ? item.eventInterestedBy.map(toId) : [],
+  eventNotInterestedBy: Array.isArray(item.eventNotInterestedBy) ? item.eventNotInterestedBy.map(toId) : [],
+})
 
 const formatRelativeTime = (value) => {
   const ms = timestampToMs(value)
@@ -696,6 +709,7 @@ const showGroupCreatedPopup = ({ groupCode = '', inviteCode = '', onEnter = () =
 
 function Forum({ onChannelViewChange = () => {} }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const syncedDark = useSyncedDarkMode()
   const [manualDark, setManualDark] = useState(null)
   const dark = manualDark ?? syncedDark
@@ -709,7 +723,22 @@ function Forum({ onChannelViewChange = () => {} }) {
   const [groups, setGroups] = useState([])
   const [notifications, setNotifications] = useState([])
   const [loadingPosts, setLoadingPosts] = useState(true)
-  const [activeSection, setActiveSection] = useState(SECTIONS.HALL)
+  const validSectionIds = useMemo(
+    () => new Set(Object.values(SECTIONS)),
+    [],
+  )
+
+  const getSectionFromUrl = () => {
+    if (typeof window === 'undefined') return SECTIONS.HALL
+    const requestedSection =
+      new URLSearchParams(window.location.search).get('section')
+
+    return requestedSection && validSectionIds.has(requestedSection)
+      ? requestedSection
+      : SECTIONS.HALL
+  }
+
+  const [activeSection, setActiveSection] = useState(getSectionFromUrl)
   const [filter, setFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [myPostStatusFilter, setMyPostStatusFilter] = useState('all')
@@ -751,113 +780,124 @@ function Forum({ onChannelViewChange = () => {} }) {
   const currentForumRestrictions = userProfiles[currentUser?.uid]?.forumRestrictions || profile?.forumRestrictions || {}
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user)
+    let cancelled = false
+
+    const syncCurrentUser = async () => {
       setProfileLoading(true)
+
       if (!user) {
-        setProfile(null)
-        setProfileLoading(false)
+        if (!cancelled) {
+          setCurrentUser(null)
+          setProfile(null)
+          setProfileLoading(false)
+        }
         return
       }
 
-      try {
-        const userSnap = await getDoc(doc(db, 'users', user.uid))
-        setProfile(userSnap.exists() ? userSnap.data() : null)
-      } catch (error) {
-        console.error('Không thể tải thông tin người dùng:', error)
-        setProfile(null)
-      } finally {
-        setProfileLoading(false)
-      }
-    })
+      const baseUser = normalizeForumUser(user)
+      if (!cancelled) setCurrentUser(baseUser)
 
-    return () => unsubscribe()
-  }, [])
+      try {
+        const response = await forumApi.me()
+        const apiUser = normalizeForumUser(response.user || response.data || response)
+        if (!cancelled) {
+          setCurrentUser((previous) => normalizeForumUser({ ...previous, ...apiUser }))
+          setProfile(apiUser)
+        }
+      } catch (error) {
+        console.error('Không thể tải thông tin người dùng từ SQL:', error)
+        if (!cancelled) setProfile(baseUser)
+      } finally {
+        if (!cancelled) setProfileLoading(false)
+      }
+    }
+
+    syncCurrentUser()
+    return () => { cancelled = true }
+  }, [user])
 
   useEffect(() => {
-    const usersQuery = query(collection(db, 'users'), limit(500))
-    const unsubscribe = onSnapshot(
-      usersQuery,
-      (snapshot) => {
+    let cancelled = false
+    let timer = null
+
+    const loadUsers = async () => {
+      try {
+        const response = await forumApi.users()
+        const users = Array.isArray(response.users) ? response.users : []
         const nextProfiles = {}
-        snapshot.docs.forEach((item) => {
-          nextProfiles[item.id] = { id: item.id, ...item.data() }
+        users.forEach((item) => {
+          const normalized = normalizeForumUser(item)
+          if (normalized.id) nextProfiles[normalized.id] = normalized
         })
-        setUserProfiles(nextProfiles)
-      },
-      (error) => console.warn('Không thể đồng bộ avatar người dùng:', error),
-    )
-    return () => unsubscribe()
+        if (!cancelled) setUserProfiles(nextProfiles)
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể đồng bộ người dùng từ SQL:', error)
+      }
+    }
+
+    loadUsers()
+    timer = window.setInterval(loadUsers, 10000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [])
 
-  const openUserProfile = (user = {}) => {
-    if (!user?.uid || user.isAnonymous) return
-    const firebaseProfile = userProfiles[user.uid] || {}
+  const openUserProfile = (targetUser = {}) => {
+    const userId = toId(targetUser.uid || targetUser.id)
+    if (!userId || targetUser.isAnonymous) return
+    const savedProfile = userProfiles[userId] || {}
     setProfilePopup({
-      uid: user.uid,
-      name: firebaseProfile.fullName || firebaseProfile.displayName || firebaseProfile.name || user.name || 'Người dùng ZUNY',
-      role: getRoleKey(firebaseProfile.role || firebaseProfile.userRole || user.role),
-      className: firebaseProfile.className || firebaseProfile.class || firebaseProfile.lop || '',
-      avatarUrl: firebaseProfile.photoURL || firebaseProfile.avatarUrl || firebaseProfile.avatarURL || firebaseProfile.avatar || firebaseProfile.profileImage || user.avatarUrl || '',
-      initials: getInitials(firebaseProfile.fullName || firebaseProfile.displayName || firebaseProfile.name || user.name),
+      uid: userId,
+      name: savedProfile.fullName || savedProfile.displayName || savedProfile.name || targetUser.name || 'Người dùng ZUNY',
+      role: getRoleKey(savedProfile.role || savedProfile.userRole || targetUser.role),
+      className: savedProfile.className || savedProfile.class || savedProfile.lop || '',
+      avatarUrl: savedProfile.photoURL || savedProfile.avatarUrl || savedProfile.avatarURL || savedProfile.avatar || savedProfile.profileImage || targetUser.avatarUrl || '',
+      initials: getInitials(savedProfile.fullName || savedProfile.displayName || savedProfile.name || targetUser.name),
     })
   }
 
   useEffect(() => {
-    const postsQuery = query(collection(db, 'forumPosts'), orderBy('createdAt', 'desc'), limit(120))
-    const unsubscribe = onSnapshot(
-      postsQuery,
-      (snapshot) => {
-        setPosts(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
-        setLoadingPosts(false)
-      },
-      (error) => {
-        console.error('Không thể tải bài viết cộng đồng:', error)
-        toast.error('Không thể tải bài viết cộng đồng')
-        setLoadingPosts(false)
-      },
-    )
+    let cancelled = false
+    let timer = null
 
-    return () => unsubscribe()
-  }, [])
-
-  // Đồng bộ realtime riêng cho mục Đã lưu. Listener này không phụ thuộc giới hạn
-  // của bảng tin chung, nên bài cũ đã lưu vẫn xuất hiện và cập nhật ngay.
-  useEffect(() => {
-    if (!currentUser?.uid) {
-      setSavedPosts([])
-      return undefined
+    const loadPosts = async () => {
+      try {
+        const response = await forumApi.posts({ limit: 300 })
+        const nextPosts = (Array.isArray(response.posts) ? response.posts : []).map(normalizeForumItemIds)
+        if (!cancelled) {
+          setPosts(nextPosts.slice(0, 120))
+          const currentId = toId(currentUser?.uid)
+          setSavedPosts(currentId ? nextPosts.filter((item) => (item.savedBy || []).includes(currentId)) : [])
+          setLoadingPosts(false)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Không thể tải bài viết cộng đồng từ SQL:', error)
+          setLoadingPosts(false)
+        }
+      }
     }
 
-    const savedPostsQuery = query(
-      collection(db, 'forumPosts'),
-      where('savedBy', 'array-contains', currentUser.uid),
-      limit(300),
-    )
-
-    const unsubscribe = onSnapshot(
-      savedPostsQuery,
-      (snapshot) => {
-        const nextSavedPosts = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .sort((a, b) => timestampToMs(b.createdAt) - timestampToMs(a.createdAt))
-        setSavedPosts(nextSavedPosts)
-      },
-      (error) => console.warn('Không thể đồng bộ bài đã lưu:', error),
-    )
-
-    return () => unsubscribe()
+    loadPosts()
+    timer = window.setInterval(loadPosts, 3000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [currentUser?.uid])
 
   useEffect(() => {
-    const groupsQuery = query(collection(db, 'forumGroups'), orderBy('createdAt', 'desc'), limit(80))
-    const unsubscribe = onSnapshot(
-      groupsQuery,
-      (snapshot) => setGroups(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể tải nhóm:', error),
-    )
+    let cancelled = false
+    let timer = null
 
-    return () => unsubscribe()
+    const loadGroups = async () => {
+      try {
+        const response = await forumApi.groups()
+        const nextGroups = (Array.isArray(response.groups) ? response.groups : []).map(normalizeForumItemIds)
+        if (!cancelled) setGroups(nextGroups)
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể tải nhóm từ SQL:', error)
+      }
+    }
+
+    loadGroups()
+    timer = window.setInterval(loadGroups, 4000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [])
 
   useEffect(() => {
@@ -867,16 +907,9 @@ function Forum({ onChannelViewChange = () => {} }) {
       const expiresAt = Number(group.inviteCodeExpiresAtMs || 0)
       if (groupType !== 'invite_only' || !expiresAt || expiresAt > now || rotatedInviteGroupIdsRef.current.has(group.id)) return
       rotatedInviteGroupIdsRef.current.add(group.id)
-      const expiryMs = getInviteExpiryMs(group.inviteExpiry || 'unlimited')
-      updateDoc(doc(db, 'forumGroups', group.id), {
-        inviteCode: generateInviteCode(),
-        inviteCodeIssuedAtMs: now,
-        inviteCodeExpiresAtMs: expiryMs ? now + expiryMs : 0,
-        updatedAt: serverTimestamp(),
-      }).catch((error) => console.warn('Không thể tự đổi mã mời đã hết hạn:', error))
+      forumApi.rotateInvite(group.id).catch((error) => console.warn('Không thể tự đổi mã mời đã hết hạn:', error))
     })
   }, [groups])
-
 
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -884,226 +917,81 @@ function Forum({ onChannelViewChange = () => {} }) {
       return undefined
     }
 
-    const notificationsQuery = query(
-      collection(db, 'forumNotifications'),
-      where('toUserId', '==', currentUser.uid),
-      limit(30),
-    )
+    let cancelled = false
+    let timer = null
 
-    const unsubscribe = onSnapshot(
-      notificationsQuery,
-      (snapshot) => {
-        const joinedGroupIds = new Set(
-          groups
-            .filter((group) => {
-              const membershipLists = [
-                group?.memberIds,
-                group?.members,
-                group?.userIds,
-                group?.joinedUsers,
-                group?.participants,
-                group?.studentIds,
-                group?.students,
-                group?.adminIds,
-                group?.admins,
-              ]
-
-              const matchesCurrentUser = (value) => {
-                if (typeof value === 'string') return value === currentUser.uid
-                if (!value || typeof value !== 'object') return false
-                return value.uid === currentUser.uid || value.id === currentUser.uid || value.userId === currentUser.uid
-              }
-
-              return (
-                group?.ownerId === currentUser.uid ||
-                group?.createdBy === currentUser.uid ||
-                membershipLists.some((list) => Array.isArray(list) && list.some(matchesCurrentUser))
-              )
-            })
-            .map((group) => group.id),
+    const loadNotifications = async () => {
+      try {
+        const response = await forumApi.notifications()
+        const rawItems = (Array.isArray(response.notifications) ? response.notifications : []).map(normalizeForumItemIds)
+        const currentId = toId(currentUser.uid)
+        const joinedIds = new Set(
+          groups.filter((group) => {
+            const members = Array.isArray(group.memberIds) ? group.memberIds.map(toId) : []
+            const admins = Array.isArray(group.adminIds) ? group.adminIds.map(toId) : []
+            return toId(group.ownerId) === currentId || members.includes(currentId) || admins.includes(currentId)
+          }).map((group) => toId(group.id)),
         )
+        const filtered = rawItems.filter((item) => {
+          const hiddenGroupTypes = new Set(['member-left', 'group-left', 'left-group', 'user-left-group'])
+          if (hiddenGroupTypes.has(String(item.type || '').toLowerCase())) return false
+          if (item.scope !== 'group' || !item.groupId) return true
+          if (item.type === 'group-deleted-by-admin') return true
+          return joinedIds.has(toId(item.groupId))
+        }).sort((a, b) => timestampToMs(b.createdAt) - timestampToMs(a.createdAt))
+        if (!cancelled) setNotifications(filtered)
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể tải thông báo SQL:', error)
+      }
+    }
 
-        const notificationsForCurrentMemberships = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .filter((item) => {
-            const hiddenGroupTypes = new Set(['member-left', 'group-left', 'left-group', 'user-left-group'])
-            if (hiddenGroupTypes.has(String(item.type || '').toLowerCase())) return false
-            if (item.scope !== 'group' || !item.groupId) return true
-
-            // Chỉ giữ thông báo nhóm bị xóa; mọi thông báo khác của nhóm đã rời đều bị loại ngay.
-            if (item.type === 'group-deleted-by-admin') return true
-
-            return joinedGroupIds.has(item.groupId)
-          })
-          .sort((a, b) => timestampToMs(b.createdAt) - timestampToMs(a.createdAt))
-
-        setNotifications(notificationsForCurrentMemberships)
-      },
-      (error) => console.warn('Không thể tải thông báo:', error),
-    )
-
-    return () => unsubscribe()
+    loadNotifications()
+    timer = window.setInterval(loadNotifications, 3000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [currentUser?.uid, groups])
 
   useEffect(() => {
-    if (!posts.length) return
-
+    if (!currentUser?.uid) return undefined
     let cancelled = false
-
-    const getEventTargetUserIds = async (post = {}) => {
-      const isAdminEvent = Boolean(post.eventCreatedByAdmin || post.authorRole === 'admin_dev')
-
-      if (isAdminEvent) {
-        const usersSnapshot = await getDocs(collection(db, 'users'))
-        return usersSnapshot.docs.map((userDoc) => userDoc.id)
-      }
-
-      const interestedIds = Array.isArray(post.eventInterestedBy) ? post.eventInterestedBy : []
-      const notInterestedIds = new Set(post.eventNotInterestedBy || [])
-      return interestedIds.filter((uid) => uid && !notInterestedIds.has(uid))
+    const sync = async () => {
+      try { await forumApi.syncEvents() } catch (error) { if (!cancelled) console.warn('Không thể đồng bộ thông báo sự kiện:', error) }
     }
-
-    const sendEventNotifications = async ({ post, kind }) => {
-      const targetUserIds = await getEventTargetUserIds(post)
-      const uniqueTargetUserIds = [...new Set(targetUserIds)].filter(Boolean)
-      if (!uniqueTargetUserIds.length || cancelled) return
-
-      const isAdminEvent = Boolean(post.eventCreatedByAdmin || post.authorRole === 'admin_dev')
-      const isStart = kind === 'start'
-
-      await Promise.all(
-        uniqueTargetUserIds.map((uid) =>
-          addDoc(collection(db, 'forumNotifications'), {
-            toUserId: uid,
-            fromUserId: post.authorId || '',
-            fromName: post.authorName || 'ZUNY Community',
-            type: isStart ? (isAdminEvent ? 'admin-event-started' : 'event-started') : (isAdminEvent ? 'admin-event-ended' : 'event-ended'),
-            category: isAdminEvent ? 'admin' : 'event',
-            scope: post.scope || 'hall',
-            postId: post.id,
-            title: isStart ? 'Sự kiện đã mở' : 'Sự kiện đã kết thúc',
-            text: isStart
-              ? `Sự kiện "${post.title}" đã mở lúc ${formatEventDateTime(post.eventStartAt || post.eventDate) || 'thời gian đã đặt'}.${post.eventEndAt ? ` Thời gian đóng: ${formatEventDateTime(post.eventEndAt)}.` : ''}${post.eventLocation ? ` Địa điểm/link: ${post.eventLocation}.` : ''}`
-              : `Sự kiện "${post.title}" đã kết thúc lúc ${formatEventDateTime(post.eventEndAt || post.eventCloseAt) || 'thời gian đã đặt'}.${post.eventLocation ? ` Địa điểm/link: ${post.eventLocation}.` : ''}`,
-            isAdminNotice: isAdminEvent,
-            read: false,
-            createdAt: serverTimestamp(),
-          }),
-        ),
-      )
-    }
-
-    const notifyEventTimeChanges = async () => {
-      const dueStartedEvents = posts.filter((post) => {
-        if (post.type !== 'event') return false
-        if ((post.status || 'approved') !== 'approved') return false
-        if (!(post.eventStartAt || post.eventDate) || post.eventStartedNotifiedAt) return false
-        return hasEventStarted(post)
-      })
-
-      const dueEndedEvents = posts.filter((post) => {
-        if (post.type !== 'event') return false
-        if ((post.status || 'approved') !== 'approved') return false
-        if (!(post.eventEndAt || post.eventCloseAt) || post.eventEndedNotifiedAt) return false
-        return hasEventEnded(post)
-      })
-
-      for (const post of dueStartedEvents) {
-        try {
-          const postRef = doc(db, 'forumPosts', post.id)
-          const shouldSend = await runTransaction(db, async (transaction) => {
-            const snap = await transaction.get(postRef)
-            if (!snap.exists()) return false
-            const fresh = snap.data()
-            if (fresh.eventStartedNotifiedAt) return false
-            if (fresh.type !== 'event' || (fresh.status || 'approved') !== 'approved') return false
-            if (!hasEventStarted(fresh)) return false
-
-            transaction.update(postRef, {
-              eventStartedNotifiedAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-
-            return true
-          })
-
-          if (shouldSend) await sendEventNotifications({ post, kind: 'start' })
-        } catch (error) {
-          console.warn('Không thể gửi thông báo mở sự kiện:', error)
-        }
-      }
-
-      for (const post of dueEndedEvents) {
-        try {
-          const postRef = doc(db, 'forumPosts', post.id)
-          const shouldSend = await runTransaction(db, async (transaction) => {
-            const snap = await transaction.get(postRef)
-            if (!snap.exists()) return false
-            const fresh = snap.data()
-            if (fresh.eventEndedNotifiedAt) return false
-            if (fresh.type !== 'event' || (fresh.status || 'approved') !== 'approved') return false
-            if (!hasEventEnded(fresh)) return false
-
-            transaction.update(postRef, {
-              eventEndedNotifiedAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-
-            return true
-          })
-
-          if (shouldSend) await sendEventNotifications({ post, kind: 'end' })
-        } catch (error) {
-          console.warn('Không thể gửi thông báo kết thúc sự kiện:', error)
-        }
-      }
-    }
-
-    notifyEventTimeChanges()
-
-    const interval = window.setInterval(notifyEventTimeChanges, 1000)
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [posts])
+    sync()
+    const timer = window.setInterval(sync, 5000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [currentUser?.uid])
 
   useEffect(() => {
     if (roleKey !== 'admin_dev') {
       setReports([])
-      return undefined
-    }
-
-    const reportsQuery = query(collection(db, 'forumReports'), orderBy('createdAt', 'desc'), limit(120))
-    const unsubscribe = onSnapshot(
-      reportsQuery,
-      (snapshot) => setReports(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể tải bài bị báo cáo:', error),
-    )
-
-    return () => unsubscribe()
-  }, [roleKey])
-
-
-  useEffect(() => {
-    if (roleKey !== 'admin_dev') {
       setGroupReports([])
       return undefined
     }
 
-    const groupReportsQuery = query(collection(db, 'forumGroupReports'), orderBy('createdAt', 'desc'), limit(160))
-    const unsubscribe = onSnapshot(
-      groupReportsQuery,
-      (snapshot) => setGroupReports(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể tải nhóm bị báo cáo:', error),
-    )
+    let cancelled = false
+    const loadAdminData = async () => {
+      try {
+        const [reportResponse, groupReportResponse] = await Promise.all([
+          forumApi.reports(),
+          forumApi.groupReports(),
+        ])
+        if (!cancelled) {
+          setReports((reportResponse.reports || []).map(normalizeForumItemIds))
+          setGroupReports((groupReportResponse.reports || []).map(normalizeForumItemIds))
+        }
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể tải dữ liệu kiểm duyệt SQL:', error)
+      }
+    }
 
-    return () => unsubscribe()
+    loadAdminData()
+    const timer = window.setInterval(loadAdminData, 5000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [roleKey])
 
   useEffect(() => {
     if (!selectedPost?.id) return
-    const freshPost = posts.find((post) => post.id === selectedPost.id)
+    const freshPost = posts.find((post) => toId(post.id) === toId(selectedPost.id))
     if (freshPost) setSelectedPost(freshPost)
   }, [posts, selectedPost?.id])
 
@@ -1191,42 +1079,24 @@ const filteredNotifications = useMemo(() => {
 
   const openNotification = async (item) => {
     setNotificationModal(item)
-
     if (!item.read) {
       try {
-        await updateDoc(doc(db, 'forumNotifications', item.id), {
-          read: true,
-          readAt: serverTimestamp(),
-        })
+        await forumApi.readNotification(item.id)
+        setNotifications((current) => current.map((entry) => entry.id === item.id ? { ...entry, read: true } : entry))
       } catch (error) {
         console.warn('Không thể đánh dấu thông báo đã đọc:', error)
       }
     }
   }
 
-
   const goToNotificationPost = async (item) => {
-    if (!item?.postId) {
-      toast.error('Thông báo này không liên kết tới bài viết')
-      return
-    }
-
+    if (!item?.postId) return toast.error('Thông báo này không liên kết tới bài viết')
     try {
-      const existingPost = posts.find((post) => post.id === item.postId)
-      if (existingPost) {
-        setNotificationModal(null)
-        await openPost(existingPost)
-        return
-      }
-
-      const postSnap = await getDoc(doc(db, 'forumPosts', item.postId))
-      if (!postSnap.exists()) {
-        toast.error('Bài viết không còn tồn tại')
-        return
-      }
-
+      const existingPost = posts.find((post) => toId(post.id) === toId(item.postId))
+      const targetPost = existingPost || normalizeForumItemIds((await forumApi.post(item.postId)).post || {})
+      if (!targetPost?.id) return toast.error('Bài viết không còn tồn tại')
       setNotificationModal(null)
-      await openPost({ id: postSnap.id, ...postSnap.data() })
+      await openPost(targetPost)
     } catch (error) {
       console.error('Không thể chuyển hướng tới bài viết:', error)
       toast.error('Không thể mở bài viết từ thông báo')
@@ -1235,7 +1105,8 @@ const filteredNotifications = useMemo(() => {
 
   const deleteNotification = async (item, reason = '') => {
     try {
-      await deleteDoc(doc(db, 'forumNotifications', item.id))
+      await forumApi.deleteNotification(item.id)
+      setNotifications((current) => current.filter((entry) => entry.id !== item.id))
       if (notificationModal?.id === item.id) setNotificationModal(null)
       toast.success('Đã xóa thông báo')
     } catch (error) {
@@ -1268,20 +1139,11 @@ const filteredNotifications = useMemo(() => {
 
   const markAllNotificationsRead = async () => {
     const unreadItems = filteredNotifications.filter((item) => !item.read)
-    if (!unreadItems.length) {
-      toast.success('Không có thông báo chưa đọc')
-      return
-    }
-
+    if (!unreadItems.length) return toast.success('Không có thông báo chưa đọc')
     try {
-      await Promise.all(
-        unreadItems.map((item) =>
-          updateDoc(doc(db, 'forumNotifications', item.id), {
-            read: true,
-            readAt: serverTimestamp(),
-          }),
-        ),
-      )
+      await Promise.all(unreadItems.map((item) => forumApi.readNotification(item.id)))
+      const ids = new Set(unreadItems.map((item) => item.id))
+      setNotifications((current) => current.map((item) => ids.has(item.id) ? { ...item, read: true } : item))
       toast.success('Đã đánh dấu tất cả là đã đọc')
     } catch (error) {
       console.error('Không thể đánh dấu tất cả thông báo:', error)
@@ -1290,11 +1152,7 @@ const filteredNotifications = useMemo(() => {
   }
 
   const confirmDeleteAllNotifications = () => {
-    if (!filteredNotifications.length) {
-      toast.error('Không có thông báo để xóa')
-      return
-    }
-
+    if (!filteredNotifications.length) return toast.error('Không có thông báo để xóa')
     setConfirmModal({
       title: 'Xóa tất cả thông báo?',
       message: 'Bạn có chắc chắn muốn xóa tất cả thông báo đang hiển thị không? Hành động này không thể hoàn tác.',
@@ -1302,11 +1160,9 @@ const filteredNotifications = useMemo(() => {
       danger: true,
       onConfirm: async () => {
         try {
-          await Promise.all(
-            filteredNotifications.map((item) =>
-              deleteDoc(doc(db, 'forumNotifications', item.id)),
-            ),
-          )
+          const ids = new Set(filteredNotifications.map((item) => item.id))
+          await Promise.all(filteredNotifications.map((item) => forumApi.deleteNotification(item.id)))
+          setNotifications((current) => current.filter((item) => !ids.has(item.id)))
           setNotificationModal(null)
           toast.success('Đã xóa tất cả thông báo')
         } catch (error) {
@@ -1316,6 +1172,60 @@ const filteredNotifications = useMemo(() => {
       },
     })
   }
+
+  const changeForumSection = (section, { replace = false } = {}) => {
+    const safeSection = validSectionIds.has(String(section))
+      ? String(section)
+      : SECTIONS.HALL
+
+    setActiveSection(safeSection)
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+
+      if (safeSection === SECTIONS.HALL) {
+        url.searchParams.delete('section')
+      } else {
+        url.searchParams.set('section', safeSection)
+      }
+
+      const nextUrl = `${url.pathname}${url.search}${url.hash}`
+
+      if (replace) {
+        window.history.replaceState({}, '', nextUrl)
+      } else {
+        window.history.pushState({}, '', nextUrl)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncSectionFromUrl = () => {
+      const params = new URLSearchParams(window.location.search)
+      const requestedSection = params.get('section')
+      const safeSection =
+        requestedSection && validSectionIds.has(requestedSection)
+          ? requestedSection
+          : SECTIONS.HALL
+
+      setActiveSection(safeSection)
+
+      if (requestedSection && requestedSection !== safeSection) {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('section')
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        )
+      }
+    }
+
+    window.addEventListener('popstate', syncSectionFromUrl)
+    return () => window.removeEventListener('popstate', syncSectionFromUrl)
+  }, [validSectionIds])
 
   const stats = useMemo(() => {
     const approvedPosts = posts.filter((post) => (post.status || 'approved') === 'approved')
@@ -1331,32 +1241,11 @@ const filteredNotifications = useMemo(() => {
 
   const openPost = async (post) => {
     setSelectedPost(post)
-
-    if (!currentUser?.uid || !post?.id) return
-    if (viewingPostIds.includes(post.id)) return
-
+    if (!currentUser?.uid || !post?.id || viewingPostIds.includes(post.id)) return
     setViewingPostIds((prev) => [...prev, post.id])
-
     try {
-      const postRef = doc(db, 'forumPosts', post.id)
-
-      await runTransaction(db, async (transaction) => {
-        const postSnap = await transaction.get(postRef)
-        if (!postSnap.exists()) return
-
-        const data = postSnap.data()
-        const viewedBy = Array.isArray(data.viewedBy) ? data.viewedBy : []
-
-        if (viewedBy.includes(currentUser.uid)) return
-
-        const nextViewedBy = [...viewedBy, currentUser.uid]
-
-        transaction.update(postRef, {
-          viewedBy: nextViewedBy,
-          viewsCount: nextViewedBy.length,
-          updatedAt: serverTimestamp(),
-        })
-      })
+      const response = await forumApi.viewPost(post.id)
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, viewsCount: response.viewsCount, viewedBy: response.viewedBy || item.viewedBy } : item))
     } catch (error) {
       console.warn('Không thể tăng lượt xem:', error)
     } finally {
@@ -1364,38 +1253,22 @@ const filteredNotifications = useMemo(() => {
     }
   }
 
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const postId = params.get('post')
     const commentId = params.get('comment') || ''
-
     if (!postId) return undefined
-
     let cancelled = false
     setHighlightedCommentId(commentId)
-
     async function openPostFromUrl() {
       try {
-        const existingPost = posts.find((item) => item.id === postId)
-        if (existingPost) {
-          if (!cancelled && selectedPost?.id !== postId) {
-            await openPost(existingPost)
-          }
-          return
-        }
-
-        const postSnap = await getDoc(doc(db, 'forumPosts', postId))
-        if (!postSnap.exists()) return
-
-        if (!cancelled) {
-          await openPost({ id: postSnap.id, ...postSnap.data() })
-        }
+        const existingPost = posts.find((item) => toId(item.id) === toId(postId))
+        const targetPost = existingPost || normalizeForumItemIds((await forumApi.post(postId)).post || {})
+        if (!cancelled && targetPost?.id && toId(selectedPost?.id) !== toId(postId)) await openPost(targetPost)
       } catch (error) {
         console.warn('Không thể mở bài viết từ liên kết:', error)
       }
     }
-
     openPostFromUrl()
     return () => { cancelled = true }
   }, [posts, selectedPost?.id])
@@ -1460,191 +1333,54 @@ const filteredNotifications = useMemo(() => {
 
   const createPost = async (form) => {
     if (!requireLogin()) return
-
-    if (showRestrictionPopup('post')) {
-      setComposerOpen(false)
-      return
-    }
-
+    if (showRestrictionPopup('post')) { setComposerOpen(false); return }
     if (form.scope === 'group' && form.groupId) {
       const targetGroup = groups.find((item) => item.id === form.groupId)
-      const canManageTargetGroup = targetGroup && (targetGroup.ownerId === currentUser.uid || ['admin', 'admin_dev'].includes(roleKey))
-      if (!canManageTargetGroup && targetGroup?.permissions?.createPost === false) {
-        toast.error('Nhóm này đã tắt quyền tạo bài viết của thành viên')
-        return
-      }
+      const canManageTargetGroup = targetGroup && (toId(targetGroup.ownerId) === toId(currentUser.uid) || ['admin', 'admin_dev'].includes(roleKey))
+      if (!canManageTargetGroup && targetGroup?.permissions?.createPost === false) return toast.error('Nhóm này đã tắt quyền tạo bài viết của thành viên')
     }
 
     try {
       const payload = {
-        title: form.title.trim(),
-        content: form.content.trim(),
-        type: form.type,
+        title: form.title.trim(), content: form.content.trim(), type: form.type,
         tags: Array.isArray(form.tags) ? form.tags.slice(0, 8) : String(form.tags || '').split(',').map((tag) => tag.trim().replace(/^#+/, '')).filter(Boolean).slice(0, 8),
         scope: form.scope,
         groupId: form.scope === 'group' ? form.groupId : '',
         groupName: form.scope === 'group' ? groups.find((item) => item.id === form.groupId)?.name || '' : '',
-        attachmentUrl: String(form.attachmentUrl || '').trim(),
-        attachmentName: form.attachmentName || '',
-        imageUrl: String(form.imageUrl || '').trim(),
-        eventStartAt: form.type === 'event' ? form.eventStartAt || '' : '',
-        eventEndAt: form.type === 'event' ? form.eventEndAt || '' : '',
-        eventDate: form.type === 'event' ? form.eventStartAt || '' : '',
-        eventLocation: form.type === 'event' ? String(form.eventLocation || '').trim() : '',
-        eventCreatedByAdmin: form.type === 'event' && roleKey === 'admin_dev',
-        eventInterestedBy: [],
-        eventNotInterestedBy: [],
-        eventStartedNotifiedAt: null,
-        eventEndedNotifiedAt: null,
+        attachmentUrl: String(form.attachmentUrl || '').trim(), attachmentName: form.attachmentName || '', imageUrl: String(form.imageUrl || '').trim(),
+        eventStartAt: form.type === 'event' ? form.eventStartAt || '' : '', eventEndAt: form.type === 'event' ? form.eventEndAt || '' : '',
+        eventLocation: form.type === 'event' ? String(form.eventLocation || '').trim() : '', eventCreatedByAdmin: form.type === 'event' && roleKey === 'admin_dev',
+        eventInterestedBy: [], eventNotInterestedBy: [], eventStartedNotifiedAt: null, eventEndedNotifiedAt: null,
         pollOptions: form.type === 'poll' ? (form.pollOptions || []).map((option, index) => ({ id: `option-${index + 1}`, text: String(option || '').trim() })).filter((option) => option.text).slice(0, 8) : [],
-        pollStartAt: form.type === 'poll' ? form.pollStartAt || '' : '',
-        pollEndAt: form.type === 'poll' ? form.pollEndAt || '' : '',
-        pollVotes: {},
-        pollVotesCount: {},
+        pollStartAt: form.type === 'poll' ? form.pollStartAt || '' : '', pollEndAt: form.type === 'poll' ? form.pollEndAt || '' : '', pollVotes: {}, pollVotesCount: {},
         status: form.scope === 'hall' && roleKey !== 'admin_dev' ? 'pending' : 'approved',
-        approvedAt: form.scope === 'hall' && roleKey !== 'admin_dev' ? null : serverTimestamp(),
-        approvedBy: form.scope === 'hall' && roleKey !== 'admin_dev' ? '' : currentUser.uid,
-        authorId: currentUser.uid,
-        authorName: form.isAnonymous ? 'Ẩn danh' : displayName,
-        authorEmail: form.isAnonymous ? '' : currentUser.email || '',
-        authorInitials: form.isAnonymous ? 'AD' : initials,
-        authorPhotoURL: form.isAnonymous ? '' : avatarUrl,
-        authorRole: roleKey,
-        likesCount: 0,
-        reactionsCount: 0,
-        reactionCounts: {},
-        reactions: {},
-        commentsCount: 0,
-        viewsCount: 0,
-        viewedBy: [],
-        likedBy: [],
-        savedBy: [],
-        isPinned: false,
-        isAnonymous: Boolean(form.isAnonymous),
-        teacherOnly: Boolean(form.teacherOnly),
-        isAnswered: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        authorName: form.isAnonymous ? 'Ẩn danh' : displayName, authorEmail: form.isAnonymous ? '' : currentUser.email || '', authorInitials: form.isAnonymous ? 'AD' : initials,
+        authorPhotoURL: form.isAnonymous ? '' : avatarUrl, authorRole: roleKey,
+        likesCount: 0, reactionsCount: 0, reactionCounts: {}, reactions: {}, commentsCount: 0, viewsCount: 0, viewedBy: [], likedBy: [], savedBy: [],
+        isPinned: false, isAnonymous: Boolean(form.isAnonymous), teacherOnly: Boolean(form.teacherOnly), isAnswered: false,
       }
-
-const postRef = await addDoc(collection(db, 'forumPosts'), payload)
-
-if (
-  payload.scope === 'hall' &&
-  payload.status === 'approved' &&
-  payload.type === 'announce' &&
-  ['admin', 'admin_dev'].includes(roleKey)
-) {
-  const usersSnapshot = await getDocs(collection(db, 'users'))
-
-  await Promise.all(
-    usersSnapshot.docs
-      .filter((userDoc) => userDoc.id !== currentUser.uid)
-      .map((userDoc) =>
-        addDoc(collection(db, 'forumNotifications'), {
-          toUserId: userDoc.id,
-          fromUserId: currentUser.uid,
-          fromName: displayName,
-          type: 'admin-announcement',
-          category: 'admin',
-          scope: 'hall',
-          postId: postRef.id,
-          title: 'Thông báo từ quản trị viên',
-          text: `Quản trị viên vừa đăng thông báo mới: "${payload.title}".`,
-          read: false,
-          createdAt: serverTimestamp(),
-        }),
-      ),
-  )
-}
-if (
-  payload.scope === 'hall' &&
-  payload.status === 'approved' &&
-  payload.type === 'event' &&
-  roleKey === 'admin_dev'
-) {
-  const usersSnapshot = await getDocs(collection(db, 'users'))
-
-  await Promise.all(
-    usersSnapshot.docs
-      .filter((userDoc) => userDoc.id !== currentUser.uid)
-      .map((userDoc) =>
-        addDoc(collection(db, 'forumNotifications'), {
-          toUserId: userDoc.id,
-          fromUserId: currentUser.uid,
-          fromName: displayName,
-          type: 'event-created',
-          category: 'admin',
-          scope: 'hall',
-          isAdminNotice: true,
-          postId: postRef.id,
-          title: 'Sự kiện nổi bật từ quản trị viên',
-          text: `Admin_dev vừa tạo sự kiện mới: "${payload.title}". Sự kiện này đã được ghim nổi bật ở mục Sự kiện sắp tới.`,
-          read: false,
-          createdAt: serverTimestamp(),
-        }),
-      ),
-  )
-}
+      const response = await forumApi.createPost(payload)
+      const createdPost = normalizeForumItemIds(response.post || {})
+      if (createdPost.id) setPosts((current) => [createdPost, ...current.filter((item) => item.id !== createdPost.id)].slice(0, 120))
       setComposerOpen(false)
-if (form.scope === 'hall' && roleKey !== 'admin_dev') {
-  toast.custom(
-    (t) => (
-      <button
-        type="button"
-        onClick={() => toast.dismiss(t.id)}
-        className="
-          flex w-[360px] items-start gap-3 rounded-3xl border border-amber-200
-          bg-white p-4 text-left shadow-2xl transition hover:-translate-y-0.5
-          dark:border-amber-400/20 dark:bg-slate-900
-        "
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-xl dark:bg-amber-500/15">
-          ⏳
-        </div>
-
-        <div>
-          <p className="font-black text-slate-950 dark:text-white">
-            Bài viết đã gửi thành công
-          </p>
-          <p className="mt-1 text-sm font-semibold leading-5 text-slate-500 dark:text-slate-300">
-            Bài của bạn đang trong quá trình quản trị viên duyệt trước khi hiển thị ở cộng đồng ZUNY.
-          </p>
-        </div>
-      </button>
-    ),
-    {
-      duration: 5000,
-      position: 'top-center',
-    },
-  )
-} else {
-  toast.success('Đã đăng bài lên cộng đồng', {
-    duration: 5000,
-    position: 'top-center',
-  })
-}    } catch (error) {
+      if (form.scope === 'hall' && roleKey !== 'admin_dev') {
+        toast.success('Bài viết đã gửi thành công và đang chờ quản trị viên duyệt', { duration: 5000, position: 'top-center' })
+      } else {
+        toast.success('Đã đăng bài lên cộng đồng', { duration: 5000, position: 'top-center' })
+      }
+    } catch (error) {
       console.error('Không thể đăng bài:', error)
       toast.error('Không thể đăng bài. Vui lòng thử lại')
     }
   }
 
   const toggleEventInterest = async (post, interested) => {
-    if (!requireLogin()) return
-    if (!post?.id || post.type !== 'event') return
-
-    if (isAdminAuthor(post.authorRole) || post.eventCreatedByAdmin) {
-      toast.error('Sự kiện của quản trị viên luôn được thông báo cho mọi người')
-      return
-    }
-
+    if (!requireLogin() || !post?.id || post.type !== 'event') return
+    if (isAdminAuthor(post.authorRole) || post.eventCreatedByAdmin) return toast.error('Sự kiện của quản trị viên luôn được thông báo cho mọi người')
     try {
-      await updateDoc(doc(db, 'forumPosts', post.id), {
-        eventInterestedBy: interested ? arrayUnion(currentUser.uid) : arrayRemove(currentUser.uid),
-        eventNotInterestedBy: interested ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
-        updatedAt: serverTimestamp(),
-      })
-
+      const response = await forumApi.eventInterest(post.id, interested ? 'interested' : 'not_interested')
+      const patch = { eventInterestedBy: response.eventInterestedBy || [], eventNotInterestedBy: response.eventNotInterestedBy || [] }
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, ...patch } : item))
       toast.success(interested ? 'Đã bật quan tâm sự kiện' : 'Đã tắt quan tâm sự kiện')
     } catch (error) {
       console.error('Không thể cập nhật quan tâm sự kiện:', error)
@@ -1653,63 +1389,12 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
   }
 
   const toggleLike = async (post, reactionValue = 'love') => {
-    if (!requireLogin()) return
-    if (!post?.id) return
-    if (likingPostIds.includes(post.id)) return
-
+    if (!requireLogin() || !post?.id || likingPostIds.includes(post.id)) return
     setLikingPostIds((prev) => [...prev, post.id])
-
     try {
-      const postRef = doc(db, 'forumPosts', post.id)
-      let shouldNotify = false
-      let selectedReaction = reactionValue || 'love'
-
-      await runTransaction(db, async (transaction) => {
-        const postSnap = await transaction.get(postRef)
-        if (!postSnap.exists()) return
-
-        const data = postSnap.data()
-        const currentReactions = data.reactions && typeof data.reactions === 'object' ? data.reactions : {}
-        const oldReaction = currentReactions[currentUser.uid] || ((data.likedBy || []).includes(currentUser.uid) ? 'love' : '')
-        const nextReactions = { ...currentReactions }
-
-        if (oldReaction === selectedReaction) {
-          delete nextReactions[currentUser.uid]
-          selectedReaction = ''
-        } else {
-          nextReactions[currentUser.uid] = selectedReaction
-        }
-
-        const nextCounts = buildReactionCounts(nextReactions)
-        const nextTotal = Object.values(nextCounts).reduce((sum, value) => sum + Number(value || 0), 0)
-
-        shouldNotify = Boolean(selectedReaction) && !oldReaction
-
-        transaction.update(postRef, {
-          reactions: nextReactions,
-          reactionCounts: nextCounts,
-          reactionsCount: nextTotal,
-          likesCount: nextTotal,
-          likedBy: Object.keys(nextReactions),
-          updatedAt: serverTimestamp(),
-        })
-      })
-
-      if (shouldNotify && post.authorId && post.authorId !== currentUser.uid) {
-        const reaction = REACTIONS.find((item) => item.value === selectedReaction)
-        await addDoc(collection(db, 'forumNotifications'), {
-          toUserId: post.authorId,
-          fromUserId: currentUser.uid,
-          fromName: displayName,
-          type: 'reaction',
-          category: 'post-interaction',
-          scope: post.scope || 'hall',
-          postId: post.id,
-          text: `${displayName} đã thả ${reaction?.emoji || '❤️'} vào bài viết của bạn`,
-          read: false,
-          createdAt: serverTimestamp(),
-        })
-      }
+      const response = await forumApi.reactPost(post.id, reactionValue || 'love')
+      const patch = { reactions: response.reactions || {}, reactionCounts: response.reactionCounts || {}, reactionsCount: response.reactionsCount || 0, likesCount: response.likesCount || 0, likedBy: response.likedBy || [] }
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, ...patch } : item))
     } catch (error) {
       console.error('Không thể cập nhật reaction:', error)
       toast.error('Không thể cập nhật cảm xúc')
@@ -1719,14 +1404,14 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
   }
 
   const toggleSave = async (post) => {
-    if (!requireLogin()) return
-    const saved = (post.savedBy || []).includes(currentUser.uid)
+    if (!requireLogin() || !post?.id) return
+    const wasSaved = (post.savedBy || []).map(toId).includes(toId(currentUser.uid))
     try {
-      await updateDoc(doc(db, 'forumPosts', post.id), {
-        savedBy: saved ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
-        updatedAt: serverTimestamp(),
-      })
-      toast.success(saved ? 'Đã bỏ lưu bài viết' : 'Đã lưu bài viết')
+      const response = await forumApi.savePost(post.id)
+      const patch = { savedBy: response.savedBy || [] }
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, ...patch } : item))
+      setSavedPosts((current) => response.saved ? [{ ...post, ...patch }, ...current.filter((item) => item.id !== post.id)] : current.filter((item) => item.id !== post.id))
+      toast.success(response.saved ?? !wasSaved ? 'Đã lưu bài viết' : 'Đã bỏ lưu bài viết')
     } catch (error) {
       console.error('Không thể lưu bài viết:', error)
       toast.error('Không thể lưu bài viết')
@@ -1734,230 +1419,66 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
   }
 
   const votePoll = async (post, optionId) => {
-    if (!requireLogin()) return
-    if (post.type !== 'poll') return
-
+    if (!requireLogin() || post.type !== 'poll') return
     const pollStatus = getPollStatus(post)
-    if (pollStatus === 'not-started') {
-      toast.error('Bình chọn chưa tới thời gian mở')
-      return
-    }
-    if (pollStatus === 'ended') {
-      toast.error('Bình chọn đã kết thúc')
-      return
-    }
-
-    const previousVotes = post.pollVotes || {}
-    const previousCounts = post.pollVotesCount || {}
-    const oldOptionId = previousVotes[currentUser.uid]
-
-    if (oldOptionId === optionId) {
-      toast.error('Bạn đã chọn lựa chọn này rồi')
-      return
-    }
-
-    const nextVotes = { ...previousVotes, [currentUser.uid]: optionId }
-    const nextCounts = { ...previousCounts }
-
-    if (oldOptionId) nextCounts[oldOptionId] = Math.max(0, Number(nextCounts[oldOptionId] || 0) - 1)
-    nextCounts[optionId] = Number(nextCounts[optionId] || 0) + 1
-
+    if (pollStatus === 'not-started') return toast.error('Bình chọn chưa tới thời gian mở')
+    if (pollStatus === 'ended') return toast.error('Bình chọn đã kết thúc')
+    if ((post.pollVotes || {})[toId(currentUser.uid)] === optionId) return toast.error('Bạn đã chọn lựa chọn này rồi')
     try {
-      await updateDoc(doc(db, 'forumPosts', post.id), {
-        pollVotes: nextVotes,
-        pollVotesCount: nextCounts,
-        updatedAt: serverTimestamp(),
-      })
+      const response = await forumApi.vote(post.id, optionId)
+      const patch = { pollVotes: response.pollVotes || {}, pollVotesCount: response.pollVotesCount || {} }
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, ...patch } : item))
       toast.success('Đã ghi nhận bình chọn')
     } catch (error) {
       console.error('Không thể bình chọn:', error)
-      toast.error('Không thể bình chọn')
+      toast.error(error?.status === 409 ? 'Bạn đã chọn lựa chọn này rồi' : 'Không thể bình chọn')
     }
   }
 
-
   const notifyAdmins = async ({ type = 'admin-notice', title = '', text = '', payload = {} }) => {
     try {
-      const usersSnapshot = await getDocs(collection(db, 'users'))
-      const adminDocs = usersSnapshot.docs.filter((userDoc) => {
-        const data = userDoc.data() || {}
-        const userRole = getRoleKey(data.role || data.userRole || data.type)
-        return ['admin', 'admin_dev'].includes(userRole)
-      })
-
-      await Promise.all(
-        adminDocs.map((userDoc) =>
-          addDoc(collection(db, 'forumNotifications'), {
-            toUserId: userDoc.id,
-            fromUserId: currentUser?.uid || '',
-            fromName: displayName || 'ZUNY Community',
-            type,
-            category: 'admin',
-            title,
-            text,
-            read: false,
-            createdAt: serverTimestamp(),
-            ...payload,
-          }),
-        ),
-      )
+      await forumApi.broadcastNotification({ type, title, text, category: 'admin', ...payload })
     } catch (error) {
       console.warn('Không thể gửi thông báo cho admin:', error)
     }
   }
 
   const submitReport = async ({ post, reason, detail }) => {
-    if (!requireLogin()) return
-    if (!post?.id) return
-
+    if (!requireLogin() || !post?.id) return
     try {
-      const existing = await getDocs(
-        query(
-          collection(db, 'forumReports'),
-          where('postId', '==', post.id),
-          where('reporterId', '==', currentUser.uid),
-          limit(1),
-        ),
-      )
-
-      if (!existing.empty) {
-        toast.error('Bạn đã báo cáo bài viết này rồi')
-        setReportModal(null)
-        return
-      }
-
-      await addDoc(collection(db, 'forumReports'), {
-        postId: post.id,
-        postTitle: post.title || '',
-        postContent: post.content || '',
-        postAuthorId: post.authorId || '',
-        postAuthorName: post.authorName || '',
-        reporterId: currentUser.uid,
-        reporterName: displayName,
-        reporterEmail: currentUser.email || '',
-        reason,
-        detail: String(detail || '').trim(),
-        scope: post.scope || 'hall',
-        status: 'open',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-
-      await updateDoc(doc(db, 'forumPosts', post.id), {
-        reportCount: increment(1),
-        reportedBy: arrayUnion(currentUser.uid),
-        reportStatus: 'open',
-        updatedAt: serverTimestamp(),
-      })
-
-      await notifyAdmins({
-        type: 'post-reported',
-        title: 'Bài đăng bị báo cáo',
-        text: `Bài đăng của ${post.authorName || 'người dùng'} vừa bị báo cáo vì: ${reason}`,
-        payload: {
-          scope: post.scope || 'hall',
-          postId: post.id,
-          reportReason: reason,
-        },
-      })
-
+      const response = await forumApi.createReport(post.id, reason, String(detail || '').trim())
+      if (response.report) setReports((current) => [normalizeForumItemIds(response.report), ...current])
       setReportModal(null)
       toast.success('Đã gửi báo cáo tới quản trị viên')
     } catch (error) {
-      console.error('Không thể gửi báo cáo:', error)
-      toast.error('Không thể gửi báo cáo')
+      if (error?.status === 409) {
+        toast.error('Bạn đã báo cáo bài viết này rồi')
+        setReportModal(null)
+      } else {
+        console.error('Không thể gửi báo cáo:', error)
+        toast.error('Không thể gửi báo cáo')
+      }
     }
   }
 
-
   const submitGroupReport = async ({ group, reason, detail }) => {
-    if (!requireLogin()) return
-    if (!group?.id) return
-
-    const safeReason = String(reason || '').trim()
-    const safeDetail = String(detail || '').trim()
-    if (!safeReason && !safeDetail) {
-      toast.error('Vui lòng chọn hoặc nhập lý do báo cáo nhóm')
-      return
-    }
-
+    if (!requireLogin() || !group?.id) return
+    const safeReason = String(reason || '').trim(), safeDetail = String(detail || '').trim()
+    if (!safeReason && !safeDetail) return toast.error('Vui lòng chọn hoặc nhập lý do báo cáo nhóm')
     try {
-      const existing = await getDocs(
-        query(
-          collection(db, 'forumGroupReports'),
-          where('groupId', '==', group.id),
-          where('reporterId', '==', currentUser.uid),
-          where('status', '==', 'open'),
-          limit(1),
-        ),
-      )
-
-      if (!existing.empty) {
-        toast.error('Bạn đã báo cáo nhóm này rồi')
-        return
-      }
-
-      await addDoc(collection(db, 'forumGroupReports'), {
-        groupId: group.id,
-        groupName: group.name || 'Nhóm học',
-        groupDescription: group.description || '',
-        groupOwnerId: group.ownerId || '',
-        groupOwnerName: group.ownerName || group.createdByName || '',
-        reporterId: currentUser.uid,
-        reporterName: displayName,
-        reporterEmail: currentUser.email || '',
-        reason: safeReason,
-        detail: safeDetail,
-        status: 'open',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-
-      await updateDoc(doc(db, 'forumGroups', group.id), {
-        reportCount: increment(1),
-        reportedBy: arrayUnion(currentUser.uid),
-        reportStatus: 'open',
-        updatedAt: serverTimestamp(),
-      })
-
-      await notifyAdmins({
-        type: 'group-reported',
-        title: 'Nhóm học bị báo cáo',
-        text: `Nhóm "${group.name || 'Nhóm học'}" vừa bị báo cáo vì: ${safeReason || safeDetail}`,
-        payload: {
-          scope: 'group',
-          groupId: group.id,
-          groupName: group.name || 'Nhóm học',
-          reportReason: safeReason || safeDetail,
-        },
-      })
-
+      const response = await forumApi.createGroupReport(group.id, safeReason || safeDetail, safeDetail)
+      if (response.report) setGroupReports((current) => [normalizeForumItemIds(response.report), ...current])
       toast.success('Đã gửi báo cáo nhóm tới quản trị viên')
     } catch (error) {
-      console.error('Không thể gửi báo cáo nhóm:', error)
-      toast.error('Không thể gửi báo cáo nhóm')
+      toast.error(error?.status === 409 ? 'Bạn đã báo cáo nhóm này rồi' : 'Không thể gửi báo cáo nhóm')
     }
   }
 
   const removeTemporaryAdminFromGroup = async (groupId) => {
     if (!currentUser?.uid || !groupId) return
-
-    const group = groups.find((item) => item.id === groupId)
-    const temporaryAdminIds = Array.isArray(group?.adminTemporaryMemberIds) ? group.adminTemporaryMemberIds : []
-    const shouldRemove = temporaryAdminIds.includes(currentUser.uid)
-
-    if (!shouldRemove) return
-
     try {
-      await updateDoc(doc(db, 'forumGroups', groupId), {
-        memberIds: arrayRemove(currentUser.uid),
-        adminTemporaryMemberIds: arrayRemove(currentUser.uid),
-        membersCount: increment(-1),
-        updatedAt: serverTimestamp(),
-      })
-
+      await forumApi.membership(groupId, 'remove-temporary-admin')
       if (openCreatedGroupId === groupId) setOpenCreatedGroupId('')
-      toast.success('Admin đã được đưa ra khỏi nhóm sau khi xử lý')
     } catch (error) {
       console.warn('Không thể đưa admin tạm thời ra khỏi nhóm:', error)
     }
@@ -1966,54 +1487,23 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
   const adminJoinReportedGroup = async (group) => {
     if (!requireLogin()) return
     if (!['admin', 'admin_dev'].includes(roleKey)) return toast.error('Chỉ quản trị viên mới có quyền này')
-
-    const hasOpenReport = groupReports.some((report) => report.groupId === group?.id && (report.status || 'open') === 'open')
-    if (!hasOpenReport) return toast.error('Admin chỉ được vào nhóm khi đang có báo cáo/cảnh báo cần xử lý')
-
     try {
-      const alreadyJoined = (group.memberIds || []).includes(currentUser.uid)
-      const alreadyTemporary = (group.adminTemporaryMemberIds || []).includes(currentUser.uid)
-      await updateDoc(doc(db, 'forumGroups', group.id), {
-        memberIds: arrayUnion(currentUser.uid),
-        adminTemporaryMemberIds: alreadyJoined && !alreadyTemporary ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
-        membersCount: alreadyJoined ? Number(group.membersCount || group.memberIds?.length || 1) : increment(1),
-        updatedAt: serverTimestamp(),
-      })
-      setActiveSection(SECTIONS.GROUPS)
+      await forumApi.adminJoinGroup(group.id)
+      changeForumSection(SECTIONS.GROUPS)
       setOpenCreatedGroupId(group.id)
-      toast.success(alreadyJoined && !alreadyTemporary ? 'Bạn đã ở trong nhóm này' : 'Admin đã tham gia tạm thời để xử lý báo cáo')
+      toast.success('Admin đã tham gia tạm thời để xử lý báo cáo')
     } catch (error) {
-      console.error('Không thể tham gia nhóm bị báo cáo:', error)
-      toast.error('Không thể tham gia nhóm')
+      toast.error(error?.message || 'Không thể tham gia nhóm')
     }
   }
 
   const resolveGroupReports = async (groupId, status = 'resolved', reportIds = []) => {
-    const targetIds = new Set((reportIds || []).filter(Boolean))
-    const openReports = groupReports.filter((report) => {
-      if (report.groupId !== groupId) return false
-      if ((report.status || 'open') !== 'open') return false
-      return !targetIds.size || targetIds.has(report.id)
-    })
-
-    await Promise.all(
-      openReports.map((report) => updateDoc(doc(db, 'forumGroupReports', report.id), { status, resolvedAt: serverTimestamp(), resolvedBy: currentUser?.uid || '', updatedAt: serverTimestamp() })),
-    )
-
-    const remainingOpenReports = groupReports.filter((report) => {
-      if (report.groupId !== groupId) return false
-      if ((report.status || 'open') !== 'open') return false
-      return !openReports.some((item) => item.id === report.id)
-    })
-
-    if (!remainingOpenReports.length) {
-      await updateDoc(doc(db, 'forumGroups', groupId), {
-        reportStatus: status === 'deleted' ? 'deleted' : 'resolved',
-        reportCount: 0,
-        updatedAt: serverTimestamp(),
-      }).catch((error) => console.warn('Không thể cập nhật trạng thái báo cáo nhóm:', error))
-      await removeTemporaryAdminFromGroup(groupId)
-    }
+    const targetIds = new Set((reportIds || []).map(toId))
+    const openReports = groupReports.filter((report) => toId(report.groupId) === toId(groupId) && (report.status || 'open') === 'open' && (!targetIds.size || targetIds.has(toId(report.id))))
+    await Promise.all(openReports.map((report) => forumApi.resolveGroupReport(report.id, status)))
+    setGroupReports((current) => current.map((report) => targetIds.has(toId(report.id)) || (!targetIds.size && toId(report.groupId) === toId(groupId)) ? { ...report, status } : report))
+    const remaining = groupReports.filter((report) => toId(report.groupId) === toId(groupId) && (report.status || 'open') === 'open' && !openReports.some((item) => toId(item.id) === toId(report.id)))
+    if (!remaining.length) await removeTemporaryAdminFromGroup(groupId)
   }
 
   const markGroupReportResolved = async (group, reportIds = []) => {
@@ -2031,60 +1521,24 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
 
   const warnGroupOwner = (group, report = null) => {
     if (roleKey !== 'admin_dev') return toast.error('Chỉ admin_dev mới gửi cảnh báo')
-    const ownerId = group?.ownerId || report?.groupOwnerId || ''
-    if (!ownerId) return toast.error('Không tìm thấy trưởng nhóm để gửi cảnh báo')
-
     setAdminReasonModal({
-      title: 'Viết cảnh báo cho nhóm trưởng',
-      message: `Gửi cảnh báo tới trưởng nhóm "${group?.name || report?.groupName || 'Nhóm học'}".`,
-      confirmText: 'Gửi cảnh báo',
-      placeholder: 'Nhập nội dung cảnh báo...',
-      options: GROUP_WARNING_TEMPLATES,
-      requireReason: true,
+      title: 'Viết cảnh báo cho nhóm trưởng', message: `Gửi cảnh báo tới trưởng nhóm "${group?.name || report?.groupName || 'Nhóm học'}".`, confirmText: 'Gửi cảnh báo', placeholder: 'Nhập nội dung cảnh báo...', options: GROUP_WARNING_TEMPLATES, requireReason: true,
       onConfirm: async (warningText) => {
         try {
-          await addDoc(collection(db, 'forumGroupWarnings'), {
-            groupId: group?.id || report?.groupId || '',
-            groupName: group?.name || report?.groupName || 'Nhóm học',
-            ownerId,
-            adminId: currentUser.uid,
-            adminName: displayName,
-            content: warningText,
-            reportId: report?.id || '',
-            createdAt: serverTimestamp(),
-          })
-
-          await addDoc(collection(db, 'forumNotifications'), {
-            toUserId: ownerId,
-            fromUserId: currentUser.uid,
-            fromName: displayName,
-            type: 'group-warning',
-            category: 'admin',
-            scope: 'group',
-            groupId: group?.id || report?.groupId || '',
-            groupName: group?.name || report?.groupName || 'Nhóm học',
-            title: 'Cảnh báo nhóm học',
-            text: warningText,
-            read: false,
-            createdAt: serverTimestamp(),
-          })
-
+          await forumApi.groupWarning(group?.id || report?.groupId, { content: warningText, reportId: report?.id || '' })
           if (report?.groupId) await resolveGroupReports(report.groupId, 'warned')
           await removeTemporaryAdminFromGroup(group?.id || report?.groupId || '')
           toast.success('Đã gửi cảnh báo cho nhóm trưởng')
-        } catch (error) {
-          console.error('Không thể gửi cảnh báo nhóm:', error)
-          toast.error('Không thể gửi cảnh báo')
-        }
+        } catch (error) { console.error(error); toast.error('Không thể gửi cảnh báo') }
       },
     })
   }
 
   const resolveReport = async (report) => {
     if (roleKey !== 'admin_dev') return
-
     try {
-      await deleteDoc(doc(db, 'forumReports', report.id))
+      await forumApi.deleteReport(report.id)
+      setReports((current) => current.filter((item) => item.id !== report.id))
       toast.success('Đã xóa báo cáo')
     } catch (error) {
       console.error('Không thể xử lý báo cáo:', error)
@@ -2109,27 +1563,9 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
 
   const runDeletePost = async (post, reason = '') => {
     try {
-      const deletedByAdmin = ['admin', 'admin_dev'].includes(roleKey)
-      await hardDeletePostData(post.id)
-
-      if (deletedByAdmin && post.authorId) {
-        await addDoc(collection(db, 'forumNotifications'), {
-          toUserId: post.authorId,
-          fromUserId: currentUser.uid,
-          fromName: displayName,
-          type: 'post-deleted',
-          category: 'admin',
-          scope: post.scope || 'hall',
-          postId: post.id,
-          title: 'Bài viết đã bị xóa',
-          text: reason
-            ? `Quản trị viên đã xóa bài viết "${post.title}". Lý do: ${reason}`
-            : `Quản trị viên đã xóa bài viết "${post.title}".`,
-          read: false,
-          createdAt: serverTimestamp(),
-        })
-      }
-
+      await forumApi.deletePost(post.id, reason)
+      setPosts((current) => current.filter((item) => item.id !== post.id))
+      setSavedPosts((current) => current.filter((item) => item.id !== post.id))
       if (selectedPost?.id === post.id) setSelectedPost(null)
       toast.success('Đã xóa bài viết')
     } catch (error) {
@@ -2170,32 +1606,9 @@ if (form.scope === 'hall' && roleKey !== 'admin_dev') {
   const approvePost = async (post) => {
     if (roleKey !== 'admin_dev') return toast.error('Bạn không có quyền duyệt bài')
     try {
-await updateDoc(doc(db, 'forumPosts', post.id), {
-  status: 'approved',
-  moderationStatus: 'approved',
-  approvedBy: currentUser.uid,
-  approvedAt: serverTimestamp(),
-  rejectedAt: null,
-  rejectedBy: '',
-  updatedAt: serverTimestamp(),
-})
-
-if (post.authorId) {
-  await addDoc(collection(db, 'forumNotifications'), {
-    toUserId: post.authorId,
-    fromUserId: currentUser.uid,
-    fromName: displayName,
-    type: 'moderation-approved',
-    category: 'post-moderation',
-    scope: post.scope || 'hall',
-    postId: post.id,
-    text: `Bài viết "${post.title}" của bạn đã được duyệt và hiển thị ở cộng đồng ZUNY.`,
-    read: false,
-    createdAt: serverTimestamp(),
-  })
-}
-
-toast.success('Đã duyệt bài viết')
+      const response = await forumApi.moderatePost(post.id, 'approved')
+      if (response.post) setPosts((current) => current.map((item) => item.id === post.id ? normalizeForumItemIds(response.post) : item))
+      toast.success('Đã duyệt bài viết')
     } catch (error) {
       console.error('Không thể duyệt bài:', error)
       toast.error('Không thể duyệt bài')
@@ -2204,396 +1617,99 @@ toast.success('Đã duyệt bài viết')
 
   const rejectPost = async (post) => {
     if (roleKey !== 'admin_dev') return toast.error('Bạn không có quyền từ chối bài')
-
     setAdminReasonModal({
-      title: 'Từ chối bài viết?',
-      message: 'Vui lòng nhập lý do từ chối để người đăng biết cần chỉnh sửa điều gì.',
-      confirmText: 'Từ chối',
-      placeholder: 'Nhập lý do từ chối bài viết...',
-      danger: true,
+      title: 'Từ chối bài viết?', message: 'Vui lòng nhập lý do từ chối để người đăng biết cần chỉnh sửa điều gì.', confirmText: 'Từ chối', placeholder: 'Nhập lý do từ chối bài viết...', danger: true,
       onConfirm: async (reason) => {
         try {
-          await updateDoc(doc(db, 'forumPosts', post.id), {
-            status: 'rejected',
-            moderationStatus: 'rejected',
-            rejectionReason: reason || '',
-            rejectedBy: currentUser.uid,
-            rejectedAt: serverTimestamp(),
-            approvedBy: '',
-            approvedAt: null,
-            updatedAt: serverTimestamp(),
-          })
-
-          if (post.authorId) {
-            await addDoc(collection(db, 'forumNotifications'), {
-              toUserId: post.authorId,
-              fromUserId: currentUser.uid,
-              fromName: displayName,
-              type: 'moderation-rejected',
-              category: 'post-moderation',
-              scope: post.scope || 'hall',
-              postId: post.id,
-              title: 'Bài viết bị từ chối',
-              text: reason
-                ? `Bài viết "${post.title}" của bạn đã bị từ chối. Lý do: ${reason}`
-                : `Bài viết "${post.title}" của bạn đã bị từ chối.`,
-              read: false,
-              createdAt: serverTimestamp(),
-            })
-          }
-
+          const response = await forumApi.moderatePost(post.id, 'rejected', reason || '')
+          if (response.post) setPosts((current) => current.map((item) => item.id === post.id ? normalizeForumItemIds(response.post) : item))
           toast.success('Đã từ chối bài viết')
-        } catch (error) {
-          console.error('Không thể từ chối bài:', error)
-          toast.error('Không thể từ chối bài')
-        }
+        } catch (error) { console.error(error); toast.error('Không thể từ chối bài') }
       },
     })
   }
 
   const updateUserForumRestriction = async (targetUser, key, blocked) => {
     if (roleKey !== 'admin_dev' || !targetUser?.id) return
-    if (targetUser.id === currentUser?.uid) {
-      toast.error('Không thể tự chặn tài khoản quản trị hiện tại')
-      return
-    }
-
-    const targetRole = getRoleKey(targetUser.role || targetUser.userRole || targetUser.type)
-    if (targetRole === 'admin_dev') {
-      toast.error('Không thể chặn tài khoản Admin_dev khác')
-      return
-    }
-
-    const fieldLabel = key === 'blockCommunityPosting' ? 'đăng bài ở cộng đồng' : 'tạo nhóm học'
-    const reasonField = key === 'blockCommunityPosting' ? 'postBlockReason' : 'groupBlockReason'
-
+    if (toId(targetUser.id) === toId(currentUser?.uid)) return toast.error('Không thể tự chặn tài khoản quản trị hiện tại')
+    if (getRoleKey(targetUser.role || targetUser.userRole || targetUser.type) === 'admin_dev') return toast.error('Không thể chặn tài khoản Admin_dev khác')
     try {
-      await setDoc(doc(db, 'users', targetUser.id), {
-        forumRestrictions: {
-          ...(targetUser.forumRestrictions || {}),
-          [key]: blocked,
-          [reasonField]: blocked ? `Quản trị viên đã chặn quyền ${fieldLabel}` : '',
-          updatedAt: serverTimestamp(),
-          updatedBy: currentUser.uid,
-        },
-      }, { merge: true })
-
-      await addDoc(collection(db, 'forumNotifications'), {
-        toUserId: targetUser.id,
-        fromUserId: currentUser.uid,
-        fromName: displayName,
-        type: blocked ? 'forum-user-restricted' : 'forum-user-restored',
-        category: 'admin',
-        scope: 'hall',
-        title: blocked ? 'Quyền cộng đồng đã bị giới hạn' : 'Quyền cộng đồng đã được khôi phục',
-        text: blocked
-          ? `Quản trị viên đã chặn quyền ${fieldLabel} của tài khoản bạn.`
-          : `Quản trị viên đã khôi phục quyền ${fieldLabel} của tài khoản bạn.`,
-        read: false,
-        createdAt: serverTimestamp(),
-      })
-
-      toast.success(blocked ? `Đã chặn quyền ${fieldLabel}` : `Đã mở lại quyền ${fieldLabel}`)
-    } catch (error) {
-      console.error('Không thể cập nhật quyền cộng đồng:', error)
-      toast.error('Không thể cập nhật quyền người dùng')
-    }
+      const response = await forumApi.updateUserRestriction(targetUser.id, key, blocked)
+      const updated = normalizeForumUser(response.user || targetUser)
+      setUserProfiles((current) => ({ ...current, [updated.id]: updated }))
+      toast.success(blocked ? 'Đã cập nhật giới hạn người dùng' : 'Đã mở lại quyền người dùng')
+    } catch (error) { console.error(error); toast.error('Không thể cập nhật quyền người dùng') }
   }
 
   const createGroup = async (form) => {
     if (!requireLogin()) return
-
-    if (showRestrictionPopup('group')) {
-      setGroupOpen(false)
-      return
-    }
-
-    const ownedGroupsCount = groups.filter((group) => !group.isSample && group.ownerId === currentUser.uid).length
-    if (ownedGroupsCount >= MAX_GROUPS_PER_USER) {
-      toast.error(`Mỗi người chỉ được tạo tối đa ${MAX_GROUPS_PER_USER} nhóm`)
-      return
-    }
-
+    if (showRestrictionPopup('group')) { setGroupOpen(false); return }
+    const ownedGroupsCount = groups.filter((group) => !group.isSample && toId(group.ownerId) === toId(currentUser.uid)).length
+    if (ownedGroupsCount >= MAX_GROUPS_PER_USER) return toast.error(`Mỗi người chỉ được tạo tối đa ${MAX_GROUPS_PER_USER} nhóm`)
     try {
-      const inviteExpiryMs = getInviteExpiryMs(form.inviteExpiry)
-      const nowMs = Date.now()
-      const groupRef = await addDoc(collection(db, 'forumGroups'), {
-        name: form.name.trim(),
-        description: String(form.description || '').trim(),
-        emoji: form.emoji.trim() || '👥',
-        tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 6),
-        groupType: form.groupType || (form.isPrivate ? 'private' : 'public'),
-        isPrivate: form.groupType === 'private',
-        isHidden: Boolean(form.isHidden || form.groupType === 'hidden'),
-        requireApproval: Boolean(form.requireApproval),
-        pendingMemberIds: [],
-        adminIds: [],
-        minGrade: form.minGrade || '',
-        password: form.groupType === 'private' ? String(form.password || '').trim() : '',
-        themeColor: form.themeColor || '#8b5cf6',
-        coverImage: String(form.coverImage || '').trim(),
-        coverUrl: String(form.coverImage || '').trim(),
-        groupCode: normalizeGroupCode(form.groupCode) || generateGroupCode(),
-        inviteCode: form.groupType === 'invite_only' ? String(form.inviteCode || '').trim() : '',
-        inviteExpiry: form.groupType === 'invite_only' ? (form.inviteExpiry || 'unlimited') : 'unlimited',
-        inviteCodeIssuedAtMs: form.groupType === 'invite_only' ? nowMs : 0,
-        inviteCodeExpiresAtMs: form.groupType === 'invite_only' && inviteExpiryMs ? nowMs + inviteExpiryMs : 0,
-        channels: Array.isArray(form.channels) && form.channels.length ? form.channels : [
-          { id: 'thong-bao', label: 'thông-báo', icon: '📢', type: 'announce' },
-          { id: 'thao-luan', label: 'thảo-luận', icon: '💬', type: 'chat' },
-        ],
-        createDefaultChannels: false,
-        defaultChannels: Array.isArray(form.defaultChannels) && form.defaultChannels.length ? form.defaultChannels : [
-          { id: 'thong-bao', label: 'thông-báo', icon: '📢', type: 'announce' },
-          { id: 'thao-luan', label: 'thảo-luận', icon: '💬', type: 'chat' },
-        ],
-        permissions: form.permissions || {
-          sendMessage: true,
-          sendImage: true,
-          sendFile: true,
-          invite: true,
-          createPost: true,
-        },
-        memberLimit: Number(form.memberLimit || 1000),
-        ownerId: currentUser.uid,
-ownerName: displayName,
-ownerEmail: currentUser.email || '',
-createdByName: displayName,
-createdByEmail: currentUser.email || '',
-        memberIds: [currentUser.uid],
-        membersCount: 1,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
+      const response = await forumApi.createGroup(form)
+      const group = normalizeForumItemIds(response.group || {})
+      if (group.id) setGroups((current) => [group, ...current.filter((item) => item.id !== group.id)])
       setGroupOpen(false)
-setCreatedGroupPopup({
-  groupId: groupRef.id,
-  groupCode: normalizeGroupCode(form.groupCode) || generateGroupCode(),
-  inviteCode: form.groupType === 'invite_only' ? String(form.inviteCode || '').trim() : '',
-})
-    } catch (error) {
-      console.error('Không thể tạo nhóm:', error)
-      toast.error('Không thể tạo nhóm')
-    }
+      setCreatedGroupPopup({ groupId: group.id, groupCode: group.groupCode || '', inviteCode: group.inviteCode || '' })
+    } catch (error) { console.error(error); toast.error(error?.message || 'Không thể tạo nhóm') }
   }
 
   const toggleJoinGroup = async (group) => {
     if (!requireLogin()) return
-    const joined = (group.memberIds || []).includes(currentUser.uid)
-    try {
-      if (group.isSample) {
-        const ownedGroupsCount = groups.filter((item) => !item.isSample && item.ownerId === currentUser.uid).length
-        if (ownedGroupsCount >= MAX_GROUPS_PER_USER) {
-          toast.error(`Mỗi người chỉ được tạo tối đa ${MAX_GROUPS_PER_USER} nhóm`)
-          return
-        }
-
-        await addDoc(collection(db, 'forumGroups'), {
-          name: group.name,
-          description: group.description,
-          emoji: group.emoji || '👥',
-          tags: group.tags || [],
-          isPrivate: false,
-          password: '',
-          themeColor: group.themeColor || '#8b5cf6',
-          groupCode: normalizeGroupCode(group.groupCode) || generateGroupCode(),
-          createDefaultChannels: true,
-          defaultChannels: ['thong-bao', 'thao-luan', 'hoi-bai', 'tai-lieu'],
-          ownerId: currentUser.uid,
-          ownerName: displayName,
-          ownerEmail: currentUser.email || '',
-          createdByName: displayName,
-          createdByEmail: currentUser.email || '',
-          memberIds: [currentUser.uid],
-          membersCount: 1,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        })
-        toast.success('Đã tạo và tham gia nhóm mẫu')
-        return
-      }
-
-      const adminBypassReportedGroup = ['admin', 'admin_dev'].includes(roleKey) && (
-        Number(group.reportCount || 0) > 0 || groupReports.some((report) => report.groupId === group.id && (report.status || 'open') === 'open')
-      )
-
-      const memberLimit = Number(group.memberLimit || 1000)
-      const currentMemberCount = Number(group.membersCount || group.memberIds?.length || 0)
-      if (!joined && !adminBypassReportedGroup && currentMemberCount >= memberLimit) {
-        toast.error('Nhóm đã vượt quá giới hạn thành viên nên bạn không thể tham gia')
-        return
-      }
-
-      if (!joined && !adminBypassReportedGroup && group.minGrade) {
-        const requiredRank = gradeRank(group.minGrade)
-        const userRank = roleKey === 'admin_dev' ? 999 : ['teacher', 'admin'].includes(roleKey) ? 40 : gradeRank(userClass)
-        if (userRank < requiredRank) {
-          toast.error('Bạn chưa đủ lớp học tối thiểu để tham gia nhóm này')
-          return
-        }
-      }
-
-      if (joined && group.ownerId === currentUser.uid && (group.memberIds || []).length > 1) {
-        setConfirmModal({
-    title: "Không thể rời nhóm",
-    message:
-        "Bạn đang là trưởng nhóm. Hãy chuyển quyền trưởng nhóm cho một thành viên khác trước khi rời nhóm.",
-    confirmText: "Đã hiểu",
-})
-        return
-      }
-
-      if (!joined && !adminBypassReportedGroup && group.requireApproval) {
-        const pendingIds = group.pendingMemberIds || []
-        if (pendingIds.includes(currentUser.uid)) {
-          toast.error('Yêu cầu tham gia của bạn đang chờ duyệt')
-          return
-        }
-        await updateDoc(doc(db, 'forumGroups', group.id), {
-          pendingMemberIds: arrayUnion(currentUser.uid),
-          updatedAt: serverTimestamp(),
-        })
-        toast.success('Đã gửi yêu cầu tham gia, vui lòng chờ duyệt')
-        return
-      }
-
-      const groupMembershipUpdate = {
-        memberIds: joined ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
-        membersCount: increment(joined ? -1 : 1),
-        updatedAt: serverTimestamp(),
-      }
-
-      if (joined) {
-        groupMembershipUpdate.adminIds = arrayRemove(currentUser.uid)
-        groupMembershipUpdate.pendingMemberIds = arrayRemove(currentUser.uid)
-      }
-
-      await updateDoc(doc(db, 'forumGroups', group.id), groupMembershipUpdate)
-
-      if (joined) {
-        // Ẩn ngay tại giao diện trước khi Firestore hoàn tất xóa để không còn nhấp nháy thông báo cũ.
-        setNotifications((previous) => previous.filter((item) => item.groupId !== group.id))
-        setNotificationModal((previous) => previous?.groupId === group.id ? null : previous)
-
-        // Xóa các thông báo cũ của chính nhóm vừa rời để chúng không còn nằm trong hộp thư.
-        const userNotificationsSnapshot = await getDocs(
-          query(
-            collection(db, 'forumNotifications'),
-            where('toUserId', '==', currentUser.uid),
-            limit(200),
-          ),
-        )
-
-        const staleGroupNotifications = userNotificationsSnapshot.docs.filter((item) => {
-          const data = item.data() || {}
-          return data.scope === 'group' && data.groupId === group.id
-        })
-
-        await Promise.all(staleGroupNotifications.map((item) => deleteDoc(item.ref)))
-      }
-
-      toast.success(joined ? 'Đã rời nhóm' : 'Đã tham gia nhóm')
-    } catch (error) {
-      console.error('Không thể cập nhật nhóm:', error)
-      toast.error('Không thể cập nhật nhóm')
+    const currentId = toId(currentUser.uid)
+    const joined = (group.memberIds || []).map(toId).includes(currentId)
+    if (joined && toId(group.ownerId) === currentId && (group.memberIds || []).length > 1) {
+      setConfirmModal({ title: 'Không thể rời nhóm', message: 'Bạn đang là trưởng nhóm. Hãy chuyển quyền trưởng nhóm cho một thành viên khác trước khi rời nhóm.', confirmText: 'Đã hiểu' })
+      return
     }
-  }
-
-  const deleteQueryDocs = async (targetQuery) => {
-    const snapshot = await getDocs(targetQuery)
-    await Promise.all(snapshot.docs.map((item) => deleteDoc(item.ref)))
+    try {
+      const action = !joined && group.requireApproval ? 'request' : joined ? 'leave' : 'join'
+      const response = await forumApi.membership(group.id, action)
+      if (response.group) setGroups((current) => current.map((item) => item.id === group.id ? normalizeForumItemIds(response.group) : item))
+      if (action === 'request') toast.success('Đã gửi yêu cầu tham gia, vui lòng chờ duyệt')
+      else toast.success(joined ? 'Đã rời nhóm' : 'Đã tham gia nhóm')
+    } catch (error) { console.error(error); toast.error(error?.message || 'Không thể cập nhật nhóm') }
   }
 
   const hardDeletePostData = async (postId) => {
-    if (!postId) return
-
-    await deleteQueryDocs(query(collection(db, 'forumPosts', postId, 'comments'), limit(500)))
-    await deleteQueryDocs(query(collection(db, 'forumReports'), where('postId', '==', postId), limit(500)))
-    await deleteQueryDocs(query(collection(db, 'forumNotifications'), where('postId', '==', postId), limit(500)))
-    await deleteDoc(doc(db, 'forumPosts', postId))
+    if (postId) await forumApi.deletePost(postId)
   }
 
   const createGroupDeleteNotifications = async (group, reason = '') => {
-    const memberIds = [...new Set([...(group.memberIds || []), group.ownerId].filter(Boolean))]
-    const safeReason = String(reason || '').trim()
-
-    if (!memberIds.length) return
-
-    await Promise.all(
-      memberIds.map((uid) =>
-        addDoc(collection(db, 'forumNotifications'), {
-          toUserId: uid,
-          fromUserId: currentUser.uid,
-          fromName: displayName,
-          type: 'group-deleted-by-admin',
-          category: 'admin',
-          scope: 'group',
-          groupId: group.id,
-          groupName: group.name || 'Nhóm học',
-          title: 'Nhóm học đã bị xóa',
-          text: safeReason
-            ? `Admin_dev đã xóa nhóm "${group.name || 'Nhóm học'}". Lý do: ${safeReason}`
-            : `Admin_dev đã xóa nhóm "${group.name || 'Nhóm học'}".`,
-          read: false,
-          createdAt: serverTimestamp(),
-        }),
-      ),
-    )
+    return forumApi.broadcastNotification({
+      audience: 'group-members', groupId: group.id, type: 'group-deleted-by-admin', category: 'admin', scope: 'group',
+      title: 'Nhóm học đã bị xóa', text: reason ? `Admin_dev đã xóa nhóm "${group.name || 'Nhóm học'}". Lý do: ${reason}` : `Admin_dev đã xóa nhóm "${group.name || 'Nhóm học'}".`,
+    })
   }
 
   const deleteGroup = async (group) => {
     if (!requireLogin()) return
     if (group.isSample) return toast.error('Nhóm mẫu chưa có dữ liệu để xóa')
-    const canDeleteGroup = group.ownerId === currentUser.uid || ['admin', 'admin_dev'].includes(roleKey)
+    const canDeleteGroup = toId(group.ownerId) === toId(currentUser.uid) || ['admin', 'admin_dev'].includes(roleKey)
     if (!canDeleteGroup) return toast.error('Bạn chỉ có thể xóa nhóm của mình')
 
     const runDeleteGroup = async (reason = '') => {
       try {
-        if (roleKey === 'admin_dev') {
-          await createGroupDeleteNotifications(group, reason)
-          await resolveGroupReports(group.id, 'deleted')
-        }
-
-        const groupPosts = await getDocs(query(collection(db, 'forumPosts'), where('groupId', '==', group.id), limit(500)))
-        await Promise.all(groupPosts.docs.map((item) => hardDeletePostData(item.id)))
-        await deleteQueryDocs(query(collection(db, 'forumGroupChats', String(group.id), 'messages'), limit(500)))
-        await deleteDoc(doc(db, 'forumGroups', group.id))
+        await forumApi.deleteGroup(group.id, reason)
+        setGroups((current) => current.filter((item) => item.id !== group.id))
         if (selectedGroupChat?.id === group.id) setSelectedGroupChat(null)
         toast.success('Đã xóa nhóm')
-      } catch (error) {
-        console.error('Không thể xóa nhóm:', error)
-        toast.error('Không thể xóa nhóm')
-      }
+      } catch (error) { console.error(error); toast.error(error?.message || 'Không thể xóa nhóm') }
     }
 
     if (roleKey === 'admin_dev') {
-      setAdminReasonModal({
-        title: 'Admin_dev xóa nhóm học?',
-        message: 'Bạn đang xóa nhóm với quyền admin_dev. Người dùng trong nhóm sẽ nhận được thông báo kèm lý do này.',
-        confirmText: 'Xóa nhóm',
-        placeholder: 'Nhập lý do xóa nhóm...',
-        options: GROUP_DELETE_REASONS,
-        danger: true,
-        requireReason: true,
-        onConfirm: (reason) => runDeleteGroup(reason),
-      })
+      setAdminReasonModal({ title: 'Admin_dev xóa nhóm học?', message: 'Bạn đang xóa nhóm với quyền admin_dev. Người dùng trong nhóm sẽ nhận được thông báo kèm lý do này.', confirmText: 'Xóa nhóm', placeholder: 'Nhập lý do xóa nhóm...', options: GROUP_DELETE_REASONS, danger: true, requireReason: true, onConfirm: runDeleteGroup })
       return
     }
-
-    setConfirmModal({
-      title: 'Xóa nhóm học?',
-      message: 'Nhóm, tin nhắn chat và bài viết thuộc nhóm này sẽ bị xóa vĩnh viễn. Chỉ dữ liệu của nhóm này bị xóa.',
-      confirmText: 'Xóa nhóm',
-      danger: true,
-      onConfirm: () => runDeleteGroup(),
-    })
+    setConfirmModal({ title: 'Xóa nhóm học?', message: 'Nhóm, tin nhắn chat và bài viết thuộc nhóm này sẽ bị xóa vĩnh viễn.', confirmText: 'Xóa nhóm', danger: true, onConfirm: () => runDeleteGroup() })
   }
 
   return (
     <div className={`${dark ? 'dark' : ''} min-h-full [&_button]:cursor-pointer [&_select]:cursor-pointer [&_label]:cursor-pointer`}>
 <main className="min-h-full bg-slate-50 text-slate-950 transition dark:bg-[#020617] dark:text-white">
     <div className="relative flex min-h-full">
-              <Sidebar activeSection={activeSection} roleKey={roleKey} unreadNotificationsCount={unreadNotificationsCount} pendingReviewCount={pendingReviewCount} collapsed={activeSection === SECTIONS.GROUPS ? true : sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} onChange={(section) => { setActiveSection(section); setFilter('all'); setMobileMenuOpen(false) }} dark={dark} onToggleDark={() => setManualDark((value) => !(value ?? syncedDark))} mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+              <Sidebar activeSection={activeSection} roleKey={roleKey} unreadNotificationsCount={unreadNotificationsCount} pendingReviewCount={pendingReviewCount} collapsed={activeSection === SECTIONS.GROUPS ? true : sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} onChange={(section) => { changeForumSection(section); setFilter('all'); setMobileMenuOpen(false) }} dark={dark} onToggleDark={() => setManualDark((value) => !(value ?? syncedDark))} mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
         <div className={`min-h-full min-w-0 flex-1 transition-[margin] duration-300 ${activeSection === SECTIONS.GROUPS || sidebarCollapsed ? 'lg:ml-24' : 'lg:ml-72'}`}>
         {activeSection === SECTIONS.GROUPS ? (
@@ -2634,7 +1750,7 @@ setCreatedGroupPopup({
 
             <div className={`mx-auto grid w-full max-w-7xl gap-4 px-3 py-3 sm:px-4 sm:py-4 lg:px-6 ${activeSection === SECTIONS.HALL ? "xl:grid-cols-[minmax(0,1fr)_300px]" : "grid-cols-1"}`}>
               <div className="min-w-0">
-                {activeSection === SECTIONS.HALL && <HallHero stats={stats} onCompose={openComposer} onExploreGroups={() => setActiveSection(SECTIONS.GROUPS)} />}
+                {activeSection === SECTIONS.HALL && <HallHero stats={stats} onCompose={openComposer} onExploreGroups={() => changeForumSection(SECTIONS.GROUPS)} />}
                 {activeSection === SECTIONS.GROUPS && null}
                 {activeSection === SECTIONS.ACCOUNT && (
                   <AccountHero
@@ -2810,7 +1926,7 @@ setCreatedGroupPopup({
         </div>
 
         {!groupChannelOpen && (
-          <MobileNav activeSection={activeSection} unreadNotificationsCount={unreadNotificationsCount} onChange={(section) => { setActiveSection(section); setFilter('all') }} onCompose={openComposer} />
+          <MobileNav activeSection={activeSection} unreadNotificationsCount={unreadNotificationsCount} onChange={(section) => { changeForumSection(section); setFilter('all') }} onCompose={openComposer} />
         )}
       </main>
 
@@ -3028,7 +2144,7 @@ function Sidebar({
 
   return (
     <>
-      <div className="fixed left-0 top-[4%] z-40 hidden h-[calc(100vh-80px)] lg:block">{content}</div>
+      <div className="fixed left-0 top-[var(--zuny-navbar-height,80px)] z-30 hidden h-[calc(100dvh-var(--zuny-navbar-height,80px))] lg:block">{content}</div>
       {mobileOpen && <div className="fixed inset-0 z-[80] bg-slate-950/60 backdrop-blur-sm lg:hidden" onMouseDown={onClose}><div className="h-full" onMouseDown={(event) => event.stopPropagation()}>{content}</div></div>}
     </>
   )
@@ -3036,7 +2152,7 @@ function Sidebar({
 
 function TopBar({ search, setSearch, onCompose, onMenu, initials, unread, profileLoading }) {
   return (
-<header className="sticky top-0 z-40 bg-white/85 px-4 py-3 backdrop-blur-xl dark:bg-slate-950/80 lg:px-8">
+<header className="sticky top-[var(--zuny-navbar-height,80px)] z-30 bg-white/85 px-4 py-3 backdrop-blur-xl dark:bg-slate-950/80 lg:px-8">
       <div className="mx-auto flex max-w-7xl items-center gap-3">
         <button type="button" onClick={onMenu} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 lg:hidden">
           <Menu className="h-5 w-5" />
@@ -3930,7 +3046,7 @@ function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSea
               <UserX className="h-4 w-4" /> Quản lý cá nhân
             </div>
             <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">Quyền hoạt động cộng đồng</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">Danh sách được đồng bộ trực tiếp từ Firebase.</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-300">Danh sách được đồng bộ trực tiếp từ PostgreSQL.</p>
           </div>
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -4660,20 +3776,21 @@ function PostModal({ open, onClose, onSubmit, groups, roleKey, displayName, init
   const updatePollOption = (index, value) => {
     const nextOptions = [...form.pollOptions]; nextOptions[index] = value; setForm({ ...form, pollOptions: nextOptions })
   }
-  const handleUpload = (event) => {
+  const handleUpload = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
     const isImage = file.type?.startsWith('image/')
     const isZip = file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || file.name.toLowerCase().endsWith('.zip')
     if (!isImage && !isZip) { toast.error('Chỉ hỗ trợ hình ảnh hoặc file ZIP'); event.target.value = ''; return }
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (isImage) setForm((prev) => ({ ...prev, imageUrl: String(reader.result || ''), imageFileName: file.name, showImageInput: true }))
-      else setForm((prev) => ({ ...prev, attachmentUrl: String(reader.result || ''), attachmentName: file.name }))
-      toast.success(`Đã tải lên: ${file.name}`)
-    }
-    reader.onerror = () => toast.error('Không thể đọc tệp đã chọn')
-    reader.readAsDataURL(file)
+    try {
+      const response = await forumApi.uploadForumAsset(file, isImage ? 'post-image' : 'post-attachment')
+      const url = response.url || response.publicUrl || response.fileUrl || ''
+      if (!url) throw new Error('UPLOAD_URL_MISSING')
+      if (isImage) setForm((prev) => ({ ...prev, imageUrl: url, imageFileName: file.name, showImageInput: true }))
+      else setForm((prev) => ({ ...prev, attachmentUrl: url, attachmentName: file.name }))
+      toast.success(`Đã tải lên R2: ${file.name}`)
+    } catch (error) { console.error(error); toast.error(error?.message || 'Không thể tải tệp lên R2') }
+    finally { event.target.value = '' }
   }
   const addAssetFromUrl = () => {
     const url = String(assetUrl || '').trim()
@@ -4820,13 +3937,16 @@ function PostDetailModal({ post, highlightedCommentId = '', currentUser, display
 
   useEffect(() => {
     if (!post?.id) return undefined
-    const commentsQuery = query(collection(db, 'forumPosts', post.id, 'comments'), orderBy('createdAt', 'asc'), limit(300))
-    const unsubscribe = onSnapshot(
-      commentsQuery,
-      (snapshot) => setComments(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể tải bình luận:', error),
-    )
-    return () => unsubscribe()
+    let cancelled = false
+    const loadComments = async () => {
+      try {
+        const response = await forumApi.comments(post.id)
+        if (!cancelled) setComments((response.comments || []).map(normalizeForumItemIds))
+      } catch (error) { if (!cancelled) console.warn('Không thể tải bình luận SQL:', error) }
+    }
+    loadComments()
+    const timer = window.setInterval(loadComments, 3000)
+    return () => { cancelled = true; window.clearInterval(timer) }
   }, [post?.id])
 
   useEffect(() => {
@@ -4856,59 +3976,14 @@ function PostDetailModal({ post, highlightedCommentId = '', currentUser, display
   const createComment = async ({ content, parent = null }) => {
     if (!currentUser?.uid) return toast.error('Bạn cần đăng nhập để bình luận')
     if (!canComment) return toast.error('Chỉ giáo viên được trả lời bài viết này')
-
     const text = String(content || '').trim()
     if (!text) return
-
-    const parentDepth = Number(parent?.depth || 1)
-    const nextDepth = parent ? Math.min(parentDepth + 1, 3) : 1
-    const parentId = parent ? parent.id : ''
-    const rootCommentId = parent ? (parent.rootCommentId || parent.id) : ''
-
     try {
-      const commentRef = await addDoc(collection(db, 'forumPosts', post.id, 'comments'), {
-        content: text,
-        authorId: currentUser.uid,
-        authorName: displayName,
-        authorInitials: initials,
-        authorRole: roleKey,
-        parentId,
-        rootCommentId,
-        depth: nextDepth,
-        reactions: {},
-        reactionCounts: {},
-        reactionsCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-
-      await updateDoc(doc(db, 'forumPosts', post.id), { commentsCount: increment(1), updatedAt: serverTimestamp() })
-
-      const notifyUserId = parent?.authorId && parent.authorId !== currentUser.uid ? parent.authorId : post.authorId
-      if (notifyUserId && notifyUserId !== currentUser.uid) {
-        await addDoc(collection(db, 'forumNotifications'), {
-          toUserId: notifyUserId,
-          fromUserId: currentUser.uid,
-          fromName: displayName,
-          type: parent ? 'comment-reply' : 'comment',
-          category: 'post-interaction',
-          scope: post.scope || 'hall',
-          postId: post.id,
-          commentId: commentRef.id,
-          text: parent ? `${displayName} đã trả lời bình luận của bạn` : `${displayName} đã bình luận bài viết của bạn`,
-          read: false,
-          createdAt: serverTimestamp(),
-        })
-      }
-
-      setCommentText('')
-      setReplyText('')
-      setReplyTarget(null)
+      const response = await forumApi.createComment(post.id, { content: text, parentId: parent?.id || '' })
+      if (response.comment) setComments((current) => [...current, normalizeForumItemIds(response.comment)])
+      setCommentText(''); setReplyText(''); setReplyTarget(null)
       setTimeout(() => inputRef.current?.focus(), 50)
-    } catch (error) {
-      console.error('Không thể gửi bình luận:', error)
-      toast.error('Không thể gửi bình luận')
-    }
+    } catch (error) { console.error(error); toast.error(error?.message || 'Không thể gửi bình luận') }
   }
 
   const addComment = async (event) => {
@@ -4925,39 +4000,10 @@ function PostDetailModal({ post, highlightedCommentId = '', currentUser, display
   const reactToComment = async (comment, reactionValue = 'love') => {
     if (!currentUser?.uid) return toast.error('Bạn cần đăng nhập để thả cảm xúc')
     if (!post?.id || !comment?.id) return
-
     try {
-      const commentRef = doc(db, 'forumPosts', post.id, 'comments', comment.id)
-
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(commentRef)
-        if (!snap.exists()) return
-
-        const data = snap.data()
-        const currentReactions = data.reactions && typeof data.reactions === 'object' ? data.reactions : {}
-        const oldReaction = currentReactions[currentUser.uid]
-        const nextReactions = { ...currentReactions }
-
-        if (oldReaction === reactionValue) {
-          delete nextReactions[currentUser.uid]
-        } else {
-          nextReactions[currentUser.uid] = reactionValue
-        }
-
-        const nextCounts = buildReactionCounts(nextReactions)
-        const nextTotal = Object.values(nextCounts).reduce((sum, value) => sum + Number(value || 0), 0)
-
-        transaction.update(commentRef, {
-          reactions: nextReactions,
-          reactionCounts: nextCounts,
-          reactionsCount: nextTotal,
-          updatedAt: serverTimestamp(),
-        })
-      })
-    } catch (error) {
-      console.error('Không thể thả cảm xúc bình luận:', error)
-      toast.error('Không thể cập nhật cảm xúc bình luận')
-    }
+      const response = await forumApi.reactComment(post.id, comment.id, reactionValue)
+      setComments((current) => current.map((item) => item.id === comment.id ? { ...item, reactions: response.reactions || {}, reactionCounts: response.reactionCounts || {}, reactionsCount: response.reactionsCount || 0 } : item))
+    } catch (error) { console.error(error); toast.error('Không thể cập nhật cảm xúc bình luận') }
   }
 
   return (
@@ -5194,21 +4240,17 @@ function CommunityChatModal({ chat, type, currentUser, displayName, initials, on
 
   useEffect(() => {
     if (!chatId) return undefined
-
-    const messagesQuery = query(
-      collection(db, collectionName, String(chatId), 'messages'),
-      orderBy('createdAt', 'asc'),
-      limit(300),
-    )
-
-    const unsubscribe = onSnapshot(
-      messagesQuery,
-      (snapshot) => setMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.warn('Không thể tải chat:', error),
-    )
-
-    return () => unsubscribe()
-  }, [chatId, collectionName])
+    let cancelled = false
+    const loadMessages = async () => {
+      try {
+        const response = await forumApi.groupMessages(chatId)
+        if (!cancelled) setMessages(response.messages || [])
+      } catch (error) { if (!cancelled) console.warn('Không thể tải chat SQL:', error) }
+    }
+    loadMessages()
+    const timer = window.setInterval(loadMessages, 2000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [chatId])
 
   if (!chat) return null
 
@@ -5217,21 +4259,12 @@ function CommunityChatModal({ chat, type, currentUser, displayName, initials, on
     if (!currentUser?.uid) return toast.error('Bạn cần đăng nhập để gửi tin nhắn')
     const content = text.trim()
     if (!content) return
-
     try {
-      await addDoc(collection(db, collectionName, String(chatId), 'messages'), {
-        content,
-        authorId: currentUser.uid,
-        authorName: displayName,
-        authorInitials: initials,
-        createdAt: serverTimestamp(),
-      })
+      const response = await forumApi.sendGroupMessage(chatId, content)
+      if (response.message) setMessages((current) => [...current, response.message])
       setText('')
       setTimeout(() => inputRef.current?.focus(), 50)
-    } catch (error) {
-      console.error('Không thể gửi tin nhắn:', error)
-      toast.error('Không thể gửi tin nhắn')
-    }
+    } catch (error) { console.error(error); toast.error('Không thể gửi tin nhắn') }
   }
 
   return (
@@ -5305,44 +4338,6 @@ function CommunityChatModal({ chat, type, currentUser, displayName, initials, on
 }
 
 function ModalShell({ title, onClose, children }) {
-  const reactToComment = async (comment, reactionValue = 'love') => {
-    if (!currentUser?.uid) return toast.error('Bạn cần đăng nhập để thả cảm xúc')
-    if (!post?.id || !comment?.id) return
-
-    try {
-      const commentRef = doc(db, 'forumPosts', post.id, 'comments', comment.id)
-
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(commentRef)
-        if (!snap.exists()) return
-
-        const data = snap.data()
-        const currentReactions = data.reactions && typeof data.reactions === 'object' ? data.reactions : {}
-        const oldReaction = currentReactions[currentUser.uid]
-        const nextReactions = { ...currentReactions }
-
-        if (oldReaction === reactionValue) {
-          delete nextReactions[currentUser.uid]
-        } else {
-          nextReactions[currentUser.uid] = reactionValue
-        }
-
-        const nextCounts = buildReactionCounts(nextReactions)
-        const nextTotal = Object.values(nextCounts).reduce((sum, value) => sum + Number(value || 0), 0)
-
-        transaction.update(commentRef, {
-          reactions: nextReactions,
-          reactionCounts: nextCounts,
-          reactionsCount: nextTotal,
-          updatedAt: serverTimestamp(),
-        })
-      })
-    } catch (error) {
-      console.error('Không thể thả cảm xúc bình luận:', error)
-      toast.error('Không thể cập nhật cảm xúc bình luận')
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={onClose}>
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-950" onMouseDown={(event) => event.stopPropagation()}>

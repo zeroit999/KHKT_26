@@ -96,6 +96,8 @@ function ExamRoom() {
     submitting,
     preview,
     isTeacher,
+    attemptBlocked,
+    attemptState,
     hasStarted,
     fullscreenBlocked,
     blockingReason,
@@ -193,13 +195,18 @@ function ExamRoom() {
       : Array.from({ length: SHORT_ANSWER_SLOT_COUNT }, () => '');
 
     const nextValue = [...currentValue];
-    nextValue[slotIndex] = choice;
+
+    nextValue[slotIndex] =
+      nextValue[slotIndex] === choice
+        ? ''
+        : choice;
+
     handleTextAnswer(questionId, nextValue);
   };
 
   if (loading) {
     return (
-      <section className="flex min-h-[calc(100dvh-var(--zuny-navbar-height,72px))] items-center justify-center bg-[#f4f7fb] px-4 text-slate-950 dark:bg-[#060b16] dark:text-white">
+      <section className="flex min-h-[100dvh] items-center justify-center bg-[#f4f7fb] px-4 text-slate-950 dark:bg-[#060b16] dark:text-white">
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-black shadow-sm dark:border-white/10 dark:bg-[#101827]">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
           Đang tải đề thi...
@@ -210,7 +217,7 @@ function ExamRoom() {
 
   if (!exam) {
     return (
-      <section className="flex min-h-[calc(100dvh-var(--zuny-navbar-height,72px))] items-center justify-center bg-[#f4f7fb] px-4 dark:bg-[#060b16]">
+      <section className="flex min-h-[100dvh] items-center justify-center bg-[#f4f7fb] px-4 dark:bg-[#060b16]">
         <div className="rounded-3xl border border-red-200 bg-white px-8 py-7 text-center shadow-xl dark:border-red-500/20 dark:bg-[#101827]">
           <AlertTriangle className="mx-auto h-10 w-10 text-red-500" />
           <p className="mt-4 text-lg font-black text-red-600 dark:text-red-300">
@@ -221,9 +228,65 @@ function ExamRoom() {
     );
   }
 
+  if (
+    !preview &&
+    !isTeacher &&
+    attemptBlocked
+  ) {
+    const usedAttempts = Number(
+      attemptState?.attemptCount || 0,
+    );
+
+    const maxAttempts = Number(
+      attemptState?.maxAttempts || 1,
+    );
+
+    return (
+      <section className="flex min-h-[100dvh] items-center justify-center bg-[#f4f7fb] px-4 py-10 text-slate-950 dark:bg-[#060b16] dark:text-white">
+        <div className="w-full max-w-lg rounded-[30px] border border-slate-200 bg-white p-8 text-center shadow-[0_18px_55px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-[#101827]">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-300">
+            <LockKeyhole className="h-8 w-8" />
+          </div>
+
+          <p className="mt-6 text-xs font-black uppercase tracking-[0.16em] text-red-500">
+            Phòng thi đã khóa
+          </p>
+
+          <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+            Bạn đã hết số lượt làm bài
+          </h1>
+
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">
+            Bạn đã sử dụng{' '}
+            <span className="font-black text-slate-700 dark:text-white">
+              {usedAttempts}/{maxAttempts}
+            </span>{' '}
+            lượt của bài thi{' '}
+            <span className="font-black text-slate-700 dark:text-white">
+              {exam.title}
+            </span>.
+          </p>
+
+          <p className="mt-2 text-xs font-semibold text-slate-400">
+            Bạn không thể bắt đầu, tiếp tục hoặc nộp thêm bài cho đề thi này.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="mt-7 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Quay lại danh sách đề
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   if (!preview && !isTeacher && !hasStarted) {
     return (
-      <section className="min-h-[calc(100dvh-var(--zuny-navbar-height,72px))] bg-[#f4f7fb] px-4 py-10 text-slate-950 dark:bg-[#060b16] dark:text-white">
+      <section className="min-h-[100dvh] bg-[#f4f7fb] px-4 py-10 text-slate-950 dark:bg-[#060b16] dark:text-white">
         <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_18px_55px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-[#101827]">
             <div className="flex items-start gap-4">
@@ -382,7 +445,7 @@ function ExamRoom() {
   }
 
   return (
-    <section className="min-h-[calc(100dvh-var(--zuny-navbar-height,72px))] bg-[#f4f7fb] text-slate-950 transition-colors dark:bg-[#060b16] dark:text-white">
+    <section className="min-h-[100dvh] bg-[#f4f7fb] text-slate-950 transition-colors dark:bg-[#060b16] dark:text-white">
       {lockedByFullscreen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
           <div className="w-full max-w-xl rounded-[30px] border border-red-200 bg-white p-8 text-center shadow-2xl dark:border-red-500/25 dark:bg-[#101827]">
@@ -399,13 +462,19 @@ function ExamRoom() {
             <div className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-black text-red-700 dark:bg-red-500/10 dark:text-red-300">
               Vi phạm: {violations}/{proctoringConfig.maxViolations}
             </div>
-            <button
-              type="button"
-              onClick={restoreFullscreen}
-              className="mt-6 w-full rounded-2xl bg-blue-600 px-6 py-4 text-base font-black text-white hover:bg-blue-700"
-            >
-              Khôi phục giám sát
-            </button>
+            {violations >= proctoringConfig.maxViolations ? (
+              <div className="mt-6 w-full rounded-2xl bg-red-600 px-6 py-4 text-base font-black text-white">
+                Đã vượt giới hạn vi phạm — hệ thống đang tự động nộp bài
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={restoreFullscreen}
+                className="mt-6 w-full rounded-2xl bg-blue-600 px-6 py-4 text-base font-black text-white hover:bg-blue-700"
+              >
+                Khôi phục giám sát
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -595,6 +664,26 @@ function ExamRoom() {
 
                         return (
                           <div className="px-4 py-5 sm:px-7 sm:py-7">
+                            <div className="mx-auto mb-5 flex max-w-xl flex-col items-center justify-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-4 text-center dark:border-blue-500/15 dark:bg-blue-500/[0.08] sm:flex-row">
+                              <span className="text-xs font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-300">
+                                Đáp án hiện tại
+                              </span>
+                              <div className="flex min-h-12 items-center justify-center gap-2">
+                                {currentValue.map((value, slotIndex) => (
+                                  <span
+                                    key={`short-answer-preview-${slotIndex}`}
+                                    className={`flex h-11 min-w-11 items-center justify-center rounded-xl border px-3 text-lg font-black shadow-sm ${
+                                      value
+                                        ? 'border-blue-200 bg-white text-blue-700 dark:border-blue-500/20 dark:bg-[#101827] dark:text-blue-300'
+                                        : 'border-dashed border-slate-300 bg-white/70 text-slate-300 dark:border-white/15 dark:bg-white/5 dark:text-slate-600'
+                                    }`}
+                                  >
+                                    {value || '—'}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
                             <div className="mx-auto mb-5 grid w-fit grid-cols-[44px_repeat(4,52px)] items-center gap-2 sm:grid-cols-[52px_repeat(4,62px)] sm:gap-3">
                               <div />
                               {Array.from(
@@ -625,6 +714,23 @@ function ExamRoom() {
                                     (_, slotIndex) => {
                                       const selected =
                                         currentValue[slotIndex] === row.value;
+
+                                      const allowed =
+                                        row.value === '-'
+                                          ? slotIndex === 0
+                                          : row.value === ','
+                                            ? slotIndex <= 1
+                                            : true;
+
+                                      if (!allowed) {
+                                        return (
+                                          <div
+                                            key={`${currentQuestion.id}-${row.key}-${slotIndex}`}
+                                            className="h-11 sm:h-12"
+                                            aria-hidden="true"
+                                          />
+                                        );
+                                      }
 
                                       return (
                                         <button
@@ -665,25 +771,6 @@ function ExamRoom() {
                               ))}
                             </div>
 
-                            <div className="mx-auto mt-7 flex max-w-xl flex-col items-center justify-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-4 text-center dark:border-blue-500/15 dark:bg-blue-500/[0.08] sm:flex-row">
-                              <span className="text-xs font-black uppercase tracking-[0.1em] text-blue-600 dark:text-blue-300">
-                                Đáp án hiện tại
-                              </span>
-                              <div className="flex min-h-12 items-center justify-center gap-2">
-                                {currentValue.map((value, slotIndex) => (
-                                  <span
-                                    key={`short-answer-preview-${slotIndex}`}
-                                    className={`flex h-11 min-w-11 items-center justify-center rounded-xl border px-3 text-lg font-black shadow-sm ${
-                                      value
-                                        ? 'border-blue-200 bg-white text-blue-700 dark:border-blue-500/20 dark:bg-[#101827] dark:text-blue-300'
-                                        : 'border-dashed border-slate-300 bg-white/70 text-slate-300 dark:border-white/15 dark:bg-white/5 dark:text-slate-600'
-                                    }`}
-                                  >
-                                    {value || '—'}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
                           </div>
                         );
                       })()}

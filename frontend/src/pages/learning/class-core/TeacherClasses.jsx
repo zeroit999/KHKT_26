@@ -1,28 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  addDoc,
-  collection,
-  doc,
-  deleteDoc,
-  getDocs,
-  increment,
-  arrayUnion,
-  arrayRemove,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  writeBatch,
-  where,
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { deleteObject, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-
-import { auth, db } from '../../../components/firebase.js';
+import eLearningApi from '../../../services/eLearningApi.js';
+import classroomApi from '../../../services/classroomApi.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import {
   DataUnavailable,
@@ -276,18 +255,64 @@ const CLASS_COVER_PRESETS = CLASS_COVER_CATEGORY_DEFINITIONS.flatMap((group) =>
   })),
 );
 
-function generateClassCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 8; i += 1) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
-}
-
-
 function normalizeText(value) {
   return String(value || '')
     .trim()
     .toLowerCase();
+}
+
+function normalizeUserId(value) {
+  return String(
+    value ?? ''
+  ).trim();
+}
+
+function getCurrentSqlUserId(user) {
+  return normalizeUserId(
+    user?.uid ??
+    user?.id ??
+    user?.user_id ??
+    user?.userId ??
+    ''
+  );
+}
+
+function sameUserId(left, right) {
+  const normalizedLeft = normalizeUserId(left);
+  const normalizedRight = normalizeUserId(right);
+  return Boolean(
+    normalizedLeft &&
+    normalizedRight &&
+    normalizedLeft === normalizedRight
+  );
+}
+
+function userIdListIncludes(values, userId) {
+  if (!Array.isArray(values)) return false;
+  return values.some((value) => sameUserId(value, userId));
+}
+
+function getR2StoragePath(attachment = {}) {
+  const directPath = String(
+    attachment?.storagePath ||
+    attachment?.objectKey ||
+    attachment?.key ||
+    attachment?.path ||
+    ''
+  ).trim();
+
+  if (directPath) return directPath.replace(/^\/+/, '');
+
+  const attachmentUrl = String(attachment?.url || '').trim();
+  if (!attachmentUrl || typeof URL === 'undefined') return '';
+
+  try {
+    const parsedUrl = new URL(attachmentUrl);
+    if (parsedUrl.hostname !== 'storage.zunylearn.com') return '';
+    return decodeURIComponent(parsedUrl.pathname.replace(/^\/+/, ''));
+  } catch {
+    return '';
+  }
 }
 
 function resizeChatTextarea(element, maxHeight = 140) {
@@ -877,11 +902,11 @@ function AttendanceWeekChart({ data = [] }) {
 }
 
 export function AttendanceQrCheckIn({ classId, date, token }) {
-  const { userDetails } = useAuth();
-  const [authUser, setAuthUser] = useState(() => auth.currentUser || null);
+  const { user, userDetails } = useAuth();
+  const authUser = user;
+
   const [classInfo, setClassInfo] = useState(null);
   const [session, setSession] = useState(null);
-  const [studentRecord, setStudentRecord] = useState(null);
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -889,9 +914,12 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
   const [excusedNote, setExcusedNote] = useState('');
   const [clock, setClock] = useState(Date.now());
 
-  useEffect(() => onAuthStateChanged(auth, (user) => setAuthUser(user || null)), []);
   useEffect(() => {
-    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    const timer = window.setInterval(
+      () => setClock(Date.now()),
+      1000
+    );
+
     return () => window.clearInterval(timer);
   }, []);
 
@@ -899,90 +927,179 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
     if (!classId || !date || !token) {
       setStatus('invalid');
       setError('Mã QR không hợp lệ.');
+      setClassInfo(null);
+      setSession(null);
       return undefined;
     }
-    const unsubscribeClass = onSnapshot(doc(db, 'classes', classId), (snapshot) => {
-      setClassInfo(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
-    }, () => setClassInfo(null));
-    const unsubscribeAttendance = onSnapshot(doc(db, 'classes', classId, 'attendance', date), (snapshot) => {
-      const data = snapshot.exists() ? snapshot.data() : null;
-      setSession(data);
-      if (!data || data.qrToken !== token) {
-        setStatus('expired');
-        setError('Mã QR đã hết hiệu lực hoặc đã được thay mới.');
-        return;
-      }
-      if (!data.qrExpiresAt || Date.now() >= Number(data.qrExpiresAt)) {
-        setStatus('expired');
-        setError('Mã QR đã hết hạn. Vui lòng quét mã mới từ giáo viên.');
-        return;
-      }
-      setStatus((current) => current === 'success' ? current : 'ready');
-      setError('');
-    }, (firebaseError) => {
-      setStatus('invalid');
-      setError(firebaseError?.message || 'Không thể kiểm tra mã QR.');
-    });
-    return () => { unsubscribeClass(); unsubscribeAttendance(); };
-  }, [classId, date, token]);
 
-  useEffect(() => {
-    if (!authUser?.uid || !classId) {
-      setStudentRecord(null);
-      return undefined;
-    }
     let cancelled = false;
-    const resolveStudent = async () => {
+
+    const loadQrSession = async () => {
       try {
-        const byUid = await getDocs(query(collection(db, 'classes', classId, 'students'), where('uid', '==', authUser.uid), limit(1)));
-        let match = byUid.docs[0] || null;
-        if (!match && authUser.email) {
-          const byEmail = await getDocs(query(collection(db, 'classes', classId, 'students'), where('email', '==', authUser.email.toLowerCase()), limit(1)));
-          match = byEmail.docs[0] || null;
-        }
+        const [classResult, qrResult] = await Promise.all([
+          classroomApi.getClassroom(classId),
+          classroomApi.getAttendanceQr(
+            classId,
+            date,
+            { token }
+          ),
+        ]);
+
         if (cancelled) return;
-        setStudentRecord(match ? { id: match.id, ...match.data() } : null);
-      } catch (firebaseError) {
-        if (!cancelled) setError(firebaseError?.message || 'Không thể xác minh thành viên lớp.');
+
+        setClassInfo(
+          classResult?.classroom
+          || classResult?.class
+          || null
+        );
+
+        const attendance =
+          qrResult?.attendance
+          || null;
+
+        setSession(attendance);
+
+        if (!qrResult?.valid) {
+          setStatus('expired');
+          setError(
+            'Mã QR đã hết hiệu lực hoặc đã được thay mới.'
+          );
+          return;
+        }
+
+        if (
+          !attendance?.qrExpiresAt
+          || Date.now() >= Number(attendance.qrExpiresAt)
+        ) {
+          setStatus('expired');
+          setError(
+            'Mã QR đã hết hạn. Vui lòng quét mã mới từ giáo viên.'
+          );
+          return;
+        }
+
+        setStatus((current) =>
+          current === 'success'
+            ? current
+            : 'ready'
+        );
+
+        setError('');
+      } catch (apiError) {
+        if (cancelled) return;
+
+        setSession(null);
+        setStatus('invalid');
+        setError(
+          apiError?.message
+          || 'Không thể kiểm tra mã QR.'
+        );
       }
     };
-    resolveStudent();
-    return () => { cancelled = true; };
-  }, [authUser?.uid, authUser?.email, classId]);
 
-  const expiresIn = Math.max(0, Number(session?.qrExpiresAt || 0) - clock);
-  const minutes = Math.floor(expiresIn / 60000);
-  const seconds = Math.floor((expiresIn % 60000) / 1000);
+    loadQrSession();
+
+    const intervalId = window.setInterval(
+      loadQrSession,
+      4000
+    );
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [classId, date, token]);
+
+  const expiresIn = Math.max(
+    0,
+    Number(session?.qrExpiresAt || 0) - clock
+  );
+
+  const minutes = Math.floor(
+    expiresIn / 60000
+  );
+
+  const seconds = Math.floor(
+    (expiresIn % 60000) / 1000
+  );
 
   const confirmCheckIn = async () => {
-    if (!authUser?.uid || !studentRecord?.id || !session || session.qrToken !== token || Date.now() >= Number(session.qrExpiresAt || 0)) return;
-    if (isTeacherMember(studentRecord) || normalizeText(userDetails?.role).includes('teacher')) {
-      setError('Tài khoản giáo viên không được điểm danh như học sinh.');
+    if (
+      !authUser?.uid
+      || !session
+      || session.qrToken !== token
+      || Date.now() >= Number(session.qrExpiresAt || 0)
+    ) {
       return;
     }
-    if (checkInChoice === 'excused' && !excusedNote.trim()) { setError('Vui lòng nhập lý do vắng có phép.'); return; }
+
+    if (
+      normalizeText(userDetails?.role).includes('teacher')
+    ) {
+      setError(
+        'Tài khoản giáo viên không được điểm danh như học sinh.'
+      );
+      return;
+    }
+
+    if (
+      checkInChoice === 'excused'
+      && !excusedNote.trim()
+    ) {
+      setError(
+        'Vui lòng nhập lý do vắng có phép.'
+      );
+      return;
+    }
+
     try {
       setConfirming(true);
       setError('');
-      await updateDoc(doc(db, 'classes', classId, 'attendance', date), {
-        [`qrCheckIns.${studentRecord.id}`]: {
-          studentId: studentRecord.id,
-          uid: authUser.uid,
-          email: authUser.email || studentRecord.email || '',
-          name: getStudentDisplayName(studentRecord),
-          status: checkInChoice,
-          note: checkInChoice === 'excused' ? excusedNote.trim() : '',
-          confirmedAt: serverTimestamp(),
-        },
-        updatedAt: serverTimestamp(),
-      });
+
+      const result =
+        await classroomApi.attendanceCheckIn(
+          classId,
+          date,
+          {
+            token,
+            status: checkInChoice,
+            note:
+              checkInChoice === 'excused'
+                ? excusedNote.trim()
+                : '',
+          }
+        );
+
+      if (result?.attendance) {
+        setSession(result.attendance);
+      }
+
       setStatus('success');
-    } catch (firebaseError) {
-      setError(firebaseError?.message || 'Không thể xác nhận điểm danh.');
+    } catch (apiError) {
+      setError(
+        apiError?.message
+        || 'Không thể xác nhận điểm danh.'
+      );
     } finally {
       setConfirming(false);
     }
   };
+
+  const checkInDisplayName =
+    userDetails?.fullName ||
+    userDetails?.displayName ||
+    userDetails?.name ||
+    authUser?.displayName ||
+    authUser?.email?.split('@')?.[0] ||
+    'Học sinh';
+
+  const checkInAvatar =
+    userDetails?.photoURL ||
+    userDetails?.photoUrl ||
+    userDetails?.avatarUrl ||
+    userDetails?.avatar ||
+    authUser?.photoURL ||
+    '';
 
   return (
     <main className="qr-student-checkin-page">
@@ -990,13 +1107,127 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
         <div className="qr-checkin-logo">✓</div>
         <span className="qr-checkin-eyebrow">Điểm danh QR</span>
         <h1>{classInfo?.name || 'Lớp học'}</h1>
-        {status === 'loading' ? <p>Đang kiểm tra mã điểm danh...</p> : null}
-        {!authUser ? <div className="qr-checkin-message warning"><strong>Bạn chưa đăng nhập</strong><span>Vui lòng đăng nhập tài khoản học sinh rồi quét lại mã QR.</span></div> : null}
-        {authUser && !studentRecord && status !== 'loading' ? <div className="qr-checkin-message warning"><strong>Không tìm thấy bạn trong lớp</strong><span>Tài khoản hiện tại chưa có trong danh sách học sinh của lớp này.</span></div> : null}
-        {status === 'ready' && authUser && studentRecord ? <><div className="qr-checkin-student"><span>{getStudentAvatar(studentRecord) ? <img src={getStudentAvatar(studentRecord)} alt="" referrerPolicy="no-referrer" /> : getInitial(getStudentDisplayName(studentRecord))}</span><div><strong>{getStudentDisplayName(studentRecord)}</strong><small>{studentRecord.email || authUser.email || ''}</small></div></div><div className="qr-checkin-time">Mã còn hiệu lực <b>{minutes}:{String(seconds).padStart(2, '0')}</b></div><div className="qr-checkin-choice"><button type="button" className={checkInChoice === 'present' ? 'active' : ''} onClick={() => { setCheckInChoice('present'); setError(''); }}>✓ Có mặt</button><button type="button" className={checkInChoice === 'excused' ? 'active excused' : 'excused'} onClick={() => { setCheckInChoice('excused'); setError(''); }}>○ Vắng có phép</button></div>{checkInChoice === 'excused' ? <label className="qr-excused-note"><span>Lý do vắng có phép</span><textarea rows="3" value={excusedNote} onChange={(event) => setExcusedNote(event.target.value)} placeholder="Nhập lý do để giáo viên thấy trong ghi chú điểm danh..." /></label> : null}<button type="button" className="qr-confirm-btn" onClick={confirmCheckIn} disabled={confirming}>{confirming ? 'Đang xác nhận...' : 'Xác nhận điểm danh'}</button></> : null}
-        {status === 'success' ? <div className="qr-checkin-success"><span>✓</span><strong>Điểm danh thành công</strong><p>Giáo viên sẽ thấy trạng thái {checkInChoice === 'excused' ? 'Vắng có phép' : 'Có mặt'} theo thời gian thực.</p></div> : null}
-        {error ? <p className="qr-checkin-error">{error}</p> : null}
+
+        {status === 'loading'
+          ? <p>Đang kiểm tra mã điểm danh...</p>
+          : null}
+
+        {!authUser
+          ? (
+            <div className="qr-checkin-message warning">
+              <strong>Bạn chưa đăng nhập</strong>
+              <span>Vui lòng đăng nhập tài khoản học sinh rồi quét lại mã QR.</span>
+            </div>
+          )
+          : null}
+
+        {status === 'ready' && authUser
+          ? (
+            <>
+              <div className="qr-checkin-student">
+                <span className={checkInAvatar ? 'has-image' : ''}>
+                  {checkInAvatar
+                    ? (
+                      <img
+                        src={checkInAvatar}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                      />
+                    )
+                    : getInitial(checkInDisplayName)}
+                </span>
+
+                <div>
+                  <strong>{checkInDisplayName}</strong>
+                  <small>{authUser.email || userDetails?.email || ''}</small>
+                </div>
+              </div>
+
+              <div className="qr-checkin-time">
+                Mã còn hiệu lực{' '}
+                <b>
+                  {minutes}:{String(seconds).padStart(2, '0')}
+                </b>
+              </div>
+
+              <div className="qr-checkin-choice">
+                <button
+                  type="button"
+                  className={checkInChoice === 'present' ? 'active' : ''}
+                  onClick={() => {
+                    setCheckInChoice('present');
+                    setError('');
+                  }}
+                >
+                  ✓ Có mặt
+                </button>
+
+                <button
+                  type="button"
+                  className={
+                    checkInChoice === 'excused'
+                      ? 'active excused'
+                      : 'excused'
+                  }
+                  onClick={() => {
+                    setCheckInChoice('excused');
+                    setError('');
+                  }}
+                >
+                  ○ Vắng có phép
+                </button>
+              </div>
+
+              {checkInChoice === 'excused'
+                ? (
+                  <label className="qr-excused-note">
+                    <span>Lý do vắng có phép</span>
+                    <textarea
+                      rows="3"
+                      value={excusedNote}
+                      onChange={(event) =>
+                        setExcusedNote(event.target.value)}
+                      placeholder="Nhập lý do để giáo viên thấy trong ghi chú điểm danh..."
+                    />
+                  </label>
+                )
+                : null}
+
+              <button
+                type="button"
+                className="qr-confirm-btn"
+                onClick={confirmCheckIn}
+                disabled={confirming}
+              >
+                {confirming
+                  ? 'Đang xác nhận...'
+                  : 'Xác nhận điểm danh'}
+              </button>
+            </>
+          )
+          : null}
+
+        {status === 'success'
+          ? (
+            <div className="qr-checkin-success">
+              <span>✓</span>
+              <strong>Điểm danh thành công</strong>
+              <p>
+                Giáo viên sẽ thấy trạng thái{' '}
+                {checkInChoice === 'excused'
+                  ? 'Vắng có phép'
+                  : 'Có mặt'}{' '}
+                theo thời gian thực.
+              </p>
+            </div>
+          )
+          : null}
+
+        {error
+          ? <p className="qr-checkin-error">{error}</p>
+          : null}
       </section>
+
       <style>{styles}</style>
     </main>
   );
@@ -1205,12 +1436,88 @@ function ClassExamWorkspace({ selectedClass }) {
 }
 
 function TeacherClasses() {
-  const { userDetails } = useAuth();
-  const isAdminUser = ['admin', 'administrator', 'super_admin', 'superadmin'].includes(normalizeText(userDetails?.role));
-  const [activeTab, setActiveTab] = useState('home');
+  const { user, userDetails } = useAuth();
+  const isAdminUser = normalizeText(userDetails?.role) === 'admin_dev';
+  const validWorkspaceTabIds = useMemo(
+    () =>
+      new Set([
+        'home',
+        ...CLASS_WORKSPACE_ITEMS.map((item) => item.id),
+      ]),
+    [],
+  );
+
+  const getWorkspaceTabFromUrl = () => {
+    if (typeof window === 'undefined') return 'home';
+    const requestedTab =
+      new URLSearchParams(window.location.search).get('tab');
+
+    return requestedTab && validWorkspaceTabIds.has(requestedTab)
+      ? requestedTab
+      : 'home';
+  };
+
+  const [activeTab, setActiveTab] = useState(getWorkspaceTabFromUrl);
   const [queryText, setQueryText] = useState('');
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [classView, setClassView] = useState('list');
+  const [selectedClassId, setSelectedClassId] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return String(
+      new URLSearchParams(window.location.search).get('classId') || '',
+    ).trim();
+  });
+  const [classView, setClassView] = useState(() => {
+    if (typeof window === 'undefined') return 'list';
+    return new URLSearchParams(window.location.search).get('classId')
+      ? 'workspace'
+      : 'list';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+
+    if (selectedClassId) {
+      url.searchParams.set('classId', String(selectedClassId));
+
+      if (activeTab !== 'home' && validWorkspaceTabIds.has(activeTab)) {
+        url.searchParams.set('tab', activeTab);
+      } else {
+        url.searchParams.delete('tab');
+      }
+    } else {
+      url.searchParams.delete('classId');
+      url.searchParams.delete('tab');
+    }
+
+    window.history.replaceState(
+      {},
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, [selectedClassId, activeTab, validWorkspaceTabIds]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const syncWorkspaceFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedClassId = String(params.get('classId') || '').trim();
+      const requestedTab = params.get('tab');
+      const safeTab =
+        requestedTab && validWorkspaceTabIds.has(requestedTab)
+          ? requestedTab
+          : 'home';
+
+      setSelectedClassId(requestedClassId);
+      setClassView(requestedClassId ? 'workspace' : 'list');
+      setActiveTab(safeTab);
+    };
+
+    window.addEventListener('popstate', syncWorkspaceFromUrl);
+    return () =>
+      window.removeEventListener('popstate', syncWorkspaceFromUrl);
+  }, [validWorkspaceTabIds]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -1462,11 +1769,8 @@ function TeacherClasses() {
   }, [studentRowMenuId, teacherRowMenuId]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) =>
-      setCurrentUser(user || null)
-    );
-    return unsubscribe;
-  }, []);
+    setCurrentUser(user || null);
+  }, [user]);
 
   useEffect(() => {
     if (typeof document === 'undefined' || classView !== 'detail' || !selectedClassId) {
@@ -1488,38 +1792,44 @@ function TeacherClasses() {
     let mobileChromeFrame = 0;
     const isOutsideWorkspace = (element) => element && !workspace.contains(element) && !element.contains(workspace);
     const syncMobileWorkspaceChrome = () => {
-      const shouldHideNavbar = window.matchMedia('(max-width: 1024px)').matches;
       const shouldHideChatbox = window.matchMedia('(max-width: 1024px)').matches;
-      const navbarCandidates = Array.from(document.querySelectorAll(
-        'body > header, body > nav, header[class*="navbar" i], nav[class*="navbar" i], [class*="navbar" i], [class*="topbar" i], [class*="app-header" i], [class*="main-header" i], [data-testid*="navbar" i], [role="banner"]'
-      )).filter(isOutsideWorkspace);
       const mobileOnlyCandidates = Array.from(document.querySelectorAll(
         '[class*="chatbot" i], [class*="chat-box" i], [class*="chatbox" i], [class*="chat-widget" i], [class*="floating-chat" i], [class*="ai-button" i], [class*="ai-chat" i], [class*="floating-ai" i], [id*="chatbot" i], [id*="zuny-ai" i], [data-testid*="chat" i], [aria-label*="AI" i], [aria-label*="chat" i], [title*="AI" i], [title*="chat" i]'
       )).filter(isOutsideWorkspace);
       const visualProbeCandidates = typeof document.elementsFromPoint === 'function'
         ? [
-            ...document.elementsFromPoint(Math.max(1, window.innerWidth / 2), 24),
-            ...document.elementsFromPoint(Math.max(1, window.innerWidth - 28), Math.max(1, window.innerHeight - 28)),
+            ...document.elementsFromPoint(
+              Math.max(1, window.innerWidth - 28),
+              Math.max(1, window.innerHeight - 28)
+            ),
           ]
         : [];
-      const visualChromeCandidates = (shouldHideNavbar || shouldHideChatbox)
+      const visualChromeCandidates = shouldHideChatbox
         ? Array.from(new Set([
-            ...document.querySelectorAll('.fixed, .sticky, [style*="position: fixed"], [style*="position:fixed"], [style*="position: sticky"], [style*="position:sticky"]'),
+            ...document.querySelectorAll(
+              '.fixed, [style*="position: fixed"], [style*="position:fixed"]'
+            ),
             ...visualProbeCandidates,
           ]))
           .filter(isOutsideWorkspace)
           .filter((element) => {
             const computedStyle = window.getComputedStyle(element);
-            if (!['fixed', 'sticky'].includes(computedStyle.position)) return false;
+            if (computedStyle.position !== 'fixed') return false;
+
             const rect = element.getBoundingClientRect();
             if (rect.width <= 0 || rect.height <= 0) return false;
-            const nearTop = rect.top <= 24 && rect.bottom <= Math.min(window.innerHeight * 0.22, 160) && rect.width >= window.innerWidth * 0.45;
-            const compactBottomCorner = rect.width <= 180 && rect.height <= 180 && rect.right >= window.innerWidth - 40 && rect.bottom >= window.innerHeight - 40;
-            return (shouldHideNavbar && nearTop) || (shouldHideChatbox && compactBottomCorner);
+
+            const compactBottomCorner =
+              rect.width <= 180 &&
+              rect.height <= 180 &&
+              rect.right >= window.innerWidth - 40 &&
+              rect.bottom >= window.innerHeight - 40;
+
+            return shouldHideChatbox && compactBottomCorner;
           })
         : [];
+
       const elementsToHide = new Set([
-        ...(shouldHideNavbar ? navbarCandidates : []),
         ...(shouldHideChatbox ? mobileOnlyCandidates : []),
         ...visualChromeCandidates,
       ]);
@@ -1630,60 +1940,30 @@ function TeacherClasses() {
       return undefined;
     }
 
-    setLoading(true);
+    let cancelled = false;
 
-    if (isAdminUser) {
-      const unsubscribeAll = onSnapshot(
-        collection(db, 'classes'),
-        (snapshot) => {
-          const nextClasses = snapshot.docs
-            .map((classDoc) => ({ id: classDoc.id, ...classDoc.data() }))
-            .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
-          setClasses(nextClasses);
-          setSelectedClassId((currentId) => nextClasses.some((item) => item.id === currentId) ? currentId : '');
-          setClassView((currentView) => nextClasses.length ? currentView : 'list');
-          setLoading(false);
-        },
-        (error) => {
-          console.error('Không thể tải toàn bộ lớp cho admin:', error);
-          setLoading(false);
-        }
-      );
-      return () => unsubscribeAll();
-    }
-
-    let owned = [];
-    let joined = [];
-    const syncClasses = () => {
-      const byId = new Map([...owned, ...joined].map((item) => [item.id, item]));
-      const nextClasses = [...byId.values()].sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
-      setClasses(nextClasses);
-      setSelectedClassId((currentId) => nextClasses.some((item) => item.id === currentId) ? currentId : '');
-      setClassView((currentView) => nextClasses.length ? currentView : 'list');
-      setLoading(false);
+    const loadClasses = async () => {
+      try {
+        setLoading(true);
+        const result = await classroomApi.listClassrooms();
+        if (cancelled) return;
+        const nextClasses = (Array.isArray(result?.classrooms) ? result.classrooms : [])
+          .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+        setClasses(nextClasses);
+        setSelectedClassId((currentId) => nextClasses.some((item) => item.id === currentId) ? currentId : '');
+        setClassView((currentView) => nextClasses.length ? currentView : 'list');
+      } catch (error) {
+        if (!cancelled) console.error('Không thể tải danh sách lớp:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
-    const ownedQuery = query(collection(db, 'classes'), where('teacherId', '==', currentUser.uid));
-    const joinedQuery = query(collection(db, 'classes'), where('memberIds', 'array-contains', currentUser.uid));
-
-    const unsubscribeOwned = onSnapshot(ownedQuery, (snapshot) => {
-      owned = snapshot.docs.map((classDoc) => ({ id: classDoc.id, ...classDoc.data() }));
-      syncClasses();
-    }, (error) => {
-      console.error('Không thể tải lớp do giáo viên sở hữu:', error);
-      setLoading(false);
-    });
-
-    const unsubscribeJoined = onSnapshot(joinedQuery, (snapshot) => {
-      joined = snapshot.docs.map((classDoc) => ({ id: classDoc.id, ...classDoc.data() }));
-      syncClasses();
-    }, (error) => {
-      console.error('Không thể tải lớp đã tham gia:', error);
-    });
-
+    loadClasses();
+    const intervalId = window.setInterval(loadClasses, 5000);
     return () => {
-      unsubscribeOwned();
-      unsubscribeJoined();
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [currentUser?.uid, isAdminUser]);
 
@@ -1693,18 +1973,28 @@ function TeacherClasses() {
       return undefined;
     }
 
-    const unsubs = classes.map((classItem) => onSnapshot(
-      collection(db, 'classes', classItem.id, 'assignments'),
-      (snapshot) => {
-        setAssignmentsByClass((current) => ({
-          ...current,
-          [classItem.id]: snapshot.docs.map((assignmentDoc) => ({ id: assignmentDoc.id, classId: classItem.id, className: classItem.name, ...assignmentDoc.data() })),
+    let cancelled = false;
+    const loadAssignments = async () => {
+      try {
+        const rows = await Promise.all(classes.map(async (classItem) => {
+          const result = await classroomApi.listAssignments(classItem.id);
+          return [classItem.id, (Array.isArray(result?.assignments) ? result.assignments : []).map((assignment) => ({
+            ...assignment,
+            classId: classItem.id,
+            className: classItem.name,
+          }))];
         }));
-      },
-      (error) => console.error('Không thể tải bài tập:', error)
-    ));
-
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+        if (!cancelled) setAssignmentsByClass(Object.fromEntries(rows));
+      } catch (error) {
+        if (!cancelled) console.error('Không thể tải bài tập:', error);
+      }
+    };
+    loadAssignments();
+    const intervalId = window.setInterval(loadAssignments, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [classes]);
 
   useEffect(() => {
@@ -1717,21 +2007,29 @@ function TeacherClasses() {
     setELearningResourcesError('');
     setELearningCourses([]);
 
-    const unsubscribe = onSnapshot(
-      collection(db, 'courses'),
-      (snapshot) => {
-        setELearningCourses(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
-        setELearningResourcesLoading(false);
-      },
-      (error) => {
-        console.error('Không thể tải học liệu E-learning:', error);
-        setELearningCourses([]);
-        setELearningResourcesError(error?.message || 'Không thể tải học liệu E-learning.');
-        setELearningResourcesLoading(false);
+    let cancelled = false;
+    const loadCourses = async () => {
+      try {
+        const result = await eLearningApi.courses();
+        if (!cancelled) {
+          setELearningCourses(Array.isArray(result?.courses) ? result.courses : []);
+          setELearningResourcesLoading(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Không thể tải học liệu E-learning:', error);
+          setELearningCourses([]);
+          setELearningResourcesError(error?.message || 'Không thể tải học liệu E-learning.');
+          setELearningResourcesLoading(false);
+        }
       }
-    );
-
-    return () => unsubscribe();
+    };
+    loadCourses();
+    const intervalId = window.setInterval(loadCourses, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [activeTab, classView, currentUser?.uid, selectedClassId]);
 
   useEffect(() => {
@@ -1740,36 +2038,30 @@ function TeacherClasses() {
       return undefined;
     }
 
-    const ownerIds = Array.from(new Set(eLearningCourses.flatMap((course) => [course.teacherId, course.createdByUid, course.createdBy, course.ownerId, course.userId, course.uid]).filter(Boolean).map(String)));
-    const ownerEmails = Array.from(new Set(eLearningCourses.map((course) => String(course.teacherEmail || course.createdByEmail || course.ownerEmail || '').trim()).filter(Boolean)));
-    const profileMap = {};
-    const syncProfile = (id, profile = {}) => {
-      if (id) profileMap[`id:${id}`] = profile;
-      const email = normalizeText(profile.email);
-      if (email) profileMap[`email:${email}`] = profile;
-      setELearningTeacherProfiles({ ...profileMap });
+    let cancelled = false;
+    const loadProfiles = async () => {
+      try {
+        const result = await eLearningApi.users();
+        if (cancelled) return;
+        const profiles = Array.isArray(result?.users) ? result.users : [];
+        const profileMap = {};
+        profiles.forEach((profile) => {
+          const id = profile.id || profile.uid || profile.userId;
+          const email = normalizeText(profile.email);
+          if (id) profileMap[`id:${id}`] = profile;
+          if (email) profileMap[`email:${email}`] = profile;
+        });
+        setELearningTeacherProfiles(profileMap);
+      } catch (error) {
+        if (!cancelled) console.warn('Không thể đồng bộ hồ sơ người đăng E-learning:', error);
+      }
     };
-    const unsubs = [];
-
-    ownerIds.forEach((ownerId) => {
-      unsubs.push(onSnapshot(
-        doc(db, 'users', ownerId),
-        (snapshot) => { if (snapshot.exists()) syncProfile(snapshot.id, { id: snapshot.id, ...snapshot.data() }); },
-        (error) => console.warn('Không thể đồng bộ avatar người đăng E-learning:', ownerId, error)
-      ));
-    });
-
-    for (let index = 0; index < ownerEmails.length; index += 30) {
-      const emailChunk = ownerEmails.slice(index, index + 30);
-      if (!emailChunk.length) continue;
-      unsubs.push(onSnapshot(
-        query(collection(db, 'users'), where('email', 'in', emailChunk)),
-        (snapshot) => snapshot.docs.forEach((item) => syncProfile(item.id, { id: item.id, ...item.data() })),
-        (error) => console.warn('Không thể đồng bộ avatar E-learning theo email:', error)
-      ));
-    }
-
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    loadProfiles();
+    const intervalId = window.setInterval(loadProfiles, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [activeTab, classView, currentUser?.uid, eLearningCourses]);
 
   useEffect(() => {
@@ -1777,12 +2069,43 @@ function TeacherClasses() {
       setNotifications([]);
       return undefined;
     }
-    const unsubscribe = onSnapshot(
-      query(collection(db, 'classes', selectedClassId, 'notifications'), orderBy('createdAt', 'desc')),
-      (snapshot) => setNotifications(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => console.error('Không thể tải thông báo:', error)
+
+    let cancelled = false;
+
+    const loadNotifications = async () => {
+      try {
+        const result = await classroomApi.listNotifications(
+          selectedClassId,
+          {
+            all: true,
+            limit: 500,
+          },
+        );
+
+        if (cancelled) return;
+
+        setNotifications(
+          Array.isArray(result?.notifications)
+            ? result.notifications
+            : []
+        );
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Không thể tải thông báo:', error);
+      }
+    };
+
+    loadNotifications();
+
+    const intervalId = window.setInterval(
+      loadNotifications,
+      4000,
     );
-    return unsubscribe;
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId]);
 
   useEffect(() => {
@@ -1791,15 +2114,45 @@ function TeacherClasses() {
       setSelectedConversationId('');
       return undefined;
     }
-    const unsubscribe = onSnapshot(
-      query(collection(db, 'classes', selectedClassId, 'messages'), orderBy('createdAt', 'asc')),
-      (snapshot) => setMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => {
+
+    let cancelled = false;
+
+    const loadMessages = async () => {
+      try {
+        const result = await classroomApi.listMessages(
+          selectedClassId,
+          {
+            limit: 500,
+          },
+        );
+
+        if (cancelled) return;
+
+        setMessages(
+          Array.isArray(result?.messages)
+            ? result.messages
+            : []
+        );
+
+        setMessageError('');
+      } catch (error) {
+        if (cancelled) return;
         console.error('Không thể tải trao đổi:', error);
         setMessageError(error?.message || 'Không thể tải dữ liệu trao đổi.');
       }
+    };
+
+    loadMessages();
+
+    const intervalId = window.setInterval(
+      loadMessages,
+      4000,
     );
-    return () => unsubscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId]);
 
 
@@ -1808,15 +2161,47 @@ function TeacherClasses() {
       setAttendanceRecords([]);
       return undefined;
     }
-    const unsubscribe = onSnapshot(
-      collection(db, 'classes', selectedClassId, 'attendance'),
-      (snapshot) => setAttendanceRecords(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => {
-        console.error('Không thể tải điểm danh:', error);
+
+    let cancelled = false;
+
+    const loadAttendance = async () => {
+      try {
+        const result = await classroomApi.listAttendance(
+          selectedClassId
+        );
+
+        if (cancelled) return;
+
+        setAttendanceRecords(
+          Array.isArray(result?.attendance)
+            ? result.attendance
+            : Array.isArray(result?.records)
+              ? result.records
+              : []
+        );
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(
+          'Không thể tải điểm danh:',
+          error
+        );
+
         setAttendanceRecords([]);
       }
+    };
+
+    loadAttendance();
+
+    const intervalId = window.setInterval(
+      loadAttendance,
+      4000
     );
-    return () => unsubscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId]);
 
   useEffect(() => {
@@ -1825,19 +2210,48 @@ function TeacherClasses() {
       return undefined;
     }
 
-    const historyQuery = query(
-      collection(db, 'classes', selectedClassId, 'attendance', attendanceDate, 'history'),
-      orderBy('savedAt', 'desc')
-    );
-    const unsubscribe = onSnapshot(
-      historyQuery,
-      (snapshot) => setAttendanceHistoryEntries(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => {
-        console.error('Không thể tải lịch sử điểm danh:', error);
+    let cancelled = false;
+
+    const loadAttendanceHistory = async () => {
+      try {
+        const result =
+          await classroomApi.getAttendanceHistory(
+            selectedClassId,
+            attendanceDate
+          );
+
+        if (cancelled) return;
+
+        setAttendanceHistoryEntries(
+          Array.isArray(result?.history)
+            ? result.history
+            : Array.isArray(result?.records)
+              ? result.records
+              : []
+        );
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(
+          'Không thể tải lịch sử điểm danh:',
+          error
+        );
+
         setAttendanceHistoryEntries([]);
       }
+    };
+
+    loadAttendanceHistory();
+
+    const intervalId = window.setInterval(
+      loadAttendanceHistory,
+      4000
     );
-    return () => unsubscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [attendanceDate, selectedClassId]);
 
   useEffect(() => {
@@ -1845,15 +2259,24 @@ function TeacherClasses() {
       setScheduleItems([]);
       return undefined;
     }
-    const unsubscribe = onSnapshot(
-      collection(db, 'classes', selectedClassId, 'schedule'),
-      (snapshot) => setScheduleItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-      (error) => {
-        console.error('Không thể tải lịch học:', error);
-        setScheduleItems([]);
+    let cancelled = false;
+    const loadSchedule = async () => {
+      try {
+        const result = await classroomApi.listSchedule(selectedClassId);
+        if (!cancelled) setScheduleItems(Array.isArray(result?.schedule) ? result.schedule : []);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Không thể tải lịch học:', error);
+          setScheduleItems([]);
+        }
       }
-    );
-    return () => unsubscribe();
+    };
+    loadSchedule();
+    const intervalId = window.setInterval(loadSchedule, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId]);
 
   useEffect(() => {
@@ -1865,27 +2288,21 @@ function TeacherClasses() {
       return undefined;
     }
 
-    // Firestore gợi ý:
-    // classes/{classId}/students/{studentId}: { studentCode, email, name, status, createdAt }
-    // Mã HS được giữ theo thứ tự tham gia trước/sau.
-    const studentsQuery = collection(
-      db,
-      'classes',
-      selectedClassId,
-      'students'
-    );
-
-    const unsubscribe = onSnapshot(studentsQuery, (snapshot) => {
-      const nextStudents = sortStudentsByJoinTime(
-        snapshot.docs.map((studentDoc) => ({
-          id: studentDoc.id,
-          ...studentDoc.data(),
-        }))
-      );
-      setStudents(nextStudents);
-    });
-
-    return unsubscribe;
+    let cancelled = false;
+    const loadMembers = async () => {
+      try {
+        const result = await classroomApi.listMembers(selectedClassId);
+        if (!cancelled) setStudents(sortStudentsByJoinTime(Array.isArray(result?.members) ? result.members : []));
+      } catch (error) {
+        if (!cancelled) console.error('Không thể tải thành viên lớp:', error);
+      }
+    };
+    loadMembers();
+    const intervalId = window.setInterval(loadMembers, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId]);
 
   useEffect(() => {
@@ -1900,52 +2317,47 @@ function TeacherClasses() {
       return undefined;
     }
 
-    const chunks = [];
-    for (let index = 0; index < emails.length; index += 30) chunks.push(emails.slice(index, index + 30));
-    const profilesByChunk = new Map();
-    const syncProfiles = () => {
+    let cancelled = false;
+    const loadProfiles = async () => {
+      const results = await Promise.allSettled(emails.map((email) => classroomApi.resolveUser({ email })));
+      if (cancelled) return;
       const merged = {};
-      profilesByChunk.forEach((rows) => rows.forEach((profile) => {
-        const email = normalizeText(profile.email);
+      results.forEach((result) => {
+        const profile = result.status === 'fulfilled' ? result.value?.user : null;
+        const email = normalizeText(profile?.email);
         if (email) merged[email] = profile;
-      }));
+      });
       setUserProfilesByEmail(merged);
     };
-    const unsubs = chunks.map((emailChunk, chunkIndex) => onSnapshot(
-      query(collection(db, 'users'), where('email', 'in', emailChunk)),
-      (snapshot) => {
-        profilesByChunk.set(chunkIndex, snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
-        syncProfiles();
-      },
-      (error) => console.error('Không thể đồng bộ hồ sơ người dùng:', error)
-    ));
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    loadProfiles().catch((error) => console.error('Không thể đồng bộ hồ sơ người dùng:', error));
+    const intervalId = window.setInterval(loadProfiles, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [classes, currentUser?.email, selectedClassId, students]);
 
   useEffect(() => {
     if (!selectedClassId) return undefined;
 
-    // Firestore gợi ý:
-    // classes/{classId}/subjects/{subjectId}: { name, order }
-    const subjectsQuery = query(
-      collection(db, 'classes', selectedClassId, 'subjects'),
-      orderBy('order', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(subjectsQuery, (snapshot) => {
-      const nextSubjects = snapshot.docs.map((subjectDoc) => ({
-        id: subjectDoc.id,
-        ...subjectDoc.data(),
-      }));
-      setSubjects(nextSubjects);
-      setSelectedSubjectId((currentId) => {
-        if (nextSubjects.some((item) => item.id === currentId))
-          return currentId;
-        return nextSubjects[0]?.id || '';
-      });
-    });
-
-    return unsubscribe;
+    let cancelled = false;
+    const loadSubjects = async () => {
+      try {
+        const result = await classroomApi.listSubjects(selectedClassId);
+        if (cancelled) return;
+        const nextSubjects = Array.isArray(result?.subjects) ? result.subjects : [];
+        setSubjects(nextSubjects);
+        setSelectedSubjectId((currentId) => nextSubjects.some((item) => item.id === currentId) ? currentId : nextSubjects[0]?.id || '');
+      } catch (error) {
+        if (!cancelled) console.error('Không thể tải môn học:', error);
+      }
+    };
+    loadSubjects();
+    const intervalId = window.setInterval(loadSubjects, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId]);
 
   useEffect(() => {
@@ -1954,27 +2366,26 @@ function TeacherClasses() {
       return undefined;
     }
 
-    const nextBySubject = {};
-    const unsubs = [];
-    const syncSubject = (subjectId, key, rows) => {
-      nextBySubject[subjectId] = { ...(nextBySubject[subjectId] || {}), [key]: rows };
-      setAllSubjectScores({ ...nextBySubject });
+    let cancelled = false;
+    const loadAllScores = async () => {
+      const rows = await Promise.all(subjects.map(async (subject) => {
+        const [scoresResult, testsResult] = await Promise.all([
+          classroomApi.listScores(selectedClassId, subject.id),
+          classroomApi.listSubjectTests(selectedClassId, subject.id),
+        ]);
+        return [subject.id, {
+          scores: Array.isArray(scoresResult?.scores) ? scoresResult.scores : [],
+          tests: Array.isArray(testsResult?.tests) ? testsResult.tests : [],
+        }];
+      }));
+      if (!cancelled) setAllSubjectScores(Object.fromEntries(rows));
     };
-
-    subjects.forEach((subject) => {
-      unsubs.push(onSnapshot(
-        collection(db, 'classes', selectedClassId, 'subjects', subject.id, 'scores'),
-        (snapshot) => syncSubject(subject.id, 'scores', snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-        (error) => console.error(`Không thể tải điểm môn ${subject.id}:`, error)
-      ));
-      unsubs.push(onSnapshot(
-        collection(db, 'classes', selectedClassId, 'subjects', subject.id, 'tests'),
-        (snapshot) => syncSubject(subject.id, 'tests', snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))),
-        (error) => console.error(`Không thể tải bài kiểm tra môn ${subject.id}:`, error)
-      ));
-    });
-
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    loadAllScores().catch((error) => console.error('Không thể tải dữ liệu điểm:', error));
+    const intervalId = window.setInterval(loadAllScores, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedClassId, subjects]);
 
   useEffect(() => {
@@ -1984,27 +2395,13 @@ function TeacherClasses() {
       return undefined;
     }
 
-    // Firestore gợi ý:
-    // classes/{classId}/subjects/{subjectId}/tests/{testId}: { name, code, order }
-    const testsQuery = query(
-      collection(
-        db,
-        'classes',
-        selectedClassId,
-        'subjects',
-        selectedSubjectId,
-        'tests'
-      ),
-      orderBy('order', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(testsQuery, (snapshot) => {
-      setScoreTests(
-        snapshot.docs.map((testDoc) => ({ id: testDoc.id, ...testDoc.data() }))
-      );
-    });
-
-    return unsubscribe;
+    let cancelled = false;
+    classroomApi.listSubjectTests(selectedClassId, selectedSubjectId)
+      .then((result) => {
+        if (!cancelled) setScoreTests(Array.isArray(result?.tests) ? result.tests : []);
+      })
+      .catch((error) => console.error('Không thể tải bài kiểm tra:', error));
+    return () => { cancelled = true; };
   }, [selectedClassId, selectedSubjectId]);
 
   useEffect(() => {
@@ -2013,29 +2410,13 @@ function TeacherClasses() {
       return undefined;
     }
 
-    // Firestore gợi ý:
-    // classes/{classId}/subjects/{subjectId}/scores/{studentId}: {
-    //   studentId, scores: { [testId]: number }, average?: number
-    // }
-    const scoresQuery = collection(
-      db,
-      'classes',
-      selectedClassId,
-      'subjects',
-      selectedSubjectId,
-      'scores'
-    );
-
-    const unsubscribe = onSnapshot(scoresQuery, (snapshot) => {
-      setScoreRows(
-        snapshot.docs.map((scoreDoc) => ({
-          id: scoreDoc.id,
-          ...scoreDoc.data(),
-        }))
-      );
-    });
-
-    return unsubscribe;
+    let cancelled = false;
+    classroomApi.listScores(selectedClassId, selectedSubjectId)
+      .then((result) => {
+        if (!cancelled) setScoreRows(Array.isArray(result?.scores) ? result.scores : []);
+      })
+      .catch((error) => console.error('Không thể tải điểm:', error));
+    return () => { cancelled = true; };
   }, [selectedClassId, selectedSubjectId]);
 
   const schoolYear = getSchoolYear(now);
@@ -2111,13 +2492,13 @@ function TeacherClasses() {
 
   const setInternTeacherRole = async (teacher) => {
     if (!isClassOwner || !selectedClassId || !teacher?.id || teacher.owner) return;
-    await updateDoc(doc(db, 'classes', selectedClassId, 'students', teacher.id), { classRole: 'intern_teacher', updatedAt: serverTimestamp() });
+    await classroomApi.updateMember(selectedClassId, teacher.id, { classRole: 'intern_teacher' });
     setTeacherRowMenuId('');
   };
 
   const removeInternTeacherRole = async (teacher) => {
     if (!isClassOwner || !selectedClassId || !teacher?.id || teacher.owner) return;
-    await updateDoc(doc(db, 'classes', selectedClassId, 'students', teacher.id), { classRole: '', updatedAt: serverTimestamp() });
+    await classroomApi.updateMember(selectedClassId, teacher.id, { classRole: '' });
     setTeacherRowMenuId('');
   };
 
@@ -2145,22 +2526,10 @@ function TeacherClasses() {
       setTeacherDeleteError('Không tìm thấy giáo viên cần xóa khỏi lớp.');
       return;
     }
-    const teacherUid = String(teacherToDelete.uid || '').trim();
-    if (!teacherUid) {
-      setTeacherDeleteError('Không xác định được UID của giáo viên này nên chưa thể xóa an toàn khỏi memberIds.');
-      return;
-    }
-
     try {
       setDeletingTeacher(true);
       setTeacherDeleteError('');
-      const batch = writeBatch(db);
-      batch.delete(doc(db, 'classes', selectedClassId, 'students', teacherToDelete.id));
-      batch.update(doc(db, 'classes', selectedClassId), {
-        memberIds: arrayRemove(teacherUid),
-        updatedAt: serverTimestamp(),
-      });
-      await batch.commit();
+      await classroomApi.deleteMember(selectedClassId, teacherToDelete.id);
       setTeacherDeleteOpen(false);
       setTeacherToDelete(null);
     } catch (error) {
@@ -2173,18 +2542,58 @@ function TeacherClasses() {
 
   const saveInternAttendanceStatus = async (teacher, status) => {
     if (!isClassOwner || !selectedClassId || !teacher?.id) return;
-    const currentRows = Array.isArray(selectedAttendanceRecord?.internRecords) ? selectedAttendanceRecord.internRecords : [];
-    const nextRow = { teacherId: teacher.id, uid: teacher.uid || '', email: teacher.email || '', name: getStudentDisplayName(teacher), status, updatedAtMillis: Date.now() };
-    const nextRows = [...currentRows.filter((item) => item.teacherId !== teacher.id && item.uid !== teacher.uid && normalizeText(item.email) !== normalizeText(teacher.email)), nextRow];
-    await setDoc(doc(db, 'classes', selectedClassId, 'attendance', attendanceDate), { date: attendanceDate, classId: selectedClassId, internRecords: nextRows, updatedAt: serverTimestamp() }, { merge: true });
+
+    try {
+      const result =
+        await classroomApi.updateInternAttendance(
+          selectedClassId,
+          attendanceDate,
+          teacher.id,
+          {
+            status,
+          }
+        );
+
+      if (result?.attendance) {
+        const savedAttendance = result.attendance;
+
+        setAttendanceRecords((current) => {
+          const exists = current.some(
+            (item) =>
+              String(item.id) === String(savedAttendance.id)
+              || item.date === savedAttendance.date
+              || item.attendanceDate === savedAttendance.attendanceDate
+          );
+
+          if (!exists) {
+            return [
+              savedAttendance,
+              ...current,
+            ];
+          }
+
+          return current.map((item) =>
+            (
+              String(item.id) === String(savedAttendance.id)
+              || item.date === savedAttendance.date
+              || item.attendanceDate === savedAttendance.attendanceDate
+            )
+              ? savedAttendance
+              : item
+          );
+        });
+      }
+    } catch (error) {
+      console.error(
+        'Không thể cập nhật điểm danh giáo viên thực tập:',
+        error
+      );
+    }
   };
 
   const leaveClassAsIntern = async () => {
     if (!isInternTeacher || !selectedClassId || !currentUser?.uid || !currentTeacherMember?.id) return;
-    const batch = writeBatch(db);
-    batch.delete(doc(db, 'classes', selectedClassId, 'students', currentTeacherMember.id));
-    batch.update(doc(db, 'classes', selectedClassId), { memberIds: arrayRemove(currentUser.uid), updatedAt: serverTimestamp() });
-    await batch.commit();
+    await classroomApi.leaveClassroom(selectedClassId);
     goBackToClassList();
   };
 
@@ -2284,7 +2693,7 @@ function TeacherClasses() {
     .trim()
     .replace(/[\s_-]/g, '')
     .toUpperCase();
-  const canCreateClassELearning = Boolean(currentUser?.uid) && ['TEACHER', 'ADMINDEV'].includes(normalizedELearningPublisherRole);
+  const canCreateClassELearning = Boolean(currentUser?.uid) && ['TEACHER', 'ADMIN_DEV'].includes(normalizedELearningPublisherRole);
   const eLearningPublisherName =
     userDetails?.fullName ||
     userDetails?.name ||
@@ -2345,11 +2754,19 @@ function TeacherClasses() {
         window.alert('Chỉ hỗ trợ file Word (.doc, .docx) hoặc PDF.');
         return;
       }
-      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const fileRef = ref(getStorage(), `course-files/${currentUser.uid}/${safeName}`);
       const extractedHtml = lowerName.endsWith('.docx') ? await extractClassELearningDocxHtml(file).catch(() => '') : '';
-      const snapshot = await uploadBytes(fileRef, file, { contentType: file.type || undefined });
-      const fileUrl = await getDownloadURL(snapshot.ref);
+      const uploadResult = await eLearningApi.uploadAsset(
+        file,
+        'course-file',
+        'course-files',
+      );
+      const fileUrl =
+        uploadResult?.url ||
+        uploadResult?.publicUrl ||
+        uploadResult?.fileUrl ||
+        uploadResult?.downloadUrl ||
+        '';
+      if (!fileUrl) throw new Error('R2 không trả về URL của tài liệu.');
       const documentFileType = lowerName.endsWith('.pdf') ? 'pdf' : lowerName.endsWith('.docx') ? 'docx' : 'doc';
       setELearningCreateForm((current) => ({
         ...current,
@@ -2360,8 +2777,8 @@ function TeacherClasses() {
         documentFileSize: Number(file.size || 0),
         richDocument: extractedHtml || current.richDocument || '',
       }));
-    } catch (firebaseError) {
-      console.error('Không thể tải tài liệu E-learning từ lớp:', firebaseError);
+    } catch (uploadError) {
+      console.error('Không thể tải tài liệu E-learning từ lớp:', uploadError);
       window.alert('Không thể tải file. Vui lòng thử lại.');
     } finally {
       if (input) input.value = '';
@@ -2386,14 +2803,18 @@ function TeacherClasses() {
     }
     try {
       setELearningCreateUploadingImage(true);
-      const safeName = `${Date.now()}-${String(file.name || 'image').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const imageRef = ref(getStorage(), `course-images/${currentUser.uid}/${safeName}`);
-      const contentType = file.type || ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[extension]) || 'application/octet-stream';
-      const snapshot = await uploadBytes(imageRef, file, {
-        contentType,
-        customMetadata: { originalName: file.name, ownerUid: currentUser.uid },
-      });
-      const imageUrl = await getDownloadURL(snapshot.ref);
+      const uploadResult = await eLearningApi.uploadAsset(
+        file,
+        'course-image',
+        target === 'document' ? 'document-images' : 'course-images',
+      );
+      const imageUrl =
+        uploadResult?.url ||
+        uploadResult?.publicUrl ||
+        uploadResult?.fileUrl ||
+        uploadResult?.downloadUrl ||
+        '';
+      if (!imageUrl) throw new Error('R2 không trả về URL của ảnh.');
       setELearningCreateForm((current) => target === 'document'
         ? {
           ...current,
@@ -2407,9 +2828,9 @@ function TeacherClasses() {
           richDocument: '',
         }
         : { ...current, thumbnail: imageUrl, thumbnailFileName: file.name });
-    } catch (firebaseError) {
-      console.error('Không thể tải ảnh E-learning từ lớp:', firebaseError);
-      window.alert(`Không thể tải ảnh${firebaseError?.message ? `: ${firebaseError.message}` : '.'}`);
+    } catch (uploadError) {
+      console.error('Không thể tải ảnh E-learning từ lớp:', uploadError);
+      window.alert(`Không thể tải ảnh${uploadError?.message ? `: ${uploadError.message}` : '.'}`);
     } finally {
       if (input) input.value = '';
       setELearningCreateUploadingImage(false);
@@ -2435,13 +2856,18 @@ function TeacherClasses() {
         getELearningMp4DurationFromFile(file),
         new Promise((resolve) => window.setTimeout(() => resolve(0), 8000)),
       ]);
-      const safeBaseName = fileName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
-      const videoRef = ref(getStorage(), `course-videos/${currentUser.uid}/${Date.now()}-${safeBaseName || 'video.mp4'}`);
-      const snapshot = await uploadBytes(videoRef, file, {
-        contentType: 'video/mp4',
-        customMetadata: { originalName: fileName, ownerUid: currentUser.uid },
-      });
-      const videoUrl = await getDownloadURL(snapshot.ref);
+      const uploadResult = await eLearningApi.uploadAsset(
+        file,
+        'course-video',
+        'course-videos',
+      );
+      const videoUrl =
+        uploadResult?.url ||
+        uploadResult?.publicUrl ||
+        uploadResult?.fileUrl ||
+        uploadResult?.downloadUrl ||
+        '';
+      if (!videoUrl) throw new Error('R2 không trả về URL của video.');
       const duration = formatELearningDuration(durationSeconds);
       if (lessonIndex === null) {
         setELearningCreateForm((current) => ({
@@ -2471,12 +2897,12 @@ function TeacherClasses() {
           return { ...current, lessons };
         });
       }
-    } catch (firebaseError) {
-      console.error('Không thể tải video E-learning từ lớp:', firebaseError);
-      const code = String(firebaseError?.code || '');
-      if (code.includes('storage/unauthorized')) window.alert('Hệ thống đang từ chối quyền tải video. Hãy kiểm tra Storage Rules cho course-videos/{uid}.');
-      else if (code.includes('storage/retry-limit-exceeded')) window.alert('Kết nối tải video bị gián đoạn. Vui lòng kiểm tra mạng và thử lại.');
-      else window.alert(`Không thể tải video lên hệ thống${firebaseError?.message ? `: ${firebaseError.message}` : '.'}`);
+    } catch (uploadError) {
+      console.error('Không thể tải video E-learning từ lớp:', uploadError);
+      const status = Number(uploadError?.response?.status || uploadError?.status || 0);
+      if (status === 401 || status === 403) window.alert('Hệ thống từ chối quyền tải video. Vui lòng đăng nhập lại hoặc kiểm tra quyền lớp.');
+      else if (status === 429) window.alert('Bạn thao tác quá nhanh. Vui lòng chờ rồi thử lại.');
+      else window.alert(`Không thể tải video lên hệ thống${uploadError?.message ? `: ${uploadError.message}` : '.'}`);
     } finally {
       if (input) input.value = '';
       setELearningCreateUploadingVideo(false);
@@ -2515,8 +2941,10 @@ function TeacherClasses() {
       const firstLesson = lessons[0] || {};
       const totalDurationSeconds = Number(firstLesson.durationSeconds || eLearningCreateForm.durationSeconds || 0);
       const duration = firstLesson.duration || eLearningCreateForm.duration || formatELearningDuration(totalDurationSeconds);
-      const approved = normalizedELearningPublisherRole === 'ADMINDEV' || eLearningCreateForm.visibility === 'class';
-      await addDoc(collection(db, 'courses'), {
+      const approved =
+        normalizedELearningPublisherRole === 'ADMIN_DEV' ||
+        eLearningCreateForm.visibility === 'class';
+      await eLearningApi.createCourse({
         title: eLearningCreateForm.title,
         topic: eLearningCreateForm.topic,
         description: eLearningCreateForm.description,
@@ -2584,9 +3012,6 @@ function TeacherClasses() {
         isFeatured: false,
         status: approved ? 'approved' : 'pending',
         moderationStatus: approved ? 'approved' : 'pending',
-        submittedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       });
       setELearningCreateOpen(false);
       setELearningCreateForm(buildClassELearningCreateForm(eLearningCreateType));
@@ -2594,9 +3019,9 @@ function TeacherClasses() {
       setELearningCreateNotice(eLearningCreateForm.visibility === 'class'
         ? 'Đã đăng bài E-learning cho lớp. Bài đang đồng bộ vào danh sách Học liệu.'
         : approved ? 'Đã xuất bản bài E-learning.' : 'Đã gửi bài E-learning vào quy trình kiểm duyệt hiện tại.');
-    } catch (firebaseError) {
-      console.error('Không thể tạo bài E-learning từ workspace lớp:', firebaseError);
-      window.alert(firebaseError?.message || 'Không thể tạo bài học. Vui lòng thử lại.');
+    } catch (error) {
+      console.error('Không thể tạo bài E-learning từ workspace lớp:', error);
+      window.alert(error?.message || 'Không thể tạo bài học. Vui lòng thử lại.');
     } finally {
       setELearningCreatePublishing(false);
     }
@@ -2781,80 +3206,191 @@ function TeacherClasses() {
   };
 
   const saveAttendance = async () => {
-    if (!selectedClassId || !currentUser?.uid || attendanceSaving) return;
+    if (
+      !selectedClassId
+      || !currentUser?.uid
+      || attendanceSaving
+    ) {
+      return;
+    }
+
     try {
       setAttendanceSaving(true);
       setAttendanceSaveError('');
-      const records = attendanceStudents.map((student) => ({
-        studentId: student.id,
-        email: student.email || '',
-        status: attendanceDraft[student.id]?.status || '',
-        note: attendanceDraft[student.id]?.note?.trim() || '',
-      }));
-      const attendanceRef = doc(db, 'classes', selectedClassId, 'attendance', attendanceDate);
-      const historyRef = doc(collection(db, 'classes', selectedClassId, 'attendance', attendanceDate, 'history'));
-      const latestData = {
-        date: attendanceDate,
-        classId: selectedClassId,
-        records,
-        presentCount: attendancePageStats.present,
-        lateCount: attendancePageStats.late,
-        absentCount: attendancePageStats.absent,
-        excusedCount: attendancePageStats.excused,
-        totalCount: attendancePageStats.total,
-        attendanceRate: Number(attendancePageStats.rate.toFixed(1)),
-        teacherId: currentUser.uid,
-        qrCheckIns: {},
-        createdAt: selectedAttendanceRecord?.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      const batch = writeBatch(db);
-      batch.set(attendanceRef, latestData, { merge: true });
-      batch.set(historyRef, {
-        date: attendanceDate,
-        classId: selectedClassId,
-        records,
-        presentCount: attendancePageStats.present,
-        lateCount: attendancePageStats.late,
-        absentCount: attendancePageStats.absent,
-        excusedCount: attendancePageStats.excused,
-        totalCount: attendancePageStats.total,
-        attendanceRate: Number(attendancePageStats.rate.toFixed(1)),
-        teacherId: currentUser.uid,
-        teacherName: currentUser.displayName || userDetails?.displayName || currentUser.email || 'Giáo viên',
-        teacherEmail: currentUser.email || '',
-        savedAt: serverTimestamp(),
-      });
-      await batch.commit();
+
+      const records = attendanceStudents.map(
+        (student) => ({
+          studentId: student.id,
+          email: student.email || '',
+          status:
+            attendanceDraft[student.id]?.status
+            || '',
+          note:
+            attendanceDraft[student.id]
+              ?.note
+              ?.trim()
+            || '',
+        })
+      );
+
+      const result =
+        await classroomApi.saveAttendance(
+          selectedClassId,
+          attendanceDate,
+          {
+            records,
+            clearQrCheckIns: true,
+          }
+        );
+
+      const savedAttendance =
+        result?.attendance
+        || null;
+
+      if (savedAttendance) {
+        setAttendanceRecords((current) => {
+          const exists = current.some(
+            (item) =>
+              String(item.id) === String(savedAttendance.id)
+              || item.date === savedAttendance.date
+              || item.attendanceDate === savedAttendance.attendanceDate
+          );
+
+          if (!exists) {
+            return [
+              savedAttendance,
+              ...current,
+            ];
+          }
+
+          return current.map((item) =>
+            (
+              String(item.id) === String(savedAttendance.id)
+              || item.date === savedAttendance.date
+              || item.attendanceDate === savedAttendance.attendanceDate
+            )
+              ? savedAttendance
+              : item
+          );
+        });
+      }
+
+      try {
+        const historyResult =
+          await classroomApi.getAttendanceHistory(
+            selectedClassId,
+            attendanceDate
+          );
+
+        setAttendanceHistoryEntries(
+          Array.isArray(historyResult?.history)
+            ? historyResult.history
+            : Array.isArray(historyResult?.records)
+              ? historyResult.records
+              : []
+        );
+      } catch (historyError) {
+        console.error(
+          'Không thể tải lại lịch sử điểm danh:',
+          historyError
+        );
+      }
+
       setAttendanceDirty(false);
     } catch (error) {
-      console.error('Không thể lưu điểm danh:', error);
-      setAttendanceSaveError(error?.message || 'Không thể lưu điểm danh. Vui lòng thử lại.');
+      console.error(
+        'Không thể lưu điểm danh:',
+        error
+      );
+
+      setAttendanceSaveError(
+        error?.message
+        || 'Không thể lưu điểm danh. Vui lòng thử lại.'
+      );
     } finally {
       setAttendanceSaving(false);
     }
   };
 
   const ensureAttendanceQrSession = async (force = false) => {
-    if (!selectedClassId || !attendanceDate || !currentUser?.uid || attendanceQrCreating) return;
-    const currentToken = selectedAttendanceRecord?.qrToken || '';
-    const currentExpiry = Number(selectedAttendanceRecord?.qrExpiresAt || 0);
-    if (!force && currentToken && currentExpiry > Date.now() + 3000) return;
+    if (
+      !selectedClassId
+      || !attendanceDate
+      || !currentUser?.uid
+      || attendanceQrCreating
+    ) {
+      return;
+    }
+
+    const currentToken =
+      selectedAttendanceRecord?.qrToken
+      || '';
+
+    const currentExpiry = Number(
+      selectedAttendanceRecord?.qrExpiresAt
+      || 0
+    );
+
+    if (
+      !force
+      && currentToken
+      && currentExpiry > Date.now() + 3000
+    ) {
+      return;
+    }
+
     try {
       setAttendanceQrCreating(true);
       setAttendanceQrError('');
-      await setDoc(doc(db, 'classes', selectedClassId, 'attendance', attendanceDate), {
-        date: attendanceDate,
-        classId: selectedClassId,
-        qrToken: createAttendanceQrToken(),
-        qrExpiresAt: Date.now() + 10 * 60 * 1000,
-        qrCreatedBy: currentUser.uid,
-        qrCreatedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+
+      const result =
+        await classroomApi.createAttendanceQr(
+          selectedClassId,
+          attendanceDate,
+          {
+            ttlSeconds: 600,
+          }
+        );
+
+      if (result?.attendance) {
+        const savedAttendance = result.attendance;
+
+        setAttendanceRecords((current) => {
+          const exists = current.some(
+            (item) =>
+              String(item.id) === String(savedAttendance.id)
+              || item.date === savedAttendance.date
+              || item.attendanceDate === savedAttendance.attendanceDate
+          );
+
+          if (!exists) {
+            return [
+              savedAttendance,
+              ...current,
+            ];
+          }
+
+          return current.map((item) =>
+            (
+              String(item.id) === String(savedAttendance.id)
+              || item.date === savedAttendance.date
+              || item.attendanceDate === savedAttendance.attendanceDate
+            )
+              ? savedAttendance
+              : item
+          );
+        });
+      }
     } catch (error) {
-      console.error('Không thể tạo QR điểm danh:', error);
-      setAttendanceQrError(error?.message || 'Không thể tạo mã QR điểm danh.');
+      console.error(
+        'Không thể tạo QR điểm danh:',
+        error
+      );
+
+      setAttendanceQrError(
+        error?.message
+        || 'Không thể tạo mã QR điểm danh.'
+      );
     } finally {
       setAttendanceQrCreating(false);
     }
@@ -3017,7 +3553,7 @@ function TeacherClasses() {
     try {
       setProfileSaving(true);
       setProfileEditError('');
-      await updateDoc(doc(db, 'classes', selectedClassId, 'students', studentProfile.id), {
+      await classroomApi.updateMember(selectedClassId, studentProfile.id, {
         name: profileEditForm.name.trim(),
         email,
         phone: profileEditForm.phone.trim(),
@@ -3028,7 +3564,6 @@ function TeacherClasses() {
         parentEmail: profileEditForm.parentEmail.trim(),
         parentRelation: profileEditForm.parentRelation.trim(),
         medicalNote: profileEditForm.medicalNote.trim(),
-        updatedAt: serverTimestamp(),
       });
       setProfileEditing(false);
     } catch (error) {
@@ -3402,7 +3937,7 @@ function TeacherClasses() {
     const removeExpired = async () => {
       for (const item of expired) {
         if (cancelled) return;
-        try { await deleteDoc(doc(db, 'classes', selectedClassId, 'schedule', item.id)); }
+        try { await classroomApi.deleteSchedule(selectedClassId, item.id); }
         catch (error) { console.error('Không thể tự xóa nội dung quan trọng đã hết hạn:', error); }
       }
     };
@@ -3483,42 +4018,30 @@ function TeacherClasses() {
     try {
       setScheduleEditorSaving(true);
       setScheduleEditorError('');
-      const classRef = doc(db, 'classes', selectedClassId);
-      const classUpdate = { updatedAt: serverTimestamp() };
       let itemsToUpdate = scheduleWeekItems;
+      const currentWeekConfigs = selectedClass?.scheduleWeekConfigs && typeof selectedClass.scheduleWeekConfigs === 'object' ? selectedClass.scheduleWeekConfigs : {};
+      const currentTimeRules = selectedClass?.scheduleTimeRules && typeof selectedClass.scheduleTimeRules === 'object' ? selectedClass.scheduleTimeRules : {};
+      let weekConfigs = { ...currentWeekConfigs };
+      let timeRules = { ...currentTimeRules };
       if (scope === 'future') {
-        const currentConfigs = selectedClass?.scheduleWeekConfigs && typeof selectedClass.scheduleWeekConfigs === 'object'
-          ? selectedClass.scheduleWeekConfigs
-          : {};
-        classUpdate.scheduleWeekConfigs = Object.fromEntries(Object.entries(currentConfigs).filter(([key]) => key < scheduleWeekKey));
-        classUpdate[`scheduleTimeRules.${scheduleWeekKey}`] = { ...nextConfig, updatedBy: currentUser.uid, updatedAtMillis: Date.now() };
+        weekConfigs = Object.fromEntries(Object.entries(currentWeekConfigs).filter(([key]) => key < scheduleWeekKey));
+        timeRules[scheduleWeekKey] = { ...nextConfig, updatedBy: currentUser.uid, updatedAtMillis: Date.now() };
         itemsToUpdate = scheduleItems.filter((item) => {
           const itemWeekKey = item.weekKey || getScheduleWeekKey(new Date(`${getScheduleDateFromItem(item)}T00:00:00`));
           return itemWeekKey >= scheduleWeekKey;
         });
       } else {
-        classUpdate[`scheduleWeekConfigs.${scheduleWeekKey}`] = { ...nextConfig, updatedBy: currentUser.uid, updatedAtMillis: Date.now() };
+        weekConfigs[scheduleWeekKey] = { ...nextConfig, updatedBy: currentUser.uid, updatedAtMillis: Date.now() };
       }
       const updates = remapScheduleItemsToConfig(itemsToUpdate, nextConfig);
-      const chunks = [];
-      for (let index = 0; index < updates.length; index += 430) chunks.push(updates.slice(index, index + 430));
-      const firstBatch = writeBatch(db);
-      firstBatch.update(classRef, classUpdate);
-      (chunks.shift() || []).forEach(({ item, nextSlot }) => firstBatch.update(doc(db, 'classes', selectedClassId, 'schedule', item.id), {
-        startTime: nextSlot.startTime,
-        endTime: nextSlot.endTime,
-        updatedAt: serverTimestamp(),
-      }));
-      await firstBatch.commit();
-      for (const chunk of chunks) {
-        const batch = writeBatch(db);
-        chunk.forEach(({ item, nextSlot }) => batch.update(doc(db, 'classes', selectedClassId, 'schedule', item.id), {
-          startTime: nextSlot.startTime,
-          endTime: nextSlot.endTime,
-          updatedAt: serverTimestamp(),
-        }));
-        await batch.commit();
-      }
+      await classroomApi.batchSchedule(selectedClassId, {
+        expectedUpdatedAt: selectedClass?.updatedAt || '',
+        config: { weekConfigs, timeRules },
+        updates: updates.map(({ item, nextSlot }) => ({
+          id: item.id,
+          payload: { startTime: nextSlot.startTime, endTime: nextSlot.endTime },
+        })),
+      });
       setScheduleSyncMessage(scope === 'future' ? 'Đã áp dụng khung giờ từ tuần này cho các tuần sau.' : 'Đã lưu khung giờ riêng cho tuần này.');
       if (closeEditor) setScheduleEditorOpen(false);
     } catch (error) {
@@ -3529,7 +4052,7 @@ function TeacherClasses() {
     }
   };
 
-  const copyScheduleContentToWeek = async (sourceItems, targetWeekStart, targetConfig, clearExisting = true) => {
+  const copyScheduleContentToWeek = async (sourceItems, targetWeekStart, targetConfig, clearExisting = true, config = undefined) => {
     if (!selectedClassId) return;
     const targetWeekKey = getScheduleWeekKey(targetWeekStart);
     const targetDays = Array.from({ length: 5 }, (_, index) => getLocalDateKey(addDays(targetWeekStart, index)));
@@ -3539,8 +4062,7 @@ function TeacherClasses() {
     });
     const sourceWeekStart = sourceItems.length ? getMondayStart(new Date(`${getScheduleDateFromItem(sourceItems[0])}T00:00:00`)) : null;
     const sourceConfig = sourceWeekStart ? getScheduleConfigForWeek(selectedClass || {}, getScheduleWeekKey(sourceWeekStart)) : targetConfig;
-    const batch = writeBatch(db);
-    if (clearExisting) existingTarget.filter((item) => !item.virtualTemplate).forEach((item) => batch.delete(doc(db, 'classes', selectedClassId, 'schedule', item.id)));
+    const creates = [];
     sourceItems.forEach((item) => {
       const sourceDate = getScheduleDateFromItem(item);
       if (!sourceDate) return;
@@ -3551,16 +4073,19 @@ function TeacherClasses() {
       const targetSlot = targetConfig.slots[sourceSlotIndex];
       if (!targetSlot) return;
       const targetDate = targetDays[dayIndex];
-      const refValue = doc(collection(db, 'classes', selectedClassId, 'schedule'));
-      batch.set(refValue, {
+      creates.push({
         classId: selectedClassId, weekKey: targetWeekKey, date: targetDate, weekday: new Date(`${targetDate}T00:00:00`).getDay(),
         startTime: targetSlot.startTime, endTime: targetSlot.endTime, title: item.subjectName || item.subject || item.title || '',
         lessonContent: item.lessonContent || item.lessonName || item.lesson || item.topic || '', room: ensureScheduleRoomPrefix(item.room || item.location || ''),
         note: item.note || item.description || '', important: Boolean(item.important || item.isImportant || item.pinned), teacherId: currentUser?.uid || item.teacherId || '',
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
     });
-    await batch.commit();
+    await classroomApi.batchSchedule(selectedClassId, {
+      expectedUpdatedAt: selectedClass?.updatedAt || '',
+      deleteIds: clearExisting ? existingTarget.filter((item) => !item.virtualTemplate).map((item) => item.id) : [],
+      creates,
+      ...(config ? { config } : {}),
+    });
   };
 
   const applyPreviousWeekScheduleTime = async () => {
@@ -3588,9 +4113,14 @@ function TeacherClasses() {
     try {
       setScheduleEditorSaving(true);
       setScheduleSyncMessage('');
-      const classRef = doc(db, 'classes', selectedClassId);
-      await updateDoc(classRef, { [`scheduleWeekConfigs.${scheduleWeekKey}`]: { ...previousConfig, updatedBy: currentUser.uid, updatedAtMillis: Date.now() }, updatedAt: serverTimestamp() });
-      await copyScheduleContentToWeek(previousItems, scheduleWeekStart, previousConfig, true);
+      const weekConfigs = { ...(selectedClass?.scheduleWeekConfigs || {}), [scheduleWeekKey]: { ...previousConfig, updatedBy: currentUser.uid, updatedAtMillis: Date.now() } };
+      await copyScheduleContentToWeek(
+        previousItems,
+        scheduleWeekStart,
+        previousConfig,
+        true,
+        { weekConfigs },
+      );
       setScheduleSyncMessage('Đã áp dụng thời gian, số tiết và nội dung từ tuần trước vào tuần hiện tại.');
     } catch (error) {
       console.error('Không thể áp dụng lịch tuần trước:', error);
@@ -3617,11 +4147,13 @@ function TeacherClasses() {
         });
       });
       const currentConfigs = selectedClass?.scheduleWeekConfigs && typeof selectedClass.scheduleWeekConfigs === 'object' ? selectedClass.scheduleWeekConfigs : {};
-      await updateDoc(doc(db, 'classes', selectedClassId), {
-        scheduleWeekConfigs: Object.fromEntries(Object.entries(currentConfigs).filter(([key]) => key < scheduleWeekKey)),
-        [`scheduleTimeRules.${scheduleWeekKey}`]: { ...config, updatedBy: currentUser.uid, updatedAtMillis: Date.now() },
-        [`scheduleContentRules.${scheduleWeekKey}`]: { items, updatedBy: currentUser.uid, updatedAtMillis: Date.now() },
-        updatedAt: serverTimestamp(),
+      await classroomApi.batchSchedule(selectedClassId, {
+        expectedUpdatedAt: selectedClass?.updatedAt || '',
+        config: {
+          weekConfigs: Object.fromEntries(Object.entries(currentConfigs).filter(([key]) => key < scheduleWeekKey)),
+          timeRules: { ...(selectedClass?.scheduleTimeRules || {}), [scheduleWeekKey]: { ...config, updatedBy: currentUser.uid, updatedAtMillis: Date.now() } },
+          contentRules: { ...(selectedClass?.scheduleContentRules || {}), [scheduleWeekKey]: { items, updatedBy: currentUser.uid, updatedAtMillis: Date.now() } },
+        },
       });
       setScheduleSyncMessage('Đã áp dụng thời gian, tiết học và nội dung của tuần này cho tuần hiện tại và các tuần sau.');
     } catch (error) {
@@ -3691,10 +4223,10 @@ function TeacherClasses() {
         classId: selectedClassId, weekKey: scheduleWeekKey, date: scheduleInlineEditor.date, weekday: new Date(`${scheduleInlineEditor.date}T00:00:00`).getDay(),
         startTime: normalizeScheduleTime(scheduleInlineEditor.startTime), endTime: normalizeScheduleTime(scheduleInlineEditor.endTime), title: scheduleInlineEditor.title.trim(),
         lessonContent: scheduleInlineEditor.lessonContent.trim(), room: ensureScheduleRoomPrefix(scheduleInlineEditor.room), note: scheduleInlineEditor.note.trim(),
-        important: Boolean(scheduleInlineEditor.important), teacherId: currentUser.uid, updatedAt: serverTimestamp(),
+        important: Boolean(scheduleInlineEditor.important), teacherId: currentUser.uid,
       };
-      if (scheduleInlineEditor.targetId) await setDoc(doc(db, 'classes', selectedClassId, 'schedule', scheduleInlineEditor.targetId), payload, { merge: true });
-      else await addDoc(collection(db, 'classes', selectedClassId, 'schedule'), { ...payload, createdAt: serverTimestamp() });
+      if (scheduleInlineEditor.targetId) await classroomApi.updateSchedule(selectedClassId, scheduleInlineEditor.targetId, payload);
+      else await classroomApi.createSchedule(selectedClassId, payload);
       setScheduleInlineEditor(null);
     } catch (error) {
       console.error('Không thể lưu nội dung lịch:', error);
@@ -3723,10 +4255,9 @@ function TeacherClasses() {
     try {
       setScheduleImportantSaving(true);
       setScheduleImportantError('');
-      await addDoc(collection(db, 'classes', selectedClassId, 'schedule'), {
+      await classroomApi.createSchedule(selectedClassId, {
         kind: 'persistentImportant', classId: selectedClassId, title, note: scheduleImportantForm.note.trim(),
         date: scheduleImportantForm.expiresDate, expiresAtMillis: expiresAt.getTime(), teacherId: currentUser.uid,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
       setScheduleImportantOpen(false);
     } catch (error) {
@@ -3737,7 +4268,7 @@ function TeacherClasses() {
 
   const deletePersistentImportant = async (item) => {
     if (!selectedClassId || !item?.id || item.virtualTemplate) return;
-    try { await deleteDoc(doc(db, 'classes', selectedClassId, 'schedule', item.id)); }
+    try { await classroomApi.deleteSchedule(selectedClassId, item.id); }
     catch (error) { setScheduleSyncMessage(error?.message || 'Không thể xóa nội dung quan trọng.'); }
   };
 
@@ -3913,21 +4444,15 @@ function TeacherClasses() {
       const payload = {
         classId: selectedClassId, weekKey: scheduleWeekKey, date, weekday: new Date(`${date}T00:00:00`).getDay(),
         startTime, endTime, title: scheduleEditorForm.title.trim(), lessonContent: scheduleEditorForm.lessonContent.trim(), room: ensureScheduleRoomPrefix(scheduleEditorForm.room),
-        note: scheduleEditorForm.note.trim(), important: Boolean(scheduleEditorForm.important), teacherId: currentUser.uid, updatedAt: serverTimestamp(),
+        note: scheduleEditorForm.note.trim(), important: Boolean(scheduleEditorForm.important), teacherId: currentUser.uid,
       };
-      let writePromise;
       if (scheduleEditorTargetId) {
-        writePromise = setDoc(doc(db, 'classes', selectedClassId, 'schedule', scheduleEditorTargetId), payload, { merge: true });
+        await classroomApi.updateSchedule(selectedClassId, scheduleEditorTargetId, payload);
       } else {
-        const scheduleRef = doc(collection(db, 'classes', selectedClassId, 'schedule'));
-        writePromise = setDoc(scheduleRef, { ...payload, createdAt: serverTimestamp() });
+        await classroomApi.createSchedule(selectedClassId, payload);
       }
-
-      // Firestore áp dụng local write ngay; đóng editor trước khi chờ server xác nhận
-      // để thao tác lưu nội dung lịch phản hồi tức thì trên giao diện.
       setScheduleEditorOpen(false);
       setScheduleEditorSaving(false);
-      await writePromise;
     } catch (error) {
       console.error('Không thể lưu lịch dạy:', error);
       setScheduleEditorOpen(true);
@@ -4032,19 +4557,38 @@ function TeacherClasses() {
     return candidates;
   }, [allSubjectScores, assignmentsByClass, attendanceRecords, attendanceStudents, currentUser?.email, currentUser?.uid, now, persistentImportantItems, scheduleItems, selectedClass?.name, selectedClassId, subjects]);
 
-  const teacherNotifications = useMemo(() => notifications.filter((item) => {
-    const recipientUid = item.recipientUid || item.recipientUserId || item.targetUid || '';
-    const recipientEmail = normalizeText(item.recipientEmail || item.targetEmail);
-    const recipientType = normalizeText(item.recipientType);
-    const hasRecipient = Boolean(recipientUid || recipientEmail || recipientType);
-    if (!hasRecipient) return !item.systemGenerated || item.authorId === currentUser?.uid;
-    if (recipientType === 'class') return !item.systemGenerated;
-    if (recipientType && !['teacher', 'user'].includes(recipientType)) return false;
-    return Boolean(
-      (recipientUid && recipientUid === currentUser?.uid) ||
-      (recipientEmail && recipientEmail === normalizeText(currentUser?.email))
-    );
-  }), [currentUser?.email, currentUser?.uid, notifications]);
+  const teacherNotifications = useMemo(() => {
+    const currentSqlUserId = getCurrentSqlUserId(currentUser);
+
+    return notifications.filter((item) => {
+      if (
+        currentSqlUserId &&
+        userIdListIncludes(
+          item.dismissedBy,
+          currentSqlUserId,
+        )
+      ) {
+        return false;
+      }
+
+      const recipientUid = item.recipientUid || item.recipientUserId || item.targetUid || '';
+      const recipientEmail = normalizeText(item.recipientEmail || item.targetEmail);
+      const recipientType = normalizeText(item.recipientType);
+      const hasRecipient = Boolean(recipientUid || recipientEmail || recipientType);
+
+      if (!hasRecipient) {
+        return !item.systemGenerated || sameUserId(item.authorId, currentSqlUserId);
+      }
+
+      if (recipientType === 'class') return !item.systemGenerated;
+      if (recipientType && !['teacher', 'user'].includes(recipientType)) return false;
+
+      return Boolean(
+        (recipientUid && sameUserId(recipientUid, currentSqlUserId)) ||
+        (recipientEmail && recipientEmail === normalizeText(currentUser?.email))
+      );
+    });
+  }, [currentUser, notifications]);
 
   const teacherCreatedAnnouncements = useMemo(
     () => teacherNotifications.filter((item) => !item.systemGenerated),
@@ -4052,84 +4596,241 @@ function TeacherClasses() {
   );
 
   useEffect(() => {
-    if (!selectedClassId || !currentUser?.uid || !automaticNotificationCandidates.length) return undefined;
+    if (!selectedClassId || !getCurrentSqlUserId(currentUser) || !automaticNotificationCandidates.length) return undefined;
+
     // Kiểm tra trên toàn bộ notification của lớp, không chỉ notification dành cho giáo viên.
     // Nếu chỉ dùng teacherNotifications thì notification dành cho học sinh luôn bị coi là thiếu
     // và bị ghi lại hàng loạt sau mỗi thay đổi lịch.
-    const existing = new Set(notifications.map((item) => item.sourceKey).filter(Boolean));
-    const dismissed = new Set(Array.isArray(selectedClass?.dismissedNotificationSourceKeys) ? selectedClass.dismissedNotificationSourceKeys : []);
-    const missing = automaticNotificationCandidates.filter((item) => !existing.has(item.sourceKey) && !dismissed.has(item.sourceKey));
+    const existing = new Set(
+      notifications
+        .map((item) => item.sourceKey)
+        .filter(Boolean)
+    );
+
+    const dismissed = new Set(
+      Array.isArray(selectedClass?.dismissedNotificationSourceKeys)
+        ? selectedClass.dismissedNotificationSourceKeys
+        : []
+    );
+
+    const missing = automaticNotificationCandidates.filter(
+      (item) =>
+        !existing.has(item.sourceKey) &&
+        !dismissed.has(item.sourceKey)
+    );
+
     if (!missing.length) return undefined;
+
     let cancelled = false;
+
     const syncAutomaticNotifications = async () => {
       try {
-        for (let index = 0; index < missing.length; index += 430) {
+        for (let index = 0; index < missing.length; index += 100) {
           if (cancelled) return;
-          const batch = writeBatch(db);
-          missing.slice(index, index + 430).forEach((item) => {
-            batch.set(doc(db, 'classes', selectedClassId, 'notifications', item.id), {
-              ...item,
-              readBy: [],
-              authorId: currentUser.uid,
-              authorName: 'Hệ thống lớp học',
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-          });
-          await batch.commit();
+
+          await Promise.all(
+            missing
+              .slice(index, index + 100)
+              .map((item) => classroomApi.createNotification(
+                selectedClassId,
+                {
+                  ...item,
+                  readBy: [],
+                  authorName: 'Hệ thống lớp học',
+                },
+              ))
+          );
+        }
+
+        if (cancelled) return;
+
+        const result = await classroomApi.listNotifications(
+          selectedClassId,
+          {
+            all: true,
+            limit: 500,
+          },
+        );
+
+        if (!cancelled) {
+          setNotifications(
+            Array.isArray(result?.notifications)
+              ? result.notifications
+              : []
+          );
         }
       } catch (error) {
         console.error('Không thể tạo thông báo tự động:', error);
       }
     };
-    syncAutomaticNotifications();
-    return () => { cancelled = true; };
-  }, [automaticNotificationCandidates, currentUser?.uid, notifications, selectedClass?.dismissedNotificationSourceKeys, selectedClassId]);
 
-  const unreadNotifications = useMemo(() => teacherNotifications.filter((item) => !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid)), [currentUser?.uid, teacherNotifications]);
-  const visibleNotifications = useMemo(() => notificationFilter === 'unread' ? unreadNotifications : teacherNotifications, [notificationFilter, teacherNotifications, unreadNotifications]);
+    syncAutomaticNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [automaticNotificationCandidates, currentUser, notifications, selectedClass?.dismissedNotificationSourceKeys, selectedClassId]);
+
+  const unreadNotifications = useMemo(() => {
+    const currentSqlUserId = getCurrentSqlUserId(currentUser);
+
+    return teacherNotifications.filter(
+      (item) =>
+        !currentSqlUserId ||
+        !userIdListIncludes(
+          item.readBy,
+          currentSqlUserId,
+        )
+    );
+  }, [currentUser, teacherNotifications]);
+
+  const visibleNotifications = useMemo(
+    () => notificationFilter === 'unread'
+      ? unreadNotifications
+      : teacherNotifications,
+    [notificationFilter, teacherNotifications, unreadNotifications]
+  );
 
   const markNotificationRead = async (item) => {
-    if (!selectedClassId || !item?.id || !currentUser?.uid) return;
-    try { setNotificationActionError(''); await updateDoc(doc(db, 'classes', selectedClassId, 'notifications', item.id), { readBy: arrayUnion(currentUser.uid), updatedAt: serverTimestamp() }); }
-    catch (error) { setNotificationActionError(error?.message || 'Không thể đánh dấu đã đọc.'); }
+    if (!selectedClassId || !item?.id || !getCurrentSqlUserId(currentUser)) return;
+
+    try {
+      setNotificationActionError('');
+
+      const result = await classroomApi.readNotification(
+        selectedClassId,
+        item.id,
+      );
+
+      if (result?.notification) {
+        setNotifications((current) =>
+          current.map((currentItem) =>
+            String(currentItem.id) === String(item.id)
+              ? result.notification
+              : currentItem
+          )
+        );
+      }
+    } catch (error) {
+      setNotificationActionError(error?.message || 'Không thể đánh dấu đã đọc.');
+    }
   };
 
   const markAllNotificationsRead = async () => {
-    if (!selectedClassId || !currentUser?.uid || !unreadNotifications.length) return;
+    if (!selectedClassId || !getCurrentSqlUserId(currentUser) || !unreadNotifications.length) return;
+
     try {
       setNotificationActionError('');
-      const chunks = []; for (let i = 0; i < unreadNotifications.length; i += 430) chunks.push(unreadNotifications.slice(i, i + 430));
-      for (const chunk of chunks) { const batch = writeBatch(db); chunk.forEach((item) => batch.update(doc(db, 'classes', selectedClassId, 'notifications', item.id), { readBy: arrayUnion(currentUser.uid), updatedAt: serverTimestamp() })); await batch.commit(); }
-    } catch (error) { setNotificationActionError(error?.message || 'Không thể đánh dấu tất cả đã đọc.'); }
+
+      const results = await Promise.all(
+        unreadNotifications.map((item) =>
+          classroomApi.readNotification(
+            selectedClassId,
+            item.id,
+          )
+        )
+      );
+
+      const updatedById = new Map(
+        results
+          .map((result) => result?.notification)
+          .filter(Boolean)
+          .map((notification) => [
+            String(notification.id),
+            notification,
+          ])
+      );
+
+      setNotifications((current) =>
+        current.map((item) =>
+          updatedById.get(String(item.id)) || item
+        )
+      );
+    } catch (error) {
+      setNotificationActionError(error?.message || 'Không thể đánh dấu tất cả đã đọc.');
+    }
   };
 
   const deleteAllNotifications = async () => {
-    if (!selectedClassId || !currentUser?.uid || !teacherNotifications.length || deletingAllNotifications) return;
+    if (!selectedClassId || !getCurrentSqlUserId(currentUser) || !teacherNotifications.length || deletingAllNotifications) return;
+
     if (!canTeachClass) {
       setNotificationActionError('Bạn không có quyền quản lý thông báo của lớp.');
       return;
     }
+
     try {
       setDeletingAllNotifications(true);
       setNotificationActionError('');
-      const storage = getStorage();
-      const attachments = teacherNotifications.flatMap((item) => (item.attachments || []).filter((attachment) => attachment?.type === 'file' && attachment?.url));
-      await Promise.all(attachments.map(async (attachment) => {
-        try { await deleteObject(ref(storage, attachment.url)); }
-        catch (error) { if (error?.code !== 'storage/object-not-found') throw error; }
-      }));
-      const sourceKeys = teacherNotifications.map((item) => item.sourceKey).filter(Boolean);
-      if (sourceKeys.length) {
-        await updateDoc(doc(db, 'classes', selectedClassId), { dismissedNotificationSourceKeys: arrayUnion(...sourceKeys), updatedAt: serverTimestamp() });
-      }
-      const chunks = [];
-      for (let index = 0; index < teacherNotifications.length; index += 430) chunks.push(teacherNotifications.slice(index, index + 430));
-      for (const chunk of chunks) {
-        const batch = writeBatch(db);
-        chunk.forEach((item) => batch.delete(doc(db, 'classes', selectedClassId, 'notifications', item.id)));
-        await batch.commit();
-      }
+
+      const attachments = teacherNotifications.flatMap(
+        (item) =>
+          (item.attachments || []).filter(
+            (attachment) =>
+              attachment?.type === 'file' &&
+              (attachment?.storagePath || attachment?.url)
+          )
+      );
+
+      await Promise.all(
+        attachments.map(async (attachment) => {
+          const storagePath = getR2StoragePath(attachment);
+          if (!storagePath) return;
+
+          try {
+            await classroomApi.deleteAsset(storagePath);
+          } catch (error) {
+            if (error?.status !== 404 && error?.response?.status !== 404) {
+              throw error;
+            }
+          }
+        })
+      );
+
+      const results = await Promise.all(
+        teacherNotifications.map(async (item) => {
+          if (item.sourceKey) {
+            return classroomApi.dismissNotification(
+              selectedClassId,
+              item.id,
+            );
+          }
+
+          await classroomApi.deleteNotification(
+            selectedClassId,
+            item.id,
+          );
+
+          return {
+            deletedId: String(item.id),
+          };
+        })
+      );
+
+      const dismissedById = new Map(
+        results
+          .map((result) => result?.notification)
+          .filter(Boolean)
+          .map((notification) => [
+            String(notification.id),
+            notification,
+          ])
+      );
+
+      const deletedIds = new Set(
+        results
+          .map((result) => result?.deletedId)
+          .filter(Boolean)
+      );
+
+      setNotifications((current) =>
+        current
+          .filter((item) => !deletedIds.has(String(item.id)))
+          .map((item) =>
+            dismissedById.get(String(item.id)) || item
+          )
+      );
+
       setNotificationDeleteAllOpen(false);
     } catch (error) {
       console.error('Không thể xóa toàn bộ thông báo:', error);
@@ -4241,32 +4942,68 @@ function TeacherClasses() {
   };
 
   const openRecallMessageConfirm = (item) => {
-    if (!item?.id || item.senderId !== currentUser?.uid || item.recalled || recallingMessageId) return;
+    if (
+      !item?.id ||
+      !sameUserId(item.senderId, getCurrentSqlUserId(currentUser)) ||
+      item.recalled ||
+      recallingMessageId
+    ) return;
+
     setMessageRecallConfirm(item);
   };
 
   const recallMessage = async (item) => {
-    if (!selectedClassId || !currentUser?.uid || !item?.id || item.senderId !== currentUser.uid || item.recalled || recallingMessageId) return;
+    if (
+      !selectedClassId ||
+      !getCurrentSqlUserId(currentUser) ||
+      !item?.id ||
+      !sameUserId(item.senderId, getCurrentSqlUserId(currentUser)) ||
+      item.recalled ||
+      recallingMessageId
+    ) return;
+
     try {
       setRecallingMessageId(item.id);
       setMessageRecallConfirm(null);
       setMessageError('');
+
       if (item.attachment?.storagePath || item.attachment?.url) {
         try {
-          const storage = getStorage();
-          const attachmentRef = ref(storage, item.attachment.storagePath || item.attachment.url);
-          await deleteObject(attachmentRef);
+          const storagePath = getR2StoragePath(item.attachment);
+          if (storagePath) {
+            await classroomApi.deleteAsset(storagePath);
+          }
         } catch (error) {
-          if (error?.code !== 'storage/object-not-found') throw error;
+          if (error?.status !== 404 && error?.response?.status !== 404) {
+            throw error;
+          }
         }
       }
-      await updateDoc(doc(db, 'classes', selectedClassId, 'messages', item.id), {
-        content: '',
-        attachment: null,
-        recalled: true,
-        recalledAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+
+      // Giữ nguyên hành vi cũ: xóa nội dung và attachment trước khi đánh dấu recalled.
+      await classroomApi.updateMessage(
+        selectedClassId,
+        item.id,
+        {
+          content: '',
+          attachment: null,
+        },
+      );
+
+      const result = await classroomApi.recallMessage(
+        selectedClassId,
+        item.id,
+      );
+
+      if (result?.message) {
+        setMessages((current) =>
+          current.map((currentItem) =>
+            String(currentItem.id) === String(item.id)
+              ? result.message
+              : currentItem
+          )
+        );
+      }
     } catch (error) {
       console.error('Không thể thu hồi tin nhắn:', error);
       setMessageError(error?.message || 'Không thể thu hồi tin nhắn.');
@@ -4287,36 +5024,62 @@ function TeacherClasses() {
       setMessageError('');
       let attachment = null;
       if (pendingAttachment) {
-        const storage = getStorage();
-        const safeName = pendingAttachment.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const storagePath = `classes/${selectedClassId}/messages/${Date.now()}-${safeName}`;
-        const storageRef = ref(storage, storagePath);
-        await uploadBytes(storageRef, pendingAttachment);
+        const uploadResult = await classroomApi.uploadMessageAsset(
+          selectedClassId,
+          pendingAttachment,
+        );
+        const attachmentUrl =
+          uploadResult?.url ||
+          uploadResult?.publicUrl ||
+          uploadResult?.fileUrl ||
+          uploadResult?.downloadUrl ||
+          '';
+        const storagePath =
+          uploadResult?.storagePath ||
+          uploadResult?.objectKey ||
+          uploadResult?.key ||
+          uploadResult?.path ||
+          '';
+        if (!attachmentUrl || !storagePath) {
+          throw new Error('R2 không trả về đầy đủ thông tin file tin nhắn.');
+        }
         attachment = {
           name: pendingAttachment.name,
-          url: await getDownloadURL(storageRef),
+          url: attachmentUrl,
           type: pendingAttachment.type || 'file',
           storagePath,
         };
       }
-      await addDoc(collection(db, 'classes', selectedClassId, 'messages'), {
-        classId: selectedClassId,
-        conversationId,
-        senderId: currentUser.uid,
-        senderEmail: normalizeText(currentUser.email),
-        senderName: currentUser.displayName || userDetails?.displayName || currentUser.email || 'Giáo viên',
-        senderAvatar: currentTeacherAvatar,
-        receiverId: selectedConversation.uid || selectedConversation.memberId || '',
-        receiverEmail: selectedConversation.email,
-        receiverName: selectedConversation.name,
-        receiverType: selectedConversation.type,
-        receiverAvatar: selectedConversation.avatar || '',
-        content,
-        attachment,
-        recalled: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      const result = await classroomApi.createMessage(
+        selectedClassId,
+        {
+          conversationId,
+          receiverId: selectedConversation.uid || selectedConversation.memberId || '',
+          receiverEmail: selectedConversation.email,
+          receiverName: selectedConversation.name,
+          receiverType: selectedConversation.type,
+          receiverAvatar: selectedConversation.avatar || '',
+          content,
+          attachment,
+        },
+      );
+
+      if (result?.message) {
+        setMessages((current) => {
+          const exists = current.some(
+            (item) =>
+              String(item.id) === String(result.message.id)
+          );
+
+          return exists
+            ? current.map((item) =>
+                String(item.id) === String(result.message.id)
+                  ? result.message
+                  : item
+              )
+            : [...current, result.message];
+        });
+      }
       setMessageDrafts((current) => ({ ...current, [conversationId]: '' }));
       setMessageAttachments((current) => {
         const next = { ...current };
@@ -4699,46 +5462,19 @@ function TeacherClasses() {
       setCreating(true);
       setCreateError('');
 
-      let classCode = '';
-      for (let attempt = 0; attempt < 6; attempt += 1) {
-        const candidate = generateClassCode();
-        const existing = await getDocs(query(collection(db, 'classes'), where('classCode', '==', candidate), limit(1)));
-        if (existing.empty) { classCode = candidate; break; }
-      }
-      if (!classCode) throw new Error('Không thể tạo mã lớp duy nhất. Vui lòng thử lại.');
-
-      const docRef = await addDoc(collection(db, 'classes'), {
+      const response = await classroomApi.createClassroom({
         name: className,
         grade,
-        classCode,
-        memberIds: [currentUser.uid],
         themeColor: '#2563eb',
         school: teacherSchool,
         description: '',
-        gradeSort: Number(grade) || grade,
         subject: teacherSubject,
-        teacherId: currentUser.uid,
-        teacherEmail: currentUser.email || '',
-        teacherName: currentUser.displayName || currentUser.email || '',
-        teacherPhotoURL: currentUser.photoURL || userDetails?.photoURL || userDetails?.avatarUrl || '',
-        teacherGender: userDetails?.gender || userDetails?.sex || '',
         schoolYear,
         status: 'active',
-        studentCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       });
-
-      await addDoc(collection(db, 'classes', docRef.id, 'subjects'), {
-        name: teacherSubject,
-        order: 1,
-        isDefault: true,
-        teacherId: currentUser.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      setSelectedClassId(docRef.id);
+      const createdClass = response?.classroom || response;
+      if (!createdClass?.id) throw new Error('API không trả về lớp học đã tạo.');
+      setSelectedClassId(String(createdClass.id));
       setClassView('detail');
       setCreateOpen(false);
       resetClassForm();
@@ -4762,46 +5498,13 @@ function TeacherClasses() {
     try {
       setJoining(true);
       setJoinError('');
-      const result = await getDocs(query(collection(db, 'classes'), where('classCode', '==', normalizedCode), limit(1)));
-      if (result.empty) {
-        setJoinError('Không tìm thấy lớp với mã này.');
-        return;
-      }
-      const classDoc = result.docs[0];
-      const classData = classDoc.data();
-      if (classData.teacherId === currentUser.uid) {
-        setJoinError('Bạn là người tạo lớp này nên không thể dùng mã lớp để tự tham gia.');
-        return;
-      }
-      if (Array.isArray(classData.memberIds) && classData.memberIds.includes(currentUser.uid)) {
-        setJoinError('Bạn đã là thành viên của lớp này.');
-        return;
-      }
-      const existingStudent = currentUser.email ? await getDocs(query(collection(db, 'classes', classDoc.id, 'students'), where('email', '==', currentUser.email.toLowerCase()), limit(1))) : null;
-      const batch = writeBatch(db);
-      batch.update(classDoc.ref, { memberIds: arrayUnion(currentUser.uid), updatedAt: serverTimestamp(), ...(existingStudent && existingStudent.empty && !normalizeText(userDetails?.role).includes('teacher') ? { studentCount: increment(1) } : {}) });
-      if (existingStudent && existingStudent.empty) {
-        const studentRef = doc(collection(db, 'classes', classDoc.id, 'students'));
-        batch.set(studentRef, {
-          uid: currentUser.uid,
-          email: currentUser.email.toLowerCase(),
-          name: currentUser.displayName || '',
-          role: userDetails?.role || 'STUDENT',
-          photoURL: currentUser.photoURL || userDetails?.photoURL || userDetails?.avatarUrl || '',
-          gender: userDetails?.gender || userDetails?.sex || '',
-          status: 'active',
-          classId: classDoc.id,
-          className: classData.name || '',
-          studentCode: '',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
-      await batch.commit();
+      const response = await classroomApi.joinClassroom(normalizedCode);
+      const joinedClass = response?.classroom || response;
+      if (!joinedClass?.id) throw new Error('API không trả về lớp học đã tham gia.');
       setJoinOpen(false);
       setCreateMenuOpen(false);
       setJoinCode('');
-      openClassDetail(classDoc.id);
+      openClassDetail(String(joinedClass.id));
     } catch (error) {
       console.error('Không thể tham gia lớp:', error);
       setJoinError(error?.message || 'Không thể tham gia lớp.');
@@ -4842,15 +5545,13 @@ function TeacherClasses() {
     }
     try {
       setHomeSettingsError('');
-      await updateDoc(doc(db, 'classes', selectedClassId), {
+      await classroomApi.updateClassroom(selectedClassId, {
         name: homeSettingsForm.name.trim(),
         description: homeSettingsForm.description.trim(),
         school: homeSettingsForm.school.trim(),
         grade: homeSettingsForm.grade.trim(),
-        gradeSort: Number(homeSettingsForm.grade) || homeSettingsForm.grade.trim(),
         coverPhotoUrl: homeSettingsForm.coverPhotoUrl,
         themeColor: homeSettingsForm.themeColor,
-        updatedAt: serverTimestamp(),
       });
       setCoverLibraryOpen(false);
       setHomeSettingsOpen(false);
@@ -4924,28 +5625,78 @@ function TeacherClasses() {
   };
 
   const handleDeleteNotification = async () => {
-    if (!selectedClassId || !notificationToDelete?.id || !currentUser?.uid) return;
-    const canDelete = canTeachClass || notificationToDelete.authorId === currentUser.uid;
+    if (
+      !selectedClassId ||
+      !notificationToDelete?.id ||
+      !getCurrentSqlUserId(currentUser)
+    ) return;
+
+    const canDelete =
+      canTeachClass ||
+      sameUserId(
+        notificationToDelete.authorId,
+        getCurrentSqlUserId(currentUser),
+      );
+
     if (!canDelete) {
       setNotificationDeleteError('B\u1ea1n kh\u00f4ng c\u00f3 quy\u1ec1n x\u00f3a th\u00f4ng b\u00e1o n\u00e0y.');
       return;
     }
+
     try {
       setDeletingNotification(true);
       setNotificationDeleteError('');
-      const storage = getStorage();
-      const fileAttachments = (notificationToDelete.attachments || []).filter((item) => item?.type === 'file' && item?.url);
-      await Promise.all(fileAttachments.map(async (item) => {
-        try {
-          await deleteObject(ref(storage, item.url));
-        } catch (error) {
-          if (error?.code !== 'storage/object-not-found') throw error;
-        }
-      }));
+
+      const fileAttachments = (notificationToDelete.attachments || []).filter(
+        (item) =>
+          item?.type === 'file' &&
+          (item?.storagePath || item?.url)
+      );
+
+      await Promise.all(
+        fileAttachments.map(async (item) => {
+          const storagePath = getR2StoragePath(item);
+          if (!storagePath) return;
+
+          try {
+            await classroomApi.deleteAsset(storagePath);
+          } catch (error) {
+            if (error?.status !== 404 && error?.response?.status !== 404) {
+              throw error;
+            }
+          }
+        })
+      );
+
       if (notificationToDelete.sourceKey) {
-        await updateDoc(doc(db, 'classes', selectedClassId), { dismissedNotificationSourceKeys: arrayUnion(notificationToDelete.sourceKey), updatedAt: serverTimestamp() });
+        const result = await classroomApi.dismissNotification(
+          selectedClassId,
+          notificationToDelete.id,
+        );
+
+        if (result?.notification) {
+          setNotifications((current) =>
+            current.map((item) =>
+              String(item.id) === String(notificationToDelete.id)
+                ? result.notification
+                : item
+            )
+          );
+        }
+      } else {
+        await classroomApi.deleteNotification(
+          selectedClassId,
+          notificationToDelete.id,
+        );
+
+        setNotifications((current) =>
+          current.filter(
+            (item) =>
+              String(item.id) !== String(notificationToDelete.id)
+          )
+        );
       }
-      await deleteDoc(doc(db, 'classes', selectedClassId, 'notifications', notificationToDelete.id));
+
       setNotificationToDelete(null);
     } catch (error) {
       console.error('Kh\u00f4ng th\u1ec3 x\u00f3a th\u00f4ng b\u00e1o:', error);
@@ -4982,22 +5733,59 @@ function TeacherClasses() {
       setAnnouncementError('');
       let fileAttachment = null;
       if (announcementFile) {
-        const storage = getStorage();
-        const storageRef = ref(storage, `classes/${selectedClassId}/notifications/${Date.now()}-${announcementFile.name}`);
-        await uploadBytes(storageRef, announcementFile);
-        fileAttachment = { type: 'file', name: announcementFile.name, url: await getDownloadURL(storageRef) };
+        const uploadResult = await classroomApi.uploadNotificationAsset(
+          selectedClassId,
+          announcementFile,
+        );
+        const attachmentUrl =
+          uploadResult?.url ||
+          uploadResult?.publicUrl ||
+          uploadResult?.fileUrl ||
+          uploadResult?.downloadUrl ||
+          '';
+        const storagePath =
+          uploadResult?.storagePath ||
+          uploadResult?.objectKey ||
+          uploadResult?.key ||
+          uploadResult?.path ||
+          '';
+        if (!attachmentUrl || !storagePath) {
+          throw new Error('R2 không trả về đầy đủ thông tin file thông báo.');
+        }
+        fileAttachment = {
+          type: 'file',
+          name: announcementFile.name,
+          url: attachmentUrl,
+          storagePath,
+        };
       }
-      await addDoc(collection(db, 'classes', selectedClassId, 'notifications'), {
-        contentHtml: announcementBody,
-        attachments: [...announcementLinks, ...(fileAttachment ? [fileAttachment] : [])],
-        systemGenerated: false,
-        notificationKind: 'teacherAnnouncement',
-        recipientType: 'class',
-        authorId: currentUser.uid,
-        authorName: currentUser.displayName || currentUser.email || 'Giáo viên',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      const result = await classroomApi.createNotification(
+        selectedClassId,
+        {
+          title: 'Thông báo lớp học',
+          message: stripHtmlText(announcementBody || ''),
+          contentHtml: announcementBody,
+          attachments: [...announcementLinks, ...(fileAttachment ? [fileAttachment] : [])],
+          systemGenerated: false,
+          notificationKind: 'teacherAnnouncement',
+          recipientType: 'class',
+          authorName: currentUser.displayName || currentUser.email || 'Giáo viên',
+        },
+      );
+
+      if (result?.notification) {
+        setNotifications((current) => {
+          const next = [
+            result.notification,
+            ...current.filter(
+              (item) =>
+                String(item.id) !== String(result.notification.id)
+            ),
+          ];
+
+          return next;
+        });
+      }
       setAnnouncementOpen(false);
       setAnnouncementBody('');
       setAnnouncementLinks([]);
@@ -5043,12 +5831,11 @@ function TeacherClasses() {
     URL.revokeObjectURL(url);
   };
 
-  const resolveFirebaseUserByEmail = async (email) => {
+  const resolveSystemUserByEmail = async (email) => {
     const normalizedEmail = normalizeText(email);
     if (!normalizedEmail) return null;
-    const snapshot = await getDocs(query(collection(db, 'users'), where('email', '==', normalizedEmail), limit(1)));
-    if (snapshot.empty) return null;
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    const response = await classroomApi.resolveUser({ email: normalizedEmail });
+    return response?.user || response || null;
   };
 
   const importStudentsFromText = async () => {
@@ -5081,18 +5868,16 @@ function TeacherClasses() {
       for (const row of parsed) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) throw new Error(`Email ${row.email} không đúng định dạng.`);
         if (existingEmails.has(row.email) || seen.has(row.email)) throw new Error(`Email ${row.email} đã có trong lớp hoặc bị trùng.`);
-        const profile = await resolveFirebaseUserByEmail(row.email);
+        const profile = await resolveSystemUserByEmail(row.email);
         if (!profile) throw new Error(`Email ${row.email} không tồn tại trong hệ thống.`);
         if (isTeacherMember(profile)) throw new Error(`Email ${row.email} là tài khoản giáo viên, không thể thêm vào bảng học sinh.`);
         seen.add(row.email);
         resolved.push({ row, profile });
       }
       const nextCodeStart = attendanceStudents.length;
-      const batch = writeBatch(db);
-      resolved.forEach(({ row, profile }, index) => {
-        const studentRef = doc(collection(db, 'classes', selectedClassId, 'students'));
-        batch.set(studentRef, {
-          uid: profile.uid || profile.id || '',
+      await Promise.all(resolved.map(({ row, profile }, index) =>
+        classroomApi.addMember(selectedClassId, {
+          userId: profile.uid || profile.id || '',
           studentCode: getAutoStudentCode(nextCodeStart + index),
           email: row.email,
           name: row.name || profile.displayName || profile.name || profile.fullName || '',
@@ -5103,17 +5888,9 @@ function TeacherClasses() {
           parentPhone: row.parentPhone,
           role: profile.role || 'STUDENT',
           photoURL: profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || '',
-          status: 'active', classId: selectedClassId, className: selectedClass?.name || '', teacherId: currentUser?.uid || '',
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        });
-      });
-      const resolvedMemberIds = Array.from(new Set(resolved.map(({ profile }) => String(profile.uid || profile.id || '')).filter(Boolean)));
-      batch.update(doc(db, 'classes', selectedClassId), {
-        studentCount: increment(resolved.length),
-        ...(resolvedMemberIds.length ? { memberIds: arrayUnion(...resolvedMemberIds) } : {}),
-        updatedAt: serverTimestamp(),
-      });
-      await batch.commit();
+          status: 'active',
+        })
+      ));
       setStudentImportOpen(false);
       setStudentImportText('');
     } catch (error) {
@@ -5187,7 +5964,7 @@ function TeacherClasses() {
         if (existingEmails.has(email)) throw new Error(`Email ${email} đã có trong lớp.`);
         if (seenEmails.has(email)) throw new Error(`Email ${email} bị trùng trong file.`);
 
-        const profile = await resolveFirebaseUserByEmail(email);
+        const profile = await resolveSystemUserByEmail(email);
         if (!profile) throw new Error(`Email ${email} không tồn tại trong hệ thống.`);
         if (isTeacherMember(profile)) throw new Error(`Email ${email} là tài khoản giáo viên, không thể thêm vào bảng học sinh.`);
         seenEmails.add(email);
@@ -5196,15 +5973,9 @@ function TeacherClasses() {
 
       if (!resolved.length) throw new Error('Không có học sinh đủ điều kiện để thêm vào lớp.');
       const nextCodeStart = attendanceStudents.length;
-      let batch = writeBatch(db);
-      let operationCount = 0;
-      let committedCount = 0;
-
-      for (let index = 0; index < resolved.length; index += 1) {
-        const { row, profile } = resolved[index];
-        const studentRef = doc(collection(db, 'classes', selectedClassId, 'students'));
-        batch.set(studentRef, {
-          uid: profile.uid || profile.id || '',
+      await Promise.all(resolved.map(({ row, profile }, index) =>
+        classroomApi.addMember(selectedClassId, {
+          userId: profile.uid || profile.id || '',
           studentCode: row.studentCode || getAutoStudentCode(nextCodeStart + index),
           email: row.email,
           name: row.name || profile.displayName || profile.name || profile.fullName || '',
@@ -5216,30 +5987,8 @@ function TeacherClasses() {
           role: profile.role || 'STUDENT',
           photoURL: profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || '',
           status: 'active',
-          classId: selectedClassId,
-          className: selectedClass?.name || '',
-          teacherId: currentUser?.uid || '',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        operationCount += 1;
-
-        if (operationCount === 400 || index === resolved.length - 1) {
-          await batch.commit();
-          committedCount += operationCount;
-          operationCount = 0;
-          if (index !== resolved.length - 1) batch = writeBatch(db);
-        }
-      }
-
-      if (committedCount > 0) {
-        const resolvedMemberIds = Array.from(new Set(resolved.map(({ profile }) => String(profile.uid || profile.id || '')).filter(Boolean)));
-        await updateDoc(doc(db, 'classes', selectedClassId), {
-          studentCount: increment(committedCount),
-          ...(resolvedMemberIds.length ? { memberIds: arrayUnion(...resolvedMemberIds) } : {}),
-          updatedAt: serverTimestamp(),
-        });
-      }
+        })
+      ));
       setStudentImportOpen(false);
     } catch (error) {
       console.error('Không thể nhập danh sách học sinh:', error);
@@ -5338,7 +6087,7 @@ function TeacherClasses() {
 
       const resolvedUsers = [];
       for (const row of validRows) {
-        const profile = await resolveFirebaseUserByEmail(row.email);
+        const profile = await resolveSystemUserByEmail(row.email);
         if (!profile) throw new Error(`Email ${row.email} không tồn tại trong hệ thống.`);
         if (isTeacherMember(profile)) throw new Error(`Email ${row.email} là tài khoản giáo viên, không thể thêm vào danh sách học sinh.`);
         resolvedUsers.push({ row, profile });
@@ -5348,8 +6097,8 @@ function TeacherClasses() {
 
       await Promise.all(
         resolvedUsers.map(({ row, profile }, index) =>
-          addDoc(collection(db, 'classes', selectedClassId, 'students'), {
-            uid: profile.uid || profile.id || '',
+          classroomApi.addMember(selectedClassId, {
+            userId: profile.uid || profile.id || '',
             studentCode: getAutoStudentCode(nextCodeStart + index),
             email: row.email,
             name: profile.displayName || profile.name || profile.fullName || '',
@@ -5357,21 +6106,10 @@ function TeacherClasses() {
             gender: profile.gender || profile.sex || '',
             photoURL: profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || '',
             status: 'active',
-            classId: selectedClassId,
-            className: selectedClass?.name || '',
-            teacherId: currentUser?.uid || '',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
           })
         )
       );
 
-      const resolvedMemberIds = Array.from(new Set(resolvedUsers.map(({ profile }) => String(profile.uid || profile.id || '')).filter(Boolean)));
-      await updateDoc(doc(db, 'classes', selectedClassId), {
-        studentCount: increment(validRows.length),
-        ...(resolvedMemberIds.length ? { memberIds: arrayUnion(...resolvedMemberIds) } : {}),
-        updatedAt: serverTimestamp(),
-      });
 
       setStudentOpen(false);
       resetStudentForm();
@@ -5444,15 +6182,11 @@ function TeacherClasses() {
       setEditingStudent(true);
       setStudentEditError('');
 
-      await updateDoc(
-        doc(db, 'classes', selectedClassId, 'students', studentToEdit.id),
-        {
+      await classroomApi.updateMember(selectedClassId, studentToEdit.id, {
           name: studentEditForm.name.trim(),
           email,
           phone: studentEditForm.phone.trim(),
-          updatedAt: serverTimestamp(),
-        }
-      );
+      });
 
       setStudentEditOpen(false);
       setStudentToEdit(null);
@@ -5490,29 +6224,7 @@ function TeacherClasses() {
       setDeletingStudent(true);
       setStudentDeleteError('');
 
-      const batch = writeBatch(db);
-      batch.delete(
-        doc(db, 'classes', selectedClassId, 'students', studentToDelete.id)
-      );
-      subjects.forEach((subject) => {
-        batch.delete(
-          doc(
-            db,
-            'classes',
-            selectedClassId,
-            'subjects',
-            subject.id,
-            'scores',
-            studentToDelete.id
-          )
-        );
-      });
-      await batch.commit();
-
-      await updateDoc(doc(db, 'classes', selectedClassId), {
-        studentCount: increment(-1),
-        updatedAt: serverTimestamp(),
-      });
+      await classroomApi.deleteMember(selectedClassId, studentToDelete.id);
 
       setStudentDeleteOpen(false);
       setStudentToDelete(null);
@@ -5611,11 +6323,10 @@ function TeacherClasses() {
       setSavingSettings(true);
       setSettingsError('');
 
-      await updateDoc(doc(db, 'classes', settingsClassId), {
+      await classroomApi.updateClassroom(settingsClassId, {
         name: nextName,
         logoUrl: settingsForm.logoUrl,
         coverPhotoUrl: settingsForm.coverPhotoUrl,
-        updatedAt: serverTimestamp(),
       });
 
       setSettingsOpen(false);
@@ -5649,28 +6360,6 @@ function TeacherClasses() {
     setDeleteConfirmSeconds(10);
   };
 
-  const deleteQuerySnapshot = async (snapshot) => {
-    if (snapshot.empty) return;
-
-    let batch = writeBatch(db);
-    let operationCount = 0;
-
-    for (const itemDoc of snapshot.docs) {
-      batch.delete(itemDoc.ref);
-      operationCount += 1;
-
-      if (operationCount === 450) {
-        await batch.commit();
-        batch = writeBatch(db);
-        operationCount = 0;
-      }
-    }
-
-    if (operationCount > 0) {
-      await batch.commit();
-    }
-  };
-
   const handleDeleteClass = async () => {
     if (!canDeleteClass) { setDeleteError('Chỉ giáo viên chủ lớp hoặc admin mới có thể xóa lớp.'); return; }
     const targetClassId = deleteClassId || selectedClassId;
@@ -5684,56 +6373,10 @@ function TeacherClasses() {
       setDeletingClass(true);
       setDeleteError('');
 
-      const classRef = doc(db, 'classes', targetClassId);
-      const subjectsSnapshot = await getDocs(
-        collection(db, 'classes', targetClassId, 'subjects')
-      );
-
-      await Promise.all(
-        subjectsSnapshot.docs.map(async (subjectDoc) => {
-          await deleteQuerySnapshot(
-            await getDocs(
-              collection(
-                db,
-                'classes',
-                targetClassId,
-                'subjects',
-                subjectDoc.id,
-                'tests'
-              )
-            )
-          );
-          await deleteQuerySnapshot(
-            await getDocs(
-              collection(
-                db,
-                'classes',
-                targetClassId,
-                'subjects',
-                subjectDoc.id,
-                'scores'
-              )
-            )
-          );
-        })
-      );
-
-      for (const subcollectionName of ['assignments', 'attendance', 'schedule', 'notifications', 'messages']) {
-        await deleteQuerySnapshot(await getDocs(collection(db, 'classes', targetClassId, subcollectionName)));
-      }
-
-      await deleteQuerySnapshot(
-        await getDocs(collection(db, 'classes', targetClassId, 'students'))
-      );
-      await deleteQuerySnapshot(subjectsSnapshot);
-
       if (selectedClassId === targetClassId) {
         setSelectedClassId('');
       }
-
-      const batch = writeBatch(db);
-      batch.delete(classRef);
-      await batch.commit();
+      await classroomApi.deleteClassroom(targetClassId);
 
       setDeleteOpen(false);
       setDeleteClassId('');
@@ -6714,7 +7357,7 @@ function TeacherClasses() {
                   <article className="home-info-card class-code-card"><div className="class-code-head"><span>Mã lớp</span>{selectedClass?.classCode ? <button type="button" className={classCodeCopied ? 'class-code-copy copied' : 'class-code-copy'} onClick={copyClassCode} aria-label="Sao chép mã lớp" title={classCodeCopied ? 'Đã sao chép' : 'Sao chép mã lớp'}><span>{classCodeCopied ? '✓' : '⧉'}</span></button> : null}</div><strong>{selectedClass?.classCode || 'Chưa có mã lớp'}</strong><p>{classCodeCopied ? 'Đã sao chép mã lớp vào clipboard.' : 'Mã gồm 8 ký tự dùng để tham gia lớp.'}</p></article>
                   <article className="home-info-card due-card"><div className="home-card-head"><div><span>Sắp đến hạn đóng</span><strong>{selectedUpcomingAssignments.length} bài học</strong></div></div>{selectedUpcomingAssignments.length ? <div className="home-simple-list">{selectedUpcomingAssignments.slice(0, 4).map((item) => <div key={item.id}><strong>{getAssignmentTitle(item)}</strong><span>{formatDateTime(item.startAt || item.createdAt)} → {formatDateTime(item.dueAt || item.endAt || item.deadline || item.closeAt)}</span></div>)}</div> : <p>Chưa có bài học sắp tới hạn đóng.</p>}</article>
                 </div>
-                <section className="home-notification-panel"><div className="home-panel-head"><div><span>Thông báo mới</span></div>{canTeachClass ? <button type="button" onClick={() => setAnnouncementOpen(true)}>＋ Tạo thông báo mới</button> : null}</div>{teacherCreatedAnnouncements.length ? <div className="notification-feed">{teacherCreatedAnnouncements.slice(0, 6).map((item) => <article key={item.id}><div className="notification-item-head"><small>{item.authorName || 'Giáo viên'} · {formatDateTime(item.createdAt)}</small>{(selectedClass?.teacherId === currentUser?.uid || item.authorId === currentUser?.uid) ? <button type="button" className="notification-delete-btn" onClick={() => openDeleteNotification(item)} title="Xóa thông báo" aria-label="Xóa thông báo">×</button> : null}</div><div className="notification-content" dangerouslySetInnerHTML={{ __html: item.contentHtml || item.content || '' }} />{item.attachments?.length ? <div className="notification-links">{item.attachments.map((attachment, index) => <a key={index} href={attachment.url} target="_blank" rel="noreferrer">{attachment.name || attachment.type || 'Tệp đính kèm'}</a>)}</div> : null}</article>)}</div> : <p className="home-panel-empty">Chưa có thông báo.</p>}</section>
+                <section className="home-notification-panel"><div className="home-panel-head"><div><span>Thông báo mới</span></div>{canTeachClass ? <button type="button" onClick={() => setAnnouncementOpen(true)}>＋ Tạo thông báo mới</button> : null}</div>{teacherCreatedAnnouncements.length ? <div className="notification-feed">{teacherCreatedAnnouncements.slice(0, 6).map((item) => <article key={item.id}><div className="notification-item-head"><small>{item.authorName || 'Giáo viên'} · {formatDateTime(item.createdAt)}</small>{(sameUserId(selectedClass?.teacherId, getCurrentSqlUserId(currentUser)) || sameUserId(item.authorId, getCurrentSqlUserId(currentUser))) ? <button type="button" className="notification-delete-btn" onClick={() => openDeleteNotification(item)} title="Xóa thông báo" aria-label="Xóa thông báo">×</button> : null}</div><div className="notification-content" dangerouslySetInnerHTML={{ __html: item.contentHtml || item.content || '' }} />{item.attachments?.length ? <div className="notification-links">{item.attachments.map((attachment, index) => <a key={index} href={attachment.url} target="_blank" rel="noreferrer">{attachment.name || attachment.type || 'Tệp đính kèm'}</a>)}</div> : null}</article>)}</div> : <p className="home-panel-empty">Chưa có thông báo.</p>}</section>
               </section>
             </div>
           ) : activeTab === 'overview' ? (
@@ -7113,7 +7756,7 @@ function TeacherClasses() {
               <section className="notification-center-head"><div><div className="notification-title-line"><h3>Thông báo</h3>{unreadNotifications.length ? <b>{unreadNotifications.length}</b> : null}{selectedClass?.teacherId === currentUser?.uid ? <button type="button" className="notification-delete-all notification-delete-all-mobile" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!teacherNotifications.length}>⌫ Xóa hết</button> : null}</div></div><div className="notification-center-actions"><div className="notification-filter-tabs"><button type="button" className={notificationFilter === 'all' ? 'active' : ''} onClick={() => setNotificationFilter('all')}>Tất cả</button><button type="button" className={notificationFilter === 'unread' ? 'active' : ''} onClick={() => setNotificationFilter('unread')}>Chưa đọc ({unreadNotifications.length})</button></div>{selectedClass?.teacherId === currentUser?.uid ? <button type="button" className="notification-delete-all notification-delete-all-desktop" onClick={() => setNotificationDeleteAllOpen(true)} disabled={!teacherNotifications.length}>⌫ Xóa hết</button> : null}</div></section>
               {notificationActionError ? <p className="form-error">{notificationActionError}</p> : null}
               <section className="notification-center-list">
-                {visibleNotifications.length ? visibleNotifications.map((item) => { const unread = !Array.isArray(item.readBy) || !item.readBy.includes(currentUser?.uid); const severity = item.severity || (item.systemGenerated ? 'medium' : 'normal'); const icon = item.type === 'attendance' ? '!' : item.type === 'assignment' ? '▤' : item.type === 'score' || item.type === 'average' ? '▥' : item.type === 'reward' ? '★' : item.type?.startsWith('schedule') ? '◆' : '●'; const text = item.message || stripHtmlText(item.contentHtml || item.content || item.body || ''); return <article role="button" tabIndex={0} className={`notification-center-card ${unread ? 'unread' : ''} ${severity}`} key={item.id} onClick={() => unread && markNotificationRead(item)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && unread) markNotificationRead(item); }}><div className="notification-center-icon">{icon}</div><div className="notification-center-content"><div><strong>{item.title || (item.systemGenerated ? 'Thông báo tự động' : 'Thông báo lớp học')}</strong>{item.systemGenerated ? <em className="automatic">Thông báo tự động</em> : null}{severity === 'critical' ? <em>Khẩn cấp</em> : severity === 'reward' ? <em className="reward">Khen thưởng</em> : severity === 'important' ? <em className="important">Quan trọng</em> : null}{unread ? <i /> : null}</div><p>{text || 'Thông báo từ lớp học.'}</p><small>{formatDateTime(item.createdAt || item.updatedAt)}</small></div><div className="notification-card-actions">{(selectedClass?.teacherId === currentUser?.uid || item.authorId === currentUser?.uid) ? <button type="button" className="notification-trash-btn" onClick={(event) => { event.stopPropagation(); openDeleteNotification(item); }} title="Xóa thông báo" aria-label="Xóa thông báo">⌫</button> : null}</div></article>; }) : <div className="notification-center-empty">{notificationFilter === 'unread' ? 'Không còn thông báo chưa đọc.' : 'Chưa có thông báo.'}</div>}
+                {visibleNotifications.length ? visibleNotifications.map((item) => { const unread = !userIdListIncludes(item.readBy, getCurrentSqlUserId(currentUser)); const severity = item.severity || (item.systemGenerated ? 'medium' : 'normal'); const icon = item.type === 'attendance' ? '!' : item.type === 'assignment' ? '▤' : item.type === 'score' || item.type === 'average' ? '▥' : item.type === 'reward' ? '★' : item.type?.startsWith('schedule') ? '◆' : '●'; const text = item.message || stripHtmlText(item.contentHtml || item.content || item.body || ''); return <article role="button" tabIndex={0} className={`notification-center-card ${unread ? 'unread' : ''} ${severity}`} key={item.id} onClick={() => unread && markNotificationRead(item)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && unread) markNotificationRead(item); }}><div className="notification-center-icon">{icon}</div><div className="notification-center-content"><div><strong>{item.title || (item.systemGenerated ? 'Thông báo tự động' : 'Thông báo lớp học')}</strong>{item.systemGenerated ? <em className="automatic">Thông báo tự động</em> : null}{severity === 'critical' ? <em>Khẩn cấp</em> : severity === 'reward' ? <em className="reward">Khen thưởng</em> : severity === 'important' ? <em className="important">Quan trọng</em> : null}{unread ? <i /> : null}</div><p>{text || 'Thông báo từ lớp học.'}</p><small>{formatDateTime(item.createdAt || item.updatedAt)}</small></div><div className="notification-card-actions">{(sameUserId(selectedClass?.teacherId, getCurrentSqlUserId(currentUser)) || sameUserId(item.authorId, getCurrentSqlUserId(currentUser))) ? <button type="button" className="notification-trash-btn" onClick={(event) => { event.stopPropagation(); openDeleteNotification(item); }} title="Xóa thông báo" aria-label="Xóa thông báo">⌫</button> : null}</div></article>; }) : <div className="notification-center-empty">{notificationFilter === 'unread' ? 'Không còn thông báo chưa đọc.' : 'Chưa có thông báo.'}</div>}
               </section>
             </div>
           ) : activeTab === 'messages' ? (
@@ -7136,7 +7779,7 @@ function TeacherClasses() {
                     </header>
                     <div className="messages-thread">
                       {selectedConversation.messages.length ? selectedConversation.messages.map((item) => {
-                        const mine = item.senderId === currentUser?.uid;
+                        const mine = sameUserId(item.senderId, getCurrentSqlUserId(currentUser));
                         const avatar = mine ? (item.senderAvatar || currentTeacherAvatar) : (item.senderAvatar || selectedConversation.avatar);
                         return (
                           <div className={`message-bubble-row ${mine ? 'mine' : 'theirs'}`} key={item.id}>
@@ -7281,7 +7924,7 @@ function TeacherClasses() {
               {studentProfileTab === 'attendance' ? <section><h4>Lịch sử điểm danh</h4><div className="student-profile-stat-grid"><div><b>{attendance.present}</b><span>Có mặt</span></div><div><b>{attendance.late}</b><span>Trễ</span></div><div><b>{attendance.absent}</b><span>Vắng</span></div><div><b>{attendance.total}</b><span>Tổng lượt</span></div></div>{attendanceHistory.length ? <div className="student-profile-list">{attendanceHistory.slice(0,20).map((record) => <div key={record.id}><time>{formatDateTime(record.date || record.attendanceDate || record.createdAt)}</time><strong>{record.status || record.attendanceStatus || 'Đã ghi nhận'}</strong><span>{record.note || record.subjectName || record.subject || ''}</span></div>)}</div> : <DataUnavailable icon="✓" text="Chưa có lịch sử điểm danh riêng của học sinh." />}</section> : null}
               {studentProfileTab === 'scores' ? <section><h4>Điểm số các bài thi đã làm</h4>{subjectRows.length ? <div className="student-profile-score-groups">{subjectRows.map(({subject,avg,scoredTests}) => <article key={subject.id}><header><div><strong>{subject.name || 'Môn học'}</strong><small>{scoredTests.length} bài có điểm</small></div><b>{avg === null ? '—' : avg.toFixed(1)}</b></header>{scoredTests.length ? <div className="student-profile-test-scores">{scoredTests.map(({test,value}) => <div key={test.id}><span><strong>{test.name || test.title || test.code || 'Bài kiểm tra'}</strong><small>{test.type || test.category || 'Bài thi'}{test.date || test.testDate || test.createdAt ? ` · ${formatDateTime(test.date || test.testDate || test.createdAt)}` : ''}</small></span><b>{formatScore(value)}</b></div>)}</div> : <p className="student-profile-score-empty">Môn này chưa có bài thi nào được nhập điểm cho học sinh.</p>}</article>)}</div> : <DataUnavailable icon="★" text="Chưa có điểm bài thi nào của học sinh trong dữ liệu hiện tại." />}</section> : null}
               {studentProfileTab === 'assignments' ? <section><h4>Bài tập & trạng thái</h4>{assignmentRows.length ? <div className="student-profile-assignment-list">{assignmentRows.map(({assignment,submission,due,submittedAt,label,tone}) => <article key={assignment.id}><div><strong>{getAssignmentTitle(assignment)}</strong><small>{assignment.subjectName || assignment.subject || selectedClass?.subject || 'Bài tập'}{due ? ` · Hạn ${formatDateTime(due)}` : ' · Chưa có hạn nộp'}</small></div><span className={`student-profile-assignment-status ${tone}`}>{label}</span><time>{submittedAt ? `Nộp ${formatDateTime(submittedAt)}` : submission?.updatedAt ? `Cập nhật ${formatDateTime(submission.updatedAt)}` : 'Chưa có bài nộp'}</time></article>)}</div> : <DataUnavailable icon="▤" text="Lớp hiện chưa có bài tập phù hợp cho học sinh này." />}</section> : null}
-              {studentProfileTab === 'profile' ? <section><h4>Khen thưởng & nhận xét</h4><div className="student-auto-reward-note">Đánh giá tự động bên dưới chỉ được suy ra từ điểm trung bình hiện có.</div>{autoRewards.length ? <div className="student-auto-reward-list">{autoRewards.map((reward,index) => <article key={`${reward.title}-${index}`}><span>{reward.icon}</span><div><strong>{reward.title}</strong><p>{reward.note}</p></div></article>)}</div> : <div className="student-auto-reward-empty">{average === null ? 'Chưa có đủ dữ liệu điểm để tạo khen thưởng tự động.' : 'Điểm trung bình hiện tại chưa đạt ngưỡng khen thưởng tự động từ 8.0 trở lên.'}</div>}{profileEvents.length ? <><h4 className="student-profile-firebase-title">Ghi nhận đã lưu trong hồ sơ</h4><div className="student-profile-timeline">{profileEvents.map((event,index) => <div key={event.id || index}><span>•</span><div><time>{formatDateTime(event.date || event.createdAt)}</time><strong>{event.title || event.type || 'Ghi nhận'}</strong><p>{event.note || event.description || ''}</p></div></div>)}</div></> : null}</section> : null}
+              {studentProfileTab === 'profile' ? <section><h4>Khen thưởng & nhận xét</h4><div className="student-auto-reward-note">Đánh giá tự động bên dưới chỉ được suy ra từ điểm trung bình hiện có.</div>{autoRewards.length ? <div className="student-auto-reward-list">{autoRewards.map((reward,index) => <article key={`${reward.title}-${index}`}><span>{reward.icon}</span><div><strong>{reward.title}</strong><p>{reward.note}</p></div></article>)}</div> : <div className="student-auto-reward-empty">{average === null ? 'Chưa có đủ dữ liệu điểm để tạo khen thưởng tự động.' : 'Điểm trung bình hiện tại chưa đạt ngưỡng khen thưởng tự động từ 8.0 trở lên.'}</div>}{profileEvents.length ? <><h4 className="student-profile-record-title">Ghi nhận đã lưu trong hồ sơ</h4><div className="student-profile-timeline">{profileEvents.map((event,index) => <div key={event.id || index}><span>•</span><div><time>{formatDateTime(event.date || event.createdAt)}</time><strong>{event.title || event.type || 'Ghi nhận'}</strong><p>{event.note || event.description || ''}</p></div></div>)}</div></> : null}</section> : null}
             </div>
           </aside></div>;
         })() : null}
