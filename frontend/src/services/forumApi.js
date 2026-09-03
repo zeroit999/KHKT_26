@@ -1,6 +1,6 @@
 import { authService } from './auth'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
 
 const readJson = async (response) => response.json().catch(() => ({}))
 
@@ -65,8 +65,6 @@ export const forumApi = {
   savePost: (postId) => json('POST', `/api/forum/posts/${postId}/save`, {}),
   eventInterest: (postId, interest) => json('POST', `/api/forum/posts/${postId}/event-interest`, { interest }),
   vote: (postId, optionId) => json('POST', `/api/forum/posts/${postId}/vote`, { optionId }),
-  syncEvents: () => json('POST', '/api/forum/posts/events/sync', {}),
-
   comments: (postId) => request(`/api/forum/posts/${postId}/comments?limit=300`),
   createComment: (postId, payload) => json('POST', `/api/forum/posts/${postId}/comments`, payload),
   reactComment: (postId, commentId, reaction) => json('POST', `/api/forum/posts/${postId}/comments/${commentId}/reaction`, { reaction }),

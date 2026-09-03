@@ -10,6 +10,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import { authService } from '../../services/auth.js'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode.js'
@@ -19,11 +23,20 @@ import {
   getPageAssistantProfile,
   normalizeAssistantRole,
 } from './pageAssistant.js'
+import { getUserAvatar } from '../../utils/userAvatar'
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.VITE_LOCAL_DEV_MODE === 'true' ? 'http://127.0.0.1:5000' : '')
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
 ).replace(/\/$/, '')
+
+function normalizeMarkdownMath(text) {
+  return String(text || '')
+    .replace(/\\\[/g, '$$')
+    .replace(/\\\]/g, '$$')
+    .replace(/\\\(/g, '$')
+    .replace(/\\\)/g, '$')
+}
 
 function normalizeReply(text) {
   return String(text || '').trim()
@@ -81,12 +94,13 @@ export default function ChatbotWidget() {
     user?.email ||
     'Bạn'
 
-  const userAvatar =
-    userDetails?.photoURL ||
-    userDetails?.avatar ||
-    userDetails?.avatarUrl ||
-    user?.photoURL ||
-    ''
+  const userAvatar = getUserAvatar(
+    {
+      ...(user || {}),
+      ...(userDetails || {}),
+    },
+    isDark,
+  )
 
   const userInitial = useMemo(() => {
     return String(userName || 'B').trim().charAt(0).toUpperCase()
@@ -166,9 +180,7 @@ export default function ChatbotWidget() {
     setLoading(true)
 
     try {
-      if (!API_BASE_URL) {
-        throw new Error('Chưa cấu hình VITE_API_BASE_URL cho chatbot backend.')
-      }
+
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: {
@@ -448,7 +460,16 @@ export default function ChatbotWidget() {
                           : 'rounded-bl-md border border-cyan-200 bg-white/90 text-slate-700'
                     }`}
                   >
-                    {message.content}
+                    {message.role === 'assistant' ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                      >
+                        {normalizeMarkdownMath(message.content)}
+                      </ReactMarkdown>
+                    ) : (
+                      message.content
+                    )}
                     {message.provider === 'mock' && (
                       <div className="mt-2 text-[10px] font-bold uppercase tracking-wide opacity-60">Local mock</div>
                     )}

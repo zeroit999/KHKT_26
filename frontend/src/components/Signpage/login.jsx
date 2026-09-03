@@ -61,9 +61,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const loggedInUser = await loginWithEmailPassword(email, password);
-
-      console.log('✅ Login successful:', loggedInUser?.email);
+      await loginWithEmailPassword(email, password);
 
       navigate('/');
     } catch (error) {
@@ -85,7 +83,6 @@ function Login() {
   // =========================
   useEffect(() => {
     if (!isLoading && user) {
-      console.log('✅ User already logged in, redirecting...');
 
       navigate('/');
     }

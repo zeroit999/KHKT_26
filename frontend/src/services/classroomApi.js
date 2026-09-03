@@ -46,9 +46,12 @@ const cleanParams = (params = {}) => {
 // CLASSROOMS
 // =========================================================
 
-const listClassrooms = async () => {
+const listClassrooms = async (params = {}) => {
   const response = await apiClient.get(
     '/classrooms',
+    {
+      params: cleanParams(params),
+    },
   )
 
   return unwrap(response)

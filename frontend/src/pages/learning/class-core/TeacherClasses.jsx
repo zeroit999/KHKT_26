@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import eLearningApi from '../../../services/eLearningApi.js';
 import classroomApi from '../../../services/classroomApi.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
+import { getUserAvatar } from '../../../utils/userAvatar.js';
 import {
   DataUnavailable,
   OverviewStat,
@@ -338,14 +339,7 @@ function getStudentDisplayName(student = {}) {
 }
 
 function getStudentAvatar(student = {}) {
-  return (
-    student.photoURL ||
-    student.photoUrl ||
-    student.avatarUrl ||
-    student.avatar ||
-    student.profilePhotoUrl ||
-    ''
-  );
+  return getUserAvatar(student);
 }
 
 function escapeExcelXml(value) {
@@ -640,15 +634,23 @@ function normalizeScheduleConfig(config = {}) {
     : Array.isArray(config.scheduleTimeSlots) && config.scheduleTimeSlots.length
       ? config.scheduleTimeSlots
       : DEFAULT_SCHEDULE_TIME_SLOTS;
-  const slots = sourceSlots.map((slot, index) => ({
+  const safeSourceSlots = sourceSlots.filter(
+    (slot) => slot && typeof slot === 'object'
+  );
+
+  const slots = safeSourceSlots.map((slot, index) => ({
     id: slot.id || `slot-${index + 1}`,
-    session: slot.session || (index < Math.ceil(sourceSlots.length / 2) ? 'morning' : 'afternoon'),
+    session: slot.session || (index < Math.ceil(safeSourceSlots.length / 2) ? 'morning' : 'afternoon'),
     period: Number(slot.period) || index + 1,
     startTime: normalizeScheduleTime(slot.startTime || ''),
     endTime: normalizeScheduleTime(slot.endTime || ''),
   })).filter((slot) => slot.startTime && slot.endTime);
   const sourceBreaks = Array.isArray(config.breaks) ? config.breaks : DEFAULT_SCHEDULE_BREAKS;
-  const breaks = sourceBreaks.map((item, index) => ({
+  const safeSourceBreaks = sourceBreaks.filter(
+    (item) => item && typeof item === 'object'
+  );
+
+  const breaks = safeSourceBreaks.map((item, index) => ({
     id: item.id || `break-${index + 1}`,
     afterPeriod: Number(item.afterPeriod) || 1,
     label: String(item.label || 'Giờ ra chơi').trim() || 'Giờ ra chơi',
@@ -1093,13 +1095,10 @@ export function AttendanceQrCheckIn({ classId, date, token }) {
     authUser?.email?.split('@')?.[0] ||
     'Học sinh';
 
-  const checkInAvatar =
-    userDetails?.photoURL ||
-    userDetails?.photoUrl ||
-    userDetails?.avatarUrl ||
-    userDetails?.avatar ||
-    authUser?.photoURL ||
-    '';
+  const checkInAvatar = getUserAvatar({
+    ...(authUser || {}),
+    ...(userDetails || {}),
+  });
 
   return (
     <main className="qr-student-checkin-page">
@@ -1941,26 +1940,55 @@ function TeacherClasses() {
     }
 
     let cancelled = false;
+    let firstLoad = true;
 
     const loadClasses = async () => {
       try {
-        setLoading(true);
-        const result = await classroomApi.listClassrooms();
+        if (firstLoad) {
+          setLoading(true);
+        }
+
+        const result = await classroomApi.listClassrooms(
+          isAdminUser
+            ? {}
+            : { mine: 1 },
+        );
         if (cancelled) return;
-        const nextClasses = (Array.isArray(result?.classrooms) ? result.classrooms : [])
-          .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+
+        const nextClasses = (
+          Array.isArray(result?.classrooms)
+            ? result.classrooms
+            : Array.isArray(result?.classes)
+              ? result.classes
+              : []
+        ).sort(
+          (a, b) =>
+            getTimeValue(b.createdAt) -
+            getTimeValue(a.createdAt)
+        );
+
         setClasses(nextClasses);
-        setSelectedClassId((currentId) => nextClasses.some((item) => item.id === currentId) ? currentId : '');
+        setSelectedClassId((currentId) =>
+          nextClasses.some(
+            (item) => String(item.id) === String(currentId)
+          )
+            ? currentId
+            : ''
+        );
         setClassView((currentView) => nextClasses.length ? currentView : 'list');
       } catch (error) {
         if (!cancelled) console.error('Không thể tải danh sách lớp:', error);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && firstLoad) {
+          firstLoad = false;
+          setLoading(false);
+        }
       }
     };
 
     loadClasses();
-    const intervalId = window.setInterval(loadClasses, 5000);
+    const intervalId = window.setInterval(loadClasses, 60000);
+
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -1990,7 +2018,7 @@ function TeacherClasses() {
       }
     };
     loadAssignments();
-    const intervalId = window.setInterval(loadAssignments, 5000);
+    const intervalId = window.setInterval(loadAssignments, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2025,7 +2053,7 @@ function TeacherClasses() {
       }
     };
     loadCourses();
-    const intervalId = window.setInterval(loadCourses, 5000);
+    const intervalId = window.setInterval(loadCourses, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2057,7 +2085,7 @@ function TeacherClasses() {
       }
     };
     loadProfiles();
-    const intervalId = window.setInterval(loadProfiles, 10000);
+    const intervalId = window.setInterval(loadProfiles, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2099,7 +2127,7 @@ function TeacherClasses() {
 
     const intervalId = window.setInterval(
       loadNotifications,
-      4000,
+      10000,
     );
 
     return () => {
@@ -2146,7 +2174,7 @@ function TeacherClasses() {
 
     const intervalId = window.setInterval(
       loadMessages,
-      4000,
+      10000,
     );
 
     return () => {
@@ -2195,7 +2223,7 @@ function TeacherClasses() {
 
     const intervalId = window.setInterval(
       loadAttendance,
-      4000
+      30000
     );
 
     return () => {
@@ -2245,7 +2273,7 @@ function TeacherClasses() {
 
     const intervalId = window.setInterval(
       loadAttendanceHistory,
-      4000
+      60000
     );
 
     return () => {
@@ -2272,7 +2300,7 @@ function TeacherClasses() {
       }
     };
     loadSchedule();
-    const intervalId = window.setInterval(loadSchedule, 5000);
+    const intervalId = window.setInterval(loadSchedule, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2298,7 +2326,7 @@ function TeacherClasses() {
       }
     };
     loadMembers();
-    const intervalId = window.setInterval(loadMembers, 5000);
+    const intervalId = window.setInterval(loadMembers, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2330,10 +2358,9 @@ function TeacherClasses() {
       setUserProfilesByEmail(merged);
     };
     loadProfiles().catch((error) => console.error('Không thể đồng bộ hồ sơ người dùng:', error));
-    const intervalId = window.setInterval(loadProfiles, 10000);
+
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
     };
   }, [classes, currentUser?.email, selectedClassId, students]);
 
@@ -2353,7 +2380,7 @@ function TeacherClasses() {
       }
     };
     loadSubjects();
-    const intervalId = window.setInterval(loadSubjects, 5000);
+    const intervalId = window.setInterval(loadSubjects, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2381,7 +2408,7 @@ function TeacherClasses() {
       if (!cancelled) setAllSubjectScores(Object.fromEntries(rows));
     };
     loadAllScores().catch((error) => console.error('Không thể tải dữ liệu điểm:', error));
-    const intervalId = window.setInterval(loadAllScores, 5000);
+    const intervalId = window.setInterval(loadAllScores, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -2425,12 +2452,17 @@ function TeacherClasses() {
   const teacherSchool = getTeacherSchool(userDetails);
 
   const selectedClass = useMemo(
-    () => classes.find((classItem) => classItem.id === selectedClassId) || null,
+    () =>
+      classes.find(
+        (classItem) =>
+          String(classItem.id) === String(selectedClassId)
+      ) || null,
     [classes, selectedClassId]
   );
 
   const isClassOwner = Boolean(selectedClass?.teacherId && selectedClass.teacherId === currentUser?.uid);
   const canDeleteClass = isClassOwner || isAdminUser;
+  const canManageClassMembers = isClassOwner || isAdminUser;
 
   const classMembers = useMemo(() => students.map((student) => {
     const profile = userProfilesByEmail[normalizeText(student.email)] || {};
@@ -2441,7 +2473,7 @@ function TeacherClasses() {
       role: profile.role || student.role || student.userRole || student.memberRole || '',
       classRole: student.classRole || '',
       gender: student.gender || student.sex || profile.gender || profile.sex || '',
-      photoURL: profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || student.photoURL || student.photoUrl || student.avatarUrl || student.avatar || '',
+      photoURL: profile.customAvatar || profile.customAvatarUrl || profile.googlePhotoURL || profile.google_photo_url || profile.photoURL || profile.photoUrl || profile.avatarUrl || profile.avatar || student.customAvatar || student.customAvatarUrl || student.googlePhotoURL || student.google_photo_url || student.photoURL || student.photoUrl || student.avatarUrl || student.avatar || '',
     };
   }), [students, userProfilesByEmail]);
 
@@ -2465,12 +2497,41 @@ function TeacherClasses() {
         email: selectedClass.teacherEmail || ownerProfile.email || '',
         gender: selectedClass.teacherGender || ownerProfile.gender || ownerProfile.sex || '',
         role: 'TEACHER',
-        photoURL: ownerProfile.photoURL || ownerProfile.photoUrl || ownerProfile.avatarUrl || ownerProfile.avatar || selectedClass.teacherPhotoURL || selectedClass.teacherAvatar || (selectedClass.teacherId === currentUser?.uid ? currentUser?.photoURL : '') || '',
+        photoURL: ownerProfile.customAvatar || ownerProfile.customAvatarUrl || ownerProfile.googlePhotoURL || ownerProfile.google_photo_url || ownerProfile.photoURL || ownerProfile.photoUrl || ownerProfile.avatarUrl || ownerProfile.avatar || selectedClass.teacherPhotoURL || selectedClass.teacherAvatar || (selectedClass.teacherId === currentUser?.uid ? getUserAvatar(currentUser) : '') || '',
         owner: true,
       });
     }
     classMembers.filter(isTeacherMember).forEach((teacher) => {
-      if (!rows.some((item) => item.id === teacher.id || (item.email && normalizeText(item.email) === normalizeText(teacher.email)))) rows.push(teacher);
+      const teacherUid = String(
+        teacher.uid ||
+        teacher.userId ||
+        ''
+      );
+
+      const teacherEmail = normalizeText(
+        teacher.email
+      );
+
+      const alreadyExists = rows.some((item) => {
+        const itemUid = String(
+          item.uid ||
+          item.userId ||
+          ''
+        );
+
+        const itemEmail = normalizeText(
+          item.email
+        );
+
+        return (
+          (teacherUid && itemUid && teacherUid === itemUid) ||
+          (teacherEmail && itemEmail && teacherEmail === itemEmail)
+        );
+      });
+
+      if (!alreadyExists) {
+        rows.push(teacher);
+      }
     });
     return rows;
   }, [classMembers, currentUser?.displayName, currentUser?.photoURL, currentUser?.uid, selectedClass, userProfilesByEmail]);
@@ -3975,21 +4036,25 @@ function TeacherClasses() {
   };
 
   const normalizeDraftScheduleConfig = () => {
-    const normalizedSlots = scheduleSlotDraft.map((slot, index) => ({
-      id: slot.id || `slot-${Date.now()}-${index}`,
-      session: slot.session || 'morning',
-      period: index + 1,
-      startTime: normalizeScheduleTime(slot.startTime),
-      endTime: normalizeScheduleTime(slot.endTime),
-    }));
-    const normalizedBreaks = scheduleBreakDraft.map((item, index) => ({
-      id: item.id || `break-${Date.now()}-${index}`,
-      afterPeriod: Math.max(1, Math.min(normalizedSlots.length, Number(item.afterPeriod) || 1)),
-      label: String(item.label || 'Giờ ra chơi').trim() || 'Giờ ra chơi',
-      startTime: normalizeScheduleTime(item.startTime),
-      endTime: normalizeScheduleTime(item.endTime),
-      kind: item.kind || 'break',
-    }));
+    const normalizedSlots = scheduleSlotDraft
+      .filter((slot) => slot && typeof slot === 'object')
+      .map((slot, index) => ({
+        id: slot.id || `slot-${Date.now()}-${index}`,
+        session: slot.session || 'morning',
+        period: index + 1,
+        startTime: normalizeScheduleTime(slot.startTime),
+        endTime: normalizeScheduleTime(slot.endTime),
+      }));
+    const normalizedBreaks = scheduleBreakDraft
+      .filter((item) => item && typeof item === 'object')
+      .map((item, index) => ({
+        id: item.id || `break-${Date.now()}-${index}`,
+        afterPeriod: Math.max(1, Math.min(normalizedSlots.length, Number(item.afterPeriod) || 1)),
+        label: String(item.label || 'Giờ ra chơi').trim() || 'Giờ ra chơi',
+        startTime: normalizeScheduleTime(item.startTime),
+        endTime: normalizeScheduleTime(item.endTime),
+        kind: item.kind || 'break',
+      }));
     if (!normalizedSlots.length) throw new Error('Thời khóa biểu cần có ít nhất 1 tiết học.');
     const invalidSlot = normalizedSlots.find((slot) => !slot.startTime || !slot.endTime || slot.endTime <= slot.startTime);
     if (invalidSlot) throw new Error('Mỗi tiết cần có giờ bắt đầu và giờ kết thúc hợp lệ.');
@@ -4890,17 +4955,11 @@ function TeacherClasses() {
     [currentUser?.email, userProfilesByEmail]
   );
 
-  const currentTeacherAvatar = useMemo(() => (
-    getStudentAvatar(currentTeacherProfile) ||
-    currentUser?.photoURL ||
-    userDetails?.photoURL ||
-    userDetails?.photoUrl ||
-    userDetails?.avatarUrl ||
-    userDetails?.avatar ||
-    selectedClass?.teacherPhotoURL ||
-    selectedClass?.teacherAvatar ||
-    ''
-  ), [currentTeacherProfile, currentUser?.photoURL, selectedClass?.teacherAvatar, selectedClass?.teacherPhotoURL, userDetails]);
+  const currentTeacherAvatar = useMemo(() => getUserAvatar({
+    ...(currentTeacherProfile || {}),
+    ...(currentUser || {}),
+    ...(userDetails || {}),
+  }), [currentTeacherProfile, currentUser, userDetails]);
 
   const activeMessageDraft = selectedConversationId ? (messageDrafts[selectedConversationId] || '') : '';
   const activeMessageAttachment = selectedConversationId ? (messageAttachments[selectedConversationId] || null) : null;
@@ -6214,7 +6273,10 @@ function TeacherClasses() {
   };
 
   const handleDeleteStudent = async () => {
-    if (!isClassOwner) { setStudentDeleteError('Giáo viên thực tập không thể xóa thành viên.'); return; }
+    if (!canManageClassMembers) {
+      setStudentDeleteError('Bạn không có quyền xóa thành viên khỏi lớp.');
+      return;
+    }
     if (!selectedClassId || !studentToDelete?.id) {
       setStudentDeleteError('Không tìm thấy học sinh cần xóa.');
       return;
@@ -7323,7 +7385,7 @@ function TeacherClasses() {
             <button type="button" className={activeTab === 'home' ? 'active' : ''} onClick={() => { setActiveTab('home'); setWorkspaceMobileMenuOpen(false); }}><span className="workspace-nav-icon">⌂</span>{!sidebarCollapsed ? <span>Trang chủ</span> : null}</button>
             {CLASS_WORKSPACE_SECTIONS.map((section) => <div className="workspace-nav-section" key={section.id}><button type="button" className="workspace-section-toggle" onClick={() => { if (typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches) return; setSectionOpen((current) => ({ ...current, [section.id]: !current[section.id] })); }}><span>{sidebarCollapsed ? '⋯' : section.label}</span>{!sidebarCollapsed ? <b>{sectionOpen[section.id] ? '⌃' : '⌄'}</b> : null}</button>{sectionOpen[section.id] ? <div className="workspace-section-items">{section.items.map((item) => <button key={item.id} type="button" className={activeTab === item.id ? 'active' : ''} onClick={() => { setActiveTab(item.id); setWorkspaceMobileMenuOpen(false); }} title={sidebarCollapsed ? item.label : undefined}><span className="workspace-nav-icon">{item.icon}</span>{!sidebarCollapsed ? <span>{item.label}</span> : null}</button>)}</div> : null}</div>)}
           </nav>
-          <div className="workspace-user-card"><div className={`workspace-user-avatar ${(currentTeacherMember?.photoURL || currentUser?.photoURL || userDetails?.photoURL || userDetails?.avatarUrl) ? 'has-image' : ''}`}>{(currentTeacherMember?.photoURL || currentUser?.photoURL || userDetails?.photoURL || userDetails?.avatarUrl) ? <img src={currentTeacherMember?.photoURL || currentUser?.photoURL || userDetails?.photoURL || userDetails?.avatarUrl} alt="" referrerPolicy="no-referrer" /> : getInitial(currentUser?.displayName || userDetails?.displayName || currentUser?.email || 'GV')}</div>{!sidebarCollapsed ? <div><strong>{currentUser?.displayName || userDetails?.displayName || currentUser?.email || 'Giáo viên'}</strong><span>{isInternTeacher ? 'Giáo viên thực tập' : 'Giáo viên'}</span></div> : null}</div>
+          <div className="workspace-user-card"><div className={`workspace-user-avatar ${currentTeacherAvatar ? 'has-image' : ''}`}>{currentTeacherAvatar ? <img src={currentTeacherAvatar} alt="" referrerPolicy="no-referrer" /> : getInitial(currentUser?.displayName || userDetails?.displayName || currentUser?.email || 'Giáo viên')}</div>{!sidebarCollapsed ? <div><strong>{currentUser?.displayName || userDetails?.displayName || currentUser?.email || 'Giáo viên'}</strong><span>{isInternTeacher ? 'Giáo viên thực tập' : 'Giáo viên'}</span></div> : null}</div>
         </aside>
         {workspaceMobileMenuOpen ? <button type="button" className="workspace-mobile-menu-backdrop" onClick={() => setWorkspaceMobileMenuOpen(false)} aria-label="Đóng menu lớp học" /> : null}
 
@@ -7682,7 +7744,7 @@ function TeacherClasses() {
                     const ownerEmail = normalizeText(course.teacherEmail || course.createdByEmail || course.ownerEmail || '');
                     const teacherProfile = eLearningTeacherProfiles[`id:${ownerId}`] || eLearningTeacherProfiles[`email:${ownerEmail}`] || {};
                     const teacherName = teacherProfile.fullName || teacherProfile.displayName || teacherProfile.name || course.teacherName || course.teacherEmail || 'Giáo viên ZUNY';
-                    const teacherAvatar = teacherProfile.photoURL || teacherProfile.photoUrl || teacherProfile.avatarUrl || teacherProfile.avatar || teacherProfile.profileImage || teacherProfile.profilePicture || teacherProfile.imageUrl || '';
+                    const teacherAvatar = getUserAvatar(teacherProfile);
                     return <article className={`elearning-resource-card format-${format}`} key={course.id}>
                       <button type="button" className="elearning-resource-card-open" onClick={() => openELearningResource(course)} aria-label={`Mở ${title}`} />
                       <div className="elearning-resource-thumb" style={thumbnail ? { backgroundImage: `url(${JSON.stringify(thumbnail)})` } : undefined}>

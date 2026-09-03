@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import eLearningApi from '../../services/eLearningApi.js'
 import { useAuth } from '../../contexts/AuthContext.jsx'
+import { getUserAvatar } from '../../utils/userAvatar.js'
 import { CourseGateState, DetailHeader, DescriptionBox, MainLearningViewer, DetailSidebar, PlaylistPanel, OverviewList, CBTStudyPanel, LessonDetailBlock, EmptyLearningState, NotesPanel, MiniQuizPanel, RatingStars, QAPanel, NextCoursePanel, CompletionModal, HonestyWarningModal } from './e-learning-detail/components/DetailComponents'
 import { useDarkMode, isCourseLocked, canAccessCourseByClass, getUserClassName, isTeacherRole, getRatingAverage, normalizeTextList, normalizeChecklist, normalizeQuiz, getYoutubeVideoId, markAllChecklistDone, getLocalDateKey, canTrackLearningProgress, isStudentRole, getOpenAtMs, normalizeText, formatOpenAt, stripHtml } from './e-learning-detail/utils/detailUtils'
 
@@ -1099,12 +1100,9 @@ function CourseDetail() {
     course.teacherName ||
     course.teacherEmail ||
     'Đang cập nhật'
-  const teacherAvatar =
-    courseTeacherProfile?.photoURL ||
-    courseTeacherProfile?.avatar ||
-    courseTeacherProfile?.avatarUrl ||
-    course.teacherAvatar ||
-    ''
+  const teacherAvatar = courseTeacherProfile
+    ? getUserAvatar(courseTeacherProfile)
+    : (course.teacherAvatar || '')
   const normalizedTeacherRole = String(course.createdByRole || courseTeacherProfile?.role || '')
     .trim()
     .replace(/[\s_-]/g, '')

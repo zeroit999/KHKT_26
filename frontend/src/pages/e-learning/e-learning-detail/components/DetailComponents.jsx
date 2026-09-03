@@ -64,6 +64,7 @@ async function patchCourseProgress(courseId, payload) {
   return response?.progress || null
 }
 import { getCurrentCourseTeacherName, getInitials, formatFullDateTime, stripHtml, getDifficultyLabel, formatEstimatedMinutes, getYoutubeVideoId, isPdfFile, getRatingAverage, normalizeChecklist, defaultLearningChecklist, getLocalDateKey, canTrackLearningProgress, loadYoutubeIframeApi, formatSeconds } from '../utils/detailUtils'
+import { getUserAvatar } from '../../../../utils/userAvatar.js'
 
 
 function isSimulationCourse(course = {}) {
@@ -95,7 +96,9 @@ export function CourseGateState({ icon, title, description, onBack, isDarkMode, 
 }
 export function DetailHeader({ course, courseTeacherProfile, visibleProgress, ratingAverage, lessonCount, learningRecord, onBookmark, onShare, onComplete }) {
   const teacherName = getCurrentCourseTeacherName(course, courseTeacherProfile)
-  const avatar = courseTeacherProfile?.photoURL || courseTeacherProfile?.avatar || courseTeacherProfile?.avatarUrl || ''
+  const avatar = courseTeacherProfile
+    ? getUserAvatar(courseTeacherProfile)
+    : (course?.teacherAvatar || course?.teacherPhotoURL || '')
   return (
     <header className="mt-4">
       <h1 className="w-full min-w-0 max-w-[900px] max-h-24 overflow-y-auto whitespace-normal break-words pr-1 text-xl font-black leading-8 text-slate-950 [overflow-wrap:anywhere] dark:text-white sm:text-2xl lg:max-w-[min(900px,100%)]" dangerouslySetInnerHTML={{ __html: course.title }} />
@@ -1131,7 +1134,10 @@ export function QAPanel({ courseId, currentUser, userProfile, currentRole, cours
   const normalizedRole = String(currentRole || userProfile?.role || userProfile?.Role || userProfile?.accountType || '').replace(/[\s_-]/g, '').toUpperCase()
   const isCurrentAdmin = ['ADMIN', 'ADMINDEV'].includes(normalizedRole)
   const displayName = userProfile?.fullName || userProfile?.name || userProfile?.displayName || currentUser?.displayName || currentUser?.email || 'Người dùng ZUNY'
-  const avatar = userProfile?.photoURL || userProfile?.avatar || userProfile?.avatarUrl || userProfile?.profileImage || currentUser?.photoURL || ''
+  const avatar = getUserAvatar({
+    ...(currentUser || {}),
+    ...(userProfile || {}),
+  })
   const activeWarning = pendingWarnings[0] || null
 
   function getTime(value) { return value?.toMillis?.() || (value?.seconds ? value.seconds * 1000 : new Date(value || 0).getTime()) || 0 }

@@ -93,25 +93,15 @@ function Register() {
       e.preventDefault()
 
       setError('')
-
       setLoading(true)
 
       try {
-        console.log(
-          '🔄 Creating account...'
-        )
-
         await register(
           email,
           password,
           {
-            full_name:
-              fullName,
+            full_name: fullName,
           }
-        )
-
-        console.log(
-          '✅ Register success'
         )
 
         navigate('/setup')
@@ -121,32 +111,10 @@ function Register() {
           error
         )
 
-        if (
-          error.code ===
-          'auth/email-already-in-use'
-        ) {
-          setError(
-            'Email đã được sử dụng'
-          )
-        } else if (
-          error.code ===
-          'auth/invalid-email'
-        ) {
-          setError(
-            'Email không hợp lệ'
-          )
-        } else if (
-          error.code ===
-          'auth/weak-password'
-        ) {
-          setError(
-            'Mật khẩu phải có ít nhất 6 ký tự'
-          )
-        } else {
-          setError(
+        setError(
+          error?.message ||
             'Đăng ký thất bại. Vui lòng thử lại.'
-          )
-        }
+        )
 
         setTimeout(
           () => setError(''),
@@ -323,54 +291,114 @@ function Register() {
             </div>
 
             {/* PASSWORD */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-cyan-400">
-                Mật khẩu
-              </label>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-cyan-400">
+              Mật khẩu
+            </label>
 
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-cyan-400" />
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-cyan-400" />
 
-                <input
-                  type={
-                    showPassword
-                      ? 'text'
-                      : 'password'
-                  }
-                  value={password}
-                  onChange={(e) =>
-                    setPassword(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Nhập mật khẩu"
-                  className={`w-full rounded-2xl py-4 pl-12 pr-14 outline-none backdrop-blur-xl transition ${
-                    darkMode
-                      ? 'bg-white/10 text-white placeholder:text-slate-400'
-                      : 'border border-slate-300 bg-slate-50 text-slate-900'
-                  }`}
-                  required
-                />
+              <input
+                type={
+                  showPassword
+                    ? 'text'
+                    : 'password'
+                }
+                value={password}
+                onChange={(e) =>
+                  setPassword(
+                    e.target.value
+                  )
+                }
+                placeholder="Nhập mật khẩu"
+                className={`w-full rounded-2xl py-4 pl-12 pr-14 outline-none backdrop-blur-xl transition ${
+                  darkMode
+                    ? 'bg-white/10 text-white placeholder:text-slate-400'
+                    : 'border border-slate-300 bg-slate-50 text-slate-900'
+                }`}
+                required
+              />
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowPassword(
-                      !showPassword
-                    )
-                  }
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-cyan-400"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setShowPassword(
+                    !showPassword
+                  )
+                }
+                className="absolute right-4 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-cyan-400"
+                aria-label={
+                  showPassword
+                    ? 'Ẩn mật khẩu'
+                    : 'Hiện mật khẩu'
+                }
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
 
-            {/* ERROR */}
+            {password.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {[
+                  [
+                    'length',
+                    'Ít nhất 8 ký tự',
+                  ],
+                  [
+                    'number',
+                    'Ít nhất 1 chữ số (0-9)',
+                  ],
+                  [
+                    'uppercase',
+                    'Ít nhất 1 chữ cái in hoa (A-Z)',
+                  ],
+                  [
+                    'special',
+                    'Ít nhất 1 ký tự đặc biệt',
+                  ],
+                ].map(([key, label]) => {
+                  const valid =
+                    key === 'length'
+                      ? password.length >= 8
+                      : key === 'number'
+                        ? /[0-9]/.test(password)
+                        : key === 'uppercase'
+                          ? /[A-Z]/.test(password)
+                          : /[^A-Za-z0-9]/.test(password)
+
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-center gap-2 text-xs font-medium transition-colors ${
+                        valid
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                          valid
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                            : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+                        }`}
+                      >
+                        {valid ? '✓' : '•'}
+                      </span>
+
+                      <span>{label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ERROR */}
             {error && (
               <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 backdrop-blur-xl">
                 {error}

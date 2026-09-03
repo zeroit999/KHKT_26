@@ -20,6 +20,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { getUserAvatar } from '../../utils/userAvatar'
 
 import darkLogo from '../../assets/favicon-dark-mode.png'
 import lightLogo from '../../assets/favicon-light-mode.png'
@@ -51,6 +52,17 @@ export default function MobileNavbar({
     user?.displayName ||
     user?.email?.split('@')[0] ||
     'Tài khoản'
+
+
+  const avatarUser = {
+    ...(user || {}),
+    ...(userDetails || {}),
+  }
+
+  const userAvatar = getUserAvatar(
+    avatarUser,
+    darkMode,
+  )
 
   const classItem = useMemo(() => {
     const teacherRoles = ['TEACHER', 'ADMINUSER', 'ADMINDEV']
@@ -360,17 +372,12 @@ export default function MobileNavbar({
                       : 'border-violet-200'
                 }`}
               >
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={displayName}
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-cyan-400 to-violet-600 text-sm font-bold text-white">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <img
+                  src={userAvatar}
+                  alt={displayName}
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full rounded-full object-cover"
+                />
               </button>
             ) : (
               <Link
@@ -558,17 +565,12 @@ export default function MobileNavbar({
               }`}
             >
               <div className="flex min-w-0 items-center gap-3">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={displayName}
-                    className="h-11 w-11 shrink-0 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-violet-600 font-bold text-white">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <img
+                  src={userAvatar}
+                  alt={displayName}
+                  referrerPolicy="no-referrer"
+                  className="h-11 w-11 shrink-0 rounded-full object-cover"
+                />
 
                 <div className="min-w-0 flex-1">
                   <p

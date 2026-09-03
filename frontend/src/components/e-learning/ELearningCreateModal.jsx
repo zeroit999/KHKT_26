@@ -1086,42 +1086,75 @@ function DateTimeInput({ value, onChange }) {
 
 function ImagePicker({ fileName, previewUrl, onChange, onRemove }) {
   return (
-    <div className="rounded-2xl border border-dashed border-sky-300 bg-sky-50 p-4 dark:border-sky-400/30 dark:bg-sky-400/10">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-sky-400 to-violet-500 px-5 py-4 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:-translate-y-0.5">
-          <span>🖼️</span>
-          <span>Tải ảnh đại diện</span>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={onChange}
-            className="hidden"
-          />
-        </label>
-
-        <div className="min-w-0 flex-1 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-          {fileName || 'Chưa chọn ảnh'}
+    <div className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="text-sm font-black text-slate-900 dark:text-white">
+            Ảnh đại diện
+          </div>
+          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Tải ảnh từ máy tính để hiển thị cho bài học.
+          </div>
         </div>
 
         {previewUrl && (
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-black text-red-600 transition hover:bg-red-500 hover:text-white dark:text-red-200"
+            className="shrink-0 rounded-xl px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
           >
             Xóa ảnh
           </button>
         )}
       </div>
 
-      {previewUrl && (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950">
-          <img
-            src={previewUrl}
-            alt="Xem trước ảnh đại diện bài học"
-            className="h-64 w-full object-cover"
-          />
+      <label className="group relative block cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/40 transition hover:border-blue-500 hover:bg-blue-50 dark:border-blue-400/30 dark:bg-blue-500/[0.06] dark:hover:border-blue-400">
+        {previewUrl ? (
+          <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-950">
+            <img
+              src={previewUrl}
+              alt="Ảnh đại diện bài học"
+              className="h-full w-full object-cover"
+            />
+
+            <div className="absolute inset-0 grid place-items-center bg-slate-950/0 transition group-hover:bg-slate-950/45">
+              <span className="translate-y-2 rounded-full bg-white px-4 py-2 text-sm font-black text-slate-900 opacity-0 shadow-xl transition group-hover:translate-y-0 group-hover:opacity-100">
+                Chọn ảnh khác
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-[220px] flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-100 text-3xl shadow-sm transition group-hover:scale-105 dark:bg-blue-500/15">
+              🖼️
+            </div>
+
+            <div className="mt-4 text-sm font-black text-slate-900 dark:text-white">
+              Nhấn để tải ảnh lên
+            </div>
+
+            <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Chọn ảnh JPG, PNG, WebP hoặc GIF từ máy tính
+            </div>
+
+            <span className="mt-4 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition group-hover:bg-blue-700">
+              Chọn ảnh
+            </span>
+          </div>
+        )}
+
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          onChange={onChange}
+          className="hidden"
+        />
+      </label>
+
+      {fileName && (
+        <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-white/[0.04] dark:text-slate-400">
+          <span>✓</span>
+          <span className="min-w-0 truncate">{fileName}</span>
         </div>
       )}
     </div>
@@ -1264,7 +1297,7 @@ function YoutubePreview({ url }) {
       <div className="aspect-video w-full bg-slate-950">
         <iframe
           title="Xem trước video YouTube"
-          src={`https://www.youtube.com/embed/${videoId}`}
+          src={`https://www.youtube-nocookie.com/embed/${videoId}`}
           className="h-full w-full"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
@@ -1385,6 +1418,7 @@ async function uploadSelectedFile(file, folder) {
 
 async function apiRequest(path, { method = 'GET', body, isFormData = false } = {}) {
   const token =
+    localStorage.getItem('zuny_access_token') ||
     localStorage.getItem('access_token') ||
     localStorage.getItem('accessToken') ||
     localStorage.getItem('token') ||

@@ -1,6 +1,6 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://127.0.0.1:5000'
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
 
 const ACCESS_TOKEN_KEY = 'zuny_access_token'
 const REFRESH_TOKEN_KEY = 'zuny_refresh_token'
@@ -94,6 +94,22 @@ class AuthService {
     password,
     additionalData = {}
   ) {
+    if (typeof password !== 'string' || password.length < 8) {
+      throw new Error('Mật khẩu phải có ít nhất 8 ký tự.')
+    }
+
+    if (!/[0-9]/.test(password)) {
+      throw new Error('Mật khẩu phải có ít nhất 1 chữ số (0-9).')
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      throw new Error('Mật khẩu phải có ít nhất 1 chữ cái in hoa (A-Z).')
+    }
+
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      throw new Error('Mật khẩu phải có ít nhất 1 ký tự đặc biệt.')
+    }
+
     const data =
       await this.request(
         '/auth/register',
@@ -146,6 +162,13 @@ class AuthService {
   }
 
   async getMe() {
+    const accessToken = this.getAccessToken?.()
+
+    if (!accessToken) {
+      this.currentUser = null
+      return null
+    }
+
     if (!this.accessToken) {
       return null
     }

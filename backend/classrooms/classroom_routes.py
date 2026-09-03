@@ -1148,6 +1148,9 @@ def create_classroom():
                 or profile.get(
                     "avatar"
                 )
+                or profile.get(
+                    "googlePhotoURL"
+                )
             ),
 
         teacher_gender=
@@ -2113,6 +2116,9 @@ def add_member(
                 )
                 or profile.get(
                     "avatar"
+                )
+                or profile.get(
+                    "googlePhotoURL"
                 )
             ),
 

@@ -55,8 +55,8 @@ import './profile/profile.css'
 
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://127.0.0.1:5000'
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
 
 
 export default function Profile() {
@@ -203,11 +203,31 @@ export default function Profile() {
      Không cho phép sửa role.
   ===================================================== */
 
+  const normalizedRole =
+    String(profileData.role || '')
+      .trim()
+      .toUpperCase()
+
+  const isAdminDev =
+    normalizedRole === 'ADMIN_DEV'
+
   const isTeacher =
-    profileData.role
-      ?.trim()
-      ?.toUpperCase() ===
-    'TEACHER'
+    normalizedRole === 'TEACHER' ||
+    isAdminDev
+
+  const roleLabel =
+    isAdminDev
+      ? 'Quản trị viên'
+      : normalizedRole === 'TEACHER'
+        ? 'Giáo viên'
+        : 'Học sinh'
+
+  const roleBadgeLabel =
+    isAdminDev
+      ? '🛡️ Quản trị viên'
+      : normalizedRole === 'TEACHER'
+        ? '👨‍🏫 Giáo viên'
+        : '🎓 Học sinh'
 
   /* =====================================================
      AVATAR
@@ -220,7 +240,10 @@ export default function Profile() {
   ===================================================== */
 
   const avatarSrc =
-    getUserAvatar(user)
+    getUserAvatar({
+      ...(user || {}),
+      ...(userDetails || {}),
+    })
 
   /* =====================================================
      HERO IMAGE
@@ -700,9 +723,7 @@ export default function Profile() {
               }}
             />
 
-            {isTeacher
-              ? 'Giáo viên'
-              : 'Học sinh'}
+            {roleLabel}
           </div>
 
           {/* CHANGE COVER */}
@@ -780,9 +801,7 @@ export default function Profile() {
               className="zuny-profile-left-subtitle"
             >
               {profileData.bio ||
-                (isTeacher
-                  ? 'Giáo viên'
-                  : 'Học sinh')}
+                roleLabel}
             </div>
           </div>
         </section>
@@ -947,9 +966,7 @@ export default function Profile() {
                       : '#38BDF8',
                 }}
               >
-                {isTeacher
-                  ? '👨‍🏫 Giáo viên'
-                  : '🎓 Học sinh'}
+                {roleBadgeLabel}
               </span>
             </div>
 

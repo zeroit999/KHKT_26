@@ -25,6 +25,7 @@ import {
   updateUserProfileField,
   updateUserSetting,
 } from '../../services/settingsService.js'
+import { getUserAvatar } from '../../utils/userAvatar'
 
 export default function Setting({ darkMode, onToggleDarkMode }) {
   const { user, userDetails } = useAuth()
@@ -187,7 +188,7 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
       }
 
       if (passwordForm.newPassword.length < 6) {
-        toast.error('Mật khẩu mới tối thiểu 6 ký tự')
+        toast.error('Mật khẩu mới phải có ít nhất 8 ký tự')
         return
       }
 
@@ -204,8 +205,7 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
       }
 
       const apiBaseUrl =
-        import.meta.env.VITE_API_BASE_URL ||
-        'http://127.0.0.1:5000'
+        import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
 
       const response = await fetch(
         `${apiBaseUrl}/auth/change-password`,
@@ -330,6 +330,8 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
       >
         <SidebarContent
           user={user}
+          userDetails={userDetails}
+          darkMode={darkMode}
           displayName={displayName}
           role={role}
           avatarText={avatarText}
@@ -352,6 +354,8 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
           <aside className="relative h-full w-[280px] max-w-[86vw] bg-white dark:bg-slate-900">
             <SidebarContent
               user={user}
+              userDetails={userDetails}
+              darkMode={darkMode}
               displayName={displayName}
               role={role}
               avatarText={avatarText}
@@ -432,6 +436,8 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
 
 function SidebarContent({
   user,
+  userDetails,
+  darkMode,
   displayName,
   role,
   avatarText,
@@ -482,9 +488,15 @@ function SidebarContent({
               : 'rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-800/60'
           }`}
         >
-          {user?.photoURL ? (
+          {getUserAvatar({
+          ...(user || {}),
+          ...(userDetails || {}),
+        }, darkMode) ? (
             <img
-              src={user.photoURL}
+              src={getUserAvatar({
+          ...(user || {}),
+          ...(userDetails || {}),
+        }, darkMode)}
               alt={displayName}
               title={displayName}
               className="h-11 w-11 rounded-full object-cover"

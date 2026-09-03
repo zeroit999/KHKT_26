@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { subjects, sortOptions, courseTextLimits } from '../constants/courseConstants'
 import { MenuIcon, SearchIcon, CloseIcon, PlayIcon, MoreIcon, HomeIcon, HistoryIcon, BookmarkIcon, UserIcon, ReportHistoryIcon, ManageIcon, NotificationIcon, FlagIcon, LinkIcon, EditIcon, TrashIcon, DocumentIcon, LargeFormatIcon } from '../icons/Icons'
 import { stripHtml, getCourseTeacherName, isCourseLocked, isHotCourse, getVideoDuration, formatViews, formatRelativeDate, getInitials, getCourseFormat, formatDate, normalizeLessons, normalizeChecklist, normalizeQuiz, getEmptyLesson, getYoutubeVideoId, getYoutubeDurationSeconds, formatVideoDuration, generateLibraryCourseCode, normalizeYoutubeUrl, getYoutubeEmbedUrl, countWords, limitWords } from '../utils/courseUtils'
+import { getUserAvatar } from '../../../../utils/userAvatar.js'
 
 function getSidebarItems(isAdmin, badges = {}) {
   return [
@@ -83,7 +84,7 @@ function FollowingSidebarList({ accounts, onOpen, onViewAll, mobile = false }) {
           <div className="space-y-1">
             {visibleAccounts.map((account) => {
               const name = account.fullName || account.name || account.displayName || account.email || 'Tài khoản ZUNY'
-              const avatar = account.photoURL || account.avatar || account.avatarUrl || account.profileImage || ''
+              const avatar = getUserAvatar(account)
               const normalizedRole = String(account.role || account.Role || account.accountType || account.userRole || account.type || '').trim().replace(/[\s_-]/g, '').toUpperCase()
               const isAdminAccount = ['ADMIN', 'ADMINDEV'].includes(normalizedRole)
               const isVerifiedAccount = Boolean(account.elearningVerified)
@@ -159,7 +160,9 @@ export function VideoCourseCard({ course, canManage, teacherProfilesById, openMe
     text: 'hover:text-blue-600 dark:hover:text-blue-400', progress: 'bg-blue-500', watermark: 'LEARNING',
   }
   const teacherProfile = teacherProfilesById?.[course?.teacherId] || teacherProfilesById?.[course?.createdByUid] || teacherProfilesById?.[course?.createdBy] || teacherProfilesById?.[course?.ownerId] || teacherProfilesById?.[course?.userId] || teacherProfilesById?.[course?.uid] || {}
-  const teacherAvatar = teacherProfile?.photoURL || teacherProfile?.avatar || teacherProfile?.avatarUrl || teacherProfile?.profileImage || teacherProfile?.profilePicture || teacherProfile?.imageUrl || course?.teacherAvatar || course?.teacherPhotoURL || ''
+  const teacherAvatar = teacherProfile
+    ? getUserAvatar(teacherProfile)
+    : (course?.teacherAvatar || course?.teacherPhotoURL || '')
   const isOfficial = ['ADMINDEV','ADMIN'].includes(String(course.createdByRole || '').replace(/[\s_-]/g, '').toUpperCase())
   const hasThumbnail = Boolean(String(course.thumbnail || '').trim())
 
@@ -701,7 +704,102 @@ function CompletionPanel({ completion, criteria, isDocument, isSimulation, canSu
 }
 
 function ThumbnailPicker({ value, fileName, uploading, inputRef, onUrlChange, onUpload }) {
-  return <div><span className="mb-1.5 block text-sm font-bold">Ảnh bìa / Thumbnail</span><input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={onUpload}/><div className="flex gap-2"><input value={value || ''} onChange={(e)=>onUrlChange(e.target.value)} placeholder="Dán URL hoặc tải ảnh" className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-white/15"/><button type="button" disabled={uploading} onClick={()=>inputRef.current?.click()} className="rounded-xl bg-slate-900 px-4 text-xs font-black text-white disabled:opacity-50 dark:bg-white dark:text-slate-950">{uploading?'Đang tải...':'Tải ảnh'}</button></div>{value&&<div className="mt-3 aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-white/10"><img src={value} alt={fileName||'Thumbnail'} className="h-full w-full object-cover"/></div>}</div>
+  const openPicker = () => {
+    if (!uploading) inputRef.current?.click()
+  }
+
+  const removeImage = () => {
+    if (uploading) return
+    if (inputRef.current) inputRef.current.value = ''
+    onUrlChange('')
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <span className="block text-sm font-black text-slate-900 dark:text-white">
+          Ảnh đại diện
+        </span>
+        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          Tải ảnh từ máy tính để hiển thị cho bài học.
+        </p>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={onUpload}
+      />
+
+      {!value ? (
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={openPicker}
+          className="group flex aspect-video w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/60 px-6 text-center transition hover:border-blue-500 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400/30 dark:bg-blue-500/[0.06] dark:hover:border-blue-400 dark:hover:bg-blue-500/10"
+        >
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-100 text-3xl transition group-hover:scale-105 dark:bg-blue-500/15">
+            🖼️
+          </span>
+
+          <span className="mt-4 text-sm font-black text-slate-800 dark:text-slate-100">
+            {uploading ? 'Đang tải ảnh...' : 'Nhấn để tải ảnh lên'}
+          </span>
+
+          <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            JPG, PNG, WebP hoặc GIF
+          </span>
+
+          <span className="mt-4 rounded-full bg-blue-600 px-5 py-2.5 text-xs font-black text-white shadow-sm shadow-blue-600/20">
+            {uploading ? 'Đang tải...' : 'Chọn ảnh'}
+          </span>
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={openPicker}
+            className="group relative block aspect-video w-full cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.04]"
+          >
+            <img
+              src={value}
+              alt={fileName || 'Ảnh đại diện'}
+              className="h-full w-full object-cover"
+            />
+
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/45">
+              <span className="translate-y-2 rounded-full bg-white px-5 py-2.5 text-xs font-black text-slate-900 opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100">
+                {uploading ? 'Đang tải...' : 'Chọn ảnh khác'}
+              </span>
+            </span>
+          </button>
+
+          <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200">
+                {fileName || 'Ảnh đại diện đã tải lên'}
+              </p>
+              <p className="mt-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                ✓ Ảnh đã sẵn sàng
+              </p>
+            </div>
+
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={removeImage}
+              className="shrink-0 cursor-pointer rounded-lg px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-rose-500/10"
+            >
+              Xóa ảnh
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function InfoHint({items}) { return <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-400/15 dark:bg-blue-500/[0.06]"><p className="font-black">Gợi ý</p><ul className="mt-3 space-y-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{items.map(item=><li key={item}>• {item}</li>)}</ul></div> }

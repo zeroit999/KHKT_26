@@ -1,10 +1,11 @@
 import apiClient from '../utils/apiClient'
+import { authService } from './auth'
 
 const unwrap = (response) => response?.data || {}
 
 export const eLearningApi = {
   me: async () =>
-    unwrap(await apiClient.get('/auth/me')),
+    authService.getMe(),
 
   users: async () =>
     unwrap(await apiClient.get('/forum/users', {

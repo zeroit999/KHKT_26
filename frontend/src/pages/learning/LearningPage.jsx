@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import classroomApi from '../../services/classroomApi.js'
 import eLearningApi from '../../services/eLearningApi.js'
 import { useAuth } from '../../contexts/AuthContext.jsx'
+import { getUserAvatar } from '../../utils/userAvatar.js'
 import useExamsPage from '../../hooks/exam/useExamsPage.js'
 import {
   formatRelativeDate as formatELearningRelativeDate,
@@ -60,7 +61,7 @@ function getApiRows(payload) {
   if (Array.isArray(payload)) return payload
   const candidates = [
     payload?.items, payload?.rows, payload?.data, payload?.results,
-    payload?.classrooms, payload?.members, payload?.assignments,
+    payload?.classes, payload?.classrooms, payload?.members, payload?.assignments,
     payload?.notifications, payload?.messages, payload?.attendance,
     payload?.schedule, payload?.subjects, payload?.tests, payload?.scores,
     payload?.courses, payload?.users, payload?.submissions,
@@ -246,25 +247,32 @@ function getDisplayName(userDetails, currentUser, studentRecord) {
 }
 
 function getAvatar(userDetails, currentUser, studentRecord) {
-  return (
-    studentRecord?.photoURL ||
-    studentRecord?.photoUrl ||
-    studentRecord?.avatarUrl ||
-    userDetails?.photoURL ||
-    userDetails?.photoUrl ||
-    userDetails?.avatarUrl ||
-    currentUser?.photoURL ||
-    ''
-  )
+  return getUserAvatar({
+    ...(currentUser || {}),
+    ...(userDetails || {}),
+    ...(studentRecord || {}),
+  })
+}
+
+function getDefaultClassCover(index = 0) {
+  const covers = [
+    'linear-gradient(135deg, rgba(114,166,128,.75), rgba(255,255,255,.2)), url("https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=600&q=80")',
+    'linear-gradient(135deg, rgba(37,99,235,.35), rgba(255,255,255,.08)), url("https://images.unsplash.com/photo-1517976487492-5750f3195933?auto=format&fit=crop&w=600&q=80")',
+    'linear-gradient(135deg, rgba(245,158,11,.28), rgba(255,255,255,.08)), url("https://images.unsplash.com/photo-1539650116574-8efeb43e2750?auto=format&fit=crop&w=600&q=80")',
+    'linear-gradient(135deg, rgba(15,23,42,.35), rgba(255,255,255,.08)), url("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=80")',
+    'linear-gradient(135deg, rgba(234,179,8,.25), rgba(255,255,255,.12)), url("https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80")',
+  ]
+
+  return covers[index % covers.length]
 }
 
 function getClassCover(classItem) {
   return classItem?.coverPhotoUrl || classItem?.coverUrl || classItem?.coverPhoto || ''
 }
 
-function getClassCoverStyle(classItem) {
+function getClassCoverStyle(classItem, index = 0) {
   const cover = getClassCover(classItem)
-  if (!cover) return ''
+  if (!cover) return getDefaultClassCover(index)
   const value = String(cover).trim()
   if (value.includes('gradient(') || value.startsWith('url(')) return value
   return `url(${JSON.stringify(value)})`
@@ -513,9 +521,18 @@ function LearningPage() {
       : 'home'
   }
 
+  const getClassIdFromUrl = () => {
+    if (typeof window === 'undefined') return ''
+    return new URLSearchParams(window.location.search).get('classId') || ''
+  }
+
+  const initialClassId = getClassIdFromUrl()
+
   const [currentUser, setCurrentUser] = useState(() => user || null)
   const [activePage, setActivePage] = useState(getPageFromUrl)
-  const [classView, setClassView] = useState('list')
+  const [classView, setClassView] = useState(
+    initialClassId ? 'workspace' : 'list'
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -564,7 +581,9 @@ function LearningPage() {
   }, [validPageIds])
   const [classes, setClasses] = useState([])
   const [classAssignments, setClassAssignments] = useState({})
-  const [selectedClassId, setSelectedClassId] = useState('')
+  const [selectedClassId, setSelectedClassId] = useState(
+    () => initialClassId
+  )
   const [students, setStudents] = useState([])
   const [userProfilesByEmail, setUserProfilesByEmail] = useState({})
   const [studentRecord, setStudentRecord] = useState(null)
@@ -652,34 +671,55 @@ function LearningPage() {
   }, [messageDraft])
 
   useEffect(() => {
-    if (!currentUser?.uid) {
+    const uid = String(currentUser?.uid || '').trim()
+
+    if (!uid) {
       setClasses([])
       setLoadingClasses(false)
-      return undefined
+      return
     }
 
-    let cancelled = false
     const loadClasses = async () => {
       try {
         setLoadingClasses(true)
         setError('')
-        const response = await classroomApi.listClassrooms()
-        if (cancelled) return
+
+        const response = await classroomApi.listClassrooms({ mine: 1 })
+
         const rows = getApiRows(response)
-          .filter((item) => String(item.teacherId || item.teacher_id || item.ownerId || item.owner_id || '') !== String(currentUser.uid))
-          .sort((a, b) => getTimeValue(b.createdAt || b.created_at) - getTimeValue(a.createdAt || a.created_at))
+          .filter((item) => String(
+            item.teacherId ||
+            item.teacher_id ||
+            item.ownerId ||
+            item.owner_id ||
+            ''
+          ) !== uid)
+          .sort(
+            (a, b) =>
+              getTimeValue(b.createdAt || b.created_at) -
+              getTimeValue(a.createdAt || a.created_at)
+          )
+
         setClasses(rows)
-        setSelectedClassId((current) => rows.some((item) => String(item.id) === String(current)) ? current : (rows[0]?.id || ''))
+
+        setSelectedClassId((current) =>
+          rows.some((item) => String(item.id) === String(current))
+            ? current
+            : (rows[0]?.id || '')
+        )
       } catch (apiError) {
-        if (cancelled) return
         console.error('Không thể tải lớp học của học sinh:', apiError)
-        setError(apiError?.response?.data?.message || apiError?.message || 'Không thể tải lớp học.')
+        setError(
+          apiError?.response?.data?.message ||
+          apiError?.message ||
+          'Không thể tải lớp học.'
+        )
       } finally {
-        if (!cancelled) setLoadingClasses(false)
+        setLoadingClasses(false)
       }
     }
+
     loadClasses()
-    return () => { cancelled = true }
   }, [currentUser?.uid])
 
   useEffect(() => {
@@ -1460,6 +1500,23 @@ function LearningPage() {
     setSelectedConversationClassId(classId)
     setActivePage(page)
     setMobileMenuOpen(false)
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('classId', String(classId))
+
+      if (page === 'home') {
+        url.searchParams.delete('page')
+      } else {
+        url.searchParams.set('page', page)
+      }
+
+      window.history.replaceState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      )
+    }
   }
 
   const handleJoinClass = async (event) => {
@@ -1474,10 +1531,13 @@ function LearningPage() {
         email: currentUser.email || '',
         name: currentUser.displayName || userDetails?.displayName || '',
         role: userDetails?.role || 'STUDENT',
-        photoURL: currentUser.photoURL || userDetails?.photoURL || userDetails?.avatarUrl || '',
+        photoURL: getUserAvatar({
+        ...(currentUser || {}),
+        ...(userDetails || {}),
+      }),
         gender: userDetails?.gender || userDetails?.sex || '',
       })
-      const response = await classroomApi.listClassrooms()
+      const response = await classroomApi.listClassrooms({ mine: 1 })
       const rows = getApiRows(response)
         .filter((item) => String(item.teacherId || item.teacher_id || '') !== String(currentUser.uid))
         .sort((a, b) => getTimeValue(b.createdAt || b.created_at) - getTimeValue(a.createdAt || a.created_at))
@@ -2022,13 +2082,13 @@ function LearningPage() {
   const renderClasses = () => (
     <div>
       <div className="student-page-heading"><div><h1>Lớp học của tôi</h1><p>{classes.length ? `${classes.length} lớp đang tham gia` : 'Các lớp bạn tham gia sẽ xuất hiện tại đây.'}</p></div><button className="student-primary-btn" type="button" onClick={() => { setJoinError(''); setJoinOpen(true) }}>+ Tham gia lớp</button></div>
-      {loadingClasses ? <div className="student-class-grid">{Array.from({ length: 4 }, (_, index) => <div className="student-class-card skeleton" key={index}><div /><span /><b /></div>)}</div> : classes.length ? <div className="student-class-grid">{classes.map((item) => {
+      {loadingClasses ? <div className="student-class-grid">{Array.from({ length: 4 }, (_, index) => <div className="student-class-card skeleton" key={index}><div /><span /><b /></div>)}</div> : classes.length ? <div className="student-class-grid">{classes.map((item, index) => {
         const assignments = (classAssignments[item.id] || []).filter((assignment) => !isAssignmentDraft(assignment))
         const pending = assignments.filter((assignment) => {
           const submission = getSubmission(assignment)
           return !submission?.submittedAt && !isAssignmentClosed(assignment)
         }).length
-        const cover = getClassCover(item)
+        const cover = getClassCover(item) || getDefaultClassCover(index)
         return <button type="button" className="student-class-card" key={item.id} onClick={() => openClass(item.id, 'home')} style={{ '--student-accent': getClassTheme(item) }}>
           <div className="student-class-cover" style={cover ? { backgroundImage: `linear-gradient(180deg,rgba(15,23,42,.08),rgba(15,23,42,.45)),url("${cover}")` } : { background: `linear-gradient(135deg,${getClassTheme(item)},#0f172a)` }}><span>{item.subject || item.grade || 'Lớp học'}</span></div>
           <div className="student-class-copy"><strong>{item.name || 'Lớp học'}</strong><small>{item.teacherName || item.teacherEmail || 'Giáo viên'}{item.grade ? ` · Khối ${item.grade}` : ''}</small><div><span>{item.schoolYear || 'Năm học chưa cập nhật'}</span>{pending ? <b>{pending} bài cần làm</b> : <em>Đã cập nhật</em>}</div></div>
@@ -2273,7 +2333,7 @@ function LearningPage() {
             const ownerEmail = normalizeText(course.teacherEmail || course.createdByEmail || course.ownerEmail || '')
             const teacherProfile = eLearningTeacherProfiles[`id:${ownerId}`] || eLearningTeacherProfiles[`email:${ownerEmail}`] || {}
             const teacherName = teacherProfile.fullName || teacherProfile.displayName || teacherProfile.name || course.teacherName || course.teacherEmail || 'Giáo viên ZUNY'
-            const teacherAvatar = teacherProfile.photoURL || teacherProfile.photoUrl || teacherProfile.avatarUrl || teacherProfile.avatar || teacherProfile.profileImage || teacherProfile.profilePicture || teacherProfile.imageUrl || ''
+            const teacherAvatar = getUserAvatar(teacherProfile)
             return <article className={`student-elearning-card format-${format}`} key={course.id}>
               <button type="button" className="student-elearning-card-open" onClick={() => openStudentELearningResource(course)} aria-label={`Mở ${title}`} />
               <div className="student-elearning-thumb" style={thumbnail ? { backgroundImage: `url(${JSON.stringify(thumbnail)})` } : undefined}>

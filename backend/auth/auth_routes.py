@@ -46,6 +46,15 @@ def validate_password(password):
     if len(password) < 8:
         return False, "Mật khẩu phải có ít nhất 8 ký tự."
 
+    if not any(char.isdigit() for char in password):
+        return False, "Mật khẩu phải có ít nhất 1 chữ số (0-9)."
+
+    if not any(char.isupper() for char in password):
+        return False, "Mật khẩu phải có ít nhất 1 chữ cái in hoa (A-Z)."
+
+    if not any(not char.isalnum() for char in password):
+        return False, "Mật khẩu phải có ít nhất 1 ký tự đặc biệt."
+
     return True, None
 
 
@@ -283,6 +292,7 @@ def google_login():
                 credential,
                 google_requests.Request(),
                 Config.GOOGLE_CLIENT_ID,
+                clock_skew_in_seconds=30,
             )
         )
 
@@ -300,6 +310,10 @@ def google_login():
 
         full_name = str(
             google_user.get("name") or ""
+        ).strip()
+
+        google_photo_url = str(
+            google_user.get("picture") or ""
         ).strip()
 
         if not google_sub:
@@ -345,6 +359,17 @@ def google_login():
             if not user.full_name and full_name:
                 user.full_name = full_name
 
+            profile_data = (
+                dict(user.profile_data)
+                if isinstance(user.profile_data, dict)
+                else {}
+            )
+
+            if google_photo_url:
+                profile_data["googlePhotoURL"] = google_photo_url
+
+            user.profile_data = profile_data
+
         else:
             user = User(
                 email=email,
@@ -355,6 +380,7 @@ def google_login():
                 auth_provider="google",
                 profile_data={
                     "isSetupComplete": False,
+                    "googlePhotoURL": google_photo_url,
                 },
             )
 

@@ -60,6 +60,7 @@ import { forumApi } from '../../services/forumApi'
 import { useAuth } from '../../contexts/AuthContext.jsx'
 import useSyncedDarkMode from '../../hooks/common/useSyncedDarkMode'
 import DiscordGroupsLayout from './groups/DiscordGroupsLayout'
+import { getUserAvatar } from '../../utils/userAvatar'
 
 const SECTIONS = {
   HALL: 'hall',
@@ -775,7 +776,10 @@ function Forum({ onChannelViewChange = () => {} }) {
   const displayName = profile?.fullName || profile?.displayName || profile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Người dùng ZUNY'
   const initials = getInitials(displayName, currentUser?.email)
   const liveCurrentUserProfile = userProfiles[currentUser?.uid] || profile || {}
-  const avatarUrl = liveCurrentUserProfile.photoURL || liveCurrentUserProfile.avatarUrl || liveCurrentUserProfile.avatarURL || liveCurrentUserProfile.avatar || liveCurrentUserProfile.profileImage || currentUser?.photoURL || ''
+  const avatarUrl = getUserAvatar({
+    ...(currentUser || {}),
+    ...(liveCurrentUserProfile || {}),
+  })
   const userClass = profile?.className || profile?.class || profile?.lop || profile?.studentClass || ''
   const currentForumRestrictions = userProfiles[currentUser?.uid]?.forumRestrictions || profile?.forumRestrictions || {}
 
@@ -849,7 +853,9 @@ function Forum({ onChannelViewChange = () => {} }) {
       name: savedProfile.fullName || savedProfile.displayName || savedProfile.name || targetUser.name || 'Người dùng ZUNY',
       role: getRoleKey(savedProfile.role || savedProfile.userRole || targetUser.role),
       className: savedProfile.className || savedProfile.class || savedProfile.lop || '',
-      avatarUrl: savedProfile.photoURL || savedProfile.avatarUrl || savedProfile.avatarURL || savedProfile.avatar || savedProfile.profileImage || targetUser.avatarUrl || '',
+      avatarUrl: Object.keys(savedProfile || {}).length
+      ? getUserAvatar(savedProfile)
+      : (targetUser.avatarUrl || ''),
       initials: getInitials(savedProfile.fullName || savedProfile.displayName || savedProfile.name || targetUser.name),
     })
   }
@@ -950,16 +956,6 @@ function Forum({ onChannelViewChange = () => {} }) {
     return () => { cancelled = true; window.clearInterval(timer) }
   }, [currentUser?.uid, groups])
 
-  useEffect(() => {
-    if (!currentUser?.uid) return undefined
-    let cancelled = false
-    const sync = async () => {
-      try { await forumApi.syncEvents() } catch (error) { if (!cancelled) console.warn('Không thể đồng bộ thông báo sự kiện:', error) }
-    }
-    sync()
-    const timer = window.setInterval(sync, 5000)
-    return () => { cancelled = true; window.clearInterval(timer) }
-  }, [currentUser?.uid])
 
   useEffect(() => {
     if (roleKey !== 'admin_dev') {
@@ -2511,7 +2507,7 @@ function PostCard({
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={(event) => { event.stopPropagation(); onOpenUserProfile({ uid: post.authorId, name: post.authorName, role: post.authorRole, avatarUrl: post.authorPhotoURL, isAnonymous: post.isAnonymous }) }} disabled={post.isAnonymous || !post.authorId} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-default" aria-label="Mở hồ sơ tác giả">{post.isAnonymous ? <span className="grid h-11 w-11 place-items-center rounded-2xl border border-blue-400/25 bg-slate-900 text-cyan-300 shadow-lg shadow-blue-500/15 sm:h-12 sm:w-12"><UserRoundX className="h-6 w-6" /></span> : <ProfileAvatar src={authorProfile.photoURL || authorProfile.avatarUrl || authorProfile.avatarURL || authorProfile.avatar || authorProfile.profileImage || post.authorPhotoURL} initials={post.authorInitials || getInitials(post.authorName)} className="h-11 w-11 sm:h-12 sm:w-12" />}</button>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onOpenUserProfile({ uid: post.authorId, name: post.authorName, role: post.authorRole, avatarUrl: post.authorPhotoURL, isAnonymous: post.isAnonymous }) }} disabled={post.isAnonymous || !post.authorId} className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-default" aria-label="Mở hồ sơ tác giả">{post.isAnonymous ? <span className="grid h-11 w-11 place-items-center rounded-2xl border border-blue-400/25 bg-slate-900 text-cyan-300 shadow-lg shadow-blue-500/15 sm:h-12 sm:w-12"><UserRoundX className="h-6 w-6" /></span> : <ProfileAvatar src={Object.keys(authorProfile || {}).length ? getUserAvatar(authorProfile) : (post.authorPhotoURL || '')} initials={post.authorInitials || getInitials(post.authorName)} className="h-11 w-11 sm:h-12 sm:w-12" />}</button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-black text-slate-950 dark:text-white">{post.authorName || 'Người dùng ZUNY'}</h3>
@@ -3061,7 +3057,7 @@ function PersonalAdminPanel({ users = [], currentUserId = '', search = '', onSea
             const name = user.fullName || user.displayName || user.name || user.email?.split('@')[0] || 'Người dùng ZUNY'
             const role = getRoleKey(user.role || user.userRole || user.type)
             const restrictions = user.forumRestrictions || {}
-            const avatar = user.photoURL || user.avatarUrl || user.avatarURL || user.avatar || user.profileImage || ''
+            const avatar = getUserAvatar(user)
             const protectedAdmin = role === 'admin_dev'
             return (
               <div key={user.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-200 hover:bg-white dark:border-white/10 dark:bg-slate-950/50 dark:hover:border-blue-400/30 dark:hover:bg-slate-900/90">
