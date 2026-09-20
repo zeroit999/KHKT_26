@@ -121,7 +121,7 @@ def seed_users():
         profile_data={
             "legacyUid": TEACHER_LEGACY_ID,
             "displayName": "Giáo viên Demo",
-            "subject": "Toán",
+            "subject": "Tin học",
             "classes": ["12A1"],
             "points": 0,
             "learningStreak": 0,

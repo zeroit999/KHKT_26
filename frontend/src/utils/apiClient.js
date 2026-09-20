@@ -3,10 +3,9 @@ import axios from 'axios'
 import {
   authService,
 } from '../services/auth'
+import getApiBaseUrl from '../config/apiBase'
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
+const API_BASE_URL = getApiBaseUrl()
 
 const apiClient =
   axios.create({
@@ -49,13 +48,14 @@ apiClient.interceptors.response.use(
     const originalRequest =
       error.config
 
+    const refreshToken = authService.getRefreshToken()
+
     if (
       error.response?.status ===
         401 &&
       originalRequest &&
       !originalRequest._retry &&
-      authService
-        .getRefreshToken()
+      refreshToken
     ) {
       originalRequest._retry =
         true
@@ -91,13 +91,11 @@ apiClient.interceptors.response.use(
       }
     }
 
-    const message =
-      error.response?.data
-        ?.message ||
-      error.response?.data
-        ?.error ||
-      error.message ||
-      'Có lỗi xảy ra'
+    const message = error.response?.data?.message ||
+      error.response?.data?.error ||
+      (error.request && !error.response
+        ? 'Không thể kết nối máy chủ. Hãy kiểm tra backend và kết nối mạng.'
+        : error.message || 'Có lỗi xảy ra')
 
     error.message = message
 

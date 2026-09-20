@@ -1,0 +1,25 @@
+FROM docker.io/library/python:3.14-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+RUN apt-get update \
+    && apt-get install -y \
+        --no-install-recommends \
+        g++ \
+        openjdk-21-jdk-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY runner.py /usr/local/bin/zuny-runner
+
+RUN chmod 0555 /usr/local/bin/zuny-runner \
+    && useradd \
+        --create-home \
+        --uid 10001 \
+        --shell /usr/sbin/nologin \
+        judge
+
+USER judge
+
+WORKDIR /workspace

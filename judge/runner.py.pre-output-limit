@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+
+import json
+import resource
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+MAX_INPUT_BYTES = 16 * 1024 * 1024
+
+CGROUP_MEMORY_EVENTS = Path(
+    "/sys/fs/cgroup/memory.events"
+)
+
+CGROUP_MEMORY_PEAK = Path(
+    "/sys/fs/cgroup/memory.peak"
+)
+
+
+def read_memory_events():
+    events = {}
+
+    try:
+        for line in CGROUP_MEMORY_EVENTS.read_text().splitlines():
+            key, value = line.split(maxsplit=1)
+            events[key] = int(value)
+    except (OSError, ValueError):
+        pass
+
+    return events
+
+
+def read_memory_peak_kb():
+    try:
+        value = CGROUP_MEMORY_PEAK.read_text().strip()
+
+        if value == "max":
+            return None
+
+        return int(value) // 1024
+
+    except (OSError, ValueError):
+        return None
+
+
+def counter_increased(before, after, key):
+    return (
+        after.get(key, 0)
+        > before.get(key, 0)
+    )
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(
+            json.dumps({
+                "error": "missing command"
+            }),
+            file=sys.stderr,
+        )
+        return 2
+
+    command = sys.argv[1:]
+
+    input_data = sys.stdin.buffer.read(
+        MAX_INPUT_BYTES + 1
+    )
+
+    if len(input_data) > MAX_INPUT_BYTES:
+        print(
+            "judge input exceeds limit",
+            file=sys.stderr,
+        )
+        return 125
+
+    events_before = read_memory_events()
+
+    started = time.monotonic_ns()
+
+    return_code = 125
+
+    try:
+        completed = subprocess.run(
+            command,
+            input=input_data,
+            stdout=sys.stdout.buffer,
+            stderr=sys.stderr.buffer,
+            check=False,
+        )
+
+        return_code = completed.returncode
+
+    except Exception:
+        # Không đưa chi tiết lỗi nội bộ vào protocol public.
+        print(
+            "judge runner internal error",
+            file=sys.stderr,
+        )
+
+    finally:
+        ended = time.monotonic_ns()
+
+        events_after = read_memory_events()
+
+        usage = resource.getrusage(
+            resource.RUSAGE_CHILDREN
+        )
+
+        rss_kb = int(usage.ru_maxrss)
+
+        cgroup_peak_kb = read_memory_peak_kb()
+
+        if cgroup_peak_kb is not None:
+            memory_used_kb = max(
+                rss_kb,
+                cgroup_peak_kb,
+            )
+        else:
+            memory_used_kb = rss_kb
+
+        memory_exceeded = (
+            counter_increased(
+                events_before,
+                events_after,
+                "oom",
+            )
+            or counter_increased(
+                events_before,
+                events_after,
+                "oom_kill",
+            )
+            or counter_increased(
+                events_before,
+                events_after,
+                "oom_group_kill",
+            )
+        )
+
+        metadata = {
+            "executionTimeMs": round(
+                (ended - started) / 1_000_000,
+                3,
+            ),
+            "memoryUsedKb": memory_used_kb,
+            "memoryExceeded": memory_exceeded,
+        }
+
+        print(
+            "__ZUNY_META__"
+            + json.dumps(
+                metadata,
+                separators=(",", ":"),
+            ),
+            file=sys.stderr,
+        )
+
+    return return_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

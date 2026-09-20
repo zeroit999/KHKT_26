@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 
-const API_BASE_URL = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
-
 async function apiRequest(path, {
   method = 'GET',
   body,
@@ -65,7 +63,9 @@ async function patchCourseProgress(courseId, payload) {
 }
 import { getCurrentCourseTeacherName, getInitials, formatFullDateTime, stripHtml, getDifficultyLabel, formatEstimatedMinutes, getYoutubeVideoId, isPdfFile, getRatingAverage, normalizeChecklist, defaultLearningChecklist, getLocalDateKey, canTrackLearningProgress, loadYoutubeIframeApi, formatSeconds } from '../utils/detailUtils'
 import { getUserAvatar } from '../../../../utils/userAvatar.js'
+import getApiBaseUrl from '../../../../config/apiBase.js'
 
+const API_BASE_URL = getApiBaseUrl()
 
 function isSimulationCourse(course = {}) {
   return Boolean(

@@ -198,6 +198,28 @@ export function AuthProvider({
     isAdmin ||
     isAdminDev
 
+  const normalizedTeacherSubject =
+    String(
+      userDetails?.subject
+      || userDetails?.teacherSubject
+      || userDetails?.specialty
+      || ''
+    )
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+
+  const isInformaticsTeacher =
+    normalizedRole === 'teacher'
+    && normalizedTeacherSubject ===
+      'tin hoc'
+
+  const canManageOJ =
+    isAdminDev ||
+    isInformaticsTeacher
+
   return (
     <AuthContext.Provider
       value={{
@@ -220,6 +242,8 @@ export function AuthProvider({
         isAdminDev,
         canManageAll,
         canManageExams,
+        isInformaticsTeacher,
+        canManageOJ,
       }}
     >
       {children}

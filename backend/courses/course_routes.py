@@ -2375,6 +2375,13 @@ def update_learning_user(
         "auth_provider",
         "googleSub",
         "google_sub",
+
+        # Authorization-sensitive fields.
+        # Chuyên môn giáo viên quyết định quyền quản lý OJ,
+        # nên không được sửa qua learning profile API.
+        "subject",
+        "specialty",
+        "teacherSubject",
     }
 
     direct_keys = set(

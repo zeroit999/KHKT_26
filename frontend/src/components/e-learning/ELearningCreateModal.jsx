@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import getApiBaseUrl from '../../config/apiBase'
 
-const API_BASE_URL = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const API_BASE_URL = getApiBaseUrl()
 
 const initialForm = {
   title: '',

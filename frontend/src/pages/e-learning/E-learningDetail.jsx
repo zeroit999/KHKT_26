@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import eLearningApi from '../../services/eLearningApi.js'
 import { useAuth } from '../../contexts/AuthContext.jsx'
@@ -1053,7 +1053,6 @@ function CourseDetail() {
 
   function handleSelectLesson(index) {
     setSelectedLessonIndex(index)
-    setActiveDetailTab('content')
 
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)

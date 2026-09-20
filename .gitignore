@@ -128,3 +128,29 @@ zuny-*-audit.txt
 
 # Manual local E2E helpers
 backend/tests/manual_*_e2e.py
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Dependencies and generated files
+node_modules/
+.venv/
+venv/
+venv311/
+__pycache__/
+*.pyc
+dist/
+*.log
+*.bak
+*.bak.*
+*.backup
+*.backup.*
+*-backup
+*-backup.*
+*.before-*
+*.tmp
+*.swp
+*.pid

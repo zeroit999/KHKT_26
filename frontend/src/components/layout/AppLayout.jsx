@@ -9,6 +9,7 @@ function AppLayout({
   mainClassName = 'pt-24',
   showFooter = true,
   showNavbar = true,
+  disableNavbarHover = false,
   lockPageScroll = false,
 }) {
   return (
@@ -19,6 +20,7 @@ function AppLayout({
         <Navbar
           darkMode={darkMode}
           onToggleDarkMode={onToggleDarkMode}
+          disableHover={disableNavbarHover}
         />
       )}
 

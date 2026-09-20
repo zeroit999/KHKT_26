@@ -6,6 +6,7 @@ import useResponsive from '../../hooks/common/useResponsive'
 export default function Navbar({
   darkMode,
   onToggleDarkMode,
+  disableHover = false,
 }) {
   const { isMobileOrTablet } = useResponsive()
 
@@ -14,6 +15,7 @@ export default function Navbar({
       <MobileNavbar
         darkMode={darkMode}
         onToggleDarkMode={onToggleDarkMode}
+        disableHover={disableHover}
       />
     )
   }
@@ -22,6 +24,7 @@ export default function Navbar({
     <DesktopNavbar
       darkMode={darkMode}
       onToggleDarkMode={onToggleDarkMode}
+      disableHover={disableHover}
     />
   )
 }

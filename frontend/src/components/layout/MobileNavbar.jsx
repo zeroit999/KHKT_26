@@ -1,6 +1,5 @@
 import {
   BookOpenCheck,
-  ChevronDown,
   ClipboardList,
   GraduationCap,
   Home,
@@ -109,6 +108,13 @@ export default function MobileNavbar({
         path: '/e-learning',
         icon: BookOpenCheck,
       },
+      {
+        label: 'Lập trình',
+        shortLabel: 'Lập trình',
+        path: '/oj',
+        icon: Trophy,
+      },
+
       {
         label: 'Cộng đồng',
         shortLabel: 'Cộng đồng',
@@ -327,16 +333,6 @@ export default function MobileNavbar({
                 {currentItem.shortLabel}
               </span>
 
-              <ChevronDown
-                size={17}
-                className={`shrink-0 transition-transform duration-200 ${
-                  menuOpen ? 'rotate-180' : ''
-                } ${
-                  darkMode
-                    ? 'text-white/50'
-                    : 'text-slate-500'
-                }`}
-              />
             </button>
 
             <button

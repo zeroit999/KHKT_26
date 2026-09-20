@@ -11,6 +11,9 @@ PYTHON_PATH="$BACKEND_ROOT/venv311/bin/python"
 BACKEND_OUT="$BACKEND_ROOT/backend-local.out.log"
 BACKEND_ERR="$BACKEND_ROOT/backend-local.err.log"
 
+JUDGE_OUT="$BACKEND_ROOT/judge-local.out.log"
+JUDGE_ERR="$BACKEND_ROOT/judge-local.err.log"
+
 FRONTEND_OUT="$FRONTEND_ROOT/frontend-local.out.log"
 FRONTEND_ERR="$FRONTEND_ROOT/frontend-local.err.log"
 
@@ -66,6 +69,23 @@ stop_old_process() {
     rm -f "$pid_file"
 }
 
+cleanup_failed_startup() {
+    echo
+    echo "Đang dọn tiến trình local do khởi động thất bại..." >&2
+
+    stop_old_process \
+        "$PROJECT_ROOT/.local-frontend.pid" \
+        "frontend"
+
+    stop_old_process \
+        "$PROJECT_ROOT/.local-judge.pid" \
+        "Judge Worker"
+
+    stop_old_process \
+        "$PROJECT_ROOT/.local-backend.pid" \
+        "backend"
+}
+
 if [[ ! -x "$PYTHON_PATH" ]]; then
     echo "Chưa có môi trường Python tại:" >&2
     echo "  $PYTHON_PATH" >&2
@@ -88,6 +108,18 @@ fi
 
 stop_old_process "$PROJECT_ROOT/.local-frontend.pid" "frontend"
 stop_old_process "$PROJECT_ROOT/.local-backend.pid" "backend"
+stop_old_process "$PROJECT_ROOT/.local-judge.pid" "Judge Worker"
+
+if ! command -v podman >/dev/null 2>&1; then
+    echo "Không tìm thấy Podman cho Judge Worker." >&2
+    exit 1
+fi
+
+if ! podman image exists localhost/zuny-judge:latest; then
+    echo "Không tìm thấy Judge image:" >&2
+    echo "  localhost/zuny-judge:latest" >&2
+    exit 1
+fi
 
 echo "Đang tạo/cập nhật dữ liệu PostgreSQL local..."
 
@@ -108,14 +140,43 @@ if ! wait_local_port 5000 45; then
     echo "Backend không khởi động được." >&2
     echo "Xem log:" >&2
     echo "  $BACKEND_ERR" >&2
+    cleanup_failed_startup
     exit 1
 fi
+
+echo "Đang khởi động Judge Worker..."
+
+cd "$BACKEND_ROOT"
+
+nohup "$PYTHON_PATH" -u -m oj.judge.worker \
+    >"$JUDGE_OUT" \
+    2>"$JUDGE_ERR" &
+
+JUDGE_PID=$!
+
+echo "$JUDGE_PID" >"$PROJECT_ROOT/.local-judge.pid"
+
+sleep 1
+
+if ! kill -0 "$JUDGE_PID" 2>/dev/null; then
+    echo "Judge Worker không khởi động được." >&2
+    echo "Xem log:" >&2
+    echo "  $JUDGE_ERR" >&2
+
+    rm -f "$PROJECT_ROOT/.local-judge.pid"
+
+    cleanup_failed_startup
+    exit 1
+fi
+
+echo "Judge Worker đã sẵn sàng."
+echo
 
 echo "Đang khởi động frontend..."
 
 cd "$FRONTEND_ROOT"
 
-nohup npm run dev -- --host 127.0.0.1 \
+nohup npm run dev -- --host 0.0.0.0 \
     >"$FRONTEND_OUT" \
     2>"$FRONTEND_ERR" &
 
@@ -127,6 +188,7 @@ if ! wait_local_port 5173 45; then
     echo "Frontend không khởi động được." >&2
     echo "Xem log:" >&2
     echo "  $FRONTEND_ERR" >&2
+    cleanup_failed_startup
     exit 1
 fi
 
@@ -140,6 +202,9 @@ echo
 echo "Frontend PID:         $FRONTEND_PID"
 echo "Frontend:             http://127.0.0.1:5173"
 echo
+echo "Judge PID:           $JUDGE_PID"
+echo "Judge image:         localhost/zuny-judge:latest"
+echo
 echo "Database:             PostgreSQL"
 echo "=============================================="
 echo
@@ -148,3 +213,6 @@ echo "  $BACKEND_ERR"
 echo
 echo "Log frontend:"
 echo "  $FRONTEND_ERR"
+echo
+echo "Log Judge:"
+echo "  $JUDGE_ERR"

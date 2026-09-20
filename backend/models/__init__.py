@@ -25,6 +25,14 @@ from .exam import (
 
 from .chat import ChatConversation
 
+from .oj import (
+    OJProblem,
+    OJTestCase,
+    OJSubmission,
+    OJSubmissionResult,
+)
+
+
 from .course import (
     Course,
     LearningProgress,
@@ -60,6 +68,8 @@ from .forum_group import (
     ForumGroupWarning,
 )
 
+from .email_verification import EmailVerification
+
 __all__ = [
     "User",
     "Classroom",
@@ -83,6 +93,11 @@ __all__ = [
     "ProctoringEvent",
 
     "ChatConversation",
+
+    "OJProblem",
+    "OJTestCase",
+    "OJSubmission",
+    "OJSubmissionResult",
 
     "Course",
     "LearningProgress",

@@ -26,6 +26,7 @@ import {
   updateUserSetting,
 } from '../../services/settingsService.js'
 import { getUserAvatar } from '../../utils/userAvatar'
+import getApiBaseUrl from '../../config/apiBase'
 
 export default function Setting({ darkMode, onToggleDarkMode }) {
   const { user, userDetails } = useAuth()
@@ -204,8 +205,7 @@ export default function Setting({ darkMode, onToggleDarkMode }) {
         return
       }
 
-      const apiBaseUrl =
-        import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
+      const apiBaseUrl = getApiBaseUrl()
 
       const response = await fetch(
         `${apiBaseUrl}/auth/change-password`,

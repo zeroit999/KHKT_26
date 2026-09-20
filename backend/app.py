@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 
 from flask import Flask, jsonify, request
@@ -155,11 +156,21 @@ def get_allowed_origins():
 
 
 def configure_cors(app):
+    allowed_origins = get_allowed_origins()
+    if Config.LOCAL_DEV_MODE or Config.ENVIRONMENT == "development":
+        allowed_origins.append(
+            re.compile(
+                r"^https?://(?:(?:192\.168|10)\.\d{1,3}\.\d{1,3}|"
+                r"172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})"
+                r"(?::\d+)?$"
+            )
+        )
+
     CORS(
         app,
         resources={
             r"/*": {
-                "origins": get_allowed_origins(),
+                "origins": allowed_origins,
             }
         },
         supports_credentials=True,
@@ -182,6 +193,7 @@ def register_blueprints(app):
     from auth.auth_routes import auth_bp
     from exams.exam_routes import exam_bp
     from classrooms.classroom_routes import classroom_bp
+    from oj import oj_bp
     from storage.storage_routes import storage_bp
     from forum import (
       forum_bp,
@@ -201,6 +213,10 @@ def register_blueprints(app):
 
     app.register_blueprint(
         classroom_bp
+    )
+
+    app.register_blueprint(
+        oj_bp
     )
 
     app.register_blueprint(

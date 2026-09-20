@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authService } from '../../../services/auth'
+import getApiBaseUrl from '../../../config/apiBase'
 import {
   generateGroupCode,
   generateInviteCode,
@@ -37,9 +38,7 @@ const buildSafeFileName = (fileName = 'cover-image') => {
   return `${safeName}${extension.toLowerCase()}`
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
+const API_BASE_URL = getApiBaseUrl()
 
 const uploadGroupCoverImage = async (file) => {
   if (!file) return ''

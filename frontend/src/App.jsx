@@ -18,6 +18,9 @@ import ChatbotWidget from './components/ChatbotAI/ChatbotWidget.jsx';
 
 const Home = lazy(() => import('./pages/Home.jsx'))
 const Exams = lazy(() => import('./pages/exam/Exams.jsx'))
+const OJHome = lazy(() => import('./pages/oj/OJHome.jsx'))
+const ProblemDetail = lazy(() => import('./pages/oj/ProblemDetail.jsx'))
+const OJManage = lazy(() => import('./pages/oj/OJManage.jsx'))
 const ExamRoom = lazy(() => import('./pages/exam/ExamRoom.jsx'))
 const ResultPage = lazy(() => import('./pages/exam/ResultPage.jsx'))
 const Forum = lazy(() => import('./pages/forum/Forum.jsx'))
@@ -281,6 +284,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         }
         showFooter={normalizedPath === '/'}
         showNavbar={!isAuthRoute && !isExamRoomRoute}
+        disableNavbarHover={isHomeRoute}
         lockPageScroll={isForumRoute && isForumChannelOpen}
       >
         <AnimatePresence mode="wait">
@@ -359,6 +363,33 @@ function AppContent({ darkMode, onToggleDarkMode }) {
                 element={
                   <ProtectedRoute>
                     <LearningPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/oj"
+                element={
+                  <ProtectedRoute>
+                    <OJHome />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/oj/manage"
+                element={
+                  <ProtectedRoute>
+                    <OJManage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/oj/problem/:id"
+                element={
+                  <ProtectedRoute>
+                    <ProblemDetail />
                   </ProtectedRoute>
                 }
               />

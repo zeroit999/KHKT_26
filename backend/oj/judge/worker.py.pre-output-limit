@@ -1,0 +1,553 @@
+import shutil
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from app import create_app
+from extensions import db
+from models import (
+    OJProblem,
+    OJSubmission,
+    OJSubmissionResult,
+    OJTestCase,
+)
+
+from oj.judge.comparator import outputs_equal
+from oj.judge.languages import get_language
+from oj.judge.sandbox import run_in_sandbox
+
+
+POLL_SECONDS = 1.0
+MAX_CAPTURE_CHARS = 16_384
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
+
+
+def limit_text(value):
+    value = str(value or "")
+
+    if len(value) <= MAX_CAPTURE_CHARS:
+        return value
+
+    return (
+        value[:MAX_CAPTURE_CHARS]
+        + "\n...[đã cắt bớt]"
+    )
+
+
+def claim_submission():
+    """
+    PostgreSQL queue:
+    nhiều worker có thể chạy đồng thời mà không
+    lấy trùng cùng một submission.
+    """
+    submission = (
+        db.session.execute(
+            db.select(OJSubmission)
+            .where(
+                OJSubmission.verdict
+                == "PENDING"
+            )
+            .order_by(
+                OJSubmission.created_at.asc(),
+                OJSubmission.id.asc(),
+            )
+            .with_for_update(
+                skip_locked=True
+            )
+            .limit(1)
+        )
+        .scalars()
+        .first()
+    )
+
+    if not submission:
+        db.session.rollback()
+        return None
+
+    submission.verdict = "JUDGING"
+    submission.judge_message = (
+        "Đang chấm bài."
+    )
+
+    submission_id = submission.id
+
+    db.session.commit()
+
+    return submission_id
+
+
+def get_testcases(problem_id):
+    return (
+        db.session.execute(
+            db.select(OJTestCase)
+            .where(
+                OJTestCase.problem_id
+                == problem_id
+            )
+            .order_by(
+                OJTestCase.position.asc()
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def calculate_test_points(
+    problem,
+    testcases,
+):
+    """
+    Nếu testcase có points riêng thì dùng points đó.
+
+    Nếu không có, chia đều điểm của bài cho toàn bộ
+    testcase; testcase cuối nhận phần dư.
+    """
+    explicit = [
+        testcase.points
+        for testcase in testcases
+    ]
+
+    if all(
+        value is not None
+        for value in explicit
+    ):
+        return {
+            testcase.id: max(
+                0,
+                int(testcase.points),
+            )
+            for testcase in testcases
+        }
+
+    count = len(testcases)
+
+    if count == 0:
+        return {}
+
+    base = problem.points // count
+    remainder = problem.points % count
+
+    result = {}
+
+    for index, testcase in enumerate(
+        testcases
+    ):
+        result[testcase.id] = (
+            base
+            + (
+                1
+                if index < remainder
+                else 0
+            )
+        )
+
+    return result
+
+
+def save_result(
+    submission,
+    testcase,
+    verdict,
+    *,
+    execution_time_ms=None,
+    memory_used_kb=None,
+    points=0,
+    message=None,
+):
+    row = OJSubmissionResult(
+        submission_id=submission.id,
+        testcase_id=testcase.id,
+        position=testcase.position,
+        verdict=verdict,
+        execution_time_ms=execution_time_ms,
+        memory_used_kb=memory_used_kb,
+        points=points,
+        message=message,
+    )
+
+    db.session.add(row)
+
+
+def finish_submission(
+    submission,
+    verdict,
+    *,
+    score=0,
+    execution_time_ms=None,
+    memory_used_kb=None,
+    compiler_output=None,
+    judge_message=None,
+):
+    submission.verdict = verdict
+    submission.score = max(
+        0,
+        int(score),
+    )
+    submission.execution_time_ms = (
+        execution_time_ms
+    )
+    submission.memory_used_kb = (
+        memory_used_kb
+    )
+    submission.compiler_output = (
+        limit_text(compiler_output)
+        if compiler_output
+        else None
+    )
+    submission.judge_message = (
+        judge_message
+    )
+    submission.judged_at = utc_now()
+
+    db.session.commit()
+
+
+def judge_submission(submission_id):
+    submission = db.session.get(
+        OJSubmission,
+        submission_id,
+    )
+
+    if not submission:
+        return
+
+    problem = db.session.get(
+        OJProblem,
+        submission.problem_id,
+    )
+
+    if not problem:
+        finish_submission(
+            submission,
+            "IE",
+            judge_message=(
+                "Không tìm thấy bài lập trình."
+            ),
+        )
+        return
+
+    language = get_language(
+        submission.language
+    )
+
+    if not language:
+        finish_submission(
+            submission,
+            "IE",
+            judge_message=(
+                "Ngôn ngữ chấm không được hỗ trợ."
+            ),
+        )
+        return
+
+    testcases = get_testcases(
+        problem.id
+    )
+
+    if not testcases:
+        finish_submission(
+            submission,
+            "IE",
+            judge_message=(
+                "Bài chưa có testcase để chấm."
+            ),
+        )
+        return
+
+    points_map = calculate_test_points(
+        problem,
+        testcases,
+    )
+
+    workspace = Path(
+        tempfile.mkdtemp(
+            prefix=(
+                f"zuny-oj-{submission.id}-"
+            )
+        )
+    )
+
+    try:
+        source_path = (
+            workspace
+            / language["source_file"]
+        )
+
+        source_path.write_text(
+            submission.source_code,
+            encoding="utf-8",
+        )
+
+        compile_command = language[
+            "compile"
+        ]
+
+        if compile_command:
+            compile_result = run_in_sandbox(
+                workspace,
+                compile_command,
+                memory_mb=max(
+                    256,
+                    problem.memory_limit_mb,
+                ),
+                timeout_seconds=15,
+            )
+
+            if compile_result.timed_out:
+                finish_submission(
+                    submission,
+                    "CE",
+                    compiler_output=(
+                        "Quá thời gian biên dịch."
+                    ),
+                    judge_message=(
+                        "Biên dịch không thành công."
+                    ),
+                )
+                return
+
+            if compile_result.return_code != 0:
+                finish_submission(
+                    submission,
+                    "CE",
+                    compiler_output=(
+                        compile_result.stderr
+                        or compile_result.stdout
+                    ),
+                    judge_message=(
+                        "Biên dịch không thành công."
+                    ),
+                )
+                return
+
+        total_score = 0
+        max_time_ms = 0
+        max_memory_kb = 0
+        final_verdict = "AC"
+
+        # Host timeout có thêm một khoảng nhỏ để Podman
+        # khởi tạo/dọn container.
+        execution_timeout = max(
+            1.0,
+            problem.time_limit_ms / 1000.0,
+        )
+
+        host_timeout = (
+            execution_timeout
+            + 1.5
+        )
+
+        for testcase in testcases:
+            result = run_in_sandbox(
+                workspace,
+                language["run"],
+                stdin_data=testcase.input_data,
+                memory_mb=(
+                    problem.memory_limit_mb
+                ),
+                timeout_seconds=host_timeout,
+                measured=True,
+            )
+
+            elapsed_ms = (
+                int(result.execution_time_ms)
+                if result.execution_time_ms
+                is not None
+                else None
+            )
+
+            memory_used_kb = (
+                result.memory_used_kb
+            )
+
+            if elapsed_ms is not None:
+                max_time_ms = max(
+                    max_time_ms,
+                    elapsed_ms,
+                )
+
+            if memory_used_kb is not None:
+                max_memory_kb = max(
+                    max_memory_kb,
+                    memory_used_kb,
+                )
+
+            if result.timed_out:
+                verdict = "TLE"
+                message = (
+                    "Vượt quá giới hạn thời gian."
+                )
+
+            elif (
+                result.memory_exceeded
+            ):
+                verdict = "MLE"
+                message = (
+                    "Vượt quá giới hạn bộ nhớ."
+                )
+
+            elif result.return_code != 0:
+                verdict = "RE"
+                message = (
+                    "Chương trình kết thúc bất thường."
+                )
+
+            elif (
+                elapsed_ms is not None
+                and elapsed_ms
+                > problem.time_limit_ms
+            ):
+                verdict = "TLE"
+                message = (
+                    "Vượt quá giới hạn thời gian."
+                )
+
+            elif outputs_equal(
+                result.stdout,
+                testcase.expected_output,
+            ):
+                verdict = "AC"
+                message = "Đúng."
+
+            else:
+                verdict = "WA"
+                message = "Sai kết quả."
+
+            earned_points = (
+                points_map.get(
+                    testcase.id,
+                    0,
+                )
+                if verdict == "AC"
+                else 0
+            )
+
+            total_score += earned_points
+
+            save_result(
+                submission,
+                testcase,
+                verdict,
+                execution_time_ms=elapsed_ms,
+                memory_used_kb=memory_used_kb,
+                points=earned_points,
+                message=message,
+            )
+
+            # Lưu từng testcase ngay để frontend có thể
+            # quan sát tiến trình nếu cần mở rộng sau này.
+            db.session.commit()
+
+            if verdict != "AC":
+                final_verdict = verdict
+                break
+
+        finish_submission(
+            submission,
+            final_verdict,
+            score=total_score,
+            execution_time_ms=max_time_ms,
+            memory_used_kb=max_memory_kb,
+            judge_message=(
+                "Chấm bài hoàn tất."
+            ),
+        )
+
+    finally:
+        shutil.rmtree(
+            workspace,
+            ignore_errors=True,
+        )
+
+
+def mark_internal_error(
+    submission_id,
+    error,
+):
+    db.session.rollback()
+
+    submission = db.session.get(
+        OJSubmission,
+        submission_id,
+    )
+
+    if not submission:
+        return
+
+    finish_submission(
+        submission,
+        "IE",
+        judge_message=(
+            "Judge gặp lỗi nội bộ: "
+            + limit_text(error)
+        ),
+    )
+
+
+def run_worker():
+    app = create_app()
+
+    print(
+        "ZUNY Judge Worker"
+    )
+    print(
+        "Queue: PostgreSQL"
+    )
+    print(
+        "Sandbox: Podman rootless"
+    )
+
+    with app.app_context():
+        while True:
+            submission_id = None
+
+            try:
+                submission_id = (
+                    claim_submission()
+                )
+
+                if submission_id is None:
+                    time.sleep(
+                        POLL_SECONDS
+                    )
+                    continue
+
+                print(
+                    f"[JUDGE] submission "
+                    f"#{submission_id}"
+                )
+
+                judge_submission(
+                    submission_id
+                )
+
+            except KeyboardInterrupt:
+                print(
+                    "\nJudge Worker stopped."
+                )
+                break
+
+            except Exception as error:
+                print(
+                    "[JUDGE ERROR]",
+                    repr(error),
+                )
+
+                if submission_id:
+                    mark_internal_error(
+                        submission_id,
+                        error,
+                    )
+
+                time.sleep(
+                    POLL_SECONDS
+                )
+
+
+if __name__ == "__main__":
+    run_worker()

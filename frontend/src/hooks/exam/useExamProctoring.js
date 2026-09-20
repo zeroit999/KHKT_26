@@ -5,11 +5,9 @@ import { logExamProctoringEventApi } from '../../api/examApi.js'
 import { authService } from '../../services/auth'
 import { useAuth } from '../../contexts/AuthContext'
 import { normalizeProctoringConfig } from '../../utils/proctoringConfig.js'
+import getApiBaseUrl from '../../config/apiBase.js'
 
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
+const API_BASE_URL = getApiBaseUrl()
 
 
 const createId = () => {

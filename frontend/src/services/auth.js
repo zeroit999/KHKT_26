@@ -1,9 +1,10 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
+import getApiBaseUrl from '../config/apiBase'
+
+const API_BASE_URL = getApiBaseUrl()
 
 const ACCESS_TOKEN_KEY = 'zuny_access_token'
 const REFRESH_TOKEN_KEY = 'zuny_refresh_token'
+let refreshPromise = null
 
 class AuthService {
   constructor() {
@@ -24,26 +25,24 @@ class AuthService {
     path,
     options = {}
   ) {
-    const response = await fetch(
-      `${API_BASE_URL}${path}`,
-      {
-        ...options,
-
-        headers: {
-          Accept:
-            'application/json',
-
-          ...(options.body
-            ? {
-                'Content-Type':
-                  'application/json',
-              }
-            : {}),
-
-          ...options.headers,
+    let response
+    try {
+      response = await fetch(
+        `${API_BASE_URL}${path}`,
+        {
+          ...options,
+          headers: {
+            Accept: 'application/json',
+            ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+            ...options.headers,
+          },
         },
-      }
-    )
+      )
+    } catch {
+      throw new Error(
+        'Không thể kết nối máy chủ. Hãy kiểm tra backend và kết nối mạng.',
+      )
+    }
 
     const data =
       await response
@@ -162,14 +161,10 @@ class AuthService {
   }
 
   async getMe() {
-    const accessToken = this.getAccessToken?.()
+    const accessToken = this.getAccessToken()
 
     if (!accessToken) {
       this.currentUser = null
-      return null
-    }
-
-    if (!this.accessToken) {
       return null
     }
 
@@ -181,17 +176,19 @@ class AuthService {
             'application/json',
 
           Authorization:
-            `Bearer ${this.accessToken}`,
+            `Bearer ${accessToken}`,
         },
       }
     )
 
     if (
       response.status === 401 &&
-      this.refreshToken
+      this.getRefreshToken()
     ) {
       try {
         await this.refreshAccessToken()
+
+        const refreshedAccessToken = this.getAccessToken()
 
         response = await fetch(
           `${API_BASE_URL}/auth/me`,
@@ -201,7 +198,7 @@ class AuthService {
                 'application/json',
 
               Authorization:
-                `Bearer ${this.accessToken}`,
+                `Bearer ${refreshedAccessToken}`,
             },
           }
         )
@@ -407,10 +404,18 @@ class AuthService {
   }
 
   getAccessToken() {
+    const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY)
+    if (storedToken && storedToken !== this.accessToken) {
+      this.accessToken = storedToken
+    }
     return this.accessToken
   }
 
   getRefreshToken() {
+    const storedToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+    if (storedToken && storedToken !== this.refreshToken) {
+      this.refreshToken = storedToken
+    }
     return this.refreshToken
   }
 
@@ -425,45 +430,45 @@ class AuthService {
   }
 
   async refreshAccessToken() {
-    if (!this.refreshToken) {
+    const refreshToken = this.getRefreshToken()
+
+    if (!refreshToken) {
       throw new Error(
         'No refresh token available'
       )
     }
 
-    try {
-      const data =
-        await this.request(
+    if (refreshPromise) {
+      return refreshPromise
+    }
+
+    refreshPromise = (async () => {
+      try {
+        const data = await this.request(
           '/auth/refresh',
           {
             method: 'POST',
-
             body: JSON.stringify({
-              refresh_token:
-                this.refreshToken,
+              refresh_token: refreshToken,
             }),
-          }
+          },
         )
 
-      if (
-        !data.access_token ||
-        !data.refresh_token
-      ) {
-        throw new Error(
-          'Phản hồi làm mới phiên không hợp lệ.'
-        )
+        if (!data.access_token || !data.refresh_token) {
+          throw new Error('Phản hồi làm mới phiên không hợp lệ.')
+        }
+
+        this.setTokens(data.access_token, data.refresh_token)
+        return data.access_token
+      } catch (error) {
+        this.clearSession()
+        throw error
+      } finally {
+        refreshPromise = null
       }
+    })()
 
-      this.setTokens(
-        data.access_token,
-        data.refresh_token
-      )
-
-      return data.access_token
-    } catch (error) {
-      this.clearSession()
-      throw error
-    }
+    return refreshPromise
   }
 }
 

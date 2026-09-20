@@ -568,11 +568,9 @@ def update_me():
                 or None
             )
 
-        if "role" in data:
-            user.role = normalize_role(
-                data.get("role")
-            )
-
+        # role là thuộc tính phân quyền, tuyệt đối không cho
+        # người dùng tự thay đổi qua PATCH /auth/me.
+        # Role chỉ được thiết lập bởi luồng đăng ký/quản trị tin cậy.
         if (
             "grade" in data
             or "studentGrade" in data
@@ -618,6 +616,62 @@ def update_me():
             else {}
         )
 
+        # Chuyên môn giáo viên có ảnh hưởng trực tiếp đến
+        # authorization của OJ. Chỉ cho TEACHER thiết lập
+        # chuyên môn lần đầu trong onboarding; không cho
+        # tự thay đổi sau khi đã có giá trị.
+        subject_fields = {
+            "subject",
+            "specialty",
+            "teacherSubject",
+        }
+
+        requested_subject = None
+
+        for subject_key in subject_fields:
+            if subject_key not in data:
+                continue
+
+            candidate = str(
+                data.get(subject_key)
+                or ""
+            ).strip()
+
+            if candidate:
+                requested_subject = candidate
+                break
+
+        existing_subject = str(
+            profile_data.get("subject")
+            or profile_data.get("specialty")
+            or profile_data.get("teacherSubject")
+            or ""
+        ).strip()
+
+        if requested_subject:
+            if str(user.role or "").upper() != "TEACHER":
+                return jsonify({
+                    "error": (
+                        "Chỉ tài khoản giáo viên mới được "
+                        "thiết lập chuyên môn."
+                    )
+                }), 403
+
+            if (
+                existing_subject
+                and requested_subject != existing_subject
+            ):
+                return jsonify({
+                    "error": (
+                        "Chuyên môn giáo viên không thể "
+                        "tự thay đổi sau khi đã thiết lập."
+                    )
+                }), 403
+
+            if not existing_subject:
+                # Chuẩn hóa về một nguồn duy nhất.
+                profile_data["subject"] = requested_subject
+
         protected_fields = {
             "id",
             "uid",
@@ -633,6 +687,12 @@ def update_me():
             "googleSub",
             "auth_provider",
             "authProvider",
+
+            # Authorization-sensitive fields.
+            "role",
+            "subject",
+            "specialty",
+            "teacherSubject",
         }
 
         core_fields = {

@@ -46,6 +46,7 @@ import {
 import {
   getProfileTheme,
 } from './profile/profileTheme'
+import getApiBaseUrl from '../../config/apiBase'
 
 import {
   getUserAvatar,
@@ -54,9 +55,7 @@ import {
 import './profile/profile.css'
 
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:5000' : '')
+const API_BASE_URL = getApiBaseUrl()
 
 
 export default function Profile() {

@@ -87,6 +87,18 @@ class User(db.Model):
         ),
     )
 
+    email_verified = db.Column(
+      db.Boolean,
+      nullable=False,
+      default=True,
+      server_default=db.text("true"),
+    )
+
+    email_verified_at = db.Column(
+      db.DateTime(timezone=True),
+      nullable=True,
+    )
+
     def to_dict(self):
         profile_data = (
             self.profile_data

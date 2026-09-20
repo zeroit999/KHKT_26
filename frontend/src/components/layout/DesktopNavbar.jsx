@@ -33,7 +33,11 @@ const normalizeRole = (role) =>
     .replace(/[\s_-]/g, '')
     .toUpperCase();
 
-export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
+export default function DesktopNavbar({
+  darkMode,
+  onToggleDarkMode,
+  disableHover = false,
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, userDetails, logout } = useAuth();
@@ -92,6 +96,13 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
         icon: BookOpenCheck,
       },
       {
+        label: 'Lập trình',
+        shortLabel: 'Lập trình',
+        path: '/oj',
+        icon: Trophy,
+      },
+
+      {
         label: 'Cộng đồng',
         shortLabel: 'Cộng đồng',
         path: '/forum',
@@ -112,7 +123,7 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
     icon: Home,
   };
 
-  const expanded = isHovered || isAccountOpen;
+  const expanded = disableHover || isHovered || isAccountOpen;
 
   useEffect(() => {
     setIsAccountOpen(false);
@@ -152,9 +163,11 @@ export default function DesktopNavbar({ darkMode, onToggleDarkMode }) {
           damping: 34,
           mass: 0.75,
         }}
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => {
+          if (!disableHover) setIsHovered(true);
+        }}
         onMouseLeave={() => {
-          if (!isAccountOpen) setIsHovered(false);
+          if (!disableHover && !isAccountOpen) setIsHovered(false);
         }}
         className={`pointer-events-auto relative h-16 max-w-[96vw] rounded-full border backdrop-blur-3xl ${
           expanded ? 'w-[min(97vw,1320px)]' : 'w-auto'
