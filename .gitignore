@@ -154,3 +154,6 @@ dist/
 *.tmp
 *.swp
 *.pid
+
+# Pre-change backup files
+*.pre-*
