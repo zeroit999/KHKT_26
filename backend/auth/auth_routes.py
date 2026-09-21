@@ -1,3 +1,12 @@
+from models.email_verification import EmailVerification
+from auth.email_otp import (
+    generate_otp,
+    otp_digest,
+    otp_expires_at,
+    utc_now,
+    send_verification_email,
+)
+
 import hashlib
 
 from flask import Blueprint, jsonify, request
@@ -107,6 +116,11 @@ def issue_refresh_token(user):
 
 
 def build_auth_response(user):
+    if user.email_verified is not True:
+        raise ValueError(
+            "Không được cấp JWT cho tài khoản chưa xác minh email."
+        )
+
     user_data = user.to_dict()
 
     return {
@@ -175,17 +189,50 @@ def register():
             full_name=full_name,
             role=role,
             auth_provider="local",
+            email_verified=False,
             profile_data={
                 "isSetupComplete": False,
             },
         )
 
         db.session.add(user)
+        db.session.flush()
+
+        code = generate_otp()
+        now = utc_now()
+
+        verification = EmailVerification(
+            user_id=user.id,
+            purpose="register",
+            code_hash=otp_digest(user.id, "register", code),
+            expires_at=otp_expires_at(),
+            attempts=0,
+            created_at=now,
+            last_sent_at=now,
+        )
+
+        db.session.add(verification)
         db.session.commit()
 
-        return jsonify(
-            build_auth_response(user)
-        ), 201
+        # Gửi email sau khi tài khoản và OTP đã được lưu.
+        # Nếu gửi thất bại, tài khoản vẫn tồn tại để gửi lại mã.
+        try:
+            send_verification_email(user.email, code)
+        except Exception:
+            return jsonify({
+                "error": (
+                    "Đã tạo tài khoản nhưng chưa gửi được mã xác minh. "
+                    "Vui lòng thử gửi lại mã sau."
+                ),
+                "code": "VERIFICATION_EMAIL_SEND_FAILED",
+                "email": user.email,
+            }), 503
+
+        return jsonify({
+            "message": "Đã gửi mã xác minh đến email của bạn.",
+            "email": user.email,
+            "requires_email_verification": True,
+        }), 201
 
     except Exception as error:
         db.session.rollback()
@@ -241,6 +288,13 @@ def login():
             return jsonify({
                 "error": "Email hoặc mật khẩu không đúng.",
             }), 401
+
+        if user.email_verified is not True:
+            return jsonify({
+                "error": "Bạn cần xác minh email trước khi đăng nhập.",
+                "code": "EMAIL_NOT_VERIFIED",
+                "email": user.email,
+            }), 403
 
         return jsonify(
             build_auth_response(user)
@@ -451,6 +505,28 @@ def refresh():
             return jsonify({
                 "error": "User not found",
             }), 404
+
+        if user.email_verified is not True:
+            return jsonify({
+                "error": "Bạn cần xác minh email trước khi tiếp tục.",
+                "code": "EMAIL_NOT_VERIFIED",
+            }), 403
+
+        try:
+            refresh_auth_version = int(
+                payload.get("auth_version")
+            )
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Refresh token đã bị thu hồi.",
+                "code": "TOKEN_REVOKED",
+            }), 401
+
+        if refresh_auth_version != int(user.auth_version or 1):
+            return jsonify({
+                "error": "Refresh token đã bị thu hồi.",
+                "code": "TOKEN_REVOKED",
+            }), 401
 
         token_jti = payload.get("jti")
         token_digest = refresh_token_digest(refresh_token)

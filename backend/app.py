@@ -1,3 +1,4 @@
+from auth.password_reset_routes import password_reset_bp
 import os
 import re
 import tempfile
@@ -191,6 +192,7 @@ def configure_cors(app):
 
 def register_blueprints(app):
     from auth.auth_routes import auth_bp
+    from auth.email_verification_routes import email_verification_bp
     from exams.exam_routes import exam_bp
     from classrooms.classroom_routes import classroom_bp
     from oj import oj_bp
@@ -205,6 +207,10 @@ def register_blueprints(app):
     )
     app.register_blueprint(
         auth_bp
+    )
+
+    app.register_blueprint(
+        email_verification_bp
     )
 
     app.register_blueprint(
@@ -314,6 +320,8 @@ def create_app():
     register_blueprints(
         app
     )
+
+    app.register_blueprint(password_reset_bp)
 
     @app.get("/")
     def index():

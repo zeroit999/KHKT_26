@@ -5,6 +5,7 @@ from extensions import db
 
 class User(db.Model):
     __tablename__ = "users"
+    auth_version = db.Column(db.Integer, nullable=False, default=1, server_default=db.text("1"))
 
     id = db.Column(
         db.BigInteger,
@@ -121,4 +122,12 @@ class User(db.Model):
             "grade": self.grade or "",
             "className": self.class_name or "",
             "authProvider": self.auth_provider,
+            "auth_version": int(self.auth_version or 1),
+            "emailVerified": bool(self.email_verified),
+            "email_verified": bool(self.email_verified),
+            "emailVerifiedAt": (
+                self.email_verified_at.isoformat()
+                if self.email_verified_at
+                else None
+            ),
         }

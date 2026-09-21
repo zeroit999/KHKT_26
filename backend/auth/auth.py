@@ -1,3 +1,5 @@
+from extensions import db
+from models.user import User
 import datetime
 import secrets
 from functools import wraps
@@ -40,6 +42,11 @@ class JWTManager:
                 datetime.timezone.utc
             ),
             "type": "access",
+            "auth_version": int(
+                user_data.get("auth_version")
+                or user_data.get("authVersion")
+                or 1
+            ),
         }
 
         return jwt.encode(
@@ -50,6 +57,11 @@ class JWTManager:
 
     @staticmethod
     def create_refresh_token(user_id):
+        user = db.session.get(User, int(user_id))
+
+        if user is None:
+            raise ValueError("User does not exist")
+
         payload = {
             "uid": user_id,
             "user_id": user_id,
@@ -69,6 +81,7 @@ class JWTManager:
             ),
             "type": "refresh",
             "jti": secrets.token_urlsafe(32),
+            "auth_version": int(user.auth_version or 1),
         }
 
         return jwt.encode(
@@ -101,14 +114,9 @@ def jwt_required(f):
             "",
         )
 
-        if not auth_header.startswith(
-            "Bearer "
-        ):
+        if not auth_header.startswith("Bearer "):
             return jsonify({
-                "error": (
-                    "Missing or invalid "
-                    "Authorization header"
-                ),
+                "error": "Missing or invalid Authorization header",
             }), 401
 
         token = auth_header.split(
@@ -116,19 +124,58 @@ def jwt_required(f):
             1,
         )[1].strip()
 
-        payload = JWTManager.verify_token(
-            token
-        )
+        payload = JWTManager.verify_token(token)
 
         if (
             not payload
-            or payload.get("type")
-            != "access"
+            or payload.get("type") != "access"
         ):
             return jsonify({
-                "error": (
-                    "Invalid or expired token"
-                ),
+                "error": "Invalid or expired token",
+            }), 401
+
+        user_id = (
+            payload.get("user_id")
+            or payload.get("uid")
+        )
+
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Invalid token user",
+            }), 401
+
+        user = db.session.get(
+            User,
+            user_id,
+        )
+
+        if user is None:
+            return jsonify({
+                "error": "Tài khoản không tồn tại.",
+            }), 401
+
+        if user.email_verified is not True:
+            return jsonify({
+                "error": "Bạn cần xác minh email trước khi tiếp tục.",
+                "code": "EMAIL_NOT_VERIFIED",
+            }), 403
+
+        try:
+            token_auth_version = int(
+                payload.get("auth_version")
+            )
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Token đã bị thu hồi.",
+                "code": "TOKEN_REVOKED",
+            }), 401
+
+        if token_auth_version != int(user.auth_version or 1):
+            return jsonify({
+                "error": "Token đã bị thu hồi.",
+                "code": "TOKEN_REVOKED",
             }), 401
 
         request.current_user = payload
