@@ -1,4 +1,4 @@
-import React, {
+import {
   useState,
   useEffect,
 } from 'react'
@@ -19,7 +19,6 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Sparkles,
   User,
 } from 'lucide-react'
 
@@ -104,7 +103,19 @@ function Register() {
           }
         )
 
-        navigate('/setup')
+        const pendingEmail =
+          email.trim().toLowerCase()
+
+        sessionStorage.setItem(
+          'zuny_pending_verification_email',
+          pendingEmail
+        )
+
+        navigate('/verify-email', {
+          state: {
+            email: pendingEmail,
+          },
+        })
       } catch (error) {
         console.error(
           '❌ Register error:',

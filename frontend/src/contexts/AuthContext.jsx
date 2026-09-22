@@ -133,16 +133,11 @@ export function AuthProvider({
       password,
       additionalData = {}
     ) => {
-      const currentUser =
-        await authService.register(
-          email,
-          password,
-          additionalData
-        )
-
-      applyUser(currentUser)
-
-      return currentUser
+      return authService.register(
+        email,
+        password,
+        additionalData
+      )
     }
 
   const loginWithGoogleCredential =

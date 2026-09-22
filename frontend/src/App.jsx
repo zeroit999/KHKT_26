@@ -34,6 +34,8 @@ const Setting = lazy(() => import('./pages/setting/Setting.jsx'))
 
 import Login from './components/Signpage/login.jsx';
 import Register from './components/Signpage/register.jsx';
+import VerifyEmail from './components/Signpage/VerifyEmail.jsx';
+import ForgotPassword from './components/Signpage/ForgotPassword.jsx';
 import Profile from './components/Signpage/profile.jsx';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
@@ -62,13 +64,6 @@ function applyDarkModeToDocument(isDark) {
   if (favicon) {
     favicon.setAttribute('href', isDark ? '/dark-mode.png' : '/light-mode.png');
   }
-}
-
-function normalizeAppRole(role) {
-  return String(role || '')
-    .trim()
-    .replace(/[\s_-]/g, '')
-    .toUpperCase();
 }
 
 function ScrollToTop() {
@@ -117,33 +112,6 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-function TeacherRoute({ children }) {
-  const { user, userDetails, isLoading } = useAuth();
-
-  if (isLoading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
-
-  const normalizedRole = normalizeAppRole(userDetails?.role);
-  const allowed = normalizedRole === 'TEACHER' || normalizedRole === 'ADMINDEV';
-
-  if (!allowed) return <Navigate to="/" replace />;
-
-  return children;
-}
-
-function AdminDevRoute({ children }) {
-  const { user, userDetails, isLoading } = useAuth();
-
-  if (isLoading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
-
-  const allowed = normalizeAppRole(userDetails?.role) === 'ADMINDEV';
-
-  if (!allowed) return <Navigate to="/" replace />;
-
-  return children;
-}
-
 function SetupRoute() {
   const { user, userDetails, isLoading } = useAuth();
 
@@ -187,14 +155,16 @@ function AppContent({ darkMode, onToggleDarkMode }) {
   const isForumRoute = normalizedPath === '/forum';
   const isELearningLibraryRoute = normalizedPath === '/e-learning';
   const isELearningDetailRoute = normalizedPath.startsWith('/e-learning/');
+  const isForgotPasswordRoute = normalizedPath === '/forgot-password';
   const isAuthRoute =
     location.pathname === '/login' ||
-    location.pathname === '/register';
+    location.pathname === '/register' ||
+    location.pathname === '/verify-email' ||
+    location.pathname === '/forgot-password';
 
 
-  useEffect(() => {
-    if (!isForumRoute) setIsForumChannelOpen(false);
-  }, [isForumRoute]);
+  const forumChannelOpen =
+    isForumRoute && isForumChannelOpen;
 
   const isExamRoomRoute =
     location.pathname.startsWith('/exam/') &&
@@ -270,6 +240,7 @@ function AppContent({ darkMode, onToggleDarkMode }) {
         onToggleDarkMode={onToggleDarkMode}
         mainClassName={
           isAuthRoute ||
+          isForgotPasswordRoute ||
           isExamRoomRoute ||
           isHomeRoute ||
           isELearningLibraryRoute ||
@@ -278,14 +249,14 @@ function AppContent({ darkMode, onToggleDarkMode }) {
           isSettingsRoute ||
           isForumRoute
             ? 'pt-0'
-            : isForumRoute && isForumChannelOpen
+            : forumChannelOpen
               ? 'h-screen pt-20'
               : 'pt-20'
         }
         showFooter={normalizedPath === '/'}
         showNavbar={!isAuthRoute && !isExamRoomRoute}
         disableNavbarHover={isHomeRoute}
-        lockPageScroll={isForumRoute && isForumChannelOpen}
+        lockPageScroll={forumChannelOpen}
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -301,6 +272,8 @@ function AppContent({ darkMode, onToggleDarkMode }) {
 
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
               <Route
                 path="/setup"

@@ -50,11 +50,17 @@ class AuthService {
         .catch(() => ({}))
 
     if (!response.ok) {
-      throw new Error(
+      const error = new Error(
         data.error ||
           data.message ||
           'Có lỗi xảy ra.'
       )
+
+      error.status = response.status
+      error.code = data.code || null
+      error.data = data
+
+      throw error
     }
 
     return data
@@ -123,15 +129,73 @@ class AuthService {
         }
       )
 
-    this.setTokens(
-      data.access_token,
-      data.refresh_token
+    // Đăng ký local phải xác minh email trước khi đăng nhập.
+    // Backend không cấp JWT tại bước này.
+    return data
+  }
+
+  async verifyEmail(
+    email,
+    code
+  ) {
+    return this.request(
+      '/auth/verify-email',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          code,
+        }),
+      }
     )
+  }
 
-    this.currentUser =
-      data.user
+  async resendVerification(
+    email
+  ) {
+    return this.request(
+      '/auth/resend-verification',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+        }),
+      }
+    )
+  }
 
-    return data.user
+  async requestPasswordReset(email) {
+    return this.request(
+      '/auth/forgot-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      },
+    )
+  }
+
+  async verifyPasswordResetCode(email, code) {
+    return this.request(
+      '/auth/verify-reset-otp',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, code }),
+      },
+    )
+  }
+
+  async resetPassword(email, resetToken, newPassword) {
+    return this.request(
+      '/auth/reset-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          reset_token: resetToken,
+          new_password: newPassword,
+        }),
+      },
+    )
   }
 
   async loginWithGoogleCredential(

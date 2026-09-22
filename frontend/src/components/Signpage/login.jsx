@@ -67,6 +67,23 @@ function Login() {
     } catch (error) {
       console.error('❌ Login error:', error);
 
+      if (error?.code === 'EMAIL_NOT_VERIFIED') {
+        const pendingEmail = email.trim().toLowerCase();
+
+        sessionStorage.setItem(
+          'zuny_pending_verification_email',
+          pendingEmail
+        );
+
+        navigate('/verify-email', {
+          state: {
+            email: pendingEmail,
+          },
+        });
+
+        return;
+      }
+
       setError(
         error?.message ||
           'Đăng nhập thất bại. Vui lòng thử lại.'
@@ -243,7 +260,7 @@ function Login() {
                 </label>
 
                 <Link
-                  to="/forgotpass"
+                  to="/forgot-password"
                   className="text-sm text-cyan-400 hover:text-cyan-300"
                 >
                   Quên mật khẩu?
