@@ -13,6 +13,7 @@ import {
 import {
   AlertCircle,
   ArrowLeft,
+  BrainCircuit,
   CheckCircle2,
   Clock3,
   Code2,
@@ -26,6 +27,8 @@ import {
   Terminal,
   XCircle,
 } from 'lucide-react'
+
+import ReactMarkdown from 'react-markdown'
 
 import Editor from '@monaco-editor/react'
 
@@ -276,6 +279,63 @@ function Verdict({
 }
 
 
+function AIAnalysis({
+  submission,
+  analysis,
+  loading,
+  error,
+  onAnalyze,
+}) {
+  if (!submission || submission.verdict === 'AC') {
+    return null
+  }
+
+  const pending =
+    submission.verdict === 'PENDING'
+    || submission.verdict === 'JUDGING'
+
+  return (
+    <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-400/20 dark:bg-cyan-400/10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <BrainCircuit className="h-5 w-5 text-cyan-600 dark:text-cyan-300" />
+          <div>
+            <p className="text-sm font-black text-cyan-950 dark:text-cyan-100">
+              Gợi ý sửa lỗi bằng AI
+            </p>
+            <p className="mt-0.5 text-xs font-medium text-cyan-800/70 dark:text-cyan-200/70">
+              AI chỉ dùng mã nguồn và thông tin chấm, không đọc testcase ẩn.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onAnalyze}
+          disabled={loading || pending}
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-xs font-black text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading && <LoaderCircle className="h-4 w-4 animate-spin" />}
+          {loading ? 'Đang phân tích...' : analysis ? 'Phân tích lại' : 'Phân tích lỗi'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 text-xs font-bold text-red-600 dark:text-red-300">
+          {error}
+        </p>
+      )}
+
+      {analysis && (
+        <div className="prose prose-sm mt-4 max-w-none text-slate-700 dark:prose-invert dark:text-slate-200">
+          <ReactMarkdown>{analysis}</ReactMarkdown>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 export default function ProblemDetail() {
   const { id } = useParams()
 
@@ -333,6 +393,21 @@ export default function ProblemDetail() {
     submission,
     setSubmission,
   ] = useState(null)
+
+  const [
+    aiAnalysis,
+    setAiAnalysis,
+  ] = useState('')
+
+  const [
+    aiAnalysisLoading,
+    setAiAnalysisLoading,
+  ] = useState(false)
+
+  const [
+    aiAnalysisError,
+    setAiAnalysisError,
+  ] = useState('')
 
   const pollingGenerationRef =
     useRef(0)
@@ -627,6 +702,8 @@ export default function ProblemDetail() {
 
     setSubmitting(true)
     setSubmission(null)
+    setAiAnalysis('')
+    setAiAnalysisError('')
     setError('')
 
     try {
@@ -674,6 +751,28 @@ export default function ProblemDetail() {
       )
     } finally {
       setSubmitting(false)
+    }
+  }
+
+
+  const analyzeCurrentSubmission = async () => {
+    if (!submission?.id || submission.verdict === 'AC') {
+      return
+    }
+
+    setAiAnalysisLoading(true)
+    setAiAnalysisError('')
+
+    try {
+      const data = await ojApi.analyzeSubmission(submission.id)
+      setAiAnalysis(data?.analysis || '')
+    } catch (analysisError) {
+      setAiAnalysisError(
+        analysisError.message
+        || 'Không thể phân tích bài nộp lúc này.',
+      )
+    } finally {
+      setAiAnalysisLoading(false)
     }
   }
 
@@ -1101,6 +1200,14 @@ export default function ProblemDetail() {
 
               <Verdict
                 submission={submission}
+              />
+
+              <AIAnalysis
+                submission={submission}
+                analysis={aiAnalysis}
+                loading={aiAnalysisLoading}
+                error={aiAnalysisError}
+                onAnalyze={analyzeCurrentSubmission}
               />
 
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold leading-5 text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">

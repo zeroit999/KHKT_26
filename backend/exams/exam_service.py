@@ -1,4 +1,5 @@
 import re
+import random
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -1030,7 +1031,7 @@ def question_to_data(question):
     }
 
 
-def get_exam_questions(exam_id):
+def get_exam_questions(exam_id, shuffle=False):
     questions = db.session.scalars(
         db.select(
             ExamQuestion
@@ -1045,12 +1046,17 @@ def get_exam_questions(exam_id):
         )
     ).all()
 
-    return [
+    result = [
         question_to_data(
             question
         )
         for question in questions
     ]
+
+    if shuffle:
+        random.SystemRandom().shuffle(result)
+
+    return result
 
 
 def result_to_data(result):
@@ -2028,7 +2034,10 @@ def get_exam_detail(
         )
 
     questions = get_exam_questions(
-        exam_id
+        exam_id,
+        shuffle=bool(
+            exam_data.get("shuffleQuestions", False)
+        ),
     )
 
     review = None

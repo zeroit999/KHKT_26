@@ -24,7 +24,7 @@ import DarkModeSelect from './DarkModeSelect.jsx';
 import DateTimePicker from './DateTimePicker.jsx';
 import RichEditor from './RichEditor.jsx';
 
-import { parseWordExamApi } from '../../api/examApi';
+import { parsePdfExamApi, parseWordExamApi } from '../../api/examApi';
 import {
   LEGACY_PROCTORING_CONFIG,
   PROCTORING_SETTING_ITEMS,
@@ -163,7 +163,7 @@ function CreateExamModal({
       correctAnswer: question.correctAnswer ?? '',
     }));
 
-  const [parsingWord, setParsingWord] = useState(false);
+  const [parsingFile, setParsingFile] = useState(false);
 
   const [form, setForm] = useState({
     title: '',
@@ -578,7 +578,7 @@ function CreateExamModal({
     });
   };
 
-  const handleWordFileChange = async (event) => {
+  const handleExamFileChange = async (event) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -589,13 +589,16 @@ function CreateExamModal({
     formData.append('file', file);
 
     try {
-      setParsingWord(true);
+      setParsingFile(true);
 
-      const response = await parseWordExamApi(formData);
+      const isPdf = file.name.toLowerCase().endsWith('.pdf');
+      const response = isPdf
+        ? await parsePdfExamApi(formData)
+        : await parseWordExamApi(formData);
       const parsedQuestions = response.data?.questions ?? [];
 
       if (!parsedQuestions.length) {
-        toast.error('Không tìm thấy câu hỏi trong file Word');
+        toast.error(`Không tìm thấy câu hỏi trong file ${isPdf ? 'PDF' : 'Word'}`);
         return;
       }
 
@@ -605,17 +608,17 @@ function CreateExamModal({
         questions: normalizeQuestions(parsedQuestions),
       }));
 
-      toast.success(`Đã nhập ${parsedQuestions.length} câu hỏi từ file Word`);
+      toast.success(`Đã nhập ${parsedQuestions.length} câu hỏi từ file ${isPdf ? 'PDF' : 'Word'}`);
     } catch (error) {
       console.error(error);
 
       toast.error(
         error?.response?.data?.message ||
           error.message ||
-          'Không thể đọc file Word'
+          'Không thể đọc file đề thi'
       );
     } finally {
-      setParsingWord(false);
+      setParsingFile(false);
       event.target.value = '';
     }
   };
@@ -1713,7 +1716,7 @@ function CreateExamModal({
                 3. Tệp đề thi và định dạng nhập liệu
               </h3>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Có thể nhập câu hỏi thủ công hoặc tải file Word theo mẫu.
+                Có thể nhập câu hỏi thủ công hoặc tải file Word/PDF theo mẫu.
               </p>
             </div>
           </div>
@@ -1721,36 +1724,36 @@ function CreateExamModal({
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto]">
             <div>
               <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                File Word đề thi
+                File Word/PDF đề thi
               </label>
 
               <label
                 className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed px-4 py-3 text-sm font-black transition ${
-                  parsingWord
+                  parsingFile
                     ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
                     : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200'
                 }`}
               >
                 <span className="inline-flex min-w-0 items-center gap-2">
-                  {parsingWord ? (
+                  {parsingFile ? (
                     <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
                   ) : (
                     <Upload className="h-5 w-5 shrink-0" />
                   )}
 
                   <span className="truncate">
-                    {parsingWord
-                      ? 'Đang đọc file Word...'
-                      : form.wordFileName || 'Chọn file .docx'}
+                    {parsingFile
+                      ? 'Đang đọc file đề thi...'
+                      : form.wordFileName || 'Chọn file .docx hoặc .pdf'}
                   </span>
                 </span>
 
                 <input
                   type="file"
-                  accept=".docx"
-                  onChange={handleWordFileChange}
+                  accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleExamFileChange}
                   className="hidden"
-                  disabled={parsingWord}
+                  disabled={parsingFile}
                 />
               </label>
 
@@ -1815,6 +1818,24 @@ function CreateExamModal({
             </div>
           </div>
 
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
+            <button
+              type="button"
+              aria-pressed={Boolean(form.shuffleQuestions)}
+              onClick={() => updateForm('shuffleQuestions', !form.shuffleQuestions)}
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-black transition ${
+                form.shuffleQuestions
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-200'
+                  : 'border-slate-200 text-slate-600 dark:border-white/10 dark:text-slate-300'
+              }`}
+            >
+              <span className="block">Trộn thứ tự câu hỏi</span>
+              <span className="mt-1 block text-xs font-semibold opacity-70">
+                Mỗi lượt thi hiển thị câu hỏi theo thứ tự khác nhau.
+              </span>
+            </button>
+          </div>
+
           {form.questions.map(renderQuestion)}
         </div>
 
@@ -1830,7 +1851,7 @@ function CreateExamModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={parsingWord || scoreOverLimit || invalidCloseDate}
+            disabled={parsingFile || scoreOverLimit || invalidCloseDate}
             className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {editingExam ? 'Cập nhật bài thi' : 'Tạo bài thi'}

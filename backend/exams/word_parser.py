@@ -3,6 +3,7 @@ import re
 
 from docx import Document
 from docx.oxml.ns import qn
+from pypdf import PdfReader
 
 
 SECTION_PATTERNS = [
@@ -339,9 +340,7 @@ def append_to_question(question, content):
     )
 
 
-def parse_docx_exam(file_stream):
-    segments = read_segments(file_stream)
-
+def parse_segments(segments):
     questions = []
     current_question = None
     current_section = "part1"
@@ -424,3 +423,25 @@ def parse_docx_exam(file_stream):
         "questionCount": len(questions),
         "questions": questions,
     }
+
+
+def parse_docx_exam(file_stream):
+    return parse_segments(read_segments(file_stream))
+
+
+def parse_pdf_exam(file_stream):
+    reader = PdfReader(file_stream)
+    segments = []
+
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        for line in text.splitlines():
+            value = normalize_space(line)
+            if value:
+                segments.append({
+                    "text": value,
+                    "underlinedText": "",
+                    "isImage": False,
+                })
+
+    return parse_segments(segments)

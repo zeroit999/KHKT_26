@@ -144,6 +144,17 @@ const getSubmission = async (
 }
 
 
+const analyzeSubmission = async (
+  submissionId,
+) => {
+  const response = await apiClient.post(
+    `/oj/submissions/${submissionId}/analyze`,
+  )
+
+  return unwrap(response)
+}
+
+
 const ojApi = {
   listProblems,
   getProblem,
@@ -156,6 +167,7 @@ const ojApi = {
   submitProblem,
   listSubmissions,
   getSubmission,
+  analyzeSubmission,
 }
 
 

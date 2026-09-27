@@ -5,6 +5,7 @@ from auth import auth_required
 from oj.oj_service import (
     OJError,
     add_testcase,
+    analyze_submission,
     create_problem,
     delete_testcase,
     get_manager_problem_detail,
@@ -243,6 +244,22 @@ def get_submission_detail_route(
     try:
         return jsonify(
             get_submission_detail(
+                request.current_user,
+                submission_id,
+            )
+        ), 200
+    except Exception as error:
+        return error_response(error)
+
+
+@oj_bp.post(
+    "/submissions/<int:submission_id>/analyze"
+)
+@auth_required
+def analyze_submission_route(submission_id):
+    try:
+        return jsonify(
+            analyze_submission(
                 request.current_user,
                 submission_id,
             )

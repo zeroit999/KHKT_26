@@ -39,3 +39,10 @@ export const parseWordExamApi = (formData) =>
       'Content-Type': 'multipart/form-data',
     },
   })
+
+export const parsePdfExamApi = (formData) =>
+  apiClient.post('/exams/parse-pdf', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })

@@ -45,6 +45,23 @@ QUY TẮC QUAN TRỌNG:
 """
 
 
+OJ_ANALYSIS_PROMPT = """Bạn là trợ lý phân tích bài nộp Online Judge của ZUNY.
+Hãy trả lời bằng tiếng Việt, ngắn gọn và có tính sư phạm.
+
+Mục tiêu:
+- Xác định nguyên nhân có khả năng cao khiến bài nộp chưa AC dựa trên verdict, thông báo judge, kết quả testcase và mã nguồn.
+- Gợi ý cách kiểm tra và sửa, ưu tiên các bước cụ thể.
+- Không bịa input/output của testcase ẩn và không khẳng định tuyệt đối nếu dữ liệu chưa đủ.
+- Không viết lại toàn bộ lời giải hoặc đưa đáp án hoàn chỉnh; chỉ giải thích lỗi và hướng sửa.
+
+Định dạng Markdown:
+1. Nhận định
+2. Nguyên nhân có thể xảy ra
+3. Cách kiểm tra và hướng sửa
+4. Checklist trước khi nộp lại
+"""
+
+
 def _resolve_provider():
     configured = os.getenv("CHATBOT_PROVIDER", "").strip().lower()
     if configured:
@@ -210,6 +227,94 @@ def _gemini_reply(message, history, context_text):
     if not reply:
         raise ChatbotError("Gemini API không trả về nội dung.")
     return reply
+
+
+def _oj_mock_reply(verdict, judge_message, test_results):
+    messages = " ".join(
+        str(item.get("message") or "")
+        for item in test_results
+        if isinstance(item, dict)
+    ).lower()
+    verdict = str(verdict or "").upper()
+
+    if verdict == "CE":
+        return (
+            "## Nhận định\n"
+            "Bài nộp bị lỗi biên dịch (CE).\n\n"
+            "## Nguyên nhân có thể xảy ra\n"
+            "Kiểm tra cú pháp, tên biến/hàm, thư viện đã include và phiên bản ngôn ngữ.\n\n"
+            "## Cách kiểm tra và hướng sửa\n"
+            "Đọc dòng đầu tiên có vị trí file/dòng trong thông báo compiler, sửa lỗi đó trước rồi biên dịch lại.\n\n"
+            "## Checklist trước khi nộp lại\n"
+            "- Chạy thử với ví dụ công khai.\n"
+            "- Đảm bảo chương trình có hàm nhập và kiểu dữ liệu hợp lệ."
+        )
+
+    if verdict == "TLE" or "time" in messages:
+        return (
+            "## Nhận định\n"
+            "Bài nộp có khả năng vượt giới hạn thời gian.\n\n"
+            "## Nguyên nhân có thể xảy ra\n"
+            "Độ phức tạp hoặc thao tác I/O chưa phù hợp với giới hạn của đề.\n\n"
+            "## Cách kiểm tra và hướng sửa\n"
+            "Ước lượng số vòng lặp theo kích thước lớn nhất, tránh lặp lồng nhau không cần thiết và tối ưu đọc/ghi.\n\n"
+            "## Checklist trước khi nộp lại\n"
+            "- Kiểm tra trường hợp dữ liệu lớn.\n"
+            "- Đối chiếu độ phức tạp với constraints."
+        )
+
+    return (
+        "## Nhận định\n"
+        f"Bài nộp nhận verdict `{verdict or 'chưa xác định'}` nên chưa được AC.\n\n"
+        "## Nguyên nhân có thể xảy ra\n"
+        "Kết quả tính toán, điều kiện biên hoặc định dạng output có thể chưa khớp đề bài.\n\n"
+        "## Cách kiểm tra và hướng sửa\n"
+        "Tự tạo các ca nhỏ gồm giá trị nhỏ nhất, lớn nhất, rỗng và có phần tử trùng; theo dõi biến trung gian để tìm testcase đầu tiên sai.\n\n"
+        "## Checklist trước khi nộp lại\n"
+        "- Đọc lại input/output và constraints.\n"
+        "- Kiểm tra kiểu dữ liệu, chỉ số mảng và newline cuối output."
+    )
+
+
+def create_oj_analysis(problem, submission, test_results):
+    verdict = str(getattr(submission, "verdict", "") or "").upper()
+    if verdict == "AC":
+        raise ChatbotError("Chỉ có thể phân tích bài nộp chưa đạt AC.")
+
+    safe_results = [
+        {
+            "position": item.get("position"),
+            "verdict": item.get("verdict"),
+            "executionTimeMs": item.get("executionTimeMs"),
+            "message": str(item.get("message") or "")[:500],
+        }
+        for item in (test_results or [])
+        if isinstance(item, dict)
+    ]
+    context_text = (
+        f"Đề bài: {str(getattr(problem, 'description', '') or '')[:10000]}\n"
+        f"Input: {str(getattr(problem, 'input_description', '') or '')[:3000]}\n"
+        f"Output: {str(getattr(problem, 'output_description', '') or '')[:3000]}\n"
+        f"Constraints: {str(getattr(problem, 'constraints_text', '') or '')[:4000]}\n"
+        f"Ngôn ngữ: {getattr(submission, 'language', '')}\n"
+        f"Verdict: {verdict}\n"
+        f"Judge message: {str(getattr(submission, 'judge_message', '') or '')[:2000]}\n"
+        f"Compiler output: {str(getattr(submission, 'compiler_output', '') or '')[:4000]}\n"
+        f"Test results (không gồm input/output ẩn): {safe_results}\n"
+        f"Mã nguồn:\n```{getattr(submission, 'source_code', '')[:24000]}\n```"
+    )
+    provider = _resolve_provider()
+    message = "Phân tích bài nộp chưa AC và đưa ra gợi ý sửa lỗi."
+
+    if provider == "openai":
+        return _openai_reply(message, [], f"{OJ_ANALYSIS_PROMPT}\n\n{context_text}")
+    if provider == "gemini":
+        return _gemini_reply(message, [], f"{OJ_ANALYSIS_PROMPT}\n\n{context_text}")
+    if provider == "mock":
+        return _oj_mock_reply(verdict, getattr(submission, "judge_message", ""), safe_results)
+    if provider == "unavailable":
+        raise ChatbotError("Backend chưa cấu hình OPENAI_API_KEY hoặc GEMINI_API_KEY.")
+    raise ChatbotError(f"CHATBOT_PROVIDER không hợp lệ: {provider}")
 
 
 def _mock_reply(message, relevant, profile, visible, data_context=None):

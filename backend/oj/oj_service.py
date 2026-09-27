@@ -9,6 +9,7 @@ from models import (
     OJTestCase,
     User,
 )
+from chatbot.service import create_oj_analysis
 
 
 SUPPORTED_LANGUAGES = {
@@ -1312,4 +1313,40 @@ def get_submission_detail(
             include_source=True,
             include_results=True,
         ),
+    }
+
+
+def analyze_submission(
+    current_user,
+    submission_id,
+):
+    user = require_user(current_user)
+    submission = db.session.get(OJSubmission, submission_id)
+
+    if not submission:
+        raise OJError("Không tìm thấy bài nộp.", 404)
+
+    if int(submission.user_id) != int(user.id):
+        raise OJError("Bạn không có quyền phân tích bài nộp này.", 403)
+
+    problem = db.session.get(OJProblem, submission.problem_id)
+    detail = serialize_submission(submission, include_results=True)
+
+    try:
+        analysis = create_oj_analysis(
+            problem,
+            submission,
+            detail.get("testResults", []),
+        )
+    except Exception as error:
+        from chatbot.service import ChatbotError
+
+        if isinstance(error, ChatbotError):
+            raise OJError(error.args[0], 503)
+        raise
+
+    return {
+        "success": True,
+        "submissionId": submission.id,
+        "analysis": analysis,
     }
