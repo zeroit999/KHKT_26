@@ -1,4 +1,4 @@
-import React, {
+import {
   useEffect,
   useRef,
   useState,
@@ -14,6 +14,8 @@ const GOOGLE_SCRIPT_SRC =
   "https" + "://accounts.google.com/gsi/client"
 
 let googleScriptPromise = null
+let googleInitialized = false
+let activeGoogleCredentialHandler = null
 
 function loadGoogleScript() {
   if (window.google?.accounts?.id) {
@@ -111,6 +113,7 @@ function SignWithGoogle() {
   } = useAuth()
 
   const buttonRef = useRef(null)
+  const credentialHandlerRef = useRef(null)
 
   const [error, setError] =
     useState("")
@@ -137,56 +140,67 @@ function SignWithGoogle() {
           return
         }
 
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
+        const credentialHandler = async (response) => {
+          if (
+            cancelled ||
+            !response?.credential
+          ) {
+            return
+          }
 
-          use_fedcm_for_button: true,
+          try {
+            setError("")
 
-          button_auto_select: false,
+            const user =
+              await loginWithGoogleCredential(
+                response.credential,
+                "STUDENT"
+              )
 
-          callback: async (response) => {
-            if (
-              cancelled ||
-              !response?.credential
-            ) {
+            if (cancelled) {
               return
             }
 
-            try {
-              setError("")
-
-              const user =
-                await loginWithGoogleCredential(
-                  response.credential,
-                  "STUDENT"
-                )
-
-              if (cancelled) {
-                return
-              }
-
-              navigate(
-                user?.isSetupComplete
-                  ? "/"
-                  : "/setup"
-              )
-            } catch (loginError) {
-              if (cancelled) {
-                return
-              }
-
-              console.error(
-                "Google login error:",
-                loginError
-              )
-
-              setError(
-                loginError?.message ||
-                  "Đăng nhập Google thất bại."
-              )
+            navigate(
+              user?.isSetupComplete
+                ? "/"
+                : "/setup"
+            )
+          } catch (loginError) {
+            if (cancelled) {
+              return
             }
-          },
-        })
+
+            console.error(
+              "Google login error:",
+              loginError
+            )
+
+            setError(
+              loginError?.message ||
+                "Đăng nhập Google thất bại."
+            )
+          }
+        }
+
+        credentialHandlerRef.current = credentialHandler
+        activeGoogleCredentialHandler = credentialHandler
+
+        if (!googleInitialized) {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+
+            use_fedcm_for_button: true,
+
+            button_auto_select: false,
+
+            callback: (response) => {
+              activeGoogleCredentialHandler?.(response)
+            },
+          })
+
+          googleInitialized = true
+        }
 
         buttonRef.current.innerHTML = ""
 
@@ -233,6 +247,12 @@ function SignWithGoogle() {
 
     return () => {
       cancelled = true
+
+      if (
+        activeGoogleCredentialHandler
+      ) {
+        activeGoogleCredentialHandler = null
+      }
     }
   }, [
     loginWithGoogleCredential,
