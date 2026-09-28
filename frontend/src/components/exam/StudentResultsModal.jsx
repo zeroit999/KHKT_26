@@ -658,6 +658,12 @@ function StudentResultsModal({
     setResults,
   ] = useState([])
 
+  const indicators =
+    results.find((item) => (
+      item?.id != null &&
+      String(item.id) === String(openResultId)
+    ))?.proctoringIndicators
+
   const [
     fullExam,
     setFullExam,
@@ -949,6 +955,17 @@ function StudentResultsModal({
               .stopPropagation()
         }
       >
+        {indicators?.needsReview && (
+          <div
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
+          >
+            <p className="font-black">Có dấu hiệu cần hậu kiểm</p>
+            <p className="mt-1 text-xs font-semibold">
+              {indicators.note || 'Giáo viên xem các sự kiện và bằng chứng bên dưới để tự kết luận.'}
+            </p>
+          </div>
+        )}
+
         <div
           className="
             mb-5

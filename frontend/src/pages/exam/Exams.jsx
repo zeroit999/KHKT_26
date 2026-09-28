@@ -669,6 +669,23 @@ function SubmissionsSection({ page }) {
   const [examFilter, setExamFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
 
+  const indicatorLabels = {
+    window_blur: 'Mất focus / Alt-Tab',
+    visibility_hidden: 'Rời tab / thu nhỏ',
+    fullscreen_exit: 'Thoát toàn màn hình',
+    clipboard_blocked: 'Copy / paste bị chặn',
+    context_menu_blocked: 'Chuột phải bị chặn',
+    shortcut_blocked: 'Phím tắt bị chặn',
+    camera_stopped: 'Camera bị tắt',
+    microphone_stopped: 'Microphone bị tắt',
+    screen_stopped: 'Chia sẻ màn hình dừng',
+    voice_activity_suspected: 'Nghi vấn trao đổi bằng giọng nói',
+    other_violation: 'Sự kiện cần kiểm tra',
+    camera_inactive_at_submit: 'Camera không hoạt động khi nộp',
+    microphone_inactive_at_submit: 'Microphone không hoạt động khi nộp',
+    screen_inactive_at_submit: 'Màn hình không hoạt động khi nộp',
+  }
+
   const results = page.studentResults || []
 
   const getSubmissionStatus = (result) => {
@@ -690,6 +707,28 @@ function SubmissionsSection({ page }) {
     return events.filter(
       (event) => event.severity === 'violation',
     ).length
+  }
+
+  const getReviewIndicators = (result) => {
+    const indicators = result.proctoringIndicators
+
+    if (indicators && Array.isArray(indicators.reasons)) {
+      return indicators
+    }
+
+    const events = Array.isArray(result.proctoringReport?.events)
+      ? result.proctoringReport.events
+      : []
+    const reasons = [...new Set(
+      events
+        .filter((event) => event.severity === 'violation')
+        .map((event) => event.type || 'other_violation'),
+    )]
+
+    return {
+      needsReview: reasons.length > 0,
+      reasons,
+    }
   }
 
   const gradedResults = results.filter(
@@ -890,12 +929,13 @@ function SubmissionsSection({ page }) {
         ) : filteredResults.length ? (
           <div className="overflow-x-auto">
             <div className="min-w-[1120px]">
-              <div className="grid grid-cols-[1.4fr_1.7fr_0.9fr_1fr_0.8fr_0.8fr_100px] items-center gap-4 bg-slate-50 px-6 py-4 text-[11px] font-black uppercase tracking-[0.05em] text-slate-500 dark:bg-white/5 dark:text-slate-400">
+              <div className="grid grid-cols-[1.4fr_1.7fr_0.9fr_1fr_0.8fr_1.25fr_0.8fr_100px] items-center gap-4 bg-slate-50 px-6 py-4 text-[11px] font-black uppercase tracking-[0.05em] text-slate-500 dark:bg-white/5 dark:text-slate-400">
                 <span>Học sinh</span>
                 <span>Đề thi</span>
                 <span>Điểm</span>
                 <span>Thời gian nộp</span>
                 <span>Vi phạm</span>
+                <span>Dấu hiệu hậu kiểm</span>
                 <span>Trạng thái</span>
                 <span className="text-right">
                   Thao tác
@@ -909,6 +949,8 @@ function SubmissionsSection({ page }) {
 
                   const violationCount =
                     getViolationCount(result)
+                  const indicators =
+                    getReviewIndicators(result)
 
                   return (
                     <div
@@ -916,7 +958,7 @@ function SubmissionsSection({ page }) {
                         result.id ||
                         `${result.examId}-${result.studentId}-${index}`
                       }
-                      className="grid grid-cols-[1.4fr_1.7fr_0.9fr_1fr_0.8fr_0.8fr_100px] items-center gap-4 px-6 py-4 transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04]"
+                      className="grid grid-cols-[1.4fr_1.7fr_0.9fr_1fr_0.8fr_1.25fr_0.8fr_100px] items-center gap-4 px-6 py-4 transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04]"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-slate-800 dark:text-white">
@@ -971,6 +1013,24 @@ function SubmissionsSection({ page }) {
                           }`}
                         >
                           {violationCount}
+                        </span>
+                      </div>
+
+                      <div
+                        title={indicators.reasons
+                          ?.map((reason) => indicatorLabels[reason] || reason)
+                          .join(', ')}
+                      >
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${
+                            indicators.needsReview
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
+                              : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                          }`}
+                        >
+                          {indicators.needsReview
+                            ? 'Cần hậu kiểm'
+                            : 'Chưa ghi nhận'}
                         </span>
                       </div>
 

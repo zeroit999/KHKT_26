@@ -1059,7 +1059,67 @@ def get_exam_questions(exam_id, shuffle=False):
     return result
 
 
-def result_to_data(result):
+PROCTORING_INDICATOR_TYPES = {
+    "window_blur": "window_blur",
+    "visibility_hidden": "visibility_hidden",
+    "fullscreen_exit": "fullscreen_exit",
+    "clipboard_blocked": "clipboard_blocked",
+    "context_menu_blocked": "context_menu_blocked",
+    "shortcut_blocked": "shortcut_blocked",
+    "camera_stopped": "camera_stopped",
+    "microphone_stopped": "microphone_stopped",
+    "screen_stopped": "screen_stopped",
+    "voice_activity_suspected": "voice_activity_suspected",
+}
+
+
+def build_proctoring_indicators(report):
+    report = report if isinstance(report, dict) else {}
+    events = report.get("events")
+    events = events if isinstance(events, list) else []
+
+    reasons = []
+    event_types = []
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+
+        event_type = str(event.get("type") or "")
+        if event.get("severity") == "violation":
+            reason = PROCTORING_INDICATOR_TYPES.get(
+                event_type,
+                "other_violation",
+            )
+            if reason not in reasons:
+                reasons.append(reason)
+            if event_type and event_type not in event_types:
+                event_types.append(event_type)
+
+    device_checks = (
+        ("cameraRequired", "cameraActiveAtSubmit", "camera_inactive_at_submit"),
+        ("microphoneRequired", "microphoneActiveAtSubmit", "microphone_inactive_at_submit"),
+        ("screenRequired", "screenActiveAtSubmit", "screen_inactive_at_submit"),
+    )
+
+    for required_key, active_key, reason in device_checks:
+        if report.get(required_key) and report.get(active_key) is False:
+            if reason not in reasons:
+                reasons.append(reason)
+
+    return {
+        "needsReview": bool(reasons),
+        "reasons": reasons,
+        "eventTypes": event_types,
+        "note": (
+            "Dấu hiệu cần giáo viên hậu kiểm; không phải kết luận vi phạm."
+            if reasons
+            else "Chưa ghi nhận dấu hiệu cần hậu kiểm."
+        ),
+    }
+
+
+def result_to_data(result, include_proctoring_indicators=False):
     data = dict(
         result.result_data
         or {}
@@ -1082,12 +1142,19 @@ def result_to_data(result):
             result.submitted_at
         )
 
-    return {
+    result_data = {
         "id": str(result.id),
         **serialize_doc_data(
             data
         ),
     }
+
+    if include_proctoring_indicators:
+        result_data["proctoringIndicators"] = build_proctoring_indicators(
+            data.get("proctoringReport")
+        )
+
+    return result_data
 
 
 def get_exam_results_data(exam_id):
@@ -1105,7 +1172,10 @@ def get_exam_results_data(exam_id):
     ).all()
 
     return [
-        result_to_data(result)
+        result_to_data(
+            result,
+            include_proctoring_indicators=True,
+        )
         for result in results
     ]
 

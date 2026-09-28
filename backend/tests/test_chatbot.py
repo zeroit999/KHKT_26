@@ -15,6 +15,7 @@ from chatbot.data_context import (
     format_platform_context,
 )
 from exams.exam_service import (
+    build_proctoring_indicators,
     normalize_proctoring_config,
     restrict_evidence_paths,
     sanitize_proctoring_event,
@@ -23,6 +24,24 @@ from exams.exam_service import (
 
 
 class ProctoringConfigTest(unittest.TestCase):
+    def test_builds_review_indicators_without_percentage_or_conclusion(self):
+        indicators = build_proctoring_indicators({
+            "cameraRequired": True,
+            "cameraActiveAtSubmit": False,
+            "events": [
+                {"type": "window_blur", "severity": "violation"},
+                {"type": "window_blur", "severity": "violation"},
+            ],
+        })
+
+        self.assertTrue(indicators["needsReview"])
+        self.assertEqual(
+            indicators["reasons"],
+            ["window_blur", "camera_inactive_at_submit"],
+        )
+        self.assertNotIn("percentage", indicators)
+        self.assertIn("không phải kết luận", indicators["note"])
+
     def test_normalize_proctoring_config_clamps_limits(self):
         config = normalize_proctoring_config({
             "proctoring": {
