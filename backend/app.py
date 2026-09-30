@@ -5,6 +5,7 @@ import tempfile
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from docx import Document
 from pypdf import PdfReader
 from dotenv import load_dotenv
@@ -289,6 +290,15 @@ def extract_file_text(
 def create_app():
     app = Flask(
         __name__
+    )
+
+    # Nginx là reverse proxy duy nhất trực tiếp trước Gunicorn.
+    # Nginx đã xác thực Cloudflare Real IP.
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,
+        x_proto=1,
+        x_host=1,
     )
 
     app.config.from_object(

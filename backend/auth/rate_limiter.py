@@ -45,7 +45,13 @@ class InMemoryRateLimiter:
 rate_limiter = InMemoryRateLimiter()
 
 
-def rate_limit(limit=60, window=3600, per_user=True):
+def rate_limit(
+    limit=60,
+    window=3600,
+    per_user=True,
+    key_field=None,
+    ip_limit=None,
+):
     """
     Rate limiting decorator.
 
@@ -61,7 +67,24 @@ def rate_limit(limit=60, window=3600, per_user=True):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            if per_user and hasattr(request, "current_user"):
+            if key_field:
+                data = request.get_json(silent=True) or {}
+                field_value = str(
+                    data.get(key_field) or ""
+                ).strip().lower()
+
+                if field_value:
+                    key = (
+                        f"field:{key_field}:"
+                        f"{field_value}:{f.__name__}"
+                    )
+                else:
+                    key = (
+                        f"ip:{request.remote_addr}:"
+                        f"{f.__name__}"
+                    )
+
+            elif per_user and hasattr(request, "current_user"):
                 user_id = (
                     request.current_user.get("user_id")
                     or request.current_user.get("uid")
@@ -72,6 +95,8 @@ def rate_limit(limit=60, window=3600, per_user=True):
             else:
                 key = f"ip:{request.remote_addr}:{f.__name__}"
 
+            # Lớp 1: giới hạn theo key chính
+            # (email/user/IP tùy endpoint).
             allowed, current_count = rate_limiter.is_allowed(
                 key,
                 limit,
@@ -85,6 +110,28 @@ def rate_limit(limit=60, window=3600, per_user=True):
                     "window": window,
                     "current_count": current_count,
                 }), 429
+
+            # Lớp 2: giới hạn burst tổng theo IP.
+            # Dùng cho các endpoint public như login/register.
+            if ip_limit is not None:
+                ip_key = (
+                    f"ip-burst:{request.remote_addr}:"
+                    f"{f.__name__}"
+                )
+
+                ip_allowed, ip_count = rate_limiter.is_allowed(
+                    ip_key,
+                    ip_limit,
+                    window,
+                )
+
+                if not ip_allowed:
+                    return jsonify({
+                        "error": "Rate limit exceeded",
+                        "limit": ip_limit,
+                        "window": window,
+                        "current_count": ip_count,
+                    }), 429
 
             return f(*args, **kwargs)
 

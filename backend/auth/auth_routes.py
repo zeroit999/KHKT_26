@@ -138,7 +138,7 @@ def build_auth_response(user):
 # =========================================================
 
 @auth_bp.post("/register")
-@rate_limit(limit=10, window=3600, per_user=False)
+@rate_limit(limit=5, window=3600, per_user=False, key_field="email", ip_limit=200)
 def register():
     try:
         data = request.get_json(silent=True) or {}
@@ -248,7 +248,7 @@ def register():
 # =========================================================
 
 @auth_bp.post("/login")
-@rate_limit(limit=10, window=900, per_user=False)
+@rate_limit(limit=10, window=900, per_user=False, key_field="email", ip_limit=300)
 def login():
     try:
         data = request.get_json(silent=True) or {}
@@ -465,7 +465,6 @@ def google_login():
 # =========================================================
 
 @auth_bp.post("/refresh")
-@rate_limit(limit=60, window=3600, per_user=False)
 def refresh():
     try:
         data = request.get_json(silent=True) or {}
