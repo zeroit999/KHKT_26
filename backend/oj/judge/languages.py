@@ -6,6 +6,7 @@ LANGUAGES = {
             "-std=c++23",
             "-O2",
             "-pipe",
+            "-I/opt/zuny-pch",
             "-o",
             "/workspace/main",
             "/workspace/main.cpp",
@@ -42,6 +43,15 @@ LANGUAGES = {
             "-cp",
             "/workspace",
             "Main",
+        ],
+    },
+
+    "JAVASCRIPT": {
+        "source_file": "main.js",
+        "compile": None,
+        "run": [
+            "node",
+            "/workspace/main.js",
         ],
     },
 }

@@ -39,6 +39,7 @@ const MONACO_LANGUAGE = {
   CPP23: 'cpp',
   PYTHON314: 'python',
   JAVA21: 'java',
+  JAVASCRIPT: 'javascript',
 }
 
 
@@ -161,6 +162,12 @@ public class Main {
         // Viết lời giải tại đây.
     }
 }
+`,
+  },
+
+  JAVASCRIPT: {
+    label: 'JavaScript (Node.js 24)',
+    code: `// Viết lời giải tại đây.
 `,
   },
 }
@@ -382,6 +389,8 @@ export default function ProblemDetail() {
     PYTHON314:
       languageConfig.PYTHON314.code,
     JAVA21: languageConfig.JAVA21.code,
+    JAVASCRIPT:
+      languageConfig.JAVASCRIPT.code,
   }))
 
   const [
@@ -477,6 +486,8 @@ export default function ProblemDetail() {
             languageConfig.PYTHON314.code,
           JAVA21:
             languageConfig.JAVA21.code,
+          JAVASCRIPT:
+            languageConfig.JAVASCRIPT.code,
         }
 
         setSourceBuffers(

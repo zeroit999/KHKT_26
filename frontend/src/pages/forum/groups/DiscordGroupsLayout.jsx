@@ -2491,7 +2491,13 @@ const handleLeaveGroup = async () => {
                       <span className="inline-flex items-center gap-2 text-emerald-500 dark:text-emerald-400"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />{onlineCount} online</span>
                     </div>
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {(group.tags || []).slice(0, 4).map((tag) => (
+                      {(Array.isArray(group.tags)
+                          ? group.tags
+                          : String(group.tags || '')
+                              .split(',')
+                              .map((tag) => tag.trim())
+                              .filter(Boolean)
+                        ).slice(0, 4).map((tag) => (
                         <span key={tag} className="rounded-full px-3 py-1.5 text-sm font-bold" style={{ backgroundColor: `${tagColor}1f`, color: tagColor }}>{tag}</span>
                       ))}
                     </div>

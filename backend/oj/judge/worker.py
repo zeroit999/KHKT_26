@@ -19,7 +19,7 @@ from oj.judge.languages import get_language
 from oj.judge.sandbox import run_in_sandbox
 
 
-POLL_SECONDS = 1.0
+POLL_SECONDS = 0.2
 MAX_CAPTURE_CHARS = 16_384
 
 # Giới hạn riêng cho giai đoạn biên dịch.

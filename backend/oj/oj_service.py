@@ -16,6 +16,7 @@ SUPPORTED_LANGUAGES = {
     "CPP23",
     "PYTHON314",
     "JAVA21",
+    "JAVASCRIPT",
 }
 
 DIFFICULTIES = {
@@ -427,6 +428,7 @@ def get_problem_detail(
             "CPP23",
             "PYTHON314",
             "JAVA21",
+            "JAVASCRIPT",
         ],
     }
 
@@ -496,6 +498,7 @@ def get_manager_problem_detail(
             "CPP23",
             "PYTHON314",
             "JAVA21",
+            "JAVASCRIPT",
         ],
     }
 

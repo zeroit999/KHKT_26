@@ -300,7 +300,7 @@ class OJSubmission(db.Model):
 
     __table_args__ = (
         db.CheckConstraint(
-            "language IN ('CPP23', 'PYTHON314', 'JAVA21')",
+            "language IN ('CPP23', 'PYTHON314', 'JAVA21', 'JAVASCRIPT')",
             name="ck_oj_submissions_language",
         ),
         db.CheckConstraint(
