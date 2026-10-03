@@ -30,6 +30,7 @@ PROCTORING_EVENT_TYPES = {
     "camera_stopped",
     "microphone_stopped",
     "voice_activity_suspected",
+    "ai_suspicious_event",
     "screen_stopped",
     "monitoring_restored",
     "submitted",
@@ -418,6 +419,9 @@ def restrict_evidence_paths(
         for key in (
             "evidenceCameraPath",
             "evidenceScreenPath",
+            "evidenceAiPrePath",
+            "evidenceAiEventPath",
+            "evidenceAiVideoPath",
         ):
             path = str(
                 metadata.get(
@@ -1158,26 +1162,129 @@ def result_to_data(result, include_proctoring_indicators=False):
 
 
 def get_exam_results_data(exam_id):
+    normalized_exam_id = normalize_id(exam_id)
+
     results = db.session.scalars(
         db.select(
             ExamResult
         )
         .where(
             ExamResult.exam_id
-            == normalize_id(exam_id)
+            == normalized_exam_id
         )
         .order_by(
             ExamResult.created_at.desc()
         )
     ).all()
 
-    return [
-        result_to_data(
-            result,
-            include_proctoring_indicators=True,
+    sessions = db.session.scalars(
+        db.select(
+            ProctoringSession
         )
-        for result in results
+        .where(
+            ProctoringSession.exam_id
+            == normalized_exam_id
+        )
+        .order_by(
+            ProctoringSession.updated_at.desc(),
+            ProctoringSession.id.desc(),
+        )
+    ).all()
+
+    session_by_student = {}
+
+    for session in sessions:
+        session_by_student.setdefault(
+            session.student_id,
+            session,
+        )
+
+    session_ids = [
+        session.id
+        for session in session_by_student.values()
     ]
+
+    events_by_session = {}
+
+    if session_ids:
+        proctoring_events = db.session.scalars(
+            db.select(
+                ProctoringEvent
+            )
+            .where(
+                ProctoringEvent.session_id.in_(
+                    session_ids
+                )
+            )
+            .order_by(
+                ProctoringEvent.server_at.asc(),
+                ProctoringEvent.id.asc(),
+            )
+        ).all()
+
+        for event in proctoring_events:
+            events_by_session.setdefault(
+                event.session_id,
+                [],
+            ).append(
+                serialize_doc_data(
+                    dict(
+                        event.event_data
+                        or {}
+                    )
+                )
+            )
+
+    output = []
+
+    for result in results:
+        result_data = result_to_data(
+            result,
+            include_proctoring_indicators=False,
+        )
+
+        report = result_data.get(
+            "proctoringReport"
+        )
+
+        report = (
+            dict(report)
+            if isinstance(report, dict)
+            else {}
+        )
+
+        session = session_by_student.get(
+            result.student_id
+        )
+
+        if session is not None:
+            report["events"] = (
+                events_by_session.get(
+                    session.id,
+                    [],
+                )
+            )
+
+            report["sessionId"] = str(
+                session.id
+            )
+
+            report["violationCount"] = (
+                session.violation_count
+                or 0
+            )
+
+        result_data["proctoringReport"] = report
+
+        result_data["proctoringIndicators"] = (
+            build_proctoring_indicators(
+                report
+            )
+        )
+
+        output.append(result_data)
+
+    return output
 
 
 def attempt_to_data(attempt):
@@ -2922,6 +3029,9 @@ def log_proctoring_event(
             for key in (
                 "evidenceCameraPath",
                 "evidenceScreenPath",
+                "evidenceAiPrePath",
+                "evidenceAiEventPath",
+                "evidenceAiVideoPath",
             )
         )
 
@@ -2960,10 +3070,36 @@ def log_proctoring_event(
             )
         )
 
+        previous_event_data = dict(
+            event_model.event_data
+            or {}
+        )
+
+        previous_metadata = dict(
+            previous_event_data.get(
+                "metadata",
+                {},
+            )
+            or {}
+        )
+
+        incoming_metadata = dict(
+            event.get(
+                "metadata",
+                {},
+            )
+            or {}
+        )
+
         event_data = {
+            **previous_event_data,
             **event,
+            "metadata": {
+                **previous_metadata,
+                **incoming_metadata,
+            },
             "id": final_event_id,
-            "serverAt": now,
+            "serverAt": now.isoformat(),
         }
 
         event_model.event_type = (

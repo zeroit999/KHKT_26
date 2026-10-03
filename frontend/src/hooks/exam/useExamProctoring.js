@@ -69,12 +69,24 @@ const uploadProctoringEvidence = async ({
   sessionId,
   eventId,
   source,
+  evidenceType = 'snapshot',
 }) => {
   if (!blob) {
     throw new Error(
-      'Không có dữ liệu ảnh bằng chứng.',
+      'Không có dữ liệu bằng chứng.',
     )
   }
+
+  const extension =
+    evidenceType === 'video'
+      ? 'mp4'
+      : (
+          blob.type === 'image/png'
+            ? 'png'
+            : blob.type === 'image/jpeg'
+              ? 'jpg'
+              : 'webp'
+        )
 
   const formData =
     new FormData()
@@ -82,7 +94,7 @@ const uploadProctoringEvidence = async ({
   formData.append(
     'file',
     blob,
-    `${eventId}-${source}.webp`,
+    `${eventId}-${source}-${evidenceType}.${extension}`,
   )
 
   formData.append(
@@ -103,6 +115,11 @@ const uploadProctoringEvidence = async ({
   formData.append(
     'source',
     String(source),
+  )
+
+  formData.append(
+    'evidenceType',
+    String(evidenceType),
   )
 
   let accessToken =
@@ -188,6 +205,17 @@ const uploadProctoringEvidence = async ({
 }
 
 
+const ZUNY_AI_BRIDGE_URL =
+  'http://127.0.0.1:8765'
+
+const ZUNY_AI_POLL_MS = 1000
+
+const ZUNY_AI_FRAME_INTERVAL_MS = 125
+const ZUNY_AI_FRAME_WIDTH = 640
+const ZUNY_AI_FRAME_HEIGHT = 480
+const ZUNY_AI_FRAME_QUALITY = 0.72
+
+
 export default function useExamProctoring({ exam, active, disabled = false }) {
   const { user } = useAuth()
 
@@ -207,6 +235,12 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
   const violationsRef = useRef(0)
   const lastViolationRef = useRef(new Map())
   const lastAttentionLossRef = useRef(0)
+
+  const aiBridgeTokenRef = useRef('')
+  const aiBridgeInFlightRef = useRef(new Set())
+  const aiBridgeProcessedRef = useRef(new Set())
+  const aiBridgePollingRef = useRef(false)
+  const aiFrameSendingRef = useRef(false)
 
   const needsDevicePermission = Boolean(
     config.enabled && (
@@ -250,6 +284,410 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
     disabled,
     config.enabled,
   ])
+
+  const pairAiBridge = useCallback(async () => {
+    if (aiBridgeTokenRef.current) {
+      return aiBridgeTokenRef.current
+    }
+
+    const response =
+      await fetch(
+        `${ZUNY_AI_BRIDGE_URL}/pair`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+        },
+      )
+
+    if (!response.ok) {
+      throw new Error(
+        `Không thể ghép nối ZUNY AI (${response.status}).`,
+      )
+    }
+
+    const data =
+      await response
+        .json()
+        .catch(() => ({}))
+
+    const token =
+      String(data?.token || '')
+
+    if (!token) {
+      throw new Error(
+        'ZUNY AI Bridge không trả về pairing token.',
+      )
+    }
+
+    aiBridgeTokenRef.current = token
+
+    return token
+  }, [])
+
+  const fetchAiBridgeEvidence =
+    useCallback(async (
+      path,
+      token,
+    ) => {
+      if (
+        !path ||
+        !String(path)
+          .startsWith('/')
+      ) {
+        throw new Error(
+          'Đường dẫn bằng chứng ZUNY AI không hợp lệ.',
+        )
+      }
+
+      const response =
+        await fetch(
+          `${ZUNY_AI_BRIDGE_URL}${path}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+              'X-Zuny-Bridge-Token':
+                token,
+            },
+          },
+        )
+
+      if (!response.ok) {
+        throw new Error(
+          `Không thể tải bằng chứng ZUNY AI (${response.status}).`,
+        )
+      }
+
+      return response.blob()
+    }, [])
+
+  const claimAiBridgeIncident =
+    useCallback(async (
+      bridgeId,
+      token,
+    ) => {
+      const response =
+        await fetch(
+          `${ZUNY_AI_BRIDGE_URL}/incidents/${encodeURIComponent(bridgeId)}/claim`,
+          {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+              'X-Zuny-Bridge-Token':
+                token,
+            },
+          },
+        )
+
+      if (!response.ok) {
+        throw new Error(
+          `Không thể xác nhận ZUNY AI incident (${response.status}).`,
+        )
+      }
+    }, [])
+
+  const persistAiBridgeIncident =
+    useCallback(async (
+      incident,
+      token,
+    ) => {
+      if (
+        !exam?.id ||
+        disabled ||
+        !config.enabled
+      ) {
+        return
+      }
+
+      const bridgeId =
+        String(
+          incident?.bridgeId ||
+          '',
+        )
+
+      if (!bridgeId) {
+        throw new Error(
+          'ZUNY AI incident thiếu bridgeId.',
+        )
+      }
+
+      const evidence =
+        incident?.evidence || {}
+
+      const [
+        preBlob,
+        eventBlob,
+        videoBlob,
+      ] =
+        await Promise.all([
+          fetchAiBridgeEvidence(
+            evidence.snapshotPre,
+            token,
+          ),
+          fetchAiBridgeEvidence(
+            evidence.snapshotEvent,
+            token,
+          ),
+          fetchAiBridgeEvidence(
+            evidence.video,
+            token,
+          ),
+        ])
+
+      const eventId =
+        `ai-${bridgeId}`
+
+      const uploadBase = {
+        examId:
+          exam.id,
+        sessionId:
+          sessionIdRef.current,
+        eventId,
+        source:
+          'camera',
+      }
+
+      const [
+        preUpload,
+        eventUpload,
+        videoUpload,
+      ] =
+        await Promise.all([
+          uploadProctoringEvidence({
+            ...uploadBase,
+            blob:
+              preBlob,
+            evidenceType:
+              'snapshot_pre',
+          }),
+          uploadProctoringEvidence({
+            ...uploadBase,
+            blob:
+              eventBlob,
+            evidenceType:
+              'snapshot_event',
+          }),
+          uploadProctoringEvidence({
+            ...uploadBase,
+            blob:
+              videoBlob,
+            evidenceType:
+              'video',
+          }),
+        ])
+
+      const confidence =
+        Number(
+          incident?.confidence,
+        )
+
+      const metadata = {
+        aiEventType:
+          String(
+            incident?.eventType ||
+            'UNKNOWN',
+          ),
+        aiConfidence:
+          Number.isFinite(confidence)
+            ? confidence
+            : 0,
+        aiReason:
+          String(
+            incident?.reason ||
+            '',
+          ),
+        aiStartedAt:
+          incident?.startedAt ??
+          null,
+        aiStatus:
+          'PENDING_REVIEW',
+        bridgeId,
+        evidenceAiPrePath:
+          preUpload.path,
+        evidenceAiEventPath:
+          eventUpload.path,
+        evidenceAiVideoPath:
+          videoUpload.path,
+      }
+
+      const event = {
+        id:
+          eventId,
+        type:
+          'ai_suspicious_event',
+        severity:
+          'info',
+        message:
+          'ZUNY AI phát hiện sự kiện cần giáo viên xem xét',
+        metadata,
+        at:
+          new Date()
+            .toISOString(),
+      }
+
+      // Strict persist:
+      // lỗi backend phải reject để incident KHÔNG bị claim.
+      await logExamProctoringEventApi(
+        exam.id,
+        {
+          sessionId:
+            sessionIdRef.current,
+          event,
+        },
+      )
+
+      eventsRef.current = [
+        ...eventsRef.current
+          .slice(-248),
+        event,
+      ]
+
+      setEvents(
+        eventsRef.current,
+      )
+
+      countsRef.current = {
+        ...countsRef.current,
+        ai_suspicious_event:
+          Number(
+            countsRef
+              .current
+              .ai_suspicious_event ||
+            0,
+          ) + 1,
+      }
+
+      setCounts(
+        countsRef.current,
+      )
+
+      // Chỉ claim sau khi:
+      // 1. tải evidence thành công
+      // 2. upload R2 thành công
+      // 3. PostgreSQL persist thành công
+      await claimAiBridgeIncident(
+        bridgeId,
+        token,
+      )
+    }, [
+      claimAiBridgeIncident,
+      config.enabled,
+      disabled,
+      exam,
+      fetchAiBridgeEvidence,
+    ])
+
+  const pollAiBridge =
+    useCallback(async () => {
+      if (
+        aiBridgePollingRef.current ||
+        !activeRef.current ||
+        stoppingRef.current
+      ) {
+        return
+      }
+
+      aiBridgePollingRef.current = true
+
+      try {
+        const token =
+          await pairAiBridge()
+
+        const response =
+          await fetch(
+            `${ZUNY_AI_BRIDGE_URL}/incidents`,
+            {
+              method: 'GET',
+              cache: 'no-store',
+              headers: {
+                'X-Zuny-Bridge-Token':
+                  token,
+              },
+            },
+          )
+
+        if (!response.ok) {
+          throw new Error(
+            `Không thể đọc ZUNY AI incidents (${response.status}).`,
+          )
+        }
+
+        const data =
+          await response
+            .json()
+            .catch(() => ({}))
+
+        const incidents =
+          Array.isArray(
+            data?.incidents,
+          )
+            ? data.incidents
+            : []
+
+        for (const incident of incidents) {
+          const bridgeId =
+            String(
+              incident?.bridgeId ||
+              '',
+            )
+
+          if (
+            !bridgeId ||
+            aiBridgeInFlightRef
+              .current
+              .has(bridgeId) ||
+            aiBridgeProcessedRef
+              .current
+              .has(bridgeId)
+          ) {
+            continue
+          }
+
+          aiBridgeInFlightRef
+            .current
+            .add(bridgeId)
+
+          try {
+            await persistAiBridgeIncident(
+              incident,
+              token,
+            )
+
+            aiBridgeProcessedRef
+              .current
+              .add(bridgeId)
+          } catch (error) {
+            console.warn(
+              'Không thể đồng bộ ZUNY AI incident:',
+              error?.message ||
+              error,
+            )
+          } finally {
+            aiBridgeInFlightRef
+              .current
+              .delete(bridgeId)
+          }
+        }
+      } catch (error) {
+        // Bridge là tính năng hỗ trợ cục bộ.
+        // Không làm hỏng phiên thi nếu AI local chưa chạy.
+        if (
+          activeRef.current &&
+          !stoppingRef.current
+        ) {
+          console.debug(
+            'ZUNY AI Bridge chưa sẵn sàng:',
+            error?.message ||
+            error,
+          )
+        }
+      } finally {
+        aiBridgePollingRef.current = false
+      }
+    }, [
+      pairAiBridge,
+      persistAiBridgeIncident,
+    ])
 
   const appendEvent = useCallback((type, severity, message, metadata = {}, persist = true) => {
     const event = {
@@ -813,6 +1251,247 @@ export default function useExamProctoring({ exam, active, disabled = false }) {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (
+      !active ||
+      disabled ||
+      !config.enabled
+    ) {
+      aiBridgeTokenRef.current = ''
+      aiBridgeInFlightRef.current.clear()
+      aiBridgeProcessedRef.current.clear()
+
+      return undefined
+    }
+
+    const aiBridgeInFlight =
+      aiBridgeInFlightRef.current
+
+    const aiBridgeProcessed =
+      aiBridgeProcessedRef.current
+
+    void pollAiBridge()
+
+    const aiBridgeInterval =
+      window.setInterval(
+        () => {
+          void pollAiBridge()
+        },
+        ZUNY_AI_POLL_MS,
+      )
+
+    return () => {
+      window.clearInterval(
+        aiBridgeInterval,
+      )
+
+      aiBridgeTokenRef.current = ''
+      aiBridgeInFlight.clear()
+      aiBridgeProcessed.clear()
+    }
+  }, [
+    active,
+    config.enabled,
+    disabled,
+    pollAiBridge,
+  ])
+
+  useEffect(() => {
+    if (
+      !active ||
+      disabled ||
+      !config.enabled ||
+      !config.requireCamera ||
+      !cameraActive
+    ) {
+      return undefined
+    }
+
+    const stream =
+      cameraStreamRef.current
+
+    if (
+      !stream ||
+      !isTrackActive(stream)
+    ) {
+      return undefined
+    }
+
+    const video =
+      document.createElement('video')
+
+    const canvas =
+      document.createElement('canvas')
+
+    const context =
+      canvas.getContext(
+        '2d',
+        {
+          alpha: false,
+        },
+      )
+
+    if (!context) {
+      return undefined
+    }
+
+    video.muted = true
+    video.playsInline = true
+    video.autoplay = true
+    video.srcObject = stream
+
+    canvas.width =
+      ZUNY_AI_FRAME_WIDTH
+
+    canvas.height =
+      ZUNY_AI_FRAME_HEIGHT
+
+    let disposed = false
+
+    const canvasToBlob = () =>
+      new Promise((resolve) => {
+        canvas.toBlob(
+          resolve,
+          'image/jpeg',
+          ZUNY_AI_FRAME_QUALITY,
+        )
+      })
+
+    const sendFrame = async () => {
+      if (
+        disposed ||
+        aiFrameSendingRef.current ||
+        !activeRef.current ||
+        stoppingRef.current ||
+        !isTrackActive(
+          cameraStreamRef.current,
+        )
+      ) {
+        return
+      }
+
+      if (
+        video.readyState < 2 ||
+        !video.videoWidth ||
+        !video.videoHeight
+      ) {
+        return
+      }
+
+      aiFrameSendingRef.current = true
+
+      try {
+        const token =
+          await pairAiBridge()
+
+        if (disposed) {
+          return
+        }
+
+        context.drawImage(
+          video,
+          0,
+          0,
+          ZUNY_AI_FRAME_WIDTH,
+          ZUNY_AI_FRAME_HEIGHT,
+        )
+
+        const blob =
+          await canvasToBlob()
+
+        if (
+          disposed ||
+          !blob ||
+          blob.size <= 0
+        ) {
+          return
+        }
+
+        const response =
+          await fetch(
+            `${ZUNY_AI_BRIDGE_URL}/frames`,
+            {
+              method: 'POST',
+              cache: 'no-store',
+              headers: {
+                'Content-Type':
+                  blob.type ||
+                  'image/jpeg',
+
+                'X-Zuny-Bridge-Token':
+                  token,
+              },
+              body: blob,
+            },
+          )
+
+        if (!response.ok) {
+          if (
+            response.status === 401
+          ) {
+            aiBridgeTokenRef.current = ''
+          }
+
+          throw new Error(
+            `Không thể gửi frame tới ZUNY AI (${response.status}).`,
+          )
+        }
+      } catch (error) {
+        // AI local là lớp hỗ trợ.
+        // Không làm hỏng phiên thi khi bridge chưa chạy.
+        if (
+          !disposed &&
+          activeRef.current &&
+          !stoppingRef.current
+        ) {
+          console.debug(
+            'Không thể gửi camera tới ZUNY AI:',
+            error?.message || error,
+          )
+        }
+      } finally {
+        aiFrameSendingRef.current = false
+      }
+    }
+
+    void video
+      .play()
+      .catch(() => {})
+
+    const intervalId =
+      window.setInterval(
+        () => {
+          void sendFrame()
+        },
+        ZUNY_AI_FRAME_INTERVAL_MS,
+      )
+
+    void sendFrame()
+
+    return () => {
+      disposed = true
+
+      window.clearInterval(
+        intervalId,
+      )
+
+      aiFrameSendingRef.current = false
+
+      video.pause()
+      video.srcObject = null
+
+      canvas.width = 0
+      canvas.height = 0
+    }
+  }, [
+    active,
+    cameraActive,
+    config.enabled,
+    config.requireCamera,
+    disabled,
+    pairAiBridge,
+  ])
 
   useEffect(() => {
     if (

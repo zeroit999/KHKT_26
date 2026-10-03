@@ -107,6 +107,120 @@ class ProctoringConfigTest(unittest.TestCase):
         self.assertNotIn("evidenceCameraPath", events[0]["metadata"])
         self.assertIn("evidenceScreenPath", events[0]["metadata"])
 
+    def test_accepts_ai_suspicious_event_as_info(self):
+        event = sanitize_proctoring_event({
+            "id": "ai-test-1",
+            "type": "ai_suspicious_event",
+            "severity": "info",
+            "message": "ZUNY AI phát hiện sự kiện cần xem xét",
+            "metadata": {
+                "aiEventType": "PHONE_DETECTED",
+                "aiConfidence": 0.91,
+                "aiStatus": "PENDING_REVIEW",
+            },
+        })
+
+        self.assertEqual(
+            event["type"],
+            "ai_suspicious_event",
+        )
+        self.assertEqual(
+            event["severity"],
+            "info",
+        )
+        self.assertEqual(
+            event["metadata"]["aiEventType"],
+            "PHONE_DETECTED",
+        )
+        self.assertEqual(
+            event["metadata"]["aiConfidence"],
+            0.91,
+        )
+        self.assertEqual(
+            event["metadata"]["aiStatus"],
+            "PENDING_REVIEW",
+        )
+
+
+    def test_restricts_ai_evidence_paths(self):
+        valid_prefix = (
+            "exam-proctoring/"
+            "exam/student/session/"
+        )
+
+        events = [{
+            "metadata": {
+                "evidenceAiPrePath":
+                    valid_prefix + "event-camera-snapshot_pre.jpg",
+                "evidenceAiEventPath":
+                    valid_prefix + "event-camera-snapshot_event.jpg",
+                "evidenceAiVideoPath":
+                    valid_prefix + "event-camera-video.mp4",
+            },
+        }]
+
+        restrict_evidence_paths(
+            events,
+            "exam",
+            "student",
+            "session",
+        )
+
+        metadata = events[0]["metadata"]
+
+        self.assertIn(
+            "evidenceAiPrePath",
+            metadata,
+        )
+        self.assertIn(
+            "evidenceAiEventPath",
+            metadata,
+        )
+        self.assertIn(
+            "evidenceAiVideoPath",
+            metadata,
+        )
+
+    def test_rejects_ai_evidence_from_another_student_path(self):
+        events = [{
+            "metadata": {
+                "evidenceAiPrePath": (
+                    "exam-proctoring/"
+                    "exam/other/session/pre.jpg"
+                ),
+                "evidenceAiEventPath": (
+                    "exam-proctoring/"
+                    "exam/student/session/event.jpg"
+                ),
+                "evidenceAiVideoPath": (
+                    "exam-proctoring/"
+                    "exam/other/session/video.mp4"
+                ),
+            },
+        }]
+
+        restrict_evidence_paths(
+            events,
+            "exam",
+            "student",
+            "session",
+        )
+
+        metadata = events[0]["metadata"]
+
+        self.assertNotIn(
+            "evidenceAiPrePath",
+            metadata,
+        )
+        self.assertIn(
+            "evidenceAiEventPath",
+            metadata,
+        )
+        self.assertNotIn(
+            "evidenceAiVideoPath",
+            metadata,
+        )
+
     def test_sanitize_report_counts_only_valid_violations(self):
         report = sanitize_proctoring_report({
             "sessionId": "session/unsafe",

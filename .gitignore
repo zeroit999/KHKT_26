@@ -157,3 +157,8 @@ dist/
 
 # Pre-change backup files
 *.pre-*
+.venv-ai/
+datasets/
+runs/
+weights/
+yolo11n.pt

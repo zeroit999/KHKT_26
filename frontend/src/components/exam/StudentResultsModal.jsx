@@ -5,6 +5,7 @@ import {
   ImageIcon,
   Mic,
   MonitorUp,
+  Play,
   ShieldAlert,
   X,
 } from 'lucide-react'
@@ -79,7 +80,7 @@ async function getEvidenceUrl(
 ) {
   if (!path) {
     throw new Error(
-      'Không có đường dẫn ảnh bằng chứng.',
+      'Không có đường dẫn bằng chứng.',
     )
   }
 
@@ -150,13 +151,13 @@ async function getEvidenceUrl(
     throw new Error(
       data.error ||
       data.message ||
-      'Không thể tải ảnh bằng chứng.',
+      'Không thể tải bằng chứng.',
     )
   }
 
   if (!data.url) {
     throw new Error(
-      'Backend không trả về URL ảnh bằng chứng.',
+      'Backend không trả về URL bằng chứng.',
     )
   }
 
@@ -169,29 +170,56 @@ function EvidenceThumbnail({
   label,
 }) {
   const [
-    url,
-    setUrl,
-  ] = useState('')
+    evidenceState,
+    setEvidenceState,
+  ] = useState({
+    path: null,
+    url: '',
+    loadFailed: false,
+  })
 
   const [
-    loadFailed,
-    setLoadFailed,
+    previewOpen,
+    setPreviewOpen,
   ] = useState(false)
 
   useEffect(() => {
-    let active = true
+    if (!previewOpen) {
+      return undefined
+    }
 
-    setUrl('')
-    setLoadFailed(false)
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setPreviewOpen(false)
+      }
+    }
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown,
+    )
+
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      )
+    }
+  }, [previewOpen])
+
+  useEffect(() => {
+    let active = true
 
     getEvidenceUrl(
       path,
     )
       .then((value) => {
         if (active) {
-          setUrl(
-            value,
-          )
+          setEvidenceState({
+            path,
+            url: value,
+            loadFailed: false,
+          })
         }
       })
       .catch((error) => {
@@ -201,9 +229,11 @@ function EvidenceThumbnail({
         )
 
         if (active) {
-          setLoadFailed(
-            true,
-          )
+          setEvidenceState({
+            path,
+            url: '',
+            loadFailed: true,
+          })
         }
       })
 
@@ -213,6 +243,17 @@ function EvidenceThumbnail({
   }, [
     path,
   ])
+
+  const stateMatchesPath =
+    evidenceState.path === path
+
+  const url = stateMatchesPath
+    ? evidenceState.url
+    : ''
+
+  const loadFailed = stateMatchesPath
+    ? evidenceState.loadFailed
+    : false
 
   if (loadFailed) {
     return (
@@ -269,46 +310,326 @@ function EvidenceThumbnail({
   }
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
+    <>
+      <button
+        type="button"
+        onClick={() => setPreviewOpen(true)}
+        className="
+          group
+          block
+          w-full
+          overflow-hidden
+          rounded-xl
+          border
+          border-red-200
+          bg-slate-950
+          text-left
+        "
+        aria-label={`Xem ${label}`}
+      >
+        <img
+          src={url}
+          alt={`Bằng chứng ${label}`}
+          className="
+            h-28
+            w-full
+            object-cover
+            transition
+            group-hover:scale-105
+          "
+        />
+
+        <span
+          className="
+            block
+            px-2
+            py-1
+            text-center
+            text-[11px]
+            font-black
+            text-white
+          "
+        >
+          {label}
+        </span>
+      </button>
+
+      {previewOpen && (
+        <div
+          className="
+            fixed
+            inset-0
+            z-[100]
+            flex
+            items-center
+            justify-center
+            bg-black/85
+            p-4
+            backdrop-blur-sm
+          "
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Xem ${label}`}
+          onClick={() => setPreviewOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(false)}
+            className="
+              absolute
+              right-4
+              top-4
+              z-10
+              flex
+              h-10
+              w-10
+              items-center
+              justify-center
+              rounded-full
+              bg-white/15
+              text-2xl
+              font-bold
+              text-white
+              transition
+              hover:bg-white/25
+            "
+            aria-label="Đóng ảnh"
+          >
+            ×
+          </button>
+
+          <div
+            className="
+              flex
+              max-h-[92vh]
+              max-w-[95vw]
+              flex-col
+              items-center
+              gap-3
+            "
+            onClick={(event) => event.stopPropagation()}
+          >
+            <img
+              src={url}
+              alt={`Bằng chứng ${label}`}
+              className="
+                max-h-[85vh]
+                max-w-[95vw]
+                rounded-xl
+                object-contain
+                shadow-2xl
+              "
+            />
+
+            <span
+              className="
+                rounded-full
+                bg-black/60
+                px-4
+                py-1.5
+                text-sm
+                font-bold
+                text-white
+              "
+            >
+              {label}
+            </span>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+
+
+function EvidenceVideo({
+  path,
+  label = 'Video bằng chứng AI',
+}) {
+  const [
+    evidenceState,
+    setEvidenceState,
+  ] = useState({
+    path: null,
+    url: '',
+    loadFailed: false,
+  })
+
+  useEffect(() => {
+    let active = true
+
+    getEvidenceUrl(
+      path,
+    )
+      .then((value) => {
+        if (active) {
+          setEvidenceState({
+            path,
+            url: value,
+            loadFailed: false,
+          })
+        }
+      })
+      .catch((error) => {
+        console.warn(
+          'Không thể tải video bằng chứng:',
+          error,
+        )
+
+        if (active) {
+          setEvidenceState({
+            path,
+            url: '',
+            loadFailed: true,
+          })
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [
+    path,
+  ])
+
+  const stateMatchesPath =
+    evidenceState.path === path
+
+  const url = stateMatchesPath
+    ? evidenceState.url
+    : ''
+
+  const loadFailed = stateMatchesPath
+    ? evidenceState.loadFailed
+    : false
+
+  if (loadFailed) {
+    return (
+      <div
+        className="
+          flex
+          min-h-28
+          items-center
+          justify-center
+          gap-2
+          rounded-xl
+          border
+          border-red-200
+          bg-red-50
+          px-3
+          py-4
+          text-xs
+          font-bold
+          text-red-600
+          dark:border-red-500/20
+          dark:bg-red-500/10
+          dark:text-red-300
+        "
+      >
+        <Play className="h-4 w-4" />
+
+        Không tải được {label}
+      </div>
+    )
+  }
+
+  if (!url) {
+    return (
+      <div
+        className="
+          flex
+          min-h-28
+          items-center
+          justify-center
+          gap-2
+          rounded-xl
+          border
+          border-slate-200
+          bg-slate-100
+          px-3
+          py-4
+          text-xs
+          font-bold
+          text-slate-500
+          dark:border-white/10
+          dark:bg-white/5
+          dark:text-slate-300
+        "
+      >
+        <Play className="h-4 w-4" />
+
+        Đang tải {label}
+      </div>
+    )
+  }
+
+  return (
+    <div
       className="
-        group
-        block
         overflow-hidden
         rounded-xl
         border
-        border-red-200
+        border-amber-200
         bg-slate-950
+        dark:border-amber-500/20
       "
     >
-      <img
+      <video
         src={url}
-        alt={`Bằng chứng ${label}`}
+        controls
+        preload="metadata"
+        playsInline
         className="
-          h-28
+          max-h-72
           w-full
-          object-cover
-          transition
-          group-hover:scale-105
+          bg-black
+          object-contain
         "
-      />
+      >
+        Trình duyệt không hỗ trợ phát video.
+      </video>
 
-      <span
+      <div
         className="
-          block
-          px-2
-          py-1
-          text-center
+          flex
+          items-center
+          justify-between
+          gap-2
+          px-3
+          py-2
           text-[11px]
           font-black
           text-white
         "
       >
-        {label}
-      </span>
-    </a>
+        <span
+          className="
+            inline-flex
+            items-center
+            gap-1.5
+          "
+        >
+          <Play className="h-3.5 w-3.5" />
+
+          {label}
+        </span>
+
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="
+            text-slate-300
+            underline
+            underline-offset-2
+            hover:text-white
+          "
+        >
+          Mở riêng
+        </a>
+      </div>
+    </div>
   )
 }
 
@@ -561,36 +882,252 @@ function ProctoringReport({
                       event.metadata
                         ?.evidenceCameraPath ||
                       event.metadata
-                        ?.evidenceScreenPath
+                        ?.evidenceScreenPath ||
+                      event.metadata
+                        ?.evidenceAiPrePath ||
+                      event.metadata
+                        ?.evidenceAiEventPath ||
+                      event.metadata
+                        ?.evidenceAiVideoPath
                     ) && (
-                      <div
-                        className="
-                          mt-3
-                          grid
-                          gap-2
-                          sm:grid-cols-2
-                        "
-                      >
-                        {event.metadata
-                          ?.evidenceCameraPath && (
-                          <EvidenceThumbnail
-                            path={
-                              event.metadata
-                                .evidenceCameraPath
-                            }
-                            label="Ảnh camera"
-                          />
+                      <div className="mt-3 space-y-3">
+                        {(
+                          event.metadata
+                            ?.evidenceCameraPath ||
+                          event.metadata
+                            ?.evidenceScreenPath
+                        ) && (
+                          <div
+                            className="
+                              grid
+                              gap-2
+                              sm:grid-cols-2
+                            "
+                          >
+                            {event.metadata
+                              ?.evidenceCameraPath && (
+                              <EvidenceThumbnail
+                                path={
+                                  event.metadata
+                                    .evidenceCameraPath
+                                }
+                                label="Ảnh camera"
+                              />
+                            )}
+
+                            {event.metadata
+                              ?.evidenceScreenPath && (
+                              <EvidenceThumbnail
+                                path={
+                                  event.metadata
+                                    .evidenceScreenPath
+                                }
+                                label="Ảnh màn hình"
+                              />
+                            )}
+                          </div>
                         )}
 
-                        {event.metadata
-                          ?.evidenceScreenPath && (
-                          <EvidenceThumbnail
-                            path={
+                        {(
+                          event.metadata
+                            ?.evidenceAiPrePath ||
+                          event.metadata
+                            ?.evidenceAiEventPath ||
+                          event.metadata
+                            ?.evidenceAiVideoPath
+                        ) && (
+                          <div
+                            className="
+                              rounded-xl
+                              border
+                              border-amber-200
+                              bg-amber-50/70
+                              p-3
+                              dark:border-amber-500/20
+                              dark:bg-amber-500/5
+                            "
+                          >
+                            <div
+                              className="
+                                mb-3
+                                flex
+                                flex-wrap
+                                items-start
+                                justify-between
+                                gap-2
+                              "
+                            >
+                              <div>
+                                <p
+                                  className="
+                                    text-xs
+                                    font-black
+                                    text-amber-800
+                                    dark:text-amber-200
+                                  "
+                                >
+                                  Bằng chứng ZUNY AI
+                                </p>
+
+                                <p
+                                  className="
+                                    mt-1
+                                    text-[11px]
+                                    font-semibold
+                                    text-slate-600
+                                    dark:text-slate-300
+                                  "
+                                >
+                                  AI chỉ cung cấp tín hiệu hỗ trợ
+                                  giáo viên xem xét, không tự kết
+                                  luận học sinh gian lận.
+                                </p>
+                              </div>
+
+                              <span
+                                className="
+                                  rounded-full
+                                  bg-amber-100
+                                  px-2.5
+                                  py-1
+                                  text-[10px]
+                                  font-black
+                                  text-amber-800
+                                  dark:bg-amber-500/15
+                                  dark:text-amber-200
+                                "
+                              >
+                                {event.metadata
+                                  ?.aiStatus ===
+                                'PENDING_REVIEW'
+                                  ? 'Chờ giáo viên xem xét'
+                                  : (
+                                    event.metadata
+                                      ?.aiStatus ||
+                                    'Chờ giáo viên xem xét'
+                                  )}
+                              </span>
+                            </div>
+
+                            {(
                               event.metadata
-                                .evidenceScreenPath
-                            }
-                            label="Ảnh màn hình"
-                          />
+                                ?.aiEventType ||
+                              event.metadata
+                                ?.aiConfidence != null
+                            ) && (
+                              <div
+                                className="
+                                  mb-3
+                                  flex
+                                  flex-wrap
+                                  gap-2
+                                  text-[11px]
+                                  font-bold
+                                "
+                              >
+                                {event.metadata
+                                  ?.aiEventType && (
+                                  <span
+                                    className="
+                                      rounded-lg
+                                      bg-white
+                                      px-2
+                                      py-1
+                                      text-slate-700
+                                      dark:bg-slate-950/50
+                                      dark:text-slate-200
+                                    "
+                                  >
+                                    Tín hiệu: {
+                                      event.metadata
+                                        .aiEventType
+                                    }
+                                  </span>
+                                )}
+
+                                {event.metadata
+                                  ?.aiConfidence != null && (
+                                  <span
+                                    className="
+                                      rounded-lg
+                                      bg-white
+                                      px-2
+                                      py-1
+                                      text-slate-700
+                                      dark:bg-slate-950/50
+                                      dark:text-slate-200
+                                    "
+                                  >
+                                    Độ tin cậy AI: {
+                                      Number.isFinite(
+                                        Number(
+                                          event.metadata
+                                            .aiConfidence,
+                                        ),
+                                      )
+                                        ? `${(
+                                          Number(
+                                            event.metadata
+                                              .aiConfidence,
+                                          ) * 100
+                                        ).toFixed(1)}%`
+                                        : event.metadata
+                                          .aiConfidence
+                                    }
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {(
+                              event.metadata
+                                ?.evidenceAiPrePath ||
+                              event.metadata
+                                ?.evidenceAiEventPath
+                            ) && (
+                              <div
+                                className="
+                                  grid
+                                  gap-2
+                                  sm:grid-cols-2
+                                "
+                              >
+                                {event.metadata
+                                  ?.evidenceAiPrePath && (
+                                  <EvidenceThumbnail
+                                    path={
+                                      event.metadata
+                                        .evidenceAiPrePath
+                                    }
+                                    label="Trước sự kiện"
+                                  />
+                                )}
+
+                                {event.metadata
+                                  ?.evidenceAiEventPath && (
+                                  <EvidenceThumbnail
+                                    path={
+                                      event.metadata
+                                        .evidenceAiEventPath
+                                    }
+                                    label="Lúc AI phát hiện"
+                                  />
+                                )}
+                              </div>
+                            )}
+
+                            {event.metadata
+                              ?.evidenceAiVideoPath && (
+                              <div className="mt-2">
+                                <EvidenceVideo
+                                  path={
+                                    event.metadata
+                                      .evidenceAiVideoPath
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -675,23 +1212,10 @@ function StudentResultsModal({
   ] = useState(false)
 
   useEffect(() => {
-    if (!open) {
-      setOpenResultId(
-        null,
-      )
-
-      setResults(
-        [],
-      )
-
-      setFullExam(
-        null,
-      )
-
-      return
-    }
-
-    if (!exam?.id) {
+    if (
+      !open ||
+      !exam?.id
+    ) {
       return
     }
 

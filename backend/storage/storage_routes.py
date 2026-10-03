@@ -5,7 +5,13 @@ from flask import Blueprint, jsonify, request
 
 from auth import auth_required
 from extensions import db
-from models import Classroom, ClassroomMember, User
+from models import (
+    Classroom,
+    ClassroomMember,
+    Exam,
+    ProctoringSession,
+    User,
+)
 from auth.rate_limiter import rate_limit
 from storage import (
     R2StorageError,
@@ -389,14 +395,32 @@ ALLOWED_PROCTORING_IMAGE_MIME_TYPES = {
 }
 
 
+ALLOWED_PROCTORING_VIDEO_MIME_TYPES = {
+    "video/mp4",
+}
+
+
 MAX_PROCTORING_IMAGE_SIZE = (
     5 * 1024 * 1024
+)
+
+
+MAX_PROCTORING_VIDEO_SIZE = (
+    10 * 1024 * 1024
 )
 
 
 ALLOWED_PROCTORING_SOURCES = {
     "camera",
     "screen",
+}
+
+
+ALLOWED_PROCTORING_EVIDENCE_TYPES = {
+    "snapshot",
+    "snapshot_pre",
+    "snapshot_event",
+    "video",
 }
 
 
@@ -433,6 +457,154 @@ def normalize_storage_identifier(
         return ""
 
     return value
+
+
+
+@storage_bp.get(
+    "/proctoring/evidence-url"
+)
+@auth_required
+@rate_limit(
+    limit=240,
+    window=3600,
+    per_user=True,
+)
+def get_proctoring_evidence_url():
+    try:
+        user = get_current_user()
+
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "User not found",
+            }), 404
+
+        raw_path = str(
+            request.args.get("path")
+            or ""
+        ).strip()
+
+        if (
+            not raw_path
+            or len(raw_path) > 500
+            or "\\" in raw_path
+            or raw_path.startswith("/")
+        ):
+            return jsonify({
+                "success": False,
+                "error":
+                    "Đường dẫn bằng chứng không hợp lệ.",
+            }), 400
+
+        parts = raw_path.split("/")
+
+        if (
+            len(parts) != 5
+            or parts[0] != "exam-proctoring"
+            or not parts[1].isdigit()
+            or not parts[2].isdigit()
+            or not parts[3]
+            or not parts[4]
+            or parts[3] in {".", ".."}
+            or parts[4] in {".", ".."}
+        ):
+            return jsonify({
+                "success": False,
+                "error":
+                    "Đường dẫn bằng chứng không hợp lệ.",
+            }), 400
+
+        exam_id = int(parts[1])
+        student_id = int(parts[2])
+        session_key = parts[3]
+
+        exam = db.session.get(
+            Exam,
+            exam_id,
+        )
+
+        if not exam:
+            return jsonify({
+                "success": False,
+                "error": "Không tìm thấy bài thi.",
+            }), 404
+
+        role = str(
+            user.role
+            or ""
+        ).strip().upper()
+
+        if role == "ADMIN_DEV":
+            pass
+
+        elif (
+            role == "TEACHER"
+            and str(exam.teacher_id)
+            == str(user.id)
+        ):
+            pass
+
+        else:
+            return jsonify({
+                "success": False,
+                "error":
+                    "Bạn không có quyền xem bằng chứng này.",
+            }), 403
+
+        session = db.session.scalar(
+            db.select(
+                ProctoringSession
+            ).where(
+                ProctoringSession.exam_id
+                == exam_id,
+                ProctoringSession.student_id
+                == student_id,
+                ProctoringSession.session_key
+                == session_key,
+            )
+        )
+
+        if not session:
+            return jsonify({
+                "success": False,
+                "error":
+                    "Không tìm thấy phiên giám sát phù hợp.",
+            }), 404
+
+        url = generate_presigned_get_url(
+            raw_path,
+            expires_in=900,
+        )
+
+        return jsonify({
+            "success": True,
+            "url": url,
+            "expiresIn": 900,
+        }), 200
+
+    except R2StorageError as error:
+        print(
+            "R2 proctoring evidence URL error:",
+            error,
+        )
+
+        return jsonify({
+            "success": False,
+            "error":
+                "Không thể tạo URL bằng chứng.",
+        }), 502
+
+    except Exception as error:
+        print(
+            "Proctoring evidence URL error:",
+            error,
+        )
+
+        return jsonify({
+            "success": False,
+            "error":
+                "Không thể tạo URL bằng chứng.",
+        }), 500
 
 
 @storage_bp.post(
@@ -499,6 +671,13 @@ def upload_proctoring_evidence():
             or ""
         ).strip().lower()
 
+        evidence_type = str(
+            request.form.get(
+                "evidenceType"
+            )
+            or "snapshot"
+        ).strip().lower()
+
         if not exam_id:
             return jsonify({
                 "success": False,
@@ -533,6 +712,18 @@ def upload_proctoring_evidence():
                 ),
             }), 400
 
+        if (
+            evidence_type
+            not in
+            ALLOWED_PROCTORING_EVIDENCE_TYPES
+        ):
+            return jsonify({
+                "success": False,
+                "error": (
+                    "evidenceType không hợp lệ."
+                ),
+            }), 400
+
         filename = (
             uploaded_file.filename
             or ""
@@ -552,17 +743,29 @@ def upload_proctoring_evidence():
             or ""
         ).lower()
 
+        is_video = (
+            evidence_type == "video"
+        )
+
+        allowed_mime_types = (
+            ALLOWED_PROCTORING_VIDEO_MIME_TYPES
+            if is_video
+            else ALLOWED_PROCTORING_IMAGE_MIME_TYPES
+        )
+
         if (
             content_type
-            not in
-            ALLOWED_PROCTORING_IMAGE_MIME_TYPES
+            not in allowed_mime_types
         ):
             return jsonify({
                 "success": False,
                 "error": (
-                    "Ảnh bằng chứng chỉ "
-                    "hỗ trợ WEBP, JPEG "
-                    "hoặc PNG."
+                    "Video bằng chứng chỉ hỗ trợ MP4."
+                    if is_video
+                    else (
+                        "Ảnh bằng chứng chỉ hỗ trợ "
+                        "WEBP, JPEG hoặc PNG."
+                    )
                 ),
             }), 400
 
@@ -572,36 +775,39 @@ def upload_proctoring_evidence():
             )
         )
 
+        max_file_size = (
+            MAX_PROCTORING_VIDEO_SIZE
+            if is_video
+            else MAX_PROCTORING_IMAGE_SIZE
+        )
+
         if (
             file_size <= 0
-            or file_size
-            > MAX_PROCTORING_IMAGE_SIZE
+            or file_size > max_file_size
         ):
             return jsonify({
                 "success": False,
                 "error": (
-                    "Ảnh bằng chứng phải "
-                    "nhỏ hơn hoặc bằng 5MB."
+                    "Video bằng chứng phải nhỏ hơn "
+                    "hoặc bằng 10MB."
+                    if is_video
+                    else (
+                        "Ảnh bằng chứng phải nhỏ hơn "
+                        "hoặc bằng 5MB."
+                    )
                 ),
             }), 400
 
         extension_map = {
-            "image/webp":
-                "webp",
-
-            "image/jpeg":
-                "jpg",
-
-            "image/png":
-                "png",
+            "image/webp": "webp",
+            "image/jpeg": "jpg",
+            "image/png": "png",
+            "video/mp4": "mp4",
         }
 
-        extension = (
-            extension_map.get(
-                content_type,
-                "webp",
-            )
-        )
+        extension = extension_map[
+            content_type
+        ]
 
         object_key = (
             f"exam-proctoring/"
@@ -609,7 +815,8 @@ def upload_proctoring_evidence():
             f"{user.id}/"
             f"{session_id}/"
             f"{event_id}-"
-            f"{source}."
+            f"{source}-"
+            f"{evidence_type}."
             f"{extension}"
         )
 
@@ -634,6 +841,9 @@ def upload_proctoring_evidence():
 
                     "source":
                         source,
+
+                    "evidence_type":
+                        evidence_type,
 
                     "purpose":
                         (
@@ -670,6 +880,9 @@ def upload_proctoring_evidence():
 
             "source":
                 source,
+
+            "evidenceType":
+                evidence_type,
 
             "examId":
                 exam_id,

@@ -5,24 +5,22 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
-  CheckCircle2,
   FileText,
   FlaskConical,
   GraduationCap,
   Languages,
   Map,
+  Monitor,
   Microscope,
   PenLine,
   Play,
   Sigma,
-  Sparkles,
   Trophy,
   UsersRound,
   Zap,
 } from 'lucide-react'
 
 import { getPublicExamsApi } from '../api/examApi'
-import { useAuth } from '../contexts/AuthContext'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -30,6 +28,24 @@ const fadeUp = {
 }
 
 const SUBJECTS = [
+  {
+    key: 'sinh-hoc',
+    name: 'Sinh học',
+    aliases: ['sinh học', 'sinh hoc', 'sinh', 'biology'],
+    icon: Microscope,
+    iconClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+    badgeClass: 'bg-emerald-500/10 text-emerald-400',
+    progressClass: 'bg-emerald-400',
+  },
+  {
+    key: 'tin-hoc',
+    name: 'Tin học',
+    aliases: ['tin học', 'tin hoc', 'tin', 'informatics', 'computer science'],
+    icon: Monitor,
+    iconClass: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400',
+    badgeClass: 'bg-cyan-500/10 text-cyan-400',
+    progressClass: 'bg-cyan-400',
+  },
   {
     key: 'toan',
     name: 'Toán học',
@@ -74,15 +90,6 @@ const SUBJECTS = [
     iconClass: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
     badgeClass: 'bg-rose-500/10 text-rose-400',
     progressClass: 'bg-rose-400',
-  },
-  {
-    key: 'sinh-hoc',
-    name: 'Sinh học',
-    aliases: ['sinh học', 'sinh hoc', 'sinh', 'biology'],
-    icon: Microscope,
-    iconClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
-    badgeClass: 'bg-emerald-500/10 text-emerald-400',
-    progressClass: 'bg-emerald-400',
   },
   {
     key: 'lich-su',
@@ -211,8 +218,6 @@ function StatSkeleton() {
 }
 
 function Home() {
-  const { user } = useAuth()
-
   const [exams, setExams] = useState([])
   const [loadingStats, setLoadingStats] = useState(true)
   const [statsError, setStatsError] = useState('')
@@ -240,8 +245,8 @@ function Home() {
           setExams([])
           setStatsError(
             error?.response?.data?.message ||
-              error?.message ||
-              'Không thể tải dữ liệu thống kê.',
+            error?.message ||
+            'Không thể tải dữ liệu thống kê.',
           )
         }
       } finally {
@@ -250,9 +255,13 @@ function Home() {
     }
 
     loadHomeStatistics()
+    const refreshInterval = window.setInterval(loadHomeStatistics, 30000)
+    window.addEventListener('focus', loadHomeStatistics)
 
     return () => {
       active = false
+      window.clearInterval(refreshInterval)
+      window.removeEventListener('focus', loadHomeStatistics)
     }
   }, [])
 
@@ -267,7 +276,27 @@ function Home() {
       0,
     )
 
-    const subjectStats = SUBJECTS.map((subject) => {
+    const dynamicSubjects = [...new Set(
+      exams
+        .map((exam) => String(exam?.subject || '').trim())
+        .filter(Boolean),
+    )]
+      .filter(
+        (name) => !SUBJECTS.some((subject) =>
+          subject.aliases.some((alias) => normalizeText(alias) === normalizeText(name)),
+        ),
+      )
+      .map((name) => ({
+        key: normalizeText(name).replace(/\s+/g, '-'),
+        name,
+        aliases: [name],
+        icon: FileText,
+        iconClass: 'border-slate-400/30 bg-slate-400/10 text-slate-500',
+        badgeClass: 'bg-slate-400/10 text-slate-500',
+        progressClass: 'bg-slate-400',
+      }))
+
+    const subjectStats = [...SUBJECTS, ...dynamicSubjects].map((subject) => {
       const matchingExams = exams.filter((exam) => {
         const examSubject = normalizeText(exam?.subject)
         return subject.aliases.some((alias) => normalizeText(alias) === examSubject)
@@ -283,15 +312,20 @@ function Home() {
       }
     })
 
+    const availableSubjectStats = subjectStats.filter(
+      (subject) =>
+        ['sinh-hoc', 'tin-hoc'].includes(subject.key) ||
+        (subject.exams > 0 && subject.questions > 0),
+    )
     const subjectsWithExams = subjectStats.filter((subject) => subject.exams > 0).length
-    const maxExamCount = Math.max(1, ...subjectStats.map((subject) => subject.exams))
+    const maxExamCount = Math.max(1, ...availableSubjectStats.map((subject) => subject.exams))
 
     return {
       totalExams,
       totalQuestions,
       totalAttempts,
       subjectsWithExams,
-      subjectStats: subjectStats.map((subject) => ({
+      subjectStats: availableSubjectStats.map((subject) => ({
         ...subject,
         progress: `${Math.max(5, Math.round((subject.exams / maxExamCount) * 100))}%`,
       })),
@@ -320,6 +354,10 @@ function Home() {
       label: 'Lượt làm bài đã ghi nhận',
     },
   ]
+
+  const featuredSubjects = homeData.subjectStats.filter((subject) =>
+    ['sinh-hoc', 'tin-hoc'].includes(subject.key),
+  )
 
   return (
     <main className="min-h-dvh overflow-x-hidden bg-slate-50 text-slate-950 transition-colors dark:bg-[#050b19] dark:text-white">
@@ -392,38 +430,68 @@ function Home() {
             variants={fadeUp}
             initial="hidden"
             animate="visible"
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mt-8 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-2"
+          >
+            {featuredSubjects.map((subject) => {
+              const Icon = subject.icon
+
+              return (
+                <Link
+                  key={subject.key}
+                  to={`/exams?subject=${encodeURIComponent(subject.name)}`}
+                  className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-[0_14px_35px_rgba(16,185,129,0.12)] dark:border-blue-900/60 dark:bg-[#08112a]/90 dark:hover:border-cyan-500/70"
+                >
+                  <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${subject.iconClass}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 text-sm font-bold text-slate-950 dark:text-white">
+                      {subject.name}
+                      <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-cyan-400" />
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                      {formatNumber(subject.exams)} đề · {formatNumber(subject.questions)} câu hỏi
+                    </span>
+                  </span>
+                </Link>
+              )
+            })}
+          </motion.div>
+
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
             transition={{ duration: 0.5, delay: 0.32 }}
             className="mt-16 grid w-full max-w-6xl grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white/85 shadow-sm md:grid-cols-4 dark:border-blue-900/60 dark:bg-[#08112a]/85 dark:shadow-none"
           >
             {loadingStats
               ? Array.from({ length: 4 }).map((_, index) => (
-                  <StatSkeleton key={index} />
-                ))
+                <StatSkeleton key={index} />
+              ))
               : stats.map((item, index) => {
-                  const Icon = item.icon
-                  return (
-                    <div
-                      key={item.label}
-                      className={`flex min-h-36 flex-col items-center justify-center px-3 py-6 ${
-                        index % 2 === 0 ? 'border-r border-slate-200 dark:border-blue-900/50' : ''
-                      } ${
-                        index < 2 ? 'border-b border-slate-200 md:border-b-0 dark:border-blue-900/50' : ''
-                      } ${
-                        index !== stats.length - 1
-                          ? 'md:border-r md:border-slate-200 dark:md:border-blue-900/50'
-                          : ''
+                const Icon = item.icon
+                return (
+                  <div
+                    key={item.label}
+                    className={`flex min-h-36 flex-col items-center justify-center px-3 py-6 ${index % 2 === 0 ? 'border-r border-slate-200 dark:border-blue-900/50' : ''
+                      } ${index < 2 ? 'border-b border-slate-200 md:border-b-0 dark:border-blue-900/50' : ''
+                      } ${index !== stats.length - 1
+                        ? 'md:border-r md:border-slate-200 dark:md:border-blue-900/50'
+                        : ''
                       }`}
-                    >
-                      <Icon className="h-6 w-6 text-blue-400" />
-                      <p className="mt-3 text-2xl font-black text-blue-400 sm:text-3xl">
-                        {item.value}
-                      </p>
-                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-500 sm:text-sm">
-                        {item.label}
-                      </p>
-                    </div>
-                  )
-                })}
+                  >
+                    <Icon className="h-6 w-6 text-blue-400" />
+                    <p className="mt-3 text-2xl font-black text-blue-400 sm:text-3xl">
+                      {item.value}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-500 sm:text-sm">
+                      {item.label}
+                    </p>
+                  </div>
+                )
+              })}
           </motion.div>
 
           {statsError && (
@@ -451,12 +519,13 @@ function Home() {
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {homeData.subjectStats.map((subject) => {
               const Icon = subject.icon
+              const isFeatured = ['sinh-hoc', 'tin-hoc'].includes(subject.key)
 
               return (
                 <Link
                   key={subject.key}
                   to={`/exams?subject=${encodeURIComponent(subject.name)}`}
-                  className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-400 hover:shadow-[0_18px_45px_rgba(37,99,235,0.10)] dark:border-blue-900/50 dark:bg-[#08112a] dark:shadow-none dark:hover:border-blue-600/60"
+                  className={`group rounded-2xl border bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(37,99,235,0.10)] dark:bg-[#08112a] dark:shadow-none ${isFeatured ? 'border-emerald-300 ring-1 ring-emerald-200/70 dark:border-cyan-700/70 dark:ring-cyan-500/20' : 'border-slate-200 dark:border-blue-900/50'} dark:hover:border-blue-600/60`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div
@@ -494,7 +563,7 @@ function Home() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             centered
-            eyebrow="Dữ liệu thật"
+            eyebrow="Sinh học · Tin học · dữ liệu thật"
             title="Thống kê trực tiếp từ hệ thống ZUNY"
             description="Không sử dụng số liệu minh họa. Các con số được tính từ danh sách đề thi mà API trả về."
           />
@@ -522,34 +591,6 @@ function Home() {
         </div>
       </section>
 
-      <section className="px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-        <div className="mx-auto max-w-6xl rounded-3xl border border-blue-200 bg-gradient-to-r from-blue-100 to-violet-100 px-5 py-14 text-center shadow-sm dark:border-blue-700/50 dark:from-blue-950 dark:to-indigo-950 dark:shadow-none sm:px-10 sm:py-20">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-blue-400" />
-          <h2 className="mt-6 text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">
-            Sẵn sàng bắt đầu luyện thi?
-          </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-400 sm:text-lg">
-            Chọn một đề đang được công khai trên ZUNY và bắt đầu làm bài ngay.
-          </p>
-
-          <div className="mx-auto mt-8 flex max-w-xl flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              to="/exams"
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-6 text-sm font-bold text-white transition hover:-translate-y-0.5 sm:w-auto"
-            >
-              Xem kho đề thi
-            </Link>
-            {!user && (
-              <Link
-                to="/register"
-                className="inline-flex min-h-14 w-full items-center justify-center rounded-xl border border-blue-300 bg-white/70 px-6 text-sm font-medium text-slate-700 transition hover:bg-white hover:text-blue-700 dark:border-blue-700/50 dark:bg-transparent dark:text-slate-300 dark:hover:bg-blue-500/10 dark:hover:text-white sm:w-auto"
-              >
-                Tạo tài khoản
-              </Link>
-            )}
-          </div>
-        </div>
-      </section>
     </main>
   )
 }
