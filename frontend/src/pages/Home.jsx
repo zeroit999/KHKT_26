@@ -11,7 +11,6 @@ import {
   Languages,
   Map,
   Monitor,
-  Microscope,
   PenLine,
   Play,
   Sigma,
@@ -28,15 +27,6 @@ const fadeUp = {
 }
 
 const SUBJECTS = [
-  {
-    key: 'sinh-hoc',
-    name: 'Sinh học',
-    aliases: ['sinh học', 'sinh hoc', 'sinh', 'biology'],
-    icon: Microscope,
-    iconClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
-    badgeClass: 'bg-emerald-500/10 text-emerald-400',
-    progressClass: 'bg-emerald-400',
-  },
   {
     key: 'tin-hoc',
     name: 'Tin học',
@@ -314,7 +304,7 @@ function Home() {
 
     const availableSubjectStats = subjectStats.filter(
       (subject) =>
-        ['sinh-hoc', 'tin-hoc'].includes(subject.key) ||
+        subject.key === 'tin-hoc' ||
         (subject.exams > 0 && subject.questions > 0),
     )
     const subjectsWithExams = subjectStats.filter((subject) => subject.exams > 0).length
@@ -356,8 +346,8 @@ function Home() {
   ]
 
   const featuredSubjects = homeData.subjectStats.filter((subject) =>
-    ['sinh-hoc', 'tin-hoc'].includes(subject.key),
-  )
+    subject.key === 'tin-hoc',
+  ).sort((firstSubject) => (firstSubject.key === 'tin-hoc' ? -1 : 1))
 
   return (
     <main className="min-h-dvh overflow-x-hidden bg-slate-50 text-slate-950 transition-colors dark:bg-[#050b19] dark:text-white">
@@ -375,7 +365,7 @@ function Home() {
             className="inline-flex max-w-full items-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-400 sm:text-sm"
           >
             <span className="h-2 w-2 rounded-full bg-blue-400" />
-            <span className="truncate">Kho đề thi đang được cập nhật trực tiếp từ ZUNY</span>
+            <span className="truncate">Trọng tâm Tin học · kho đề cập nhật trực tiếp từ ZUNY</span>
           </motion.div>
 
           <motion.h1
@@ -399,7 +389,7 @@ function Home() {
             transition={{ duration: 0.5, delay: 0.16 }}
             className="mt-7 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400 sm:text-lg sm:leading-8"
           >
-            Luyện thi theo cấu trúc CBT, làm đề trực tuyến và theo dõi kết quả trên cùng một nền tảng.
+            Tập trung luyện Tin học theo cấu trúc CBT, đồng thời theo dõi kết quả các môn trên cùng một nền tảng.
           </motion.p>
 
           <motion.div
@@ -410,11 +400,11 @@ function Home() {
             className="mt-9 flex w-full max-w-xl flex-col justify-center gap-3 sm:flex-row"
           >
             <Link
-              to="/exams"
-              className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-6 py-3 text-sm font-bold text-white shadow-[0_15px_40px_rgba(59,130,246,0.25)] transition hover:-translate-y-0.5 sm:w-auto"
+              to="/exams?subject=Tin%20h%E1%BB%8Dc"
+              className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-bold text-white shadow-[0_15px_40px_rgba(6,182,212,0.25)] transition hover:-translate-y-0.5 sm:w-auto"
             >
               <Play className="h-4 w-4" />
-              Bắt đầu luyện thi
+              Luyện Tin học
             </Link>
 
             <Link
@@ -505,7 +495,7 @@ function Home() {
       <section className="border-b border-slate-200 py-20 dark:border-blue-950/70 sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between gap-5">
-            <SectionTitle eyebrow="Môn học" title="Kho đề theo từng môn" />
+            <SectionTitle eyebrow="Tin học là trọng tâm" title="Kho đề theo từng môn" />
 
             <Link
               to="/exams"
@@ -519,7 +509,7 @@ function Home() {
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {homeData.subjectStats.map((subject) => {
               const Icon = subject.icon
-              const isFeatured = ['sinh-hoc', 'tin-hoc'].includes(subject.key)
+              const isFeatured = subject.key === 'tin-hoc'
 
               return (
                 <Link
@@ -563,7 +553,7 @@ function Home() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             centered
-            eyebrow="Sinh học · Tin học · dữ liệu thật"
+            eyebrow="Tin học · dữ liệu thật"
             title="Thống kê trực tiếp từ hệ thống ZUNY"
             description="Không sử dụng số liệu minh họa. Các con số được tính từ danh sách đề thi mà API trả về."
           />
