@@ -389,7 +389,7 @@ function Home() {
             transition={{ duration: 0.5, delay: 0.16 }}
             className="mt-7 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400 sm:text-lg sm:leading-8"
           >
-            Tập trung luyện Tin học theo cấu trúc CBT, đồng thời theo dõi kết quả các môn trên cùng một nền tảng.
+            Học đúng trọng tâm, luyện tập hiệu quả và từng bước chinh phục mục tiêu THPT Quốc gia.
           </motion.p>
 
           <motion.div
@@ -404,7 +404,7 @@ function Home() {
               className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-bold text-white shadow-[0_15px_40px_rgba(6,182,212,0.25)] transition hover:-translate-y-0.5 sm:w-auto"
             >
               <Play className="h-4 w-4" />
-              Luyện Tin học
+              Bắt đầu luyện thi
             </Link>
 
             <Link
@@ -421,7 +421,7 @@ function Home() {
             initial="hidden"
             animate="visible"
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-8 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-2"
+            className="mt-8 flex w-full max-w-2xl justify-center text-left"
           >
             {featuredSubjects.map((subject) => {
               const Icon = subject.icon
@@ -430,7 +430,7 @@ function Home() {
                 <Link
                   key={subject.key}
                   to={`/exams?subject=${encodeURIComponent(subject.name)}`}
-                  className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-[0_14px_35px_rgba(16,185,129,0.12)] dark:border-blue-900/60 dark:bg-[#08112a]/90 dark:hover:border-cyan-500/70"
+                  className="group flex w-full max-w-sm items-center gap-4 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-[0_14px_35px_rgba(16,185,129,0.12)] dark:border-blue-900/60 dark:bg-[#08112a]/90 dark:hover:border-cyan-500/70"
                 >
                   <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${subject.iconClass}`}>
                     <Icon className="h-5 w-5" />
