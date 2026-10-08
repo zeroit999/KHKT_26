@@ -22,6 +22,8 @@ from storage import (
 )
 
 
+from storage.integrity import calculate_file_sha256
+
 storage_bp = Blueprint(
     "storage",
     __name__,
@@ -820,6 +822,8 @@ def upload_proctoring_evidence():
             f"{extension}"
         )
 
+        evidence_sha256 = calculate_file_sha256(uploaded_file)
+
         upload_result = (
             upload_file_object(
                 uploaded_file,
@@ -827,6 +831,8 @@ def upload_proctoring_evidence():
                 content_type=
                     content_type,
                 metadata={
+                    "sha256": evidence_sha256,
+
                     "user_id":
                         user.id,
 
@@ -862,6 +868,8 @@ def upload_proctoring_evidence():
                 "Đã lưu ảnh "
                 "bằng chứng."
             ),
+
+            "sha256": evidence_sha256,
 
             "key":
                 object_key,

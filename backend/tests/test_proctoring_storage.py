@@ -1,3 +1,4 @@
+import hashlib
 import io
 import unittest
 from unittest.mock import patch
@@ -114,6 +115,74 @@ class ProctoringStorageTest(unittest.TestCase):
             )
 
         return response, upload_mock
+
+
+    def test_snapshot_sha256_integrity(self):
+        content = b"ZUNY snapshot integrity test"
+
+        response, upload_mock = self.run_with_mocks(
+            content=content,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        upload_mock.assert_called_once()
+
+        expected = hashlib.sha256(content).hexdigest()
+        payload = response.get_json()
+        args, kwargs = upload_mock.call_args
+
+        self.assertEqual(payload["sha256"], expected)
+        self.assertEqual(kwargs["metadata"]["sha256"], expected)
+
+    def test_video_sha256_integrity(self):
+        content = b"ZUNY video integrity test" * 1024
+
+        response, upload_mock = self.run_with_mocks(
+            content=content,
+            filename="evidence.mp4",
+            content_type="video/mp4",
+            evidence_type="video",
+            upload_content_type="video/mp4",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        upload_mock.assert_called_once()
+
+        expected = hashlib.sha256(content).hexdigest()
+        payload = response.get_json()
+        args, kwargs = upload_mock.call_args
+
+        self.assertEqual(payload["sha256"], expected)
+        self.assertEqual(kwargs["metadata"]["sha256"], expected)
+
+
+    def test_sha256_preserves_upload_bytes(self):
+        content = b"ZUNY R2 byte integrity" * 4096
+        captured = {}
+
+        def fake_upload(file_storage, object_key, **kwargs):
+            captured["position"] = file_storage.stream.tell()
+            captured["data"] = file_storage.stream.read()
+            captured["metadata"] = kwargs["metadata"]
+            captured["key"] = object_key
+
+            return {"contentType": "image/jpeg"}
+
+        with patch(
+            "storage.storage_routes.upload_file_object",
+            side_effect=fake_upload,
+        ) as upload_mock:
+            response = self.post_evidence(content=content)
+
+        self.assertEqual(response.status_code, 200)
+        upload_mock.assert_called_once()
+
+        expected = hashlib.sha256(content).hexdigest()
+
+        self.assertEqual(captured["position"], 0)
+        self.assertEqual(captured["data"], content)
+        self.assertEqual(captured["metadata"]["sha256"], expected)
+        self.assertEqual(response.get_json()["sha256"], expected)
 
     def test_legacy_image_defaults_to_snapshot(self):
         response, upload_mock = self.run_with_mocks()
